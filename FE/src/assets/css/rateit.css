@@ -1,0 +1,62 @@
+/*===================================================================================*/
+/*  Rating CSS FIX for React */
+/*===================================================================================*/
+
+.rateit {
+    display: inline-block;
+    position: relative;
+    user-select: none;
+}
+
+.rateit .rateit-range {
+    position: relative;
+    display: inline-block;
+    background: #ddd;
+    height: 14px;
+    outline: none;
+}
+
+.rateit-small .rateit-range {
+    position: relative;
+    display: inline-block;
+    background: #ddd;
+    height: 14px;
+    outline: none;
+}
+
+.rateit .rateit-range * {
+    display: block;
+}
+
+.rateit .rateit-hover,
+.rateit .rateit-selected {
+    position: absolute;
+    left: 0px;
+    background: gold;
+    height: 14px;
+}
+
+.rateit .rateit-hover-rtl,
+.rateit .rateit-selected-rtl {
+    left: auto;
+    right: 0px;
+}
+
+.rateit .rateit-preset {
+    background: orange;
+}
+
+.rateit button.rateit-reset {
+    background: #ccc;
+    width: 14px;
+    height: 14px;
+    display: inline-block;
+    float: left;
+    border: none;
+    padding: 0;
+}
+
+.rateit button.rateit-reset:hover,
+.rateit button.rateit-reset:focus {
+    background: #999;
+}
