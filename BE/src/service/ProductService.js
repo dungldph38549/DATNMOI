@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Product = require("../model/ProductModel");
 
 const createProduct = async (newProduct) => {
@@ -81,11 +82,143 @@ const createProduct = async (newProduct) => {
       data: createdProduct,
     };
   } catch (e) {
-    // Giữ nguyên hành vi: ném lỗi ra ngoài cho tầng controller/middleware xử lý
+    throw e;
+  }
+};
+
+const updateProduct = async (productId, updateData) => {
+  try {
+    if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+      return {
+        status: "ERR",
+        message: "Invalid product id",
+      };
+    }
+
+    if (!updateData || typeof updateData !== "object") {
+      return {
+        status: "ERR",
+        message: "Invalid update payload",
+      };
+    }
+
+    const product = await Product.findById(productId);
+    if (!product) {
+      return {
+        status: "ERR",
+        message: "Product not found",
+      };
+    }
+
+    const {
+      name,
+      image,
+      type,
+      countInStock,
+      price,
+      rating,
+      description,
+      discount,
+    } = updateData;
+
+    const payload = {};
+
+    if (name !== undefined) payload.name = name;
+    if (image !== undefined) payload.image = image;
+    if (type !== undefined) payload.type = type;
+    if (description !== undefined) payload.description = description;
+    if (rating !== undefined) payload.rating = rating;
+
+    if (countInStock !== undefined) {
+      const num = Number(countInStock);
+      if (Number.isNaN(num) || num < 0) {
+        return {
+          status: "ERR",
+          message: "countInStock must be a non-negative number",
+        };
+      }
+      payload.countInStock = num;
+    }
+
+    if (price !== undefined) {
+      const num = Number(price);
+      if (Number.isNaN(num) || num < 0) {
+        return {
+          status: "ERR",
+          message: "price must be a non-negative number",
+        };
+      }
+      payload.price = num;
+    }
+
+    if (discount !== undefined && discount !== null) {
+      const num = Number(discount);
+      if (Number.isNaN(num) || num < 0) {
+        return {
+          status: "ERR",
+          message: "discount must be a non-negative number",
+        };
+      }
+      payload.discount = num;
+    }
+
+    if (payload.name) {
+      const duplicate = await Product.findOne({
+        name: payload.name,
+        _id: { $ne: productId },
+      });
+      if (duplicate) {
+        return {
+          status: "ERR",
+          message: "Product name already exists",
+        };
+      }
+    }
+
+    const updated = await Product.findByIdAndUpdate(
+      productId,
+      { $set: payload },
+      { new: true, runValidators: true }
+    );
+
+    return {
+      status: "OK",
+      message: "SUCCESS",
+      data: updated,
+    };
+  } catch (e) {
+    throw e;
+  }
+};
+
+const deleteProduct = async (productId) => {
+  try {
+    if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+      return {
+        status: "ERR",
+        message: "Invalid product id",
+      };
+    }
+
+    const result = await Product.findByIdAndDelete(productId);
+    if (!result) {
+      return {
+        status: "ERR",
+        message: "Product not found",
+      };
+    }
+
+    return {
+      status: "OK",
+      message: "Delete product success",
+    };
+  } catch (e) {
     throw e;
   }
 };
 
 module.exports = {
   createProduct,
+  updateProduct,
+  deleteProduct,
 };
