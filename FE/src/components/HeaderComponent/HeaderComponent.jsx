@@ -15,7 +15,7 @@ const HeaderComponent = () => {
 
   return (
     <header className="sticky top-0 z-50 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-primary/10 px-6 lg:px-20 py-4">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-8 font-display">
+      <div className="w-full px-6 lg:px-20 flex items-center justify-between gap-8 font-display">
         <div className="flex items-center gap-10">
           <Link to="/" className="flex items-center gap-2 group">
             <div className="bg-primary p-1 rounded">

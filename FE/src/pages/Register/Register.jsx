@@ -3,7 +3,7 @@ import React from "react";
 const Register = () => {
   return (
     <main className="flex-1 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
-      <div className="min-h-[calc(100vh-80px)] grid grid-cols-1 lg:grid-cols-2">
+      <div className="min-h-screen flex justify-center pt-10">
         {/* Left Side - Hero Image */}
         <div className="hidden lg:flex relative overflow-hidden">
           <img
@@ -24,7 +24,7 @@ const Register = () => {
         </div>
 
         {/* Right Side - Registration Form */}
-        <div className="flex items-center justify-center px-6 py-12 lg:px-16">
+        <div className="min-h-screen flex justify-center mt-10">
           <div className="w-full max-w-md space-y-8">
             <div>
               <h1 className="text-3xl font-black tracking-tight">

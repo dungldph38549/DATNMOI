@@ -1,7 +1,7 @@
 const FooterComponent = () => {
   return (
     <footer className="bg-background-dark text-white pt-20 pb-10 px-6 lg:px-20 border-t border-white/5 font-display">
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
           {/* Brand Column */}
           <div className="space-y-6">
@@ -134,7 +134,7 @@ const FooterComponent = () => {
         </div>
 
         <div className="pt-10 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 text-slate-500 text-sm">
-          <p>© 2024 SNEAKERHOUSE INC. All rights reserved.</p>
+          <p>© 2026 SNEAKERHOUSE INC. All rights reserved.</p>
           <div className="flex gap-8">
             <a href="#" className="hover:text-white transition-colors">
               Privacy Policy
