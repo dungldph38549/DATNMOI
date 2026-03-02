@@ -2,6 +2,7 @@ const express = require("express");
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
 const productRouter = require("./routers/ProductRouter");
+const brandRouter = require("./routers/BrandRouter");
 
 dotenv.config({ quiet: true });
 
@@ -23,6 +24,8 @@ app.get("/", (req, res) => {
 
 // Product routes
 app.use("/api/product", productRouter);
+// Brand routes
+app.use("/api/brand", brandRouter);
 
 mongoose
   .connect(mongoURI)
