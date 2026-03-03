@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 
 const productRouter = require("./routers/ProductRouter");
 const brandRouter = require("./routers/BrandRouter");
+const voucherRouter = require("./routers/VoucherRouter");
 
 dotenv.config();
 
@@ -25,6 +26,7 @@ app.get("/", (req, res) => {
 
 app.use("/api/product", productRouter);
 app.use("/api/brand", brandRouter);
+app.use("/api/voucher", voucherRouter);
 
 // connect DB rồi mới chạy server
 mongoose
