@@ -1,7 +1,6 @@
-// src/controller/CategoryController.js
+
 const Category = require('../model/CategoryModel');
 
-// Create: Thêm danh mục mới
 exports.createCategory = async (req, res) => {
     const { name, description } = req.body;
 
@@ -14,7 +13,7 @@ exports.createCategory = async (req, res) => {
     }
 };
 
-// Read: Lấy tất cả danh mục
+
 exports.getCategories = async (req, res) => {
     try {
         const categories = await Category.find();
@@ -24,7 +23,7 @@ exports.getCategories = async (req, res) => {
     }
 };
 
-// Read: Lấy danh mục theo ID
+
 exports.getCategoryById = async (req, res) => {
     const { id } = req.params;
 
@@ -39,7 +38,7 @@ exports.getCategoryById = async (req, res) => {
     }
 };
 
-// Update: Cập nhật thông tin danh mục theo ID
+
 exports.updateCategory = async (req, res) => {
     const { id } = req.params;
     const { name, description } = req.body;
@@ -55,7 +54,7 @@ exports.updateCategory = async (req, res) => {
     }
 };
 
-// Delete: Xóa danh mục theo ID
+
 exports.deleteCategory = async (req, res) => {
     const { id } = req.params;
 
