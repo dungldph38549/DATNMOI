@@ -2,8 +2,8 @@ import React from "react";
 
 const ProductDetail = () => {
   return (
-    <main className="flex-1 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
-      <div className="max-w-7xl mx-auto px-6 py-8">
+    <main className="flex-1 w-full bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
+      <div className="w-full px-6 lg:px-20 py-8">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-slate-500 mb-8">
           <a className="hover:text-primary" href="#">

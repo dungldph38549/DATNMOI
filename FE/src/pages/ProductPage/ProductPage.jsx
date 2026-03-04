@@ -68,7 +68,7 @@ const ProductPage = () => {
   const [page, setPage] = useState(1);
 
   return (
-    <main className="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 font-display">
+    <main className="flex-grow w-full px-10 lg:px-20 py-8 font-display">
       {/* Breadcrumb */}
       <div className="flex flex-wrap items-center gap-2 mb-6 text-sm text-slate-500">
         <Link to="/" className="hover:text-primary transition-colors">

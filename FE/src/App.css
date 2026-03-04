@@ -1,3 +1,8 @@
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
 .App {
   text-align: center;
 }
@@ -36,7 +41,8 @@
     transform: rotate(360deg);
   }
 }
-body {
+.body {
+  width: 100%;
   margin: 0;
   font-family: sans-serif;
   background: #f3f3f3;
@@ -46,6 +52,7 @@ body {
   max-width: 420px;
   margin: auto;
   background: #fff;
+
 }
 
 .header {
@@ -246,4 +253,8 @@ body {
   padding: 10px;
   background: white;
   border-top: 1px solid #ddd;
+}
+
+.content {
+  flex: 1;
 }
