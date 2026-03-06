@@ -1,4 +1,3 @@
-
 // index.js
 require("dotenv").config();
 const express = require("express");
@@ -9,8 +8,13 @@ const productRouter = require("./src/routers/ProductRouter");
 const brandRouter = require("./src/routers/BrandRouter");
 const voucherRouter = require("./src/routers/VoucherRouter");
 const categoryRouter = require("./src/routers/CategoryRouter");
+
+const reviewRouter = require("./src/routers/ReviewRouter");
+const adminReviewRouter = require("./src/routers/adminReviewRoutes");
+
 const sizeRouter = require("./src/routers/SizeRouter");
 const colorRouter = require("./src/routers/ColorRouter");
+
 
 dotenv.config(); // Đọc các biến từ file .env
 
@@ -34,8 +38,11 @@ app.use("/api/product", productRouter);
 app.use("/api/brand", brandRouter);
 app.use("/api/voucher", voucherRouter);
 app.use("/api/category", categoryRouter);
+app.use("/api/reviews", reviewRouter);
+app.use("/api/admin", adminReviewRouter);
 app.use("/api/size", sizeRouter);
 app.use("/api/color", colorRouter);
+
 
 // Kết nối MongoDB và khởi động server
 mongoose
