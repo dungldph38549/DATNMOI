@@ -1,19 +1,22 @@
+
+// index.js
+require("dotenv").config();
 const express = require("express");
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
 
-const productRouter = require("./routers/ProductRouter");
-const brandRouter = require("./routers/BrandRouter");
-const voucherRouter = require("./routers/VoucherRouter");
+const productRouter = require("./src/routers/ProductRouter");
+const brandRouter = require("./src/routers/BrandRouter");
+const voucherRouter = require("./src/routers/VoucherRouter");
+const categoryRouter = require("./src/routers/CategoryRouter"); // Import CategoryRouter
 
-dotenv.config();
+dotenv.config(); // Đọc các biến từ file .env
 
 const app = express();
-
 app.use(express.json());
 
 const port = process.env.PORT || 3001;
-const mongoURI = process.env.MONGO_DB;
+const mongoURI = process.env.MONGO_DB; // Lấy kết nối MongoDB từ file .env
 
 if (!mongoURI) {
   console.error("MONGO_DB is not defined in .env");
@@ -24,11 +27,13 @@ app.get("/", (req, res) => {
   res.send("Hello API");
 });
 
+// Sử dụng các router cho các API
 app.use("/api/product", productRouter);
 app.use("/api/brand", brandRouter);
 app.use("/api/voucher", voucherRouter);
+app.use("/api/category", categoryRouter); // Sử dụng CategoryRouter cho đường dẫn /api/category
 
-// connect DB rồi mới chạy server
+// Kết nối MongoDB và khởi động server
 mongoose
   .connect(mongoURI)
   .then(() => {
