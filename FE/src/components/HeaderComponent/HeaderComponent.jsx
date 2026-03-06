@@ -40,13 +40,13 @@ const HeaderComponent = () => {
               Shop
             </Link>
             <Link
-              to="/collections"
+              to="/category"
               className="text-sm font-medium hover:text-primary transition-colors"
             >
               Collections
             </Link>
             <Link
-              to="/about"
+              to="/contact"
               className="text-sm font-medium hover:text-primary transition-colors"
             >
               About

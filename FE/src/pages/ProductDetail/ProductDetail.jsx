@@ -1,27 +1,70 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 
 const ProductDetail = () => {
+  const { id } = useParams();
+  const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchDetail = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await fetch(`/api/product/${id}`);
+        const data = await res.json();
+
+        if (data.status !== "OK") {
+          throw new Error(data.message || "Không tìm thấy sản phẩm");
+        }
+
+        setProduct(data.data);
+      } catch (err) {
+        setError(err.message || "Có lỗi khi tải chi tiết sản phẩm");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchDetail();
+    }
+  }, [id]);
   return (
     <main className="flex-1 w-full bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
       <div className="max-w-7xl mx-auto px-6 lg:px-20 py-8">
         {/* Breadcrumbs */}
         <nav className="flex items-center gap-2 text-sm text-slate-500 mb-8">
-          <a className="hover:text-primary" href="#">
+          <Link className="hover:text-primary" to="/">
             Home
-          </a>
+          </Link>
           <span className="material-symbols-outlined text-xs">
             chevron_right
           </span>
-          <a className="hover:text-primary" href="#">
+          <Link className="hover:text-primary" to="/product">
             Sneakers
-          </a>
+          </Link>
           <span className="material-symbols-outlined text-xs">
             chevron_right
           </span>
           <span className="text-slate-900 dark:text-slate-100 font-medium">
-            Air Max v2 Pro
+            {product?.name || "Product"}
           </span>
         </nav>
+
+        {loading && (
+          <p className="text-sm text-slate-500">Đang tải chi tiết sản phẩm...</p>
+        )}
+
+        {error && (
+          <p className="text-sm text-red-500 mb-4">Lỗi: {error}</p>
+        )}
+
+        {!loading && !error && !product && (
+          <p className="text-sm text-slate-500">Không tìm thấy sản phẩm.</p>
+        )}
 
         {/* Product Hero Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-20">
@@ -30,8 +73,8 @@ const ProductDetail = () => {
             <div className="aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800">
               <img
                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                alt="Main view of orange Nike sneaker"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDaiuPEb-WUvKqpelAQUayukIHh6Y8PHtfP00rJESKQoxMwWrf3r-HajG2MJhkd2bqXqMA5S4Y0Opj64y5k87J1EM9x5NR5039WPB53z-zLGwGt586NsJwbe1J4MxiREjLlANGX9l1YzWhv_xZJi1wgLMn4hCUVeJ_4I9zw2hkKUkYdoqeH2T33Hs5FsNefY9y8tQ6oNwuzYeo9xLr_Jfwry-PRmmHwZf7Grpa6PJoU0fKERR9Uqry-Lefw8-3rBkXP8IF55zPa88U"
+                alt={product?.name || "Product image"}
+                src={product?.image}
               />
             </div>
             <div className="grid grid-cols-4 gap-4">
@@ -74,7 +117,7 @@ const ProductDetail = () => {
               </span>
             </div>
             <h1 className="text-5xl font-black text-slate-900 dark:text-slate-100 mb-4 tracking-tight">
-              Air Max v2 Pro
+              {product?.name || "Product name"}
             </h1>
             <div className="flex items-center gap-4 mb-6">
               <div className="flex items-center text-primary">
@@ -89,12 +132,11 @@ const ProductDetail = () => {
               </span>
             </div>
             <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-8">
-              $189.00
+              {product ? `$${product.price}` : "--"}
             </p>
             <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-8">
-              Engineered for both performance running and street-ready style. The
-              Air Max v2 Pro features a breathable mesh upper combined with our
-              signature responsive cushioning for all-day comfort.
+              {product?.description ||
+                "Engineered for both performance running and street-ready style."}
             </p>
 
             {/* Color Selection */}
