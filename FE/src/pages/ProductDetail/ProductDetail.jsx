@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { addToCart } from "../../redux/cartSlice";
 
 const ProductDetail = () => {
   const { id } = useParams();
+  const dispatch = useDispatch();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -191,7 +194,23 @@ const ProductDetail = () => {
 
             {/* CTA Buttons */}
             <div className="flex gap-4">
-              <button className="flex-1 bg-primary text-slate-900 font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:brightness-110 transition-all shadow-xl shadow-primary/20">
+              <button
+                type="button"
+                disabled={!product}
+                onClick={() => {
+                  if (!product) return;
+                  dispatch(
+                    addToCart({
+                      productId: product._id,
+                      name: product.name,
+                      image: product.image,
+                      price: product.price,
+                      qty: 1,
+                    }),
+                  );
+                }}
+                className="flex-1 bg-primary text-slate-900 font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:brightness-110 transition-all shadow-xl shadow-primary/20 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
                 <span className="material-symbols-outlined">shopping_bag</span>
                 ADD TO CART
               </button>

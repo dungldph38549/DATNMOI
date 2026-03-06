@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 
 const Register = () => {
   return (
@@ -132,12 +133,12 @@ const Register = () => {
                   className="text-sm text-slate-600 dark:text-slate-400 cursor-pointer"
                 >
                   I agree to the{" "}
-                  <a
-                    href="#"
+                  <Link
+                    to="/terms"
                     className="text-primary font-semibold hover:underline"
                   >
                     Terms &amp; Conditions
-                  </a>{" "}
+                  </Link>{" "}
                   and Privacy Policy.
                 </label>
               </div>
@@ -197,12 +198,9 @@ const Register = () => {
             {/* Login Link */}
             <p className="text-center text-sm text-slate-500">
               Already have an account?{" "}
-              <a
-                href="#"
-                className="text-primary font-bold hover:underline"
-              >
+              <Link to="/login" className="text-primary font-bold hover:underline">
                 Log In
-              </a>
+              </Link>
             </p>
           </div>
         </div>

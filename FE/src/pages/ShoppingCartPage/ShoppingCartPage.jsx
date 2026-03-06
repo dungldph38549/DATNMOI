@@ -1,9 +1,19 @@
 import React from "react";
-import p1 from "../../assets/images/products/p1.jpg";
-import p2 from "../../assets/images/products/p2.jpg";
+import { Link, useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  removeFromCart,
+  selectCartSubtotal,
+  setQty,
+} from "../../redux/cartSlice";
 
 
 const ShoppingCartPage = () => {
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const items = useSelector((state) => state.cart.items);
+  const subtotal = useSelector(selectCartSubtotal);
+
   return (
     <>
       <div className="breadcrumb">
@@ -11,7 +21,7 @@ const ShoppingCartPage = () => {
           <div className="breadcrumb-inner">
             <ul className="list-inline list-unstyled">
               <li>
-                <a href="#">Home</a>
+                <Link to="/">Home</Link>
               </li>
               <li className="active">Shopping Cart</li>
             </ul>
@@ -42,141 +52,106 @@ const ShoppingCartPage = () => {
                         <td colSpan={7}>
                           <div className="shopping-cart-btn">
                             <span>
-                              <a
-                                href="#"
+                              <Link
+                                to="/product"
                                 className="btn btn-upper btn-primary outer-left-xs"
                               >
                                 Continue Shopping
-                              </a>
-                              <a
-                                href="#"
-                                className="btn btn-upper btn-primary pull-right outer-right-xs"
-                              >
-                                Update shopping cart
-                              </a>
+                              </Link>
                             </span>
                           </div>
                         </td>
                       </tr>
                     </tfoot>
                     <tbody>
-                      <tr>
-                        <td className="romove-item">
-                          <a href="#" title="cancel" className="icon">
-                            <i className="fa fa-trash-o" />
-                          </a>
-                        </td>
-                        <td className="cart-image">
-                          <a className="entry-thumbnail" href="detail.html">
-                            <img src={p1} alt=""/> </a>
-                        </td>
-                        <td className="cart-product-name-info">
-                          <h4 className="cart-product-description">
-                            <a href="detail.html">Floral Print Buttoned</a>
-                          </h4>
-                          <div className="row">
-                            <div className="col-sm-4">
-                              <div className="rating rateit-small" />
+                      {items.length === 0 && (
+                        <tr>
+                          <td colSpan={7}>
+                            <div className="py-4 text-center">
+                              Giỏ hàng đang trống.{" "}
+                              <Link to="/product">Mua sắm ngay</Link>
                             </div>
-                            <div className="col-sm-8">
-                              <div className="reviews">(06 Reviews)</div>
-                            </div>
-                          </div>
-                          <div className="cart-product-info">
-                            <span className="product-color">
-                              COLOR:<span>Blue</span>
-                            </span>
-                          </div>
-                        </td>
-                        <td className="cart-product-edit">
-                          <a href="#" className="product-edit">
-                            Edit
-                          </a>
-                        </td>
-                        <td className="cart-product-quantity">
-                          <div className="quant-input">
-                            <div className="arrows">
-                              <div className="arrow plus gradient">
-                                <span className="ir">
-                                  <i className="icon fa fa-sort-asc" />
-                                </span>
-                              </div>
-                              <div className="arrow minus gradient">
-                                <span className="ir">
-                                  <i className="icon fa fa-sort-desc" />
-                                </span>
-                              </div>
-                            </div>
-                            <input type="text" defaultValue="1" />
-                          </div>
-                        </td>
-                        <td className="cart-product-sub-total">
-                          <span className="cart-sub-total-price">$300.00</span>
-                        </td>
-                        <td className="cart-product-grand-total">
-                          <span className="cart-grand-total-price">$300.00</span>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="romove-item">
-                          <a href="#" title="cancel" className="icon">
-                            <i className="fa fa-trash-o" />
-                          </a>
-                        </td>
-                        <td className="cart-image">
-                          <a className="entry-thumbnail" href="detail.html">
-                            <img src={p2} alt=""/>
-                          </a>
-                        </td>
-                        <td className="cart-product-name-info">
-                          <h4 className="cart-product-description">
-                            <a href="detail.html">Floral Print Buttoned</a>
-                          </h4>
-                          <div className="row">
-                            <div className="col-sm-4">
-                              <div className="rating rateit-small" />
-                            </div>
-                            <div className="col-sm-8">
-                              <div className="reviews">(06 Reviews)</div>
-                            </div>
-                          </div>
-                          <div className="cart-product-info">
-                            <span className="product-color">
-                              COLOR:<span>Pink</span>
-                            </span>
-                          </div>
-                        </td>
-                        <td className="cart-product-edit">
-                          <a href="#" className="product-edit">
-                            Edit
-                          </a>
-                        </td>
-                        <td className="cart-product-quantity">
-                          <div className="cart-quantity">
-                            <div className="quant-input">
-                              <div className="arrows">
-                                <div className="arrow plus gradient">
-                                  <span className="ir">
-                                    <i className="icon fa fa-sort-asc" />
-                                  </span>
-                                </div>
-                                <div className="arrow minus gradient">
-                                  <span className="ir">
-                                    <i className="icon fa fa-sort-desc" />
-                                  </span>
-                                </div>
-                              </div>
-                              <input type="text" defaultValue="1" />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="cart-product-sub-total">
-                          <span className="cart-sub-total-price">$300.00</span>
-                        </td>
-                        <td className="cart-product-grand-total">
-                          <span className="cart-grand-total-price">$300.00</span>
-                        </td>
-                      </tr>
+                          </td>
+                        </tr>
+                      )}
+
+                      {items.map((item) => {
+                        const itemSubtotal =
+                          (item.price || 0) * (item.qty || 0);
+
+                        return (
+                          <tr key={item.productId}>
+                            <td className="romove-item">
+                              <button
+                                type="button"
+                                title="remove"
+                                className="icon"
+                                onClick={() =>
+                                  dispatch(removeFromCart(item.productId))
+                                }
+                                style={{ background: "transparent", border: 0 }}
+                              >
+                                <i className="fa fa-trash-o" />
+                              </button>
+                            </td>
+
+                            <td className="cart-image">
+                              <Link
+                                className="entry-thumbnail"
+                                to={`/product/${item.productId}`}
+                              >
+                                <img src={item.image} alt={item.name} />
+                              </Link>
+                            </td>
+
+                            <td className="cart-product-name-info">
+                              <h4 className="cart-product-description">
+                                <Link to={`/product/${item.productId}`}>
+                                  {item.name}
+                                </Link>
+                              </h4>
+                            </td>
+
+                            <td className="cart-product-edit">
+                              <Link
+                                to={`/product/${item.productId}`}
+                                className="product-edit"
+                              >
+                                View
+                              </Link>
+                            </td>
+
+                            <td className="cart-product-quantity">
+                              <input
+                                type="number"
+                                min={1}
+                                value={item.qty}
+                                onChange={(e) =>
+                                  dispatch(
+                                    setQty({
+                                      productId: item.productId,
+                                      qty: e.target.value,
+                                    }),
+                                  )
+                                }
+                                className="form-control"
+                                style={{ width: 90 }}
+                              />
+                            </td>
+
+                            <td className="cart-product-sub-total">
+                              <span className="cart-sub-total-price">
+                                ${itemSubtotal.toFixed(2)}
+                              </span>
+                            </td>
+                            <td className="cart-product-grand-total">
+                              <span className="cart-grand-total-price">
+                                ${itemSubtotal.toFixed(2)}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -288,11 +263,15 @@ const ShoppingCartPage = () => {
                       <th>
                         <div className="cart-sub-total">
                           Subtotal
-                          <span className="inner-left-md">$600.00</span>
+                          <span className="inner-left-md">
+                            ${subtotal.toFixed(2)}
+                          </span>
                         </div>
                         <div className="cart-grand-total">
                           Grand Total
-                          <span className="inner-left-md">$600.00</span>
+                          <span className="inner-left-md">
+                            ${subtotal.toFixed(2)}
+                          </span>
                         </div>
                       </th>
                     </tr>
@@ -304,6 +283,8 @@ const ShoppingCartPage = () => {
                           <button
                             type="submit"
                             className="btn btn-primary checkout-btn"
+                            disabled={items.length === 0}
+                            onClick={() => navigate("/checkout")}
                           >
                             PROCCED TO CHEKOUT
                           </button>

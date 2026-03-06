@@ -1,9 +1,12 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { selectCartCount } from "../../redux/cartSlice";
 
 const HeaderComponent = () => {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const cartCount = useSelector(selectCartCount);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -72,12 +75,17 @@ const HeaderComponent = () => {
           </form>
 
           <div className="flex items-center gap-4">
-            <button className="p-2 hover:bg-primary/10 rounded-full transition-colors relative">
+            <Link
+              to="/cart"
+              className="p-2 hover:bg-primary/10 rounded-full transition-colors relative"
+            >
               <span className="material-symbols-outlined">shopping_cart</span>
-              <span className="absolute top-1 right-1 bg-primary text-[10px] font-bold text-white w-4 h-4 flex items-center justify-center rounded-full">
-                3
-              </span>
-            </button>
+              {cartCount > 0 && (
+                <span className="absolute top-1 right-1 bg-primary text-[10px] font-bold text-white w-4 h-4 flex items-center justify-center rounded-full">
+                  {cartCount}
+                </span>
+              )}
+            </Link>
             <button className="p-2 hover:bg-primary/10 rounded-full transition-colors lg:hidden">
               <span className="material-symbols-outlined">menu</span>
             </button>

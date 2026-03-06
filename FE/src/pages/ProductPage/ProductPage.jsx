@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import ProductFilterSidebar from "../../components/ProductFilterSidebar/ProductFilterSidebar";
+import { useDispatch } from "react-redux";
+import { addToCart } from "../../redux/cartSlice";
 
 const ProductPage = () => {
   const [selectedSize, setSelectedSize] = useState(9);
@@ -8,6 +10,7 @@ const ProductPage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const dispatch = useDispatch();
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -129,7 +132,7 @@ const ProductPage = () => {
                   {/* PRODUCT INFO */}
                   <div className="p-6">
                     <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">
-                      {product.brand}
+                      {product.type}
                     </p>
 
                     <h3 className="font-bold text-lg mb-2 truncate">
@@ -151,6 +154,18 @@ const ProductPage = () => {
 
                       <button
                         type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          dispatch(
+                            addToCart({
+                              productId: product._id,
+                              name: product.name,
+                              image: product.image,
+                              price: product.price,
+                              qty: 1,
+                            }),
+                          );
+                        }}
                         className="bg-primary text-white p-2 rounded-lg hover:bg-primary/90 transition-colors flex items-center justify-center"
                       >
                         <span className="material-symbols-outlined">
