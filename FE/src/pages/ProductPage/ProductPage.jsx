@@ -1,71 +1,36 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-
-const products = [
-  {
-    id: 1,
-    brand: "Nike",
-    name: "Air Zoom Pegasus 38",
-    price: 120,
-    badge: "Trending",
-    badgeBg: "primary",
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuDrTATP0em5NbeY5EVQ2beyoq_m3H0BMbXX3WVVMtk5ukaTo_2OCZ9YD-53sPyrTlrGWZd19jMUSmiYKlKSYiNbPl4czJR_Bh6jzdv8zZDZeShhqMDfRkCydJyjavEeGwX7bs2n9vQwDe9K0RGRDHI4AVxCqJO6DNJTJQGwCWGYfagQYIribGqYKzA4HWNdreJGyrmbEaO3zWzylE41EEgloFyd1mteqiaW_i4s0Shyz4EKAZNPxXoqBFvN8WzvW9SBnOFkxUWTAiY",
-    alt: "Red Nike running sneaker on white background",
-  },
-  {
-    id: 2,
-    brand: "Adidas",
-    name: "Stan Smith Originals",
-    price: 95,
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuBtXm0eNrrJzE3mhWsuTAtYGRNO6dvusW9exfhs-HToXY2DSTA8cPYumLPbA_msqHZNNsSie6aFr_h9YcZjbGXQRsHJWj7hWYTKboaahmYX4lWbbQukTQvUPMJkHzL5RR-vAHwRLH1m8GJcr27TnjIloCJFifDsqHYijFBSesNPgQvxL3x3cVOWfSqt21z6PDP25CSvWjfSi6aZU3kSv16cLZzuj-uICblN17gCmSyLO2ab-0J5KkoC3oTGjdSTzlJkF-7YcnwWkEo",
-    alt: "Classic white and green Adidas Stan Smith sneakers",
-  },
-  {
-    id: 3,
-    brand: "New Balance",
-    name: "574 Core",
-    price: 80,
-    originalPrice: 100,
-    badge: "Sale -20%",
-    badgeBg: "slate-900",
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuA18oCWdAvmTioNJogVcy7NlxsZs63lHYnQeau29FR9OO5XypozK_aOgiIo0DaOWF6BNX5VuRT5u3VNv1cPilMfcfZufoNg80d5uR2PpemgxW8XcPTMTml9rcl-wNcGCjNySfQOmlsQgolNq_wmssoopOX_LgVpP6eExbd8KzCDwVq27VX4JCtSVd52EA_9pWLgLJPljtQ30KgLruwQ77YBz2f-v1ZRFnOflEPih4S9Jnl7WOnjotBxHTkpV_2RDoneiVtdOOg7szc",
-    alt: "Brown lifestyle sneaker with sleek design",
-  },
-  {
-    id: 4,
-    brand: "Nike",
-    name: "React Vision",
-    price: 145,
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuBU6MoD7IS1V-V1W-a7G_4eCm74-bxIWFMGfjBLbb55FHIvoNtFYbiuon_vHTeZ56FyOSUvXxwpC3H3T92BwccuPkVXpGu5s5oZ-o-voFum0G2sw0T6AZMpMfq3nVMo4ldLjO9OeT3heL3UWhTyRQTnL9uYBkcXsNBdFFairgOj2mmeHyV7C83s7a9GXEnmiidUDJBpm1TobBXeMTdSeOAsjN9t2Iy7LikuJBBtyPk-0avS3o44bKklZOCYQxWW125NnBAF6ngVR58",
-    alt: "Vibrant neon green Nike sports shoes",
-  },
-  {
-    id: 5,
-    brand: "Puma",
-    name: "RS-X³ Puzzle",
-    price: 110,
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuBcAqN6TpkdfkagbKgdg-8NU0uUB_hJaI3HSwanCBMN629YMdC8rfDN-BApSZFgCIzUN2ukJHtx8KOxjz2AR7WCGHQScXmu_YiwCvrJ35SYFtm7NcdlG7tWoYkIvJ0uUMhoZzv0OkYwcQuyQXfxbusY_dBu4lpRjO7OtQn0lSiQSdSZmoqoir4kOc5GpO5xGdaCVTqh3nIqHV5C2Kt6cpVKcakW-N_EmgtV9sqTA2rfcCUWlTwqmyKRvnHjahtPlV7Cdy6yyrC3oJA",
-    alt: "Light gray and white athletic sneakers",
-  },
-  {
-    id: 6,
-    brand: "Nike",
-    name: "Air Max 270",
-    price: 160,
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuCDhDm22kItL1ZMrQTjS8gGX9cCu3dfkuXqzXZNKlHl1svsF8JzZtipwpQNifcB3kdOV-2G-bdKepIjmQZ6t0GBnR3taZ2xibERJe8U4ttoYOtebURGC8uD7qOOvHCe03Cj9R7jZV6pK9fbV2l-xtpEvlYWwi_BCipO5icTLKuT7o1zbTuVYzlWv4Y52-5RCHvbwydZSJbY5oOrOseFEGqarDmzaXEBSgzkJ9sYhlWNj16UQ2oP3QgBhSB5sN0b9Gl5aq6yHkICQVU",
-    alt: "Stylish dark Nike air sneakers",
-  },
-];
 
 const ProductPage = () => {
   const [selectedSize, setSelectedSize] = useState(9);
   const [page, setPage] = useState(1);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await fetch("/api/product");
+        const data = await res.json();
+
+        if (data.status !== "OK") {
+          throw new Error(data.message || "Failed to fetch products");
+        }
+
+        setProducts(data.data || []);
+      } catch (err) {
+        setError(err.message || "Có lỗi khi tải sản phẩm");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   return (
     <main className="flex-grow w-full px-10 lg:px-20 py-8 font-display">
@@ -204,17 +169,27 @@ const ProductPage = () => {
             </div>
           </div>
 
+          {loading && (
+            <p className="text-sm text-slate-500">Đang tải sản phẩm...</p>
+          )}
+
+          {error && (
+            <p className="text-sm text-red-500 mb-4">
+              Lỗi: {error}
+            </p>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {products.map((product) => (
               <div
-                key={product.id}
+                key={product._id}
                 className="group relative bg-white dark:bg-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-slate-100 dark:border-slate-800"
               >
                 <div className="aspect-square overflow-hidden bg-slate-100 relative">
                   <img
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    src={product.image}
-                    alt={product.alt}
+                  src={product.image}
+                  alt={product.name}
                   />
                   <button
                     type="button"
