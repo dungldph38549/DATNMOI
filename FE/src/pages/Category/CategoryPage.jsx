@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import ProductFilterSidebar from "../../components/ProductFilterSidebar/ProductFilterSidebar";
 
 const products = [
   {
@@ -22,11 +23,21 @@ const products = [
 ];
 
 const CategoryPage = () => {
+  const [selectedSize, setSelectedSize] = useState(9);
+
   return (
     <div className="body-content outer-top-xs">
       <div className="container">
         <div className="row">
-          {/* Sidebar giữ nguyên nếu bạn đã có */}
+          {/* Sidebar chung */}
+          <div className="col-md-3">
+            <div className="hidden lg:block">
+              <ProductFilterSidebar
+                selectedSize={selectedSize}
+                onChangeSize={setSelectedSize}
+              />
+            </div>
+          </div>
 
           <div className="col-md-9">
             {/* ===== Toolbar ===== */}

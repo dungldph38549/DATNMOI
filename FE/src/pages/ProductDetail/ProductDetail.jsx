@@ -1,348 +1,482 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { addToCart } from "../../redux/cartSlice";
 
 const ProductDetail = () => {
+  const { id } = useParams();
+  const dispatch = useDispatch();
+  const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchDetail = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await fetch(`/api/product/${id}`);
+        const data = await res.json();
+
+        if (data.status !== "OK") {
+          throw new Error(data.message || "Không tìm thấy sản phẩm");
+        }
+
+        setProduct(data.data);
+      } catch (err) {
+        setError(err.message || "Có lỗi khi tải chi tiết sản phẩm");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchDetail();
+    }
+  }, [id]);
   return (
     <main className="flex-1 w-full bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
-      <div className="w-full px-6 lg:px-20 py-8">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm text-slate-500 mb-8">
-          <a className="hover:text-primary" href="#">
+      <div className="max-w-7xl mx-auto px-6 lg:px-20 py-8">
+        {/* Breadcrumbs */}
+        <nav className="flex items-center gap-2 text-sm text-slate-500 mb-8">
+          <Link className="hover:text-primary" to="/">
             Home
-          </a>
+          </Link>
           <span className="material-symbols-outlined text-xs">
             chevron_right
           </span>
-          <a className="hover:text-primary" href="#">
-            Footwear
-          </a>
+          <Link className="hover:text-primary" to="/product">
+            Sneakers
+          </Link>
           <span className="material-symbols-outlined text-xs">
             chevron_right
           </span>
           <span className="text-slate-900 dark:text-slate-100 font-medium">
-            Air Max Pulse
+            {product?.name || "Product"}
           </span>
-        </div>
+        </nav>
 
-        {/* Product Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-          {/* Product Images */}
-          <div className="lg:col-span-7 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2 aspect-square bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden">
+        {loading && (
+          <p className="text-sm text-slate-500">Đang tải chi tiết sản phẩm...</p>
+        )}
+
+        {error && (
+          <p className="text-sm text-red-500 mb-4">Lỗi: {error}</p>
+        )}
+
+        {!loading && !error && !product && (
+          <p className="text-sm text-slate-500">Không tìm thấy sản phẩm.</p>
+        )}
+
+        {/* Product Hero Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-20">
+          {/* Image Gallery */}
+          <div className="space-y-4">
+            <div className="aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800">
+              <img
+                className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                alt={product?.name || "Product image"}
+                src={product?.image}
+              />
+            </div>
+            <div className="grid grid-cols-4 gap-4">
+              <div className="aspect-square rounded-lg overflow-hidden border-2 border-primary cursor-pointer">
                 <img
-                  alt="Main Product View"
                   className="w-full h-full object-cover"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDmtSm_fvtOM71wRKTcwP4y89rrZz63IiuB_uoXlVhpK6yCD8Zieticm4IaC2ALWSYyuMamm4OdvmKpnWtVciryGrtZIgXyCIDyUOASyHFbP6pJrBrcnU9XDtmXbwz2lxQWbh42SO9m8CV07oECg4xfIMSzh8vZkV7j_Z3ObgqSdbxp_f-XvJ9tFcjIDuXUXMvfvpzWqKHf8CJQg0c1dXvLliDYWaemFb0GwWJD6zX7x3qXqoD7vd7xQNWKclf9egcmnhG0ZH8ZKcQ"
+                  alt="Side view of orange sneaker"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9BZ-fJqaLes3cLWcU0PwGZuxA9ObOJ7nVx7dqrzusCfvXKREX_KS2KgEMyyzdC9Aiu8HiAGszphQeUEAU_CXoxksEsxiX6eISQjqtfndtwO4TUv6Bwv_IgYm-1a2ACXSgU7lfs9AaWM-1dDoL9Jj8KsDbe6ccLueP8Inn6Fz-6Er0h5tMHONvFFT0gX_UlpOi3F_FrEHlp7rQxuapwDUX44PA-bSzdO8dm_gg1W9WmRHhbrt8N0FBLDbKB1WDCoKLIfU6iTF6854"
                 />
               </div>
-              <div className="aspect-square bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden">
+              <div className="aspect-square rounded-lg overflow-hidden border border-transparent hover:border-primary/50 cursor-pointer bg-slate-100 dark:bg-slate-800">
                 <img
-                  alt="Detail View 1"
                   className="w-full h-full object-cover"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCgzoIqBKoYKZTb3IH3edF8VjMXFVidLcN5bJIVd4vJMg9wgwjJxOy8r5ptlt1h8Hu_CUFkQMnECYriQd7rao44LVFjE8NkwbOlBGq6eEeBaLoC20Cw8-mtSHMcdxipc_xCd0ka5enlbi6UIzxjZY5RN0LkHoyxSn5R29I1-pGnO4Iw5rjb8GhEyHK-W5OCp8lUHpUGgc3_uREv3dnYeP8w7ygAtqFV9PK0pt9JGrjDa395499q2wz2eYnbrdz94viuNSm0n9vsoXo"
+                  alt="Top view of orange sneaker"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7xK4RrFzve11osM2rabOt0xggfXP4-kINgh9kB90tKzGd2YF7z9EVwaVj1VPN3IcodDeNMriDOGzCqLN1g7dOgLELSk5exIcDvKDVPCstXdbgR5GAoRcNhTbO7KKpfN1piu_Qn6hFLe7bnENgiD_ynWLwG_PLsb_0rneEGmqhCv6AIpePQCvVpBqIel2ag-vWrJFmqSe6D0IHNaoG6fqD6dWHaJ_yq8HJYA7hG8dWp3zvJZect_Bb90I09XokykQU3tFg1v4yUxc"
                 />
               </div>
-              <div className="aspect-square bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden">
+              <div className="aspect-square rounded-lg overflow-hidden border border-transparent hover:border-primary/50 cursor-pointer bg-slate-100 dark:bg-slate-800">
                 <img
-                  alt="Detail View 2"
                   className="w-full h-full object-cover"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJI0qBdg1loGlajaXSpt7PCj4tz6_Y3F9eICJAUtab46j4P9r2kl5X4PdIn2Y2JisdWA0NBkmIXX3SSWe4STP4HcpJrGAj5GjXizvyoxjojmzMG-cIsXSgDmRDLJH5bDJnemOTU3WFWkn7x0pb3q-nLu-OWsq56_KtmvY5W5Iw6_0uo4xQKDEOLuisHnv0bCTDPnkcyipg-wlVbvIywxMSC6s9f6_sWvFI0qsu8C1EyoUROHcHYEBiCFKHN0O_opx4I4Q_DDGhDP0"
+                  alt="Detail view of sneaker sole"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCAggMZV4BGHJuny0gHDcWEYeA1m8nF5FZ5DxsKQSnanzy-wQy8Oaj-6PuNa-Fso6f-gbvNth8JDrREkimJhvDMxxUP5GCKySyOtX-KLutFu3Hfmje18hYJPXVYNFtDVKyGW3XDvPpvLVcqgHhV97BG_Fbr5YQJ7aj5L1jT2ZOSumh3wYDj5G74zW2Ff0iijf2atzZ8m_hLkSV_00gIJcgPJ39_rUOqJbVis5Ah-8Uw4ayeGsjulrBlE3DIUTJDKHv5lCghVshkhlw"
                 />
               </div>
-              <div className="aspect-square bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden">
+              <div className="aspect-square rounded-lg overflow-hidden border border-transparent hover:border-primary/50 cursor-pointer bg-slate-100 dark:bg-slate-800">
                 <img
-                  alt="Detail View 3"
                   className="w-full h-full object-cover"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuAimKqdx_sLWZyXBqtDUQgMxfbDC9PulDKAojsY7xP4NyLTWzt1CIosTg1wCjmQliQ8Iebl1FhCtRgQLdiAMo92hbX4I3TVfUAJvVd0E92oFlvnALwx9nt29pZRhcggPhqcW9-6OzR8xgbAanMx9WvnZeKZ7I5b6Nlk9G0YhCo9Yv0GWvjMaPmplrgKQJN-ot7yElXSXA1Mf2KhLWd9pkAFOyparEwagSrun1MM8uku-Ny1B_fGOJta4sy1oJGFXstvK1fwprfRCVg"
-                />
-              </div>
-              <div className="aspect-square bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden">
-                <img
-                  alt="Detail View 4"
-                  className="w-full h-full object-cover"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCFhYh7-GBobv13ODXz7WLdKXin_uCTbztEj1SM1GDw5Txekl560tqmoZipKxNWOmh3xH2s0qy8RHxsCbL8q6Nyr2-s_ZjhKZ6hNjSd8EbVjbcuuld8dRdDdiBoCeO8dOKTHqmPUHjRZaSV3ZptKLXZFHQ3aZPzcaXNkrV83VAcYKPsUKzeDvXvMA9FuQ498RXEjtJDpOXNU4li9tqXU93crzEhpvRzvdraG7gJtYqDqwRfYAJ0ZpU2aZVZwAtFoFeqYCvB6LD-3gU"
+                  alt="Back view of sneaker heel"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmdxSlmDz468-W1I43hxefdyg4RANBzDHkvi_ovw5KqAtc7gp2SkzHAc0MLyOBcn40ip7aZV4HhwJXZ52SuafJc28sTC_ZcbCtwZEh-vEBaMOHR5eYlN05ihNTXDOLb57a70ZVldrZlKghB3Ox71He6Y4aK0uiAjR3cu_TobMBkzzgzAZIK54mJ4qDwXB62qmAxs--KnXWYkton8DOHhxgyYiPDlEvwoSz3q_AqffPjSfS58-JrKHVXDUD652_66Ybxf-FsC9Utpc"
                 />
               </div>
             </div>
           </div>
 
-          {/* Product Info */}
-          <div className="lg:col-span-5 space-y-8">
-            <div>
-              <div className="flex items-center gap-2 text-primary font-bold mb-2">
-                <span className="text-sm tracking-widest uppercase">
-                  New Release
-                </span>
-              </div>
-              <h2 className="text-4xl font-black tracking-tight mb-2">
-                Air Max Pulse
-              </h2>
-              <p className="text-lg text-slate-500">
-                Men&apos;s Road Running Shoes
-              </p>
-              <p className="text-2xl font-bold mt-4">$150.00</p>
+          {/* Product Details */}
+          <div className="flex flex-col justify-start">
+            <div className="mb-2">
+              <span className="text-primary font-bold tracking-widest text-xs uppercase">
+                Premium Performance
+              </span>
             </div>
-
-            {/* Rating */}
-            <div className="flex items-center gap-4">
-              <div className="flex text-primary">
+            <h1 className="text-5xl font-black text-slate-900 dark:text-slate-100 mb-4 tracking-tight">
+              {product?.name || "Product name"}
+            </h1>
+            <div className="flex items-center gap-4 mb-6">
+              <div className="flex items-center text-primary">
                 <span className="material-symbols-outlined fill-1">star</span>
                 <span className="material-symbols-outlined fill-1">star</span>
                 <span className="material-symbols-outlined fill-1">star</span>
                 <span className="material-symbols-outlined fill-1">star</span>
                 <span className="material-symbols-outlined">star_half</span>
               </div>
-              <span className="text-sm font-semibold border-b border-slate-300">
-                124 Reviews
+              <span className="text-sm font-medium text-slate-500">
+                4.8 (124 Reviews)
               </span>
             </div>
+            <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-8">
+              {product ? `$${product.price}` : "--"}
+            </p>
+            <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-8">
+              {product?.description ||
+                "Engineered for both performance running and street-ready style."}
+            </p>
 
-            {/* Colorway */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="font-bold">Select Colorway</h3>
-                <span className="text-sm text-slate-500">Orange / Black</span>
-              </div>
+            {/* Color Selection */}
+            <div className="mb-8">
+              <h3 className="text-sm font-bold uppercase tracking-wider mb-4">
+                Select Color
+              </h3>
               <div className="flex gap-3">
-                <button className="w-16 h-16 rounded-lg border-2 border-primary overflow-hidden">
-                  <img
-                    alt="Color 1"
-                    className="w-full h-full object-cover"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYrZ5_JGV6MKBAxI0TUXdZ9ypFZtEjZ4pp-5CYUCfY67leIN8HVfj7_pQPCsN-9Hybb2DxqL4Ro0xTzDTa7N4vU8AM4dhHp-EikHzm0cxG30JwwjFxHxOadbNOuJ_9GJGfgezWybvUiQKqa_Fnw3dYQuLXWHH4mnYeOxdo-r3GwNMUcXPft4_7U2Hi1z2ZE2eZlR0U_cPQdd_C2fghol66HWDieuUT4Lv801A8mkuDlNKCVQPOoYKlTt6HI5azkl9bmLqbRdJs8VI"
-                  />
-                </button>
-                <button className="w-16 h-16 rounded-lg border-2 border-transparent hover:border-slate-300 overflow-hidden">
-                  <img
-                    alt="Color 2"
-                    className="w-full h-full object-cover"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuBFf_C7KzfZAjw0Z4xHIrjyU8-n9Kpnf-F_9u8GVQaFUTxvIgR2Pcsehm2-0fdDcccQ9datJDMcqCGMokrn2QCnV-CEM2izU6nuP2CiKkVCc8l6vvrb4RHkkO5CWJ-Vj74W2W8va0ubhW3qBw175P3h6adnu0aaumy61oqh9Cg4ZyoB9K4Vp51Zdjg7UFtA-RJzA8i2MDaK2Lj2gaUxNMMT-rWETe0uUMAlgUhp9S80HJHvPiw9DJcEWzxUoVAm4nmZqugCi9U06gM"
-                  />
-                </button>
-                <button className="w-16 h-16 rounded-lg border-2 border-transparent hover:border-slate-300 overflow-hidden">
-                  <img
-                    alt="Color 3"
-                    className="w-full h-full object-cover"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDS-xL5mqkhJVyv9PyS4fDUO1CvLXeXE76vyurcFWgIvCCYF1Xe-ORHDq8AQ4MBOFtKhQKDyWmtuw3AE0exQsPlcQ0O4c2xHj7z1YJsdBjMnZxztrVKEzcJU-xr6bPEKDj7n3XUXNYbPaddIwjRqUnhKHImrUWcEEfDmmtjSb788gqGHND39eYOxjHG9LR1BTQV4kuDV2hqWM5C-w-v3q78MLWACaL3nSYZirZnUxXkkgYr9n5ZOJnQjm1BDjfI7hacRforvlH6sJs"
-                  />
-                </button>
+                <button className="w-12 h-12 rounded-full bg-primary border-4 border-white dark:border-slate-900 shadow-lg ring-2 ring-primary"></button>
+                <button className="w-12 h-12 rounded-full bg-slate-900 border-4 border-white dark:border-slate-900 shadow-md"></button>
+                <button className="w-12 h-12 rounded-full bg-slate-200 border-4 border-white dark:border-slate-900 shadow-md"></button>
               </div>
             </div>
 
-            {/* Size */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="font-bold">Select Size</h3>
-                <a
-                  className="text-sm text-slate-500 hover:text-primary underline"
-                  href="#"
-                >
+            {/* Size Selection */}
+            <div className="mb-10">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-sm font-bold uppercase tracking-wider">
+                  Select Size (US)
+                </h3>
+                <button className="text-xs font-bold text-primary underline underline-offset-4">
                   Size Guide
-                </a>
+                </button>
               </div>
               <div className="grid grid-cols-4 gap-2">
-                <button className="py-3 border border-slate-200 dark:border-slate-700 rounded hover:border-primary hover:bg-primary/5 transition-all">
-                  US 7
+                <button className="py-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-primary font-medium text-sm transition-colors">
+                  7
                 </button>
-                <button className="py-3 border border-slate-200 dark:border-slate-700 rounded hover:border-primary hover:bg-primary/5 transition-all">
-                  US 8
+                <button className="py-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-primary font-medium text-sm transition-colors">
+                  8
                 </button>
-                <button className="py-3 border border-primary bg-primary/10 rounded font-bold">
-                  US 9
+                <button className="py-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-primary font-medium text-sm transition-colors">
+                  9
                 </button>
-                <button className="py-3 border border-slate-200 dark:border-slate-700 rounded hover:border-primary hover:bg-primary/5 transition-all">
-                  US 10
+                <button className="py-3 rounded-lg border-2 border-primary bg-primary/5 font-bold text-sm">
+                  10
                 </button>
-                <button className="py-3 border border-slate-200 dark:border-slate-700 rounded hover:border-primary hover:bg-primary/5 transition-all">
-                  US 11
+                <button className="py-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-primary font-medium text-sm transition-colors">
+                  11
                 </button>
-                <button className="py-3 border border-slate-200 dark:border-slate-700 rounded hover:border-primary hover:bg-primary/5 transition-all text-slate-300 cursor-not-allowed">
-                  US 12
+                <button className="py-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-primary font-medium text-sm transition-colors">
+                  12
                 </button>
-                <button className="py-3 border border-slate-200 dark:border-slate-700 rounded hover:border-primary hover:bg-primary/5 transition-all">
-                  US 13
+                <button className="py-3 rounded-lg border border-slate-200 dark:border-slate-700 opacity-40 cursor-not-allowed font-medium text-sm">
+                  13
                 </button>
-                <button className="py-3 border border-slate-200 dark:border-slate-700 rounded hover:border-primary hover:bg-primary/5 transition-all">
-                  US 14
+                <button className="py-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-primary font-medium text-sm transition-colors">
+                  14
                 </button>
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="space-y-3">
-              <button className="w-full py-5 bg-primary hover:bg-primary/90 text-white rounded-full font-bold text-lg shadow-lg shadow-primary/20 transition-all">
-                Add to Cart
+            {/* CTA Buttons */}
+            <div className="flex gap-4">
+              <button
+                type="button"
+                disabled={!product}
+                onClick={() => {
+                  if (!product) return;
+                  dispatch(
+                    addToCart({
+                      productId: product._id,
+                      name: product.name,
+                      image: product.image,
+                      price: product.price,
+                      qty: 1,
+                    }),
+                  );
+                }}
+                className="flex-1 bg-primary text-slate-900 font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:brightness-110 transition-all shadow-xl shadow-primary/20 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <span className="material-symbols-outlined">shopping_bag</span>
+                ADD TO CART
               </button>
-              <button className="w-full py-5 border-2 border-slate-200 dark:border-slate-700 hover:border-primary rounded-full font-bold text-lg flex items-center justify-center gap-2 transition-all">
+              <button className="p-4 border-2 border-slate-200 dark:border-slate-700 rounded-xl hover:border-primary/50 transition-colors">
                 <span className="material-symbols-outlined">favorite</span>
-                Favorite
               </button>
             </div>
 
-            {/* Shipping Info */}
-            <div className="p-6 bg-slate-100 dark:bg-slate-800 rounded-xl space-y-4">
-              <div className="flex gap-4">
-                <span className="material-symbols-outlined text-primary">
+            <div className="mt-8 flex items-center gap-6 text-xs font-medium text-slate-500 uppercase tracking-widest">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-sm">
                   local_shipping
-                </span>
-                <div>
-                  <p className="font-bold text-sm">Free Delivery</p>
-                  <p className="text-xs text-slate-500">Orders over $100</p>
-                </div>
+                </span>{" "}
+                Free Shipping
               </div>
-              <div className="flex gap-4">
-                <span className="material-symbols-outlined text-primary">
-                  keyboard_return
-                </span>
-                <div>
-                  <p className="font-bold text-sm">30-Day Returns</p>
-                  <p className="text-xs text-slate-500">No questions asked</p>
-                </div>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-sm">
+                  verified_user
+                </span>{" "}
+                2 Year Warranty
               </div>
             </div>
           </div>
         </div>
 
-        {/* Product Information & Reviews */}
-        <section className="mt-24 grid grid-cols-1 lg:grid-cols-2 gap-16 py-16 border-t border-slate-200 dark:border-slate-800">
-          {/* Product Information */}
-          <div className="space-y-6">
-            <h3 className="text-2xl font-bold">Product Information</h3>
-            <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-              Drawing inspiration from the rhythm of the city, the Air Max Pulse
-              brings an underground touch to the iconic Air Max line. Its
-              textile-wrapped midsole and vacuum-sealed accents keep &apos;em
-              looking fresh and clean, while colors inspired by the urban music
-              scene give &apos;em an edge.
-            </p>
-            <ul className="space-y-3">
-              <li className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-primary text-sm">
-                  check_circle
-                </span>
-                <span>
-                  Point-loaded cushioning system features a plastic clip that
-                  distributes weight to targeted points across the Air unit.
-                </span>
-              </li>
-              <li className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-primary text-sm">
-                  check_circle
-                </span>
-                <span>
-                  Breathable textile upper with leather and synthetic overlays.
-                </span>
-              </li>
-              <li className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-primary text-sm">
-                  check_circle
-                </span>
-                <span>Rubber Waffle outsole gives you durable traction.</span>
-              </li>
-            </ul>
+        {/* Review Section */}
+        <section className="border-t border-slate-200 dark:border-slate-800 pt-16 pb-24">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
+            <div>
+              <h2 className="text-3xl font-black mb-2">Customer Reviews</h2>
+              <p className="text-slate-500">
+                Real feedback from our sneaker community.
+              </p>
+            </div>
+            <button className="bg-primary/10 text-primary border-2 border-primary px-8 py-3 rounded-xl font-bold hover:bg-primary hover:text-white transition-all">
+              Write a Review
+            </button>
           </div>
 
-          {/* Reviews */}
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-2xl font-bold">Reviews (124)</h3>
-              <button className="text-primary font-bold hover:underline">
-                Write a review
-              </button>
-            </div>
-
-            {/* Rating Summary */}
-            <div className="flex items-center gap-8 p-6 bg-white dark:bg-slate-800 rounded-2xl">
-              <div className="text-center">
-                <p className="text-5xl font-black text-primary">4.8</p>
-                <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider font-bold">
-                  Average Rating
-                </p>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            {/* Ratings Summary */}
+            <div className="lg:col-span-4 space-y-8">
+              <div className="bg-primary/5 dark:bg-primary/10 p-8 rounded-3xl border border-primary/10">
+                <div className="text-center mb-6">
+                  <p className="text-6xl font-black text-primary mb-2">4.8</p>
+                  <div className="flex justify-center text-primary mb-2">
+                    <span className="material-symbols-outlined fill-1 text-2xl">
+                      star
+                    </span>
+                    <span className="material-symbols-outlined fill-1 text-2xl">
+                      star
+                    </span>
+                    <span className="material-symbols-outlined fill-1 text-2xl">
+                      star
+                    </span>
+                    <span className="material-symbols-outlined fill-1 text-2xl">
+                      star
+                    </span>
+                    <span className="material-symbols-outlined fill-1 text-2xl">
+                      star
+                    </span>
+                  </div>
+                  <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">
+                    Based on 124 reviews
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  {/* 5 Star */}
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-bold w-4">5</span>
+                    <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div className="bg-primary h-full w-[85%] rounded-full"></div>
+                    </div>
+                    <span className="text-sm text-slate-500 font-medium w-8 text-right">
+                      85%
+                    </span>
+                  </div>
+                  {/* 4 Star */}
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-bold w-4">4</span>
+                    <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div className="bg-primary h-full w-[10%] rounded-full"></div>
+                    </div>
+                    <span className="text-sm text-slate-500 font-medium w-8 text-right">
+                      10%
+                    </span>
+                  </div>
+                  {/* 3 Star */}
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-bold w-4">3</span>
+                    <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div className="bg-primary h-full w-[3%] rounded-full"></div>
+                    </div>
+                    <span className="text-sm text-slate-500 font-medium w-8 text-right">
+                      3%
+                    </span>
+                  </div>
+                  {/* 2 Star */}
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-bold w-4">2</span>
+                    <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div className="bg-primary h-full w-[2%] rounded-full"></div>
+                    </div>
+                    <span className="text-sm text-slate-500 font-medium w-8 text-right">
+                      2%
+                    </span>
+                  </div>
+                  {/* 1 Star */}
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-bold w-4">1</span>
+                    <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div className="bg-primary h-full w-[0%] rounded-full"></div>
+                    </div>
+                    <span className="text-sm text-slate-500 font-medium w-8 text-right">
+                      0%
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="flex-1 space-y-2">
-                <div className="flex items-center gap-4">
-                  <span className="text-xs font-bold w-2">5</span>
-                  <div className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                    <div className="bg-primary h-full w-[80%]"></div>
-                  </div>
-                  <span className="text-xs text-slate-500 w-8">80%</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-xs font-bold w-2">4</span>
-                  <div className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                    <div className="bg-primary h-full w-[12%]"></div>
-                  </div>
-                  <span className="text-xs text-slate-500 w-8">12%</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-xs font-bold w-2">3</span>
-                  <div className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                    <div className="bg-primary h-full w-[5%]"></div>
-                  </div>
-                  <span className="text-xs text-slate-500 w-8">5%</span>
+
+              <div className="p-6 bg-slate-100 dark:bg-slate-800/50 rounded-2xl">
+                <h4 className="font-bold mb-3">Reviewer Highlights</h4>
+                <div className="flex flex-wrap gap-2">
+                  <span className="bg-white dark:bg-slate-700 px-3 py-1 rounded-full text-xs font-medium border border-slate-200 dark:border-slate-600">
+                    &quot;Super Comfortable&quot;
+                  </span>
+                  <span className="bg-white dark:bg-slate-700 px-3 py-1 rounded-full text-xs font-medium border border-slate-200 dark:border-slate-600">
+                    &quot;True to size&quot;
+                  </span>
+                  <span className="bg-white dark:bg-slate-700 px-3 py-1 rounded-full text-xs font-medium border border-slate-200 dark:border-slate-600">
+                    &quot;Fast Shipping&quot;
+                  </span>
                 </div>
               </div>
             </div>
 
             {/* Individual Reviews */}
-            <div className="space-y-6">
-              <div className="border-b border-slate-100 dark:border-slate-800 pb-6">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="font-bold">Alex Johnson</p>
-                    <div className="flex text-primary text-xs scale-90 -ml-1">
-                      <span className="material-symbols-outlined fill-1">
-                        star
-                      </span>
-                      <span className="material-symbols-outlined fill-1">
-                        star
-                      </span>
-                      <span className="material-symbols-outlined fill-1">
-                        star
-                      </span>
-                      <span className="material-symbols-outlined fill-1">
-                        star
-                      </span>
-                      <span className="material-symbols-outlined fill-1">
-                        star
-                      </span>
+            <div className="lg:col-span-8 space-y-10">
+              {/* Review Item 1 */}
+              <div className="border-b border-slate-100 dark:border-slate-800 pb-10">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-primary">
+                      JD
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 dark:text-slate-100">
+                        James D.
+                      </h4>
+                      <div className="flex items-center gap-2">
+                        <div className="flex text-primary text-xs">
+                          <span className="material-symbols-outlined fill-1 text-sm">
+                            star
+                          </span>
+                          <span className="material-symbols-outlined fill-1 text-sm">
+                            star
+                          </span>
+                          <span className="material-symbols-outlined fill-1 text-sm">
+                            star
+                          </span>
+                          <span className="material-symbols-outlined fill-1 text-sm">
+                            star
+                          </span>
+                          <span className="material-symbols-outlined fill-1 text-sm">
+                            star
+                          </span>
+                        </div>
+                        <span className="text-xs text-slate-400">
+                          Oct 24, 2023
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <span className="text-xs text-slate-400">2 days ago</span>
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 uppercase tracking-wider">
+                    <span className="material-symbols-outlined text-xs">
+                      verified
+                    </span>{" "}
+                    Verified Purchase
+                  </span>
                 </div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Best running shoes I&apos;ve ever owned. The cushioning is
-                  revolutionary. Highly recommend for long road runs.
+                <h5 className="font-bold mb-2">
+                  Best running shoes I&apos;ve owned!
+                </h5>
+                <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
+                  The comfort level on these is insane. I&apos;ve been running in
+                  them for two weeks now and my feet feel great. Plus, the orange
+                  color really pops in person!
                 </p>
+                <div className="flex items-center gap-4">
+                  <button className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-primary">
+                    <span className="material-symbols-outlined text-sm">
+                      thumb_up
+                    </span>{" "}
+                    Helpful (12)
+                  </button>
+                  <button className="text-xs font-bold text-slate-500 hover:text-primary">
+                    Report
+                  </button>
+                </div>
               </div>
-              <div className="border-b border-slate-100 dark:border-slate-800 pb-6">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="font-bold">Marcus Chen</p>
-                    <div className="flex text-primary text-xs scale-90 -ml-1">
-                      <span className="material-symbols-outlined fill-1">
-                        star
-                      </span>
-                      <span className="material-symbols-outlined fill-1">
-                        star
-                      </span>
-                      <span className="material-symbols-outlined fill-1">
-                        star
-                      </span>
-                      <span className="material-symbols-outlined fill-1">
-                        star
-                      </span>
-                      <span className="material-symbols-outlined">star</span>
+
+              {/* Review Item 2 */}
+              <div className="border-b border-slate-100 dark:border-slate-800 pb-10">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-primary">
+                      SL
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 dark:text-slate-100">
+                        Sarah L.
+                      </h4>
+                      <div className="flex items-center gap-2">
+                        <div className="flex text-primary text-xs">
+                          <span className="material-symbols-outlined fill-1 text-sm">
+                            star
+                          </span>
+                          <span className="material-symbols-outlined fill-1 text-sm">
+                            star
+                          </span>
+                          <span className="material-symbols-outlined fill-1 text-sm">
+                            star
+                          </span>
+                          <span className="material-symbols-outlined fill-1 text-sm">
+                            star
+                          </span>
+                          <span className="material-symbols-outlined text-sm">
+                            star
+                          </span>
+                        </div>
+                        <span className="text-xs text-slate-400">
+                          Oct 18, 2023
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <span className="text-xs text-slate-400">1 week ago</span>
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 uppercase tracking-wider">
+                    <span className="material-symbols-outlined text-xs">
+                      verified
+                    </span>{" "}
+                    Verified Purchase
+                  </span>
                 </div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Great style and comfort. Fits true to size. Delivery was very
-                  fast.
+                <h5 className="font-bold mb-2">
+                  Great for gym and lifestyle
+                </h5>
+                <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
+                  Love the versatility. I can wear these to my HIIT workout and
+                  then straight out for coffee. Only downside is they run a tiny
+                  bit narrow, maybe go up half a size if you have wide feet.
                 </p>
+                <div className="flex items-center gap-4">
+                  <button className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-primary">
+                    <span className="material-symbols-outlined text-sm">
+                      thumb_up
+                    </span>{" "}
+                    Helpful (5)
+                  </button>
+                  <button className="text-xs font-bold text-slate-500 hover:text-primary">
+                    Report
+                  </button>
+                </div>
               </div>
-              <button className="w-full py-4 border border-slate-200 dark:border-slate-700 rounded-xl font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
-                View All Reviews
+
+              <button className="w-full py-4 border-2 border-slate-200 dark:border-slate-800 rounded-xl font-bold hover:border-primary/50 transition-colors">
+                Load More Reviews
               </button>
             </div>
           </div>

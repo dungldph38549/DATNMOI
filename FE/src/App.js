@@ -11,6 +11,9 @@ import Register from "./pages/Register/Register";
 import Login from "./pages/Login/Login";
 import ShoppingCartPage from "./pages/ShoppingCartPage/ShoppingCartPage";
 import TermsConditionsPage from "./pages/TermsConditionsPage/TermsConditionsPage";
+import ContactPage from "./pages/ContactPage/ContactPage";
+import CheckOut from "./pages/CheckOut/CheckOut";
+import CategoryPage from "./pages/Category/CategoryPage";
 
 //  IMPORT TRANG ADMIN USERS
 import User from "./pages/User"; 
@@ -21,7 +24,6 @@ function App() {
   return (
     <BrowserRouter>
       <div className="app">
-        
         <HeaderComponent />
 
         <div className="content">
@@ -30,10 +32,13 @@ function App() {
             {/* CLIENT ROUTES */}
             <Route path="/" element={<HomePage />} />
             <Route path="/product" element={<ProductPage />} />
-            <Route path="/product-detail" element={<ProductDetail />} />
+            <Route path="/product/:id" element={<ProductDetail />} />
+            <Route path="/category" element={<CategoryPage />} />
             <Route path="/register" element={<Register />} />
             <Route path="/login" element={<Login />} />
             <Route path="/cart" element={<ShoppingCartPage />} />
+            <Route path="/checkout" element={<CheckOut />} />
+            <Route path="/contact" element={<ContactPage />} />
             <Route path="/terms" element={<TermsConditionsPage />} />
 
             {/*  ADMIN ROUTE */}
@@ -54,7 +59,6 @@ function App() {
         </div>
 
         <FooterComponent />
-
       </div>
     </BrowserRouter>
   );
