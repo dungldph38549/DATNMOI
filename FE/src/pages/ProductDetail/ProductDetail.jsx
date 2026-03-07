@@ -41,19 +41,19 @@ const ProductDetail = () => {
         {/* Breadcrumbs */}
         <nav className="flex items-center gap-2 text-sm text-slate-500 mb-8">
           <Link className="hover:text-primary" to="/">
-            Home
+            Trang chủ
           </Link>
           <span className="material-symbols-outlined text-xs">
             chevron_right
           </span>
           <Link className="hover:text-primary" to="/product">
-            Sneakers
+            Giày thể thao
           </Link>
           <span className="material-symbols-outlined text-xs">
             chevron_right
           </span>
           <span className="text-slate-900 dark:text-slate-100 font-medium">
-            {product?.name || "Product"}
+            {product?.name || "Sản phẩm"}
           </span>
         </nav>
 
@@ -84,28 +84,28 @@ const ProductDetail = () => {
               <div className="aspect-square rounded-lg overflow-hidden border-2 border-primary cursor-pointer">
                 <img
                   className="w-full h-full object-cover"
-                  alt="Side view of orange sneaker"
+                  alt="Góc nhìn bên hông của giày màu cam"
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9BZ-fJqaLes3cLWcU0PwGZuxA9ObOJ7nVx7dqrzusCfvXKREX_KS2KgEMyyzdC9Aiu8HiAGszphQeUEAU_CXoxksEsxiX6eISQjqtfndtwO4TUv6Bwv_IgYm-1a2ACXSgU7lfs9AaWM-1dDoL9Jj8KsDbe6ccLueP8Inn6Fz-6Er0h5tMHONvFFT0gX_UlpOi3F_FrEHlp7rQxuapwDUX44PA-bSzdO8dm_gg1W9WmRHhbrt8N0FBLDbKB1WDCoKLIfU6iTF6854"
                 />
               </div>
               <div className="aspect-square rounded-lg overflow-hidden border border-transparent hover:border-primary/50 cursor-pointer bg-slate-100 dark:bg-slate-800">
                 <img
                   className="w-full h-full object-cover"
-                  alt="Top view of orange sneaker"
+                  alt="Góc nhìn từ trên xuống của giày màu cam"
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7xK4RrFzve11osM2rabOt0xggfXP4-kINgh9kB90tKzGd2YF7z9EVwaVj1VPN3IcodDeNMriDOGzCqLN1g7dOgLELSk5exIcDvKDVPCstXdbgR5GAoRcNhTbO7KKpfN1piu_Qn6hFLe7bnENgiD_ynWLwG_PLsb_0rneEGmqhCv6AIpePQCvVpBqIel2ag-vWrJFmqSe6D0IHNaoG6fqD6dWHaJ_yq8HJYA7hG8dWp3zvJZect_Bb90I09XokykQU3tFg1v4yUxc"
                 />
               </div>
               <div className="aspect-square rounded-lg overflow-hidden border border-transparent hover:border-primary/50 cursor-pointer bg-slate-100 dark:bg-slate-800">
                 <img
                   className="w-full h-full object-cover"
-                  alt="Detail view of sneaker sole"
+                  alt="Cận cảnh đế giày"
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuCAggMZV4BGHJuny0gHDcWEYeA1m8nF5FZ5DxsKQSnanzy-wQy8Oaj-6PuNa-Fso6f-gbvNth8JDrREkimJhvDMxxUP5GCKySyOtX-KLutFu3Hfmje18hYJPXVYNFtDVKyGW3XDvPpvLVcqgHhV97BG_Fbr5YQJ7aj5L1jT2ZOSumh3wYDj5G74zW2Ff0iijf2atzZ8m_hLkSV_00gIJcgPJ39_rUOqJbVis5Ah-8Uw4ayeGsjulrBlE3DIUTJDKHv5lCghVshkhlw"
                 />
               </div>
               <div className="aspect-square rounded-lg overflow-hidden border border-transparent hover:border-primary/50 cursor-pointer bg-slate-100 dark:bg-slate-800">
                 <img
                   className="w-full h-full object-cover"
-                  alt="Back view of sneaker heel"
+                  alt="Góc nhìn sau gót giày"
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmdxSlmDz468-W1I43hxefdyg4RANBzDHkvi_ovw5KqAtc7gp2SkzHAc0MLyOBcn40ip7aZV4HhwJXZ52SuafJc28sTC_ZcbCtwZEh-vEBaMOHR5eYlN05ihNTXDOLb57a70ZVldrZlKghB3Ox71He6Y4aK0uiAjR3cu_TobMBkzzgzAZIK54mJ4qDwXB62qmAxs--KnXWYkton8DOHhxgyYiPDlEvwoSz3q_AqffPjSfS58-JrKHVXDUD652_66Ybxf-FsC9Utpc"
                 />
               </div>
@@ -116,7 +116,7 @@ const ProductDetail = () => {
           <div className="flex flex-col justify-start">
             <div className="mb-2">
               <span className="text-primary font-bold tracking-widest text-xs uppercase">
-                Premium Performance
+                Hiệu năng cao cấp
               </span>
             </div>
             <h1 className="text-5xl font-black text-slate-900 dark:text-slate-100 mb-4 tracking-tight">
@@ -131,7 +131,7 @@ const ProductDetail = () => {
                 <span className="material-symbols-outlined">star_half</span>
               </div>
               <span className="text-sm font-medium text-slate-500">
-                4.8 (124 Reviews)
+                4.8 (124 đánh giá)
               </span>
             </div>
             <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-8">
@@ -139,13 +139,13 @@ const ProductDetail = () => {
             </p>
             <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-8">
               {product?.description ||
-                "Engineered for both performance running and street-ready style."}
+                "Thiết kế cho cả hiệu năng vận động và phong cách đường phố."}
             </p>
 
             {/* Color Selection */}
             <div className="mb-8">
               <h3 className="text-sm font-bold uppercase tracking-wider mb-4">
-                Select Color
+                Chọn màu
               </h3>
               <div className="flex gap-3">
                 <button className="w-12 h-12 rounded-full bg-primary border-4 border-white dark:border-slate-900 shadow-lg ring-2 ring-primary"></button>
@@ -158,10 +158,10 @@ const ProductDetail = () => {
             <div className="mb-10">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-sm font-bold uppercase tracking-wider">
-                  Select Size (US)
+                  Chọn size (US)
                 </h3>
                 <button className="text-xs font-bold text-primary underline underline-offset-4">
-                  Size Guide
+                  Hướng dẫn chọn size
                 </button>
               </div>
               <div className="grid grid-cols-4 gap-2">
@@ -212,7 +212,7 @@ const ProductDetail = () => {
                 className="flex-1 bg-primary text-slate-900 font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:brightness-110 transition-all shadow-xl shadow-primary/20 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <span className="material-symbols-outlined">shopping_bag</span>
-                ADD TO CART
+                THÊM VÀO GIỎ
               </button>
               <button className="p-4 border-2 border-slate-200 dark:border-slate-700 rounded-xl hover:border-primary/50 transition-colors">
                 <span className="material-symbols-outlined">favorite</span>
@@ -224,13 +224,13 @@ const ProductDetail = () => {
                 <span className="material-symbols-outlined text-primary text-sm">
                   local_shipping
                 </span>{" "}
-                Free Shipping
+                Giao hàng miễn phí
               </div>
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-sm">
                   verified_user
                 </span>{" "}
-                2 Year Warranty
+                Bảo hành 2 năm
               </div>
             </div>
           </div>
@@ -240,13 +240,13 @@ const ProductDetail = () => {
         <section className="border-t border-slate-200 dark:border-slate-800 pt-16 pb-24">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
             <div>
-              <h2 className="text-3xl font-black mb-2">Customer Reviews</h2>
+              <h2 className="text-3xl font-black mb-2">Đánh giá từ khách hàng</h2>
               <p className="text-slate-500">
-                Real feedback from our sneaker community.
+                Những phản hồi thực tế từ cộng đồng yêu giày.
               </p>
             </div>
             <button className="bg-primary/10 text-primary border-2 border-primary px-8 py-3 rounded-xl font-bold hover:bg-primary hover:text-white transition-all">
-              Write a Review
+              Viết đánh giá
             </button>
           </div>
 
@@ -274,7 +274,7 @@ const ProductDetail = () => {
                     </span>
                   </div>
                   <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">
-                    Based on 124 reviews
+                    Dựa trên 124 đánh giá
                   </p>
                 </div>
                 <div className="space-y-3">
@@ -332,16 +332,16 @@ const ProductDetail = () => {
               </div>
 
               <div className="p-6 bg-slate-100 dark:bg-slate-800/50 rounded-2xl">
-                <h4 className="font-bold mb-3">Reviewer Highlights</h4>
+                <h4 className="font-bold mb-3">Điểm nổi bật từ đánh giá</h4>
                 <div className="flex flex-wrap gap-2">
                   <span className="bg-white dark:bg-slate-700 px-3 py-1 rounded-full text-xs font-medium border border-slate-200 dark:border-slate-600">
-                    &quot;Super Comfortable&quot;
+                    &quot;Siêu êm ái&quot;
                   </span>
                   <span className="bg-white dark:bg-slate-700 px-3 py-1 rounded-full text-xs font-medium border border-slate-200 dark:border-slate-600">
-                    &quot;True to size&quot;
+                    &quot;Đúng size&quot;
                   </span>
                   <span className="bg-white dark:bg-slate-700 px-3 py-1 rounded-full text-xs font-medium border border-slate-200 dark:border-slate-600">
-                    &quot;Fast Shipping&quot;
+                    &quot;Giao hàng nhanh&quot;
                   </span>
                 </div>
               </div>
@@ -384,30 +384,29 @@ const ProductDetail = () => {
                       </div>
                     </div>
                   </div>
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 uppercase tracking-wider">
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 uppercase tracking-wider">
                     <span className="material-symbols-outlined text-xs">
                       verified
                     </span>{" "}
-                    Verified Purchase
+                        ĐÃ MUA HÀNG
                   </span>
                 </div>
                 <h5 className="font-bold mb-2">
-                  Best running shoes I&apos;ve owned!
+                  Đôi giày chạy tốt nhất tôi từng có!
                 </h5>
                 <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-                  The comfort level on these is insane. I&apos;ve been running in
-                  them for two weeks now and my feet feel great. Plus, the orange
-                  color really pops in person!
+                  Độ êm của đôi này thực sự ấn tượng. Tôi đã chạy với nó hai tuần
+                  và chân vẫn rất dễ chịu. Màu cam ra ngoài nhìn cũng rất nổi bật!
                 </p>
                 <div className="flex items-center gap-4">
                   <button className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-primary">
                     <span className="material-symbols-outlined text-sm">
                       thumb_up
                     </span>{" "}
-                    Helpful (12)
+                    Hữu ích (12)
                   </button>
                   <button className="text-xs font-bold text-slate-500 hover:text-primary">
-                    Report
+                    Báo cáo
                   </button>
                 </div>
               </div>
@@ -447,36 +446,35 @@ const ProductDetail = () => {
                       </div>
                     </div>
                   </div>
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 uppercase tracking-wider">
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 uppercase tracking-wider">
                     <span className="material-symbols-outlined text-xs">
                       verified
                     </span>{" "}
-                    Verified Purchase
+                        ĐÃ MUA HÀNG
                   </span>
                 </div>
                 <h5 className="font-bold mb-2">
-                  Great for gym and lifestyle
+                  Tuyệt vời cho phòng gym và đi chơi
                 </h5>
                 <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-                  Love the versatility. I can wear these to my HIIT workout and
-                  then straight out for coffee. Only downside is they run a tiny
-                  bit narrow, maybe go up half a size if you have wide feet.
+                  Rất đa dụng. Tôi có thể mang đi tập HIIT rồi đi cà phê luôn.
+                  Điểm trừ nhỏ là form hơi ôm chân, ai bàn chân rộng nên tăng lên nửa size.
                 </p>
                 <div className="flex items-center gap-4">
                   <button className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-primary">
                     <span className="material-symbols-outlined text-sm">
                       thumb_up
                     </span>{" "}
-                    Helpful (5)
+                    Hữu ích (5)
                   </button>
                   <button className="text-xs font-bold text-slate-500 hover:text-primary">
-                    Report
+                    Báo cáo
                   </button>
                 </div>
               </div>
 
               <button className="w-full py-4 border-2 border-slate-200 dark:border-slate-800 rounded-xl font-bold hover:border-primary/50 transition-colors">
-                Load More Reviews
+                Xem thêm đánh giá
               </button>
             </div>
           </div>

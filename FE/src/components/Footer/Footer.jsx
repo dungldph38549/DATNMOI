@@ -19,13 +19,13 @@ const Footer = () => {
 
           {/* CONTACT */}
           <div>
-            <h5>CONTACT US</h5>
+            <h5>LIÊN HỆ</h5>
 
             <div className="contact-item">
               <FaMapMarkerAlt className="icon" />
               <div>
-                ThemesGround, 789 Main rd,<br />
-                Anytown, CA 12345 USA
+                ThemesGround, 789 Đường Chính,<br />
+                Anytown, CA 12345, USA
               </div>
             </div>
 
@@ -45,37 +45,37 @@ const Footer = () => {
 
           {/* CUSTOMER SERVICE */}
           <div>
-            <h5>CUSTOMER SERVICE</h5>
+            <h5>DỊCH VỤ KHÁCH HÀNG</h5>
             <ul>
-              <li>My Account</li>
-              <li>Order History</li>
-              <li>FAQ</li>
-              <li>Specials</li>
-              <li>Help Center</li>
+              <li>Tài khoản của tôi</li>
+              <li>Lịch sử đơn hàng</li>
+              <li>Câu hỏi thường gặp</li>
+              <li>Ưu đãi</li>
+              <li>Trung tâm hỗ trợ</li>
             </ul>
           </div>
 
           {/* CORPORATION */}
           <div>
-            <h5>CORPORATION</h5>
+            <h5>VỀ CÔNG TY</h5>
             <ul>
-              <li>About us</li>
-              <li>Customer Service</li>
-              <li>Company</li>
-              <li>Investor Relations</li>
-              <li>Advanced Search</li>
+              <li>Giới thiệu</li>
+              <li>Dịch vụ khách hàng</li>
+              <li>Công ty</li>
+              <li>Quan hệ nhà đầu tư</li>
+              <li>Tìm kiếm nâng cao</li>
             </ul>
           </div>
 
           {/* WHY CHOOSE US */}
           <div>
-            <h5>WHY CHOOSE US</h5>
+            <h5>VÌ SAO CHỌN CHÚNG TÔI</h5>
             <ul>
-              <li>Shopping Guide</li>
+              <li>Hướng dẫn mua sắm</li>
               <li>Blog</li>
-              <li>Company</li>
-              <li>Investor Relations</li>
-              <li>Contact Us</li>
+              <li>Về công ty</li>
+              <li>Quan hệ nhà đầu tư</li>
+              <li>Liên hệ</li>
             </ul>
           </div>
 

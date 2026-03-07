@@ -7,7 +7,7 @@ const ContactPage = () => {
       {/* Breadcrumb */}
       <div className="breadcrumb-section">
         <div className="container">
-          Home / <span>Contact</span>
+          Trang chủ / <span>Liên hệ</span>
         </div>
       </div>
       {/* Google Map */}
@@ -32,42 +32,42 @@ const ContactPage = () => {
 
         {/* LEFT SIDE */}
         <div className="contact-left">
-          <h3>Contact Form</h3>
+          <h3>Form liên hệ</h3>
 
           <form>
             <div className="form-row">
               <div className="form-group">
-                <label>Your Name *</label>
+                <label>Họ và tên *</label>
                 <input type="text" />
               </div>
 
               <div className="form-group">
-                <label>Email Address *</label>
+                <label>Địa chỉ Email *</label>
                 <input type="email" />
               </div>
 
               <div className="form-group">
-                <label>Title *</label>
+                <label>Tiêu đề *</label>
                 <input type="text" />
               </div>
             </div>
 
             <div className="form-group full">
-              <label>Your Comments *</label>
+              <label>Nội dung góp ý *</label>
               <textarea rows="5"></textarea>
             </div>
 
-            <button className="send-btn">SEND MESSAGE</button>
+            <button className="send-btn">GỬI TIN NHẮN</button>
           </form>
         </div>
 
         {/* RIGHT SIDE */}
         <div className="contact-right">
-          <h3>Information</h3>
+          <h3>Thông tin liên hệ</h3>
 
           <div className="info-item">
             <div className="icon">📍</div>
-            <p>ThemesGround, 789 Main rd,<br/>Anytown, CA 12345 USA</p>
+            <p>ThemesGround, 789 Đường Chính,<br/>Anytown, CA 12345 USA</p>
           </div>
 
           <div className="info-item">

@@ -15,9 +15,9 @@ const Login = () => {
 
         {/* Title */}
         <div className="text-center mb-8">
-          <h2 className="text-4xl font-black mb-3">Welcome Back</h2>
+          <h2 className="text-4xl font-black mb-3">Chào mừng trở lại</h2>
           <p className="text-slate-500 dark:text-slate-400 text-lg">
-            Sign in to continue to your account
+            Đăng nhập để tiếp tục sử dụng tài khoản của bạn
           </p>
         </div>
 
@@ -33,7 +33,7 @@ const Login = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Password</label>
+            <label className="block text-sm font-medium mb-2">Mật khẩu</label>
             <input
               type="password"
               placeholder="••••••••"
@@ -45,14 +45,14 @@ const Login = () => {
             type="submit"
             className="w-full bg-primary text-slate-900 font-bold py-4 rounded-xl shadow-lg hover:bg-primary/90 transition-all text-lg"
           >
-            Log In
+            Đăng nhập
           </button>
         </form>
 
         {/* Divider */}
         <div className="flex items-center my-10">
           <div className="flex-grow border-t border-slate-300 dark:border-slate-700"></div>
-          <span className="px-4 text-sm text-slate-400">OR</span>
+          <span className="px-4 text-sm text-slate-400">HOẶC</span>
           <div className="flex-grow border-t border-slate-300 dark:border-slate-700"></div>
         </div>
 
@@ -80,9 +80,9 @@ const Login = () => {
 
         {/* Sign Up */}
         <p className="mt-10 text-center text-base text-slate-500 dark:text-slate-400">
-          Don’t have an account?{" "}
+          Chưa có tài khoản?{" "}
           <Link to="/register" className="text-primary font-bold hover:underline">
-            Sign up
+            Đăng ký ngay
           </Link>
         </p>
       </div>

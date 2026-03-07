@@ -16,8 +16,8 @@ const FooterComponent = () => {
               </h2>
             </div>
             <p className="text-slate-400 leading-relaxed">
-              Redefining street culture since 2010. We curate the world&apos;s
-              most exclusive footwear for those who walk their own path.
+              Định nghĩa lại văn hóa đường phố từ năm 2010. Chúng tôi tuyển chọn
+              những đôi giày độc quyền nhất dành cho những người muốn tạo lối đi riêng.
             </p>
             <div className="flex gap-4">
               <a
@@ -47,31 +47,31 @@ const FooterComponent = () => {
 
           {/* Navigation Links */}
           <div>
-            <h4 className="text-lg font-bold mb-6">Quick Links</h4>
+            <h4 className="text-lg font-bold mb-6">Liên kết nhanh</h4>
             <ul className="space-y-4 text-slate-400">
               <li>
                 <a href="#" className="hover:text-primary transition-colors">
-                  New Arrivals
+                  Sản phẩm mới
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-primary transition-colors">
-                  Best Sellers
+                  Bán chạy nhất
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-primary transition-colors">
-                  Release Calendar
+                  Lịch phát hành
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-primary transition-colors">
-                  Sneaker Care
+                  Chăm sóc giày
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-primary transition-colors">
-                  Size Guide
+                  Hướng dẫn chọn size
                 </a>
               </li>
             </ul>
@@ -79,31 +79,31 @@ const FooterComponent = () => {
 
           {/* Support Links */}
           <div>
-            <h4 className="text-lg font-bold mb-6">Customer Support</h4>
+            <h4 className="text-lg font-bold mb-6">Hỗ trợ khách hàng</h4>
             <ul className="space-y-4 text-slate-400">
               <li>
                 <a href="#" className="hover:text-primary transition-colors">
-                  Order Tracking
+                  Tra cứu đơn hàng
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-primary transition-colors">
-                  Returns &amp; Exchanges
+                  Đổi trả &amp; bảo hành
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-primary transition-colors">
-                  Shipping Information
+                  Thông tin giao hàng
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-primary transition-colors">
-                  Contact Us
+                  Liên hệ
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-primary transition-colors">
-                  FAQs
+                  Câu hỏi thường gặp
                 </a>
               </li>
             </ul>
@@ -111,15 +111,15 @@ const FooterComponent = () => {
 
           {/* Newsletter */}
           <div>
-            <h4 className="text-lg font-bold mb-6">Join the Community</h4>
+            <h4 className="text-lg font-bold mb-6">Tham gia cộng đồng</h4>
             <p className="text-slate-400 text-sm mb-4">
-              Get early access to exclusive drops and insider news.
+              Nhận thông tin sớm về các bộ sưu tập độc quyền và tin tức mới nhất.
             </p>
             <form className="space-y-3">
               <div className="relative">
                 <input
                   type="email"
-                  placeholder="Your email address"
+                  placeholder="Nhập email của bạn"
                   className="w-full bg-white/5 border border-white/10 rounded-lg py-3 px-4 text-sm focus:outline-none focus:border-primary"
                 />
               </div>
@@ -127,23 +127,23 @@ const FooterComponent = () => {
                 type="submit"
                 className="w-full bg-primary text-background-dark font-bold py-3 rounded-lg hover:brightness-110 transition-all"
               >
-                Subscribe Now
+                Đăng ký ngay
               </button>
             </form>
           </div>
         </div>
 
         <div className="pt-10 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 text-slate-500 text-sm">
-          <p>© 2026 SNEAKERHOUSE INC. All rights reserved.</p>
+          <p>© 2026 SNEAKERHOUSE INC. Đã đăng ký bản quyền.</p>
           <div className="flex gap-8">
             <a href="#" className="hover:text-white transition-colors">
-              Privacy Policy
+              Chính sách bảo mật
             </a>
             <a href="#" className="hover:text-white transition-colors">
-              Terms of Service
+              Điều khoản sử dụng
             </a>
             <a href="#" className="hover:text-white transition-colors">
-              Accessibility
+              Hỗ trợ truy cập
             </a>
           </div>
         </div>

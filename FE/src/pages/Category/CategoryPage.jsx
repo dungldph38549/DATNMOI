@@ -6,19 +6,22 @@ const products = [
     id: 1,
     name: "Simple Product",
     price: 600,
-    image: "/assets/images/products/p1.jpg",
+    image:
+      "https://images.unsplash.com/photo-1600185365926-3a2ce3cdb9eb?auto=format&fit=crop&w=800&q=80",
   },
   {
     id: 2,
     name: "Handbag Premium",
     price: 450,
-    image: "/assets/images/products/p2.jpg",
+    image:
+      "https://images.unsplash.com/photo-1588361861040-ac9b1018f6d5?auto=format&fit=crop&w=800&q=80",
   },
   {
     id: 3,
     name: "Fashion Bag",
     price: 520,
-    image: "/assets/images/products/p3.jpg",
+    image:
+      "https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?auto=format&fit=crop&w=800&q=80",
   },
 ];
 
@@ -45,19 +48,19 @@ const CategoryPage = () => {
               <div className="row">
                 <div className="col-md-2 col-sm-2 col-xs-6">
                   <div className="lbl-cnt">
-                    <span className="lbl">Sort by</span>
+                    <span className="lbl">Sắp xếp theo</span>
                     <select className="form-control">
-                      <option>Default</option>
-                      <option>Price (Low to High)</option>
-                      <option>Price (High to Low)</option>
-                      <option>Newest</option>
+                      <option>Mặc định</option>
+                      <option>Giá (thấp đến cao)</option>
+                      <option>Giá (cao đến thấp)</option>
+                      <option>Mới nhất</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="col-md-2 col-sm-2 col-xs-6">
                   <div className="lbl-cnt">
-                    <span className="lbl">Show</span>
+                    <span className="lbl">Hiển thị</span>
                     <select className="form-control">
                       <option>12</option>
                       <option>24</option>
@@ -105,8 +108,8 @@ const CategoryPage = () => {
                                 alert(`Added ${product.name} to cart`)
                               }
                             >
-                              <i className="fa fa-shopping-cart"></i> Add to
-                              cart
+                            <i className="fa fa-shopping-cart"></i> Thêm vào
+                            giỏ hàng
                             </button>
                           </div>
                         </div>

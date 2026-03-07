@@ -8,9 +8,9 @@ const TermsConditionsPage = () => {
           <div className="breadcrumb-inner">
             <ul className="list-inline list-unstyled">
               <li>
-                <a href="#">Home</a>
+                <a href="#">Trang chủ</a>
               </li>
-              <li className="active">Terms &amp; Conditions</li>
+              <li className="active">Điều khoản &amp; điều kiện</li>
             </ul>
           </div>
         </div>
@@ -21,9 +21,9 @@ const TermsConditionsPage = () => {
           <div className="terms-conditions-page">
             <div className="row">
               <div className="col-md-12 terms-conditions">
-                <h2 className="heading-title">Terms and Conditions</h2>
+                <h2 className="heading-title">Điều khoản và điều kiện</h2>
                 <div>
-                  <h3>Intellectual Propertly</h3>
+                  <h3>Sở hữu trí tuệ</h3>
                   <ol>
                     <li>
                       Lorem ipsum dolor sit amet, consectetur adipiscing elit.
@@ -67,7 +67,7 @@ const TermsConditionsPage = () => {
                       adipiscing elit.
                     </li>
                   </ol>
-                  <h3>Termination</h3>
+                  <h3>Chấm dứt</h3>
                   <ol>
                     <li>
                       Lorem ipsum dolor sit amet, consectetur adipiscing elit.
@@ -97,20 +97,20 @@ const TermsConditionsPage = () => {
                       adipiscing elit.
                     </li>
                   </ol>
-                  <h3>Changes to this agreement</h3>
+                  <h3>Thay đổi thỏa thuận</h3>
                   <p>
-                    We reserve the right, at our sole discretion, to modify or
-                    replace these Terms and Conditions by posting the updated
-                    terms on the Site. Your continued use of the Site after any
-                    such changes constitutes your acceptance of the new Terms
-                    and Conditions.{" "}
+                    Chúng tôi có quyền, theo quyết định riêng, sửa đổi hoặc thay thế
+                    các Điều khoản và điều kiện này bằng cách đăng các điều khoản
+                    cập nhật trên Trang web. Việc bạn tiếp tục sử dụng Trang web sau
+                    khi có thay đổi đồng nghĩa với việc bạn chấp nhận các Điều khoản
+                    và điều kiện mới.{" "}
                   </p>
-                  <h3>Contact Us</h3>
+                  <h3>Liên hệ</h3>
                   <p>
-                    If you have any questions about this Agreement, please
-                    contact us filling this{" "}
+                    Nếu bạn có bất kỳ câu hỏi nào về thỏa thuận này, vui lòng
+                    liên hệ với chúng tôi bằng cách điền vào{" "}
                     <a href="#" className="contact-form">
-                      contact form
+                      biểu mẫu liên hệ
                     </a>
                   </p>
                 </div>

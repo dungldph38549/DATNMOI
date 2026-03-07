@@ -48,8 +48,6 @@ const CheckOut = () => {
           amount: item.qty,
           image: item.image,
           price: item.price,
-
-          // FIX lỗi product id
           product: item.product || item._id,
         })),
 
@@ -68,7 +66,6 @@ const CheckOut = () => {
         taxPrice: 0,
         totalPrice: total,
 
-        // FIX lỗi user
         user: user._id,
       };
 
@@ -94,11 +91,22 @@ const CheckOut = () => {
   return (
     <div className="body-content outer-top-xs">
       <div className="container">
+
+        <div className="breadcrumb">
+          <div className="breadcrumb-inner">
+            <ul className="list-inline list-unstyled">
+              <li>
+                <Link to="/">Trang chủ</Link>
+              </li>
+              <li className="active">Thanh toán</li>
+            </ul>
+          </div>
+        </div>
+
         <div className="row">
 
           <div className="col-md-8">
             <div className="checkout-box">
-
               <h2>Thông tin giao hàng</h2>
 
               <form onSubmit={onPlaceOrder}>
@@ -192,7 +200,6 @@ const CheckOut = () => {
                 </Link>
 
               </form>
-
             </div>
           </div>
 

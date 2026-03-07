@@ -34,25 +34,25 @@ const HeaderComponent = () => {
               to="/"
               className="text-sm font-medium hover:text-primary transition-colors"
             >
-              New Arrivals
+              Sản phẩm mới
             </Link>
             <Link
               to="/product"
               className="text-sm font-medium hover:text-primary transition-colors"
             >
-              Shop
+              Cửa hàng
             </Link>
             <Link
               to="/category"
               className="text-sm font-medium hover:text-primary transition-colors"
             >
-              Collections
+              Bộ sưu tập
             </Link>
             <Link
               to="/contact"
               className="text-sm font-medium hover:text-primary transition-colors"
             >
-              About
+              Liên hệ
             </Link>
           </nav>
         </div>
@@ -67,7 +67,7 @@ const HeaderComponent = () => {
             </span>
             <input
               type="text"
-              placeholder="Search sneakers..."
+              placeholder="Tìm kiếm giày..."
               className="w-full bg-primary/5 border-none rounded-full py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary outline-none"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
