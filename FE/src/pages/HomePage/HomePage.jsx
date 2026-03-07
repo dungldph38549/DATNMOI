@@ -207,7 +207,7 @@ const HomePage = () => {
                   <div className="relative aspect-square bg-slate-100 dark:bg-slate-700 p-6">
                     <img
                       className="w-full h-full object-contain group-hover:scale-110 transition-transform"
-                      src={p.image}
+                      src={`http://localhost:3001/uploads/${p.image}`}
                       alt={p.name}
                     />
                   </div>

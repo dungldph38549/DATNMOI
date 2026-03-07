@@ -100,7 +100,10 @@ const ShoppingCartPage = () => {
                                 className="entry-thumbnail"
                                 to={`/product/${item.productId}`}
                               >
-                                <img src={item.image} alt={item.name} />
+                                <img
+                                  src={`http://localhost:3001/uploads/${item.image}`}
+                                  alt={item.name}
+                                />
                               </Link>
                             </td>
 

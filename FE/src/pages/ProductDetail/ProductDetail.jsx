@@ -74,11 +74,15 @@ const ProductDetail = () => {
           {/* Image Gallery */}
           <div className="space-y-4">
             <div className="aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800">
-              <img
-                className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                alt={product?.name || "Product image"}
-                src={product?.image}
-              />
+            <img
+              className="w-full h-full object-cover"
+              alt={product?.name}
+              src={
+                product?.image
+                  ? `http://localhost:3001/uploads/${product.image}`
+                  : null
+              }
+            />
             </div>
             <div className="grid grid-cols-4 gap-4">
               <div className="aspect-square rounded-lg overflow-hidden border-2 border-primary cursor-pointer">

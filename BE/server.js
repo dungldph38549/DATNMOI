@@ -3,28 +3,27 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const path = require("path");
 const routes = require("./src/routers");
 
 const app = express();
 
-// ✅ CORS phải đặt trước routes
+// CORS
 app.use(
   cors({
     origin: "http://localhost:3000",
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
 
-// xử lý preflight request
-app.options("*", cors());
-
+// Parse JSON
 app.use(express.json());
 
-// ======================
+// ✅ Cho phép truy cập ảnh trong thư mục uploads
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 // MongoDB
-// ======================
 if (!process.env.MONGO_URI) {
   console.error("❌ MONGO_URI is not defined in .env");
   process.exit(1);
@@ -38,14 +37,10 @@ mongoose
     process.exit(1);
   });
 
-// ======================
 // Routes
-// ======================
 routes(app);
 
-// ======================
 // Start server
-// ======================
 const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
