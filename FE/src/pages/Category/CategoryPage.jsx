@@ -6,19 +6,22 @@ const products = [
     id: 1,
     name: "Simple Product",
     price: 600,
-    image: "/assets/images/products/p1.jpg",
+    image:
+      "https://images.unsplash.com/photo-1600185365926-3a2ce3cdb9eb?auto=format&fit=crop&w=800&q=80",
   },
   {
     id: 2,
     name: "Handbag Premium",
     price: 450,
-    image: "/assets/images/products/p2.jpg",
+    image:
+      "https://images.unsplash.com/photo-1588361861040-ac9b1018f6d5?auto=format&fit=crop&w=800&q=80",
   },
   {
     id: 3,
     name: "Fashion Bag",
     price: 520,
-    image: "/assets/images/products/p3.jpg",
+    image:
+      "https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?auto=format&fit=crop&w=800&q=80",
   },
 ];
 

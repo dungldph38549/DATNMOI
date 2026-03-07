@@ -16,15 +16,30 @@ const HomePage = () => {
         setError(null);
 
         const res = await fetch("/api/product");
-        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error("Không thể tải danh sách sản phẩm từ server.");
+        }
+
+        let data;
+        try {
+          data = await res.json();
+        } catch (parseError) {
+          // Log chi tiết để debug nhưng không hiển thị thông báo kỹ thuật cho người dùng
+          console.error("Lỗi parse JSON sản phẩm:", parseError);
+          throw new Error("Dữ liệu sản phẩm trả về không hợp lệ.");
+        }
 
         if (data.status !== "OK") {
-          throw new Error(data.message || "Failed to fetch products");
+          throw new Error(
+            data.message || "Không thể tải danh sách sản phẩm.",
+          );
         }
 
         setProducts((data.data || []).slice(0, 8));
       } catch (err) {
-        setError(err.message || "Có lỗi khi tải sản phẩm");
+        console.error("Lỗi khi tải sản phẩm:", err);
+        setError("Hiện không thể tải sản phẩm. Vui lòng thử lại sau.");
       } finally {
         setLoading(false);
       }

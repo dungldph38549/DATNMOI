@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import "./User.css";
 
 const API = "http://localhost:3001/api/users";
@@ -19,8 +18,10 @@ function UserPage() {
   // lấy danh sách user
   const fetchUsers = async () => {
     try {
-      const res = await axios.get(API);
-      setUsers(res.data);
+      const res = await fetch(API);
+      if (!res.ok) throw new Error("Không thể tải danh sách người dùng");
+      const data = await res.json();
+      setUsers(data.data || data);
     } catch (error) {
       console.log("GET ERROR:", error);
     }
@@ -43,14 +44,22 @@ function UserPage() {
     e.preventDefault();
 
     try {
-      if (editingId) {
-        // UPDATE
-        await axios.put(`${API}/${editingId}`, form);
-        setEditingId(null);
-      } else {
-        // CREATE
-        await axios.post(API, form);
+      const options = {
+        method: editingId ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(form),
+      };
+
+      const url = editingId ? `${API}/${editingId}` : API;
+      const res = await fetch(url, options);
+
+      if (!res.ok) {
+        throw new Error("Không thể lưu thông tin người dùng");
       }
+
+      setEditingId(null);
 
       // reset form
       setForm({
@@ -70,7 +79,8 @@ function UserPage() {
   // xóa user
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`${API}/${id}`);
+      const res = await fetch(`${API}/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Không thể xóa người dùng");
       fetchUsers();
     } catch (error) {
       console.log("DELETE ERROR:", error);
