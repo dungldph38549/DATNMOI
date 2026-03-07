@@ -27,25 +27,23 @@ const userSchema = new mongoose.Schema(
     },
 
     phone: {
-      type: Number,
+      type: String,        // 🔥 đổi Number -> String
       required: true,
     },
 
     access_token: {
       type: String,
-      required: true,
+      default: null,       // 🔥 bỏ required
     },
 
     refresh_token: {
       type: String,
-      required: true,
+      default: null,       // 🔥 bỏ required
     },
   },
   {
     timestamps: true,
-  },
+  }
 );
 
-const User = mongoose.model("User", userSchema);
-
-module.exports = User;
+module.exports = mongoose.model("User", userSchema);
