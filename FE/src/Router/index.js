@@ -14,6 +14,8 @@ import AdminOrderDetailPage from "../admin/AdminOrderDetail.jsx";
 import ReturnPayment from "../pages/ReturnPayment/ReturnPayment.jsx";
 import CustommerPage from "../pages/CustommerPage/CustommerPage.jsx";
 import OrderHistoryPage from "../pages/OrderHistoryPage/OrderHistoryPage.jsx";
+import User from "../pages/User/index.jsx";
+
 export const routers = [
   {
     path: "/",
@@ -61,13 +63,18 @@ export const routers = [
     isShowHeader: true,
   },
   {
-    path: "*",
-    page: NotFoundPage,
+    path: "/admin",
+    page: AdminPage,
     isShowHeader: false,
   },
   {
-    path: "/admin",
-    page: AdminPage,
+    path: "/admin/order/:id",
+    page: AdminOrderDetailPage,
+    isShowHeader: false,
+  },
+  {
+    path: "/admin/users",
+    page: User,
     isShowHeader: false,
   },
   {
@@ -90,9 +97,11 @@ export const routers = [
     page: OrderDetailPage,
     isShowHeader: true,
   },
+
+  
   {
-    path: "/admin/order/:id",
-    page: AdminOrderDetailPage,
+    path: "*",
+    page: NotFoundPage,
     isShowHeader: false,
   },
 ];
