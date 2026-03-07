@@ -14,9 +14,9 @@ const Register = () => {
 
         {/* Title */}
         <div className="text-center mb-8">
-          <h2 className="text-4xl font-black mb-3">Create Account</h2>
+          <h2 className="text-4xl font-black mb-3">Tạo tài khoản</h2>
           <p className="text-slate-500 dark:text-slate-400 text-lg">
-            Sign up to get started with SneakerHouse
+            Đăng ký để bắt đầu trải nghiệm cùng SneakerHouse
           </p>
         </div>
 
@@ -32,7 +32,7 @@ const Register = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Password</label>
+            <label className="block text-sm font-medium mb-2">Mật khẩu</label>
             <input
               type="password"
               placeholder="••••••••"
@@ -41,7 +41,7 @@ const Register = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Confirm Password</label>
+            <label className="block text-sm font-medium mb-2">Xác nhận mật khẩu</label>
             <input
               type="password"
               placeholder="••••••••"
@@ -53,14 +53,14 @@ const Register = () => {
             type="submit"
             className="w-full bg-primary text-slate-900 font-bold py-4 rounded-xl shadow-lg hover:bg-primary/90 transition-all text-lg"
           >
-            Sign Up
+            Đăng ký
           </button>
         </form>
 
         {/* Divider */}
         <div className="flex items-center my-10">
           <div className="flex-grow border-t border-slate-300 dark:border-slate-700"></div>
-          <span className="px-4 text-sm text-slate-400">OR</span>
+          <span className="px-4 text-sm text-slate-400">HOẶC</span>
           <div className="flex-grow border-t border-slate-300 dark:border-slate-700"></div>
         </div>
 
@@ -89,9 +89,9 @@ const Register = () => {
 
         {/* Sign In */}
         <p className="mt-10 text-center text-base text-slate-500 dark:text-slate-400">
-          Already have an account?{" "}
+          Đã có tài khoản?{" "}
           <a href="#" className="text-primary font-bold hover:underline">
-            Log in
+            Đăng nhập
           </a>
         </p>
       </div>

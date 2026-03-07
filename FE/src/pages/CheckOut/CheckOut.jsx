@@ -35,9 +35,9 @@ const CheckOut = () => {
           <div className="breadcrumb-inner">
             <ul className="list-inline list-unstyled">
               <li>
-                <Link to="/">Home</Link>
+                <Link to="/">Trang chủ</Link>
               </li>
-              <li className="active">Checkout</li>
+              <li className="active">Thanh toán</li>
             </ul>
           </div>
         </div>
@@ -133,16 +133,16 @@ const CheckOut = () => {
                       </tr>
                     ))}
                     <tr>
-                      <td>Subtotal</td>
+                      <td>Tạm tính</td>
                       <td className="text-right">${subtotal.toFixed(2)}</td>
                     </tr>
                     <tr>
-                      <td>Shipping</td>
+                      <td>Vận chuyển</td>
                       <td className="text-right">${shipping.toFixed(2)}</td>
                     </tr>
                     <tr>
                       <td>
-                        <strong>Total</strong>
+                        <strong>Tổng cộng</strong>
                       </td>
                       <td className="text-right">
                         <strong>${total.toFixed(2)}</strong>

@@ -41,13 +41,13 @@ const ProductPage = () => {
       {/* Breadcrumb */}
       <div className="flex flex-wrap items-center gap-2 mb-6 text-sm text-slate-500">
         <Link to="/" className="hover:text-primary transition-colors">
-          Home
+          Trang chủ
         </Link>
         <span className="material-symbols-outlined text-xs">
           chevron_right
         </span>
         <span className="text-slate-900 dark:text-slate-100 font-medium">
-          Sneakers
+          Giày thể thao
         </span>
       </div>
 
@@ -61,18 +61,18 @@ const ProductPage = () => {
         {/* Product Grid */}
         <div className="flex-1">
           <div className="flex items-center justify-between mb-8">
-            <h1 className="text-3xl font-bold">Men&apos;s Sneakers</h1>
+            <h1 className="text-3xl font-bold">Giày thể thao nam</h1>
 
             <div className="flex items-center gap-4">
               <p className="text-sm text-slate-500">
-                Showing 1-12 of 84 results
+                Hiển thị 1-12 trong tổng số 84 sản phẩm
               </p>
 
               <select className="text-sm border-slate-200 rounded-full bg-white dark:bg-slate-800 py-2 pl-4 pr-10 focus:ring-primary focus:border-primary">
-                <option>Sort by: Popularity</option>
-                <option>Sort by: Newest</option>
-                <option>Sort by: Price Low to High</option>
-                <option>Sort by: Price High to Low</option>
+                <option>Sắp xếp: Phổ biến</option>
+                <option>Sắp xếp: Mới nhất</option>
+                <option>Sắp xếp: Giá thấp đến cao</option>
+                <option>Sắp xếp: Giá cao đến thấp</option>
               </select>
             </div>
           </div>

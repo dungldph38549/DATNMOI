@@ -48,19 +48,19 @@ const CategoryPage = () => {
               <div className="row">
                 <div className="col-md-2 col-sm-2 col-xs-6">
                   <div className="lbl-cnt">
-                    <span className="lbl">Sort by</span>
+                    <span className="lbl">Sắp xếp theo</span>
                     <select className="form-control">
-                      <option>Default</option>
-                      <option>Price (Low to High)</option>
-                      <option>Price (High to Low)</option>
-                      <option>Newest</option>
+                      <option>Mặc định</option>
+                      <option>Giá (thấp đến cao)</option>
+                      <option>Giá (cao đến thấp)</option>
+                      <option>Mới nhất</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="col-md-2 col-sm-2 col-xs-6">
                   <div className="lbl-cnt">
-                    <span className="lbl">Show</span>
+                    <span className="lbl">Hiển thị</span>
                     <select className="form-control">
                       <option>12</option>
                       <option>24</option>
@@ -108,8 +108,8 @@ const CategoryPage = () => {
                                 alert(`Added ${product.name} to cart`)
                               }
                             >
-                              <i className="fa fa-shopping-cart"></i> Add to
-                              cart
+                            <i className="fa fa-shopping-cart"></i> Thêm vào
+                            giỏ hàng
                             </button>
                           </div>
                         </div>

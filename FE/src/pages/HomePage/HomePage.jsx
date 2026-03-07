@@ -64,21 +64,21 @@ const HomePage = () => {
             </div>
             <div className="relative z-10 max-w-xl space-y-6">
               <span className="inline-block px-4 py-1 bg-primary text-background-dark text-xs font-bold uppercase tracking-widest rounded-full">
-                Exclusive Drop
+                Phiên bản giới hạn
               </span>
               <h1 className="text-5xl lg:text-7xl font-black leading-tight">
-                Elevate Your Every Step
+                Nâng tầm từng bước chân
               </h1>
               <p className="text-lg text-slate-200">
-                The limited edition Air Pulse series is finally here. Engineered
-                for performance, designed for the streets.
+                Dòng Air Pulse phiên bản giới hạn đã có mặt. Tối ưu cho hiệu năng,
+                thiết kế cho phong cách đường phố.
               </p>
               <div className="flex flex-wrap gap-4 pt-4">
                 <Link
                   to="/product"
                   className="px-8 py-4 bg-primary text-background-dark font-bold rounded-full hover:shadow-lg hover:shadow-primary/30 transition-all flex items-center gap-2"
                 >
-                  Shop Now
+                  Mua ngay
                   <span className="material-symbols-outlined">
                     arrow_forward
                   </span>
@@ -87,7 +87,7 @@ const HomePage = () => {
                   to="/category"
                   className="px-8 py-4 bg-white/10 backdrop-blur-md text-white font-bold rounded-full border border-white/20 hover:bg-white/20 transition-all"
                 >
-                  View Lookbook
+                  Xem bộ sưu tập
                 </Link>
               </div>
             </div>
@@ -100,16 +100,16 @@ const HomePage = () => {
         <div className="max-w-7xl mx-auto">
           <div className="flex items-end justify-between mb-8">
             <div>
-              <h2 className="text-3xl font-bold">Shop by Category</h2>
+              <h2 className="text-3xl font-bold">Mua sắm theo danh mục</h2>
               <p className="text-slate-500 mt-1">
-                Find the perfect pair for your lifestyle
+                Tìm đôi giày phù hợp với phong cách sống của bạn
               </p>
             </div>
             <Link
               to="/category"
               className="text-primary font-bold flex items-center gap-1 hover:underline"
             >
-              See All Categories{" "}
+              Xem tất cả danh mục{" "}
               <span className="material-symbols-outlined text-sm">
                 open_in_new
               </span>
@@ -131,7 +131,7 @@ const HomePage = () => {
               <div className="absolute bottom-6 left-6">
                 <h3 className="text-2xl font-bold text-white mb-2">Running</h3>
                 <button className="text-white text-sm font-semibold py-2 px-4 bg-white/20 backdrop-blur-md rounded-lg hover:bg-primary hover:text-background-dark transition-colors">
-                  Explore
+                  Khám phá
                 </button>
               </div>
             </Link>
@@ -152,7 +152,7 @@ const HomePage = () => {
                   Basketball
                 </h3>
                 <button className="text-white text-sm font-semibold py-2 px-4 bg-white/20 backdrop-blur-md rounded-lg hover:bg-primary hover:text-background-dark transition-colors">
-                  Explore
+                  Khám phá
                 </button>
               </div>
             </Link>
@@ -173,7 +173,7 @@ const HomePage = () => {
                   Lifestyle
                 </h3>
                 <button className="text-white text-sm font-semibold py-2 px-4 bg-white/20 backdrop-blur-md rounded-lg hover:bg-primary hover:text-background-dark transition-colors">
-                  Explore
+                  Khám phá
                 </button>
               </div>
             </Link>
@@ -184,7 +184,7 @@ const HomePage = () => {
       {/* New Arrivals Grid */}
       <section className="px-6 lg:px-20 py-12 bg-primary/5">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold mb-10 text-center">Trending Now</h2>
+          <h2 className="text-3xl font-bold mb-10 text-center">Xu hướng hiện nay</h2>
           {loading && (
             <p className="text-sm text-slate-500 text-center">
               Đang tải sản phẩm...
@@ -251,7 +251,7 @@ const HomePage = () => {
               to="/product"
               className="inline-block px-10 py-3 border-2 border-primary text-primary font-bold rounded-full hover:bg-primary hover:text-background-dark transition-all"
             >
-              Browse All Collection
+              Xem toàn bộ bộ sưu tập
             </Link>
           </div>
         </div>

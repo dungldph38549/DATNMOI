@@ -7,15 +7,15 @@ function Header() {
       <div className="top-bar">
         <div className="container top-inner">
           <div className="left-top">
-            USD ▾ &nbsp;&nbsp; English ▾
+            VND ▾ &nbsp;&nbsp; Tiếng Việt ▾
           </div>
 
           <div className="right-top">
-            <a href="#">My Account</a>
-            <a href="#">Wishlist</a>
-            <a href="#">My Cart</a>
-            <a href="#">Checkout</a>
-            <a href="#">Login</a>
+            <a href="#">Tài khoản</a>
+            <a href="#">Yêu thích</a>
+            <a href="#">Giỏ hàng</a>
+            <a href="#">Thanh toán</a>
+            <a href="#">Đăng nhập</a>
           </div>
         </div>
       </div>
@@ -29,14 +29,14 @@ function Header() {
           </div>
 
           <div className="search-box">
-            <div className="category">Categories ▾</div>
-            <input type="text" placeholder="Search here..." />
+            <div className="category">Danh mục ▾</div>
+            <input type="text" placeholder="Tìm kiếm sản phẩm..." />
             <button>🔍</button>
           </div>
 
           <div className="cart">
             <span className="cart-count">2</span>
-            <span>CART - $600.00</span>
+            <span>GIỎ HÀNG - 600.000₫</span>
           </div>
 
         </div>
@@ -46,16 +46,16 @@ function Header() {
       <div className="navbar">
         <div className="container nav-inner">
           <ul>
-            <li className="active">HOME</li>
-            <li>CLOTHING</li>
-            <li className="hot">ELECTRONICS</li>
-            <li className="new">HEALTH & BEAUTY</li>
-            <li>WATCHES</li>
-            <li>JEWELLERY</li>
-            <li>SHOES</li>
-            <li>KIDS & GIRLS</li>
-            <li>PAGES</li>
-            <li className="offer">TODAYS OFFER</li>
+            <li className="active">TRANG CHỦ</li>
+            <li>QUẦN ÁO</li>
+            <li className="hot">ĐIỆN TỬ</li>
+            <li className="new">SỨC KHỎE & LÀM ĐẸP</li>
+            <li>ĐỒNG HỒ</li>
+            <li>TRANG SỨC</li>
+            <li>GIÀY DÉP</li>
+            <li>TRẺ EM</li>
+            <li>TRANG KHÁC</li>
+            <li className="offer">KHUYẾN MÃI HÔM NAY</li>
           </ul>
         </div>
       </div>

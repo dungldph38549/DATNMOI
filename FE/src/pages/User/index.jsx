@@ -102,7 +102,7 @@ function UserPage() {
 
   return (
     <div className="admin-users">
-      <h2>Quản lý User</h2>
+      <h2>Quản lý người dùng</h2>
 
       <form onSubmit={handleSubmit} className="user-form">
         <input
@@ -138,8 +138,8 @@ function UserPage() {
         />
 
         <select name="role" value={form.role} onChange={handleChange}>
-          <option value="user">User</option>
-          <option value="admin">Admin</option>
+          <option value="user">Người dùng</option>
+          <option value="admin">Quản trị viên</option>
         </select>
 
         <button type="submit" className="btn-submit">
@@ -171,7 +171,7 @@ function UserPage() {
                     u.isAdmin ? "role-admin" : "role-user"
                   }`}
                 >
-                  {u.isAdmin ? "admin" : "user"}
+                  {u.isAdmin ? "Quản trị viên" : "Người dùng"}
                 </span>
               </td>
 
