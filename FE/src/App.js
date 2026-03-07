@@ -12,16 +12,22 @@ import Login from "./pages/Login/Login";
 import ShoppingCartPage from "./pages/ShoppingCartPage/ShoppingCartPage";
 import TermsConditionsPage from "./pages/TermsConditionsPage/TermsConditionsPage";
 
+//  IMPORT TRANG ADMIN USERS
+import User from "./pages/User"; 
+// Nếu file của bạn là ./pages/user/index.jsx thì đổi lại cho đúng:
+// import User from "./pages/user";
+
 function App() {
   return (
     <BrowserRouter>
-
       <div className="app">
-
+        
         <HeaderComponent />
 
         <div className="content">
           <Routes>
+
+            {/* CLIENT ROUTES */}
             <Route path="/" element={<HomePage />} />
             <Route path="/product" element={<ProductPage />} />
             <Route path="/product-detail" element={<ProductDetail />} />
@@ -30,6 +36,10 @@ function App() {
             <Route path="/cart" element={<ShoppingCartPage />} />
             <Route path="/terms" element={<TermsConditionsPage />} />
 
+            {/*  ADMIN ROUTE */}
+            <Route path="/admin/users" element={<User />} />
+
+            {/* 404 */}
             <Route
               path="*"
               element={
@@ -39,13 +49,13 @@ function App() {
                 </div>
               }
             />
+
           </Routes>
         </div>
 
         <FooterComponent />
 
       </div>
-
     </BrowserRouter>
   );
 }
