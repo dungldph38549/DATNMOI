@@ -11,10 +11,8 @@ const categoryRouter = require("./src/routers/CategoryRouter");
 
 const reviewRouter = require("./src/routers/ReviewRouter");
 const adminReviewRouter = require("./src/routers/adminReviewRoutes");
-
 const sizeRouter = require("./src/routers/SizeRouter");
 const colorRouter = require("./src/routers/ColorRouter");
-
 
 dotenv.config(); // Đọc các biến từ file .env
 
@@ -42,7 +40,6 @@ app.use("/api/reviews", reviewRouter); //
 app.use("/api/admin", adminReviewRouter);//
 app.use("/api/size", sizeRouter);//
 app.use("/api/color", colorRouter);//
-
 
 // Kết nối MongoDB và khởi động server
 mongoose
