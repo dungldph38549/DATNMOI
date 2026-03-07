@@ -1,34 +1,53 @@
-require("dotenv").config(); // Load biến môi trường từ .env
+require("dotenv").config();
 
 const express = require("express");
 const mongoose = require("mongoose");
+const cors = require("cors");
 const routes = require("./src/routers");
 
 const app = express();
 
-// Middleware
+// ✅ CORS phải đặt trước routes
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
+
+// xử lý preflight request
+app.options("*", cors());
+
 app.use(express.json());
 
-// Kiểm tra biến môi trường
+// ======================
+// MongoDB
+// ======================
 if (!process.env.MONGO_URI) {
   console.error("❌ MONGO_URI is not defined in .env");
   process.exit(1);
 }
 
-// Kết nối MongoDB
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ Connected to MongoDB"))
   .catch((err) => {
-    console.error("❌ Failed to connect to MongoDB:", err);
+    console.error("❌ Failed to connect MongoDB:", err);
     process.exit(1);
   });
 
-// Sử dụng routes
+// ======================
+// Routes
+// ======================
 routes(app);
 
-// Lắng nghe server
-const PORT = process.env.PORT || 3000;
+// ======================
+// Start server
+// ======================
+const PORT = process.env.PORT || 3001;
+
 app.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
