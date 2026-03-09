@@ -1,6 +1,53 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { addToCart } from "../../redux/cartSlice";
 
 const HomePage = () => {
+  const dispatch = useDispatch();
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await fetch("/api/product");
+
+        if (!res.ok) {
+          throw new Error("Không thể tải danh sách sản phẩm từ server.");
+        }
+
+        let data;
+        try {
+          data = await res.json();
+        } catch (parseError) {
+          // Log chi tiết để debug nhưng không hiển thị thông báo kỹ thuật cho người dùng
+          console.error("Lỗi parse JSON sản phẩm:", parseError);
+          throw new Error("Dữ liệu sản phẩm trả về không hợp lệ.");
+        }
+
+        if (data.status !== "OK") {
+          throw new Error(
+            data.message || "Không thể tải danh sách sản phẩm.",
+          );
+        }
+
+        setProducts((data.data || []).slice(0, 8));
+      } catch (err) {
+        console.error("Lỗi khi tải sản phẩm:", err);
+        setError("Hiện không thể tải sản phẩm. Vui lòng thử lại sau.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
   return (
     <main className="flex-1 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
       {/* Hero Section */}
@@ -17,25 +64,31 @@ const HomePage = () => {
             </div>
             <div className="relative z-10 max-w-xl space-y-6">
               <span className="inline-block px-4 py-1 bg-primary text-background-dark text-xs font-bold uppercase tracking-widest rounded-full">
-                Exclusive Drop
+                Phiên bản giới hạn
               </span>
               <h1 className="text-5xl lg:text-7xl font-black leading-tight">
-                Elevate Your Every Step
+                Nâng tầm từng bước chân
               </h1>
               <p className="text-lg text-slate-200">
-                The limited edition Air Pulse series is finally here. Engineered
-                for performance, designed for the streets.
+                Dòng Air Pulse phiên bản giới hạn đã có mặt. Tối ưu cho hiệu năng,
+                thiết kế cho phong cách đường phố.
               </p>
               <div className="flex flex-wrap gap-4 pt-4">
-                <button className="px-8 py-4 bg-primary text-background-dark font-bold rounded-full hover:shadow-lg hover:shadow-primary/30 transition-all flex items-center gap-2">
-                  Shop Now
+                <Link
+                  to="/product"
+                  className="px-8 py-4 bg-primary text-background-dark font-bold rounded-full hover:shadow-lg hover:shadow-primary/30 transition-all flex items-center gap-2"
+                >
+                  Mua ngay
                   <span className="material-symbols-outlined">
                     arrow_forward
                   </span>
-                </button>
-                <button className="px-8 py-4 bg-white/10 backdrop-blur-md text-white font-bold rounded-full border border-white/20 hover:bg-white/20 transition-all">
-                  View Lookbook
-                </button>
+                </Link>
+                <Link
+                  to="/category"
+                  className="px-8 py-4 bg-white/10 backdrop-blur-md text-white font-bold rounded-full border border-white/20 hover:bg-white/20 transition-all"
+                >
+                  Xem bộ sưu tập
+                </Link>
               </div>
             </div>
           </div>
@@ -47,25 +100,28 @@ const HomePage = () => {
         <div className="max-w-7xl mx-auto">
           <div className="flex items-end justify-between mb-8">
             <div>
-              <h2 className="text-3xl font-bold">Shop by Category</h2>
+              <h2 className="text-3xl font-bold">Mua sắm theo danh mục</h2>
               <p className="text-slate-500 mt-1">
-                Find the perfect pair for your lifestyle
+                Tìm đôi giày phù hợp với phong cách sống của bạn
               </p>
             </div>
-            <a
-              href="#"
+            <Link
+              to="/category"
               className="text-primary font-bold flex items-center gap-1 hover:underline"
             >
-              See All Categories{" "}
+              Xem tất cả danh mục{" "}
               <span className="material-symbols-outlined text-sm">
                 open_in_new
               </span>
-            </a>
+            </Link>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Category Card 1 */}
-            <div className="group relative aspect-[4/5] rounded-xl overflow-hidden cursor-pointer">
+            <Link
+              to="/category?type=Running"
+              className="group relative aspect-[4/5] rounded-xl overflow-hidden cursor-pointer block"
+            >
               <img
                 className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuDbtKp14mxnTdhy2GJG9uWRJcEgWpCU8ATDQEZF1tif4LVrtXTc-bWK2-DrpZlOpsCu3Ub7SoKdmR8e8LgJapBQs2044XxeCkqlBMhqiSoyiorQ76WCEUR-0fflMeXbllB0AYLviJxL9F3VY6OZdHC5BMfqFi820XGxvdNxYa6P6qUGmTfPK6cvpiVHwaMHMo8UHu2ELXyGZAbLWk5uIbDh1_wEsk4Y3SgdN196WNFnONhv9w-sMIYuXA5aYSPR8D1tLLSgx8s0RWo"
@@ -75,13 +131,16 @@ const HomePage = () => {
               <div className="absolute bottom-6 left-6">
                 <h3 className="text-2xl font-bold text-white mb-2">Running</h3>
                 <button className="text-white text-sm font-semibold py-2 px-4 bg-white/20 backdrop-blur-md rounded-lg hover:bg-primary hover:text-background-dark transition-colors">
-                  Explore
+                  Khám phá
                 </button>
               </div>
-            </div>
+            </Link>
 
             {/* Category Card 2 */}
-            <div className="group relative aspect-[4/5] rounded-xl overflow-hidden cursor-pointer">
+            <Link
+              to="/category?type=Basketball"
+              className="group relative aspect-[4/5] rounded-xl overflow-hidden cursor-pointer block"
+            >
               <img
                 className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuAMBkXX8P53hvH3Ml0MhVpf-6G9NwCPu1USfMz5s4qmjBLn8EbPZ6iiOmJwX6GI9DmjIChlkma8Tjy38JJ6Njhq0lx_EwC8fYyQlst-_XSUqwFL2jXjb5D4J0GwWarsNExUTPDiWxhmuj0pgJtQMLoVHwC7hHfDxDVZlQdk6J1mCAofoMkWzRAY1_01xbOHJd_H6uJo8PQinGVQerhukUJpJ1ilJ8IbudpVwCuePHpG9H1CZRQM3Ux-QGFhsE1rF9bZolsiSoyjCao"
@@ -93,13 +152,16 @@ const HomePage = () => {
                   Basketball
                 </h3>
                 <button className="text-white text-sm font-semibold py-2 px-4 bg-white/20 backdrop-blur-md rounded-lg hover:bg-primary hover:text-background-dark transition-colors">
-                  Explore
+                  Khám phá
                 </button>
               </div>
-            </div>
+            </Link>
 
             {/* Category Card 3 */}
-            <div className="group relative aspect-[4/5] rounded-xl overflow-hidden cursor-pointer">
+            <Link
+              to="/category?type=Lifestyle"
+              className="group relative aspect-[4/5] rounded-xl overflow-hidden cursor-pointer block"
+            >
               <img
                 className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuDgZicS_k_2tddPzM9kgzUuoG4NNTwGeQLpmm3nfXibtyWxs9jRb0Hn8leieLwbcvoP6L36CUsWIyvWBuf8ccJNK8YjdJk2ZGSfjhtD5ghBrwrcygPfKOCEcYx1JN6ixOOMfVhazXi20UMyFI434jMrnc4-GH5Js9gd8j06InFFSNwY4EvzesHfm4rEMOm7GUFbISR7D3g0JvaKwXNP3ZfnNa_AGmTBoD--awfOe-z6D4PgYF4gqtktbPLzKII82bqm4bXenSj5Kbk"
@@ -111,10 +173,10 @@ const HomePage = () => {
                   Lifestyle
                 </h3>
                 <button className="text-white text-sm font-semibold py-2 px-4 bg-white/20 backdrop-blur-md rounded-lg hover:bg-primary hover:text-background-dark transition-colors">
-                  Explore
+                  Khám phá
                 </button>
               </div>
-            </div>
+            </Link>
           </div>
         </div>
       </section>
@@ -122,147 +184,75 @@ const HomePage = () => {
       {/* New Arrivals Grid */}
       <section className="px-6 lg:px-20 py-12 bg-primary/5">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold mb-10 text-center">Trending Now</h2>
+          <h2 className="text-3xl font-bold mb-10 text-center">Xu hướng hiện nay</h2>
+          {loading && (
+            <p className="text-sm text-slate-500 text-center">
+              Đang tải sản phẩm...
+            </p>
+          )}
+
+          {error && (
+            <p className="text-sm text-red-500 text-center mb-6">
+              Lỗi: {error}
+            </p>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {/* Product Item 1 */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-primary/5 hover:shadow-xl transition-shadow group">
-              <div className="relative aspect-square bg-slate-100 dark:bg-slate-700 p-6">
-                <img
-                  className="w-full h-full object-contain group-hover:scale-110 transition-transform"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuADo0PQ0J-zxpgHALllQwlqpgM4P7m1_UK5YMCpKFSNd40bXf5Zdqc9MWKQYYhm670yv1Xxcu_1fGvVVpwAhnC8UCb0q-ivSz8UspetJxkyXmY6n1KWMC85hvPbGR1PgzOy-z5p5vjAiHVengdUnhpSssEDtCi2WwI4QOE-ORTuciF_0XcgCQx5tFj4tU-1Scrd2Qw65-v2eLPApOpgOixB3Tt6OacJiVqRX0jTvXF34uSJNtlNGRTDtSy8zCXf5S_7bWKJESFzObU"
-                  alt="Black minimalist athletic sneaker"
-                />
-                <span className="absolute top-3 right-3 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded">
-                  HOT
-                </span>
-                <button className="absolute bottom-4 right-4 bg-white dark:bg-slate-900 p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span className="material-symbols-outlined text-primary">
-                    favorite
-                  </span>
-                </button>
-              </div>
-              <div className="p-4">
-                <p className="text-xs text-slate-500 uppercase font-bold tracking-widest mb-1">
-                  Performance
-                </p>
-                <h4 className="font-bold text-lg mb-2">Swift Flow Pro</h4>
-                <div className="flex items-center justify-between">
-                  <span className="text-xl font-black text-primary">
-                    $129.00
-                  </span>
-                  <button className="bg-primary/20 hover:bg-primary p-2 rounded-lg transition-colors">
-                    <span className="material-symbols-outlined text-sm">
-                      add_shopping_cart
+            {products.map((p) => (
+              <div
+                key={p._id}
+                className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-primary/5 hover:shadow-xl transition-shadow group"
+              >
+                <Link to={`/product/${p._id}`}>
+                  <div className="relative aspect-square bg-slate-100 dark:bg-slate-700 p-6">
+                    <img
+                      className="w-full h-full object-contain group-hover:scale-110 transition-transform"
+                      src={`http://localhost:3001/uploads/${p.image}`}
+                      alt={p.name}
+                    />
+                  </div>
+                </Link>
+                <div className="p-4">
+                  <p className="text-xs text-slate-500 uppercase font-bold tracking-widest mb-1">
+                    {p.type}
+                  </p>
+                  <h4 className="font-bold text-lg mb-2 truncate">{p.name}</h4>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xl font-black text-primary">
+                      ${Number(p.price || 0).toFixed(2)}
                     </span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        dispatch(
+                          addToCart({
+                            productId: p._id,
+                            name: p.name,
+                            image: p.image,
+                            price: p.price,
+                            qty: 1,
+                          }),
+                        )
+                      }
+                      className="bg-primary/20 hover:bg-primary p-2 rounded-lg transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm">
+                        add_shopping_cart
+                      </span>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {/* Product Item 2 */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-primary/5 hover:shadow-xl transition-shadow group">
-              <div className="relative aspect-square bg-slate-100 dark:bg-slate-700 p-6">
-                <img
-                  className="w-full h-full object-contain group-hover:scale-110 transition-transform"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfggzfiBveb5BSIcqXGwVZpGksXoLoyFyQuQdGP31mkKWOp2MXzyEXhoYHxPSz338ytu5LmRc0z2OQMu-pOjHrA6GbF7TNtcfQqB3nvuljlxzN6yeCWD9hOb-PjSXPTP2btSWG66CQqRTZwFdGbaRqSVAqVKiHBMQzVJMGQWAaAY_k5DMS3kHnAbVewEAsXnMvl_5Fq15p-F_A03jg-QAm8Df4CaFpdaEQgEHu3eO5LAZ-ppuYWDenD3oPj4NP9NN_Hfy4e_xboxM"
-                  alt="Colorful retro-style sneaker"
-                />
-                <button className="absolute bottom-4 right-4 bg-white dark:bg-slate-900 p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span className="material-symbols-outlined text-primary">
-                    favorite
-                  </span>
-                </button>
-              </div>
-              <div className="p-4">
-                <p className="text-xs text-slate-500 uppercase font-bold tracking-widest mb-1">
-                  Lifestyle
-                </p>
-                <h4 className="font-bold text-lg mb-2">Retro Wave &apos;94</h4>
-                <div className="flex items-center justify-between">
-                  <span className="text-xl font-black text-primary">
-                    $110.00
-                  </span>
-                  <button className="bg-primary/20 hover:bg-primary p-2 rounded-lg transition-colors">
-                    <span className="material-symbols-outlined text-sm">
-                      add_shopping_cart
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Product Item 3 */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-primary/5 hover:shadow-xl transition-shadow group">
-              <div className="relative aspect-square bg-slate-100 dark:bg-slate-700 p-6">
-                <img
-                  className="w-full h-full object-contain group-hover:scale-110 transition-transform"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDkXXTxcEpZGqIrbR42HuBhSGqRr16QtAewJjnGrUk9lyXxtWSy5-dYSScmgkyWC7kLY-mBCRgSiI2TaoEim_6cQbmQufXjy2nhu3URp8W-z3bOe60mZPkbWdlYMFsJxEAoCHRZf9-P8L5UfTON-XYyC_lLHPdeIb7nAZxQNqVOJwW-ePXzXQ9bVMBs9HqoSSQmcg7fec2vctkDqc5xFcAI-BR01oEx-D2I1b3mrDS-z3zPn6KC4rtrIeDiW5kEIqdMbF7lyUgY0Jc"
-                  alt="Vibrant classic canvas sneaker"
-                />
-                <button className="absolute bottom-4 right-4 bg-white dark:bg-slate-900 p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span className="material-symbols-outlined text-primary">
-                    favorite
-                  </span>
-                </button>
-              </div>
-              <div className="p-4">
-                <p className="text-xs text-slate-500 uppercase font-bold tracking-widest mb-1">
-                  Classic
-                </p>
-                <h4 className="font-bold text-lg mb-2">Heritage Canvas Low</h4>
-                <div className="flex items-center justify-between">
-                  <span className="text-xl font-black text-primary">
-                    $85.00
-                  </span>
-                  <button className="bg-primary/20 hover:bg-primary p-2 rounded-lg transition-colors">
-                    <span className="material-symbols-outlined text-sm">
-                      add_shopping_cart
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Product Item 4 */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-primary/5 hover:shadow-xl transition-shadow group">
-              <div className="relative aspect-square bg-slate-100 dark:bg-slate-700 p-6">
-                <img
-                  className="w-full h-full object-contain group-hover:scale-110 transition-transform"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuD5G_6YN-0wKNYLfVMoqzyI7raFePYGGdPAxVpCExHVc8qAvETLu8o2pjN2_2-DG4DwH7G3Sk8NHOWBW_H6eEmKHZB6G0PL9T0zMZjQ5eT1nMfgCGucWfbG-H3ur_XUxeG7KNZKK0lImDxURA7czkDdLBkUYbCbk66B-R8gVkLV6XB5Jd7BBmeEvzWnW80_9BRYe4GJO_1RM8wGdr5eRKgCbZpZN9MxzjqNzmBMYwhlYi85SDxnhuogLyrhaFeXvVJopszCmLkcLY0"
-                  alt="Modern textured trainer"
-                />
-                <span className="absolute top-3 right-3 bg-primary text-background-dark text-[10px] font-bold px-2 py-1 rounded">
-                  NEW
-                </span>
-                <button className="absolute bottom-4 right-4 bg-white dark:bg-slate-900 p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span className="material-symbols-outlined text-primary">
-                    favorite
-                  </span>
-                </button>
-              </div>
-              <div className="p-4">
-                <p className="text-xs text-slate-500 uppercase font-bold tracking-widest mb-1">
-                  Training
-                </p>
-                <h4 className="font-bold text-lg mb-2">Apex Trainer V2</h4>
-                <div className="flex items-center justify-between">
-                  <span className="text-xl font-black text-primary">
-                    $145.00
-                  </span>
-                  <button className="bg-primary/20 hover:bg-primary p-2 rounded-lg transition-colors">
-                    <span className="material-symbols-outlined text-sm">
-                      add_shopping_cart
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
 
           <div className="text-center mt-12">
-            <button className="px-10 py-3 border-2 border-primary text-primary font-bold rounded-full hover:bg-primary hover:text-background-dark transition-all">
-              Browse All Collection
-            </button>
+            <Link
+              to="/product"
+              className="inline-block px-10 py-3 border-2 border-primary text-primary font-bold rounded-full hover:bg-primary hover:text-background-dark transition-all"
+            >
+              Xem toàn bộ bộ sưu tập
+            </Link>
           </div>
         </div>
       </section>

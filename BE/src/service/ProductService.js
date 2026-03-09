@@ -1,6 +1,48 @@
 const mongoose = require("mongoose");
 const Product = require("../model/ProductModel");
 
+const getAllProducts = async () => {
+  try {
+    const products = await Product.find().sort({ createdAt: -1 });
+
+    return {
+      status: "OK",
+      message: "SUCCESS",
+      data: products,
+    };
+  } catch (e) {
+    throw e;
+  }
+};
+
+const getProductDetail = async (productId) => {
+  try {
+    if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+      return {
+        status: "ERR",
+        message: "Invalid product id",
+      };
+    }
+
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return {
+        status: "ERR",
+        message: "Product not found",
+      };
+    }
+
+    return {
+      status: "OK",
+      message: "SUCCESS",
+      data: product,
+    };
+  } catch (e) {
+    throw e;
+  }
+};
+
 const createProduct = async (newProduct) => {
   try {
     if (!newProduct || typeof newProduct !== "object") {
@@ -218,6 +260,8 @@ const deleteProduct = async (productId) => {
 };
 
 module.exports = {
+  getAllProducts,
+  getProductDetail,
   createProduct,
   updateProduct,
   deleteProduct,

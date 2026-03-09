@@ -1,44 +1,56 @@
-// index.js
 require("dotenv").config();
 const express = require("express");
-const dotenv = require("dotenv");
 const mongoose = require("mongoose");
+const cors = require("cors");
+const path = require("path");
 
 const productRouter = require("./src/routers/ProductRouter");
 const brandRouter = require("./src/routers/BrandRouter");
 const voucherRouter = require("./src/routers/VoucherRouter");
 const categoryRouter = require("./src/routers/CategoryRouter");
-
+const userRouter = require("./src/routers/UserRouter");
 const reviewRouter = require("./src/routers/ReviewRouter");
 const adminReviewRouter = require("./src/routers/adminReviewRoutes");
 const sizeRouter = require("./src/routers/SizeRouter");
 const colorRouter = require("./src/routers/ColorRouter");
+
 const inventoryRoutes = require("./routes/inventoryRoutes");
 const { initSocket } = require("./socket/inventorySocket");
 const { scheduleLowStockScan } = require("./jobs/alertJob");
 
 dotenv.config(); // Đọc các biến từ file .env
 
+const orderRouter = require("./src/routers/OrderRouter");
+
 const app = express();
-app.use(express.json());
 
 const port = process.env.PORT || 3001;
-const mongoURI = process.env.MONGO_DB; // Lấy kết nối MongoDB từ file .env
+const mongoURI = process.env.MONGO_DB;
 
-if (!mongoURI) {
-  console.error("MONGO_DB is not defined in .env");
-  process.exit(1);
-}
+// Middleware
+app.use(express.json());
 
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  })
+);
+
+// Static folder cho ảnh
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Test API
 app.get("/", (req, res) => {
   res.send("Hello API");
 });
 
-// Sử dụng các router cho các API
+// Routes
 app.use("/api/product", productRouter);
 app.use("/api/brand", brandRouter);
 app.use("/api/voucher", voucherRouter);
 app.use("/api/category", categoryRouter);
+app.use("/api/users", userRouter);
 app.use("/api/reviews", reviewRouter);
 app.use("/api/admin", adminReviewRouter);
 app.use("/api/size", sizeRouter);
@@ -77,17 +89,20 @@ initSocket(io);
 
 // ── Cron Jobs ─────────────────────────────────────────────────
 scheduleLowStockScan();
+=======
+app.use("/api/order", orderRouter);
 
-// Kết nối MongoDB và khởi động server
+
+// MongoDB
 mongoose
   .connect(mongoURI)
   .then(() => {
-    console.log("Connected to MongoDB");
+    console.log("✅ Connected to MongoDB");
 
     app.listen(port, () => {
-      console.log("Server running at port", port);
+      console.log(`🚀 Server running: http://localhost:${port}`);
     });
   })
   .catch((err) => {
-    console.error("MongoDB error:", err.message);
+    console.error("❌ MongoDB error:", err.message);
   });

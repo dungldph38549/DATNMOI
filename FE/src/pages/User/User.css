@@ -1,0 +1,130 @@
+/* ===== PAGE ===== */
+.admin-users {
+  padding: 30px;
+  background: #f5f6fa;
+  min-height: 100vh;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.admin-users h2 {
+  margin-bottom: 20px;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+/* ===== FORM ===== */
+.user-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: white;
+  padding: 15px;
+  border-radius: 10px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+  margin-bottom: 20px;
+}
+
+.user-form input,
+.user-form select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  min-width: 160px;
+  outline: none;
+  transition: 0.2s;
+}
+
+.user-form input:focus,
+.user-form select:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 3px rgba(13,110,253,0.3);
+}
+
+/* ===== BUTTON SUBMIT ===== */
+.btn-submit {
+  background: #198754;
+  color: white;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: 0.2s;
+}
+
+.btn-submit:hover {
+  background: #157347;
+}
+
+/* ===== TABLE ===== */
+.user-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+}
+
+.user-table thead {
+  background: #111;
+  color: white;
+}
+
+.user-table th,
+.user-table td {
+  padding: 14px;
+  text-align: left;
+}
+
+.user-table tbody tr {
+  border-bottom: 1px solid #eee;
+}
+
+.user-table tbody tr:hover {
+  background: #f7f7f7;
+}
+
+/* ===== ROLE BADGE ===== */
+.role-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.role-user {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.role-admin {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+/* ===== ACTION BUTTON ===== */
+.action-btn {
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: white;
+  margin-right: 6px;
+}
+
+.btn-edit {
+  background: #0d6efd;
+}
+
+.btn-edit:hover {
+  background: #0b5ed7;
+}
+
+.btn-delete {
+  background: #dc3545;
+}
+
+.btn-delete:hover {
+  background: #bb2d3b;
+}

@@ -2,11 +2,19 @@ const express = require("express");
 const router = express.Router();
 const ProductController = require("../controller/ProductController");
 
-// POST /api/product/create
-router.post("/create", ProductController.createProduct);
-// PUT /api/product/:id
+// GET all products
+router.get("/", ProductController.getAllProducts);
+
+// GET product detail
+router.get("/:id", ProductController.getProductDetail);
+
+// CREATE product
+router.post("/", ProductController.createProduct);
+
+// UPDATE product
 router.put("/:id", ProductController.updateProduct);
-// DELETE /api/product/:id
+
+// DELETE product
 router.delete("/:id", ProductController.deleteProduct);
 
 module.exports = router;

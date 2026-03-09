@@ -1,9 +1,12 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { selectCartCount } from "../../redux/cartSlice";
 
 const HeaderComponent = () => {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const cartCount = useSelector(selectCartCount);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -31,25 +34,25 @@ const HeaderComponent = () => {
               to="/"
               className="text-sm font-medium hover:text-primary transition-colors"
             >
-              New Arrivals
+              Sản phẩm mới
             </Link>
             <Link
               to="/product"
               className="text-sm font-medium hover:text-primary transition-colors"
             >
-              Shop
+              Cửa hàng
             </Link>
             <Link
-              to="/collections"
+              to="/category"
               className="text-sm font-medium hover:text-primary transition-colors"
             >
-              Collections
+              Bộ sưu tập
             </Link>
             <Link
-              to="/about"
+              to="/contact"
               className="text-sm font-medium hover:text-primary transition-colors"
             >
-              About
+              Liên hệ
             </Link>
           </nav>
         </div>
@@ -64,7 +67,7 @@ const HeaderComponent = () => {
             </span>
             <input
               type="text"
-              placeholder="Search sneakers..."
+              placeholder="Tìm kiếm giày..."
               className="w-full bg-primary/5 border-none rounded-full py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary outline-none"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -72,12 +75,17 @@ const HeaderComponent = () => {
           </form>
 
           <div className="flex items-center gap-4">
-            <button className="p-2 hover:bg-primary/10 rounded-full transition-colors relative">
+            <Link
+              to="/cart"
+              className="p-2 hover:bg-primary/10 rounded-full transition-colors relative"
+            >
               <span className="material-symbols-outlined">shopping_cart</span>
-              <span className="absolute top-1 right-1 bg-primary text-[10px] font-bold text-white w-4 h-4 flex items-center justify-center rounded-full">
-                3
-              </span>
-            </button>
+              {cartCount > 0 && (
+                <span className="absolute top-1 right-1 bg-primary text-[10px] font-bold text-white w-4 h-4 flex items-center justify-center rounded-full">
+                  {cartCount}
+                </span>
+              )}
+            </Link>
             <button className="p-2 hover:bg-primary/10 rounded-full transition-colors lg:hidden">
               <span className="material-symbols-outlined">menu</span>
             </button>
