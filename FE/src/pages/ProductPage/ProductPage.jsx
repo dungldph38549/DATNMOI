@@ -22,7 +22,24 @@ const ProductPage = () => {
   }, []);
 
   return (
+
+    <main className="flex-grow w-full px-10 lg:px-20 py-8 font-display">
+      {/* Breadcrumb */}
+      <div className="flex flex-wrap items-center gap-2 mb-6 text-sm text-slate-500">
+        <Link
+          to="/product-detail"
+          className="hover:text-primary transition-colors"
+        >
+          Home
+        </Link>
+        <span className="material-symbols-outlined text-xs">chevron_right</span>
+        <span className="text-slate-900 dark:text-slate-100 font-medium">
+          Sneakers
+        </span>
+      </div>
+
     <main className="flex-grow w-full px-10 lg:px-20 py-8">
+
 
       <div className="flex flex-col lg:flex-row gap-8">
 
@@ -91,6 +108,63 @@ const ProductPage = () => {
 
             ))}
 
+
+          {/* Pagination */}
+          <div className="mt-12 flex justify-center">
+            <nav className="flex items-center gap-2">
+              <button
+                type="button"
+                className="size-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined">chevron_left</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage(1)}
+                className={`size-10 flex items-center justify-center rounded-lg font-bold ${
+                  page === 1
+                    ? "bg-primary text-white"
+                    : "border border-slate-200 hover:bg-slate-100"
+                }`}
+              >
+                1
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage(2)}
+                className={`size-10 flex items-center justify-center rounded-lg ${
+                  page === 2
+                    ? "bg-primary text-white"
+                    : "border border-slate-200 hover:bg-slate-100"
+                }`}
+              >
+                2
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage(3)}
+                className={`size-10 flex items-center justify-center rounded-lg ${
+                  page === 3
+                    ? "bg-primary text-white"
+                    : "border border-slate-200 hover:bg-slate-100"
+                }`}
+              >
+                3
+              </button>
+              <span className="px-2">...</span>
+              <button
+                type="button"
+                className="size-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-100"
+              >
+                8
+              </button>
+              <button
+                type="button"
+                className="size-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-100"
+              >
+                <span className="material-symbols-outlined">chevron_right</span>
+              </button>
+            </nav>
           </div>
 
         </div>
