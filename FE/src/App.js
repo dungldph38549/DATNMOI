@@ -15,9 +15,7 @@ import TermsConditionsPage from "./pages/TermsConditionsPage/TermsConditionsPage
 function App() {
   return (
     <BrowserRouter>
-
       <div className="app">
-
         <HeaderComponent />
 
         <div className="content">
@@ -43,9 +41,7 @@ function App() {
         </div>
 
         <FooterComponent />
-
       </div>
-
     </BrowserRouter>
   );
 }

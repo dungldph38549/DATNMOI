@@ -71,7 +71,10 @@ const ProductPage = () => {
     <main className="flex-grow w-full px-10 lg:px-20 py-8 font-display">
       {/* Breadcrumb */}
       <div className="flex flex-wrap items-center gap-2 mb-6 text-sm text-slate-500">
-        <Link to="/" className="hover:text-primary transition-colors">
+        <Link
+          to="/product-detail"
+          className="hover:text-primary transition-colors"
+        >
           Home
         </Link>
         <span className="material-symbols-outlined text-xs">chevron_right</span>
@@ -283,7 +286,9 @@ const ProductPage = () => {
                 type="button"
                 onClick={() => setPage(1)}
                 className={`size-10 flex items-center justify-center rounded-lg font-bold ${
-                  page === 1 ? "bg-primary text-white" : "border border-slate-200 hover:bg-slate-100"
+                  page === 1
+                    ? "bg-primary text-white"
+                    : "border border-slate-200 hover:bg-slate-100"
                 }`}
               >
                 1
@@ -292,7 +297,9 @@ const ProductPage = () => {
                 type="button"
                 onClick={() => setPage(2)}
                 className={`size-10 flex items-center justify-center rounded-lg ${
-                  page === 2 ? "bg-primary text-white" : "border border-slate-200 hover:bg-slate-100"
+                  page === 2
+                    ? "bg-primary text-white"
+                    : "border border-slate-200 hover:bg-slate-100"
                 }`}
               >
                 2
@@ -301,7 +308,9 @@ const ProductPage = () => {
                 type="button"
                 onClick={() => setPage(3)}
                 className={`size-10 flex items-center justify-center rounded-lg ${
-                  page === 3 ? "bg-primary text-white" : "border border-slate-200 hover:bg-slate-100"
+                  page === 3
+                    ? "bg-primary text-white"
+                    : "border border-slate-200 hover:bg-slate-100"
                 }`}
               >
                 3
