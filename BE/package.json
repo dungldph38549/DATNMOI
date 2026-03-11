@@ -20,6 +20,7 @@
     "mongose": "^0.0.2-security",
     "multer": "^2.0.1",
     "nodemon": "^3.1.10",
+    "socket.io": "^4.8.3",
     "vnpay": "^2.4.0"
   },
   "devDependencies": {

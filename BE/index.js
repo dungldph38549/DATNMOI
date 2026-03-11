@@ -13,13 +13,6 @@ const reviewRouter = require("./src/routers/ReviewRouter");
 const adminReviewRouter = require("./src/routers/adminReviewRoutes");
 const sizeRouter = require("./src/routers/SizeRouter");
 const colorRouter = require("./src/routers/ColorRouter");
-
-const inventoryRoutes = require("./routes/inventoryRoutes");
-const { initSocket } = require("./socket/inventorySocket");
-const { scheduleLowStockScan } = require("./jobs/alertJob");
-
-dotenv.config(); // Đọc các biến từ file .env
-
 const orderRouter = require("./src/routers/OrderRouter");
 
 const app = express();
@@ -34,7 +27,7 @@ app.use(
   cors({
     origin: "http://localhost:3000",
     credentials: true,
-  })
+  }),
 );
 
 // Static folder cho ảnh
@@ -55,7 +48,8 @@ app.use("/api/reviews", reviewRouter);
 app.use("/api/admin", adminReviewRouter);
 app.use("/api/size", sizeRouter);
 app.use("/api/color", colorRouter);
-app.use("/api/inventory", inventoryRoutes);
+app.use("/api/order", orderRouter);
+
 // ── Global Error Handler ──────────────────────────────────────
 app.use((err, req, res, next) => {
   const status = err.status || 500;
@@ -83,15 +77,6 @@ app.use((err, req, res, next) => {
     ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
   });
 });
-
-// ── Socket.io ─────────────────────────────────────────────────
-initSocket(io);
-
-// ── Cron Jobs ─────────────────────────────────────────────────
-scheduleLowStockScan();
-=======
-app.use("/api/order", orderRouter);
-
 
 // MongoDB
 mongoose
