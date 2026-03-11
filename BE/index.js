@@ -13,6 +13,7 @@ const reviewRouter = require("./src/routers/ReviewRouter");
 const adminReviewRouter = require("./src/routers/adminReviewRoutes");
 const sizeRouter = require("./src/routers/SizeRouter");
 const colorRouter = require("./src/routers/ColorRouter");
+const cartRouter = require("./src/routers/CartRouter");
 const orderRouter = require("./src/routers/OrderRouter");
 
 const app = express();
@@ -49,6 +50,7 @@ app.use("/api/admin", adminReviewRouter);
 app.use("/api/size", sizeRouter);
 app.use("/api/color", colorRouter);
 app.use("/api/order", orderRouter);
+app.use("/api/cart", cartRouter);
 
 // ── Global Error Handler ──────────────────────────────────────
 app.use((err, req, res, next) => {
