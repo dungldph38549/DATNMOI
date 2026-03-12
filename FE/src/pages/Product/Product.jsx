@@ -29,7 +29,7 @@ return (
 <img
 src={`http://localhost:3001/uploads/${product.image}`}
 alt={product.name}
-className="h-full object-contain group-hover:scale-115 transition duration-500"
+className="w-full h-[260px] object-cover rounded-lg"
 />
 
 {/* OVERLAY */}

@@ -1,32 +1,216 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import {
+  FaStar,
+  FaShoppingCart,
+  FaHeart,
+  FaRegHeart,
+  FaEye,
+} from "react-icons/fa";
+import { useDispatch } from "react-redux";
+import { addToCart } from "../../redux/cartSlice";
 
 const Product = ({ product }) => {
+  const dispatch = useDispatch();
 
-return (
+  const [wishlist, setWishlist] = useState(false);
+  const [showQuickView, setShowQuickView] = useState(false);
+  const [added, setAdded] = useState(false);
 
-<div className="product-card border rounded p-3 text-center">
+  // LOAD WISHLIST
+  useEffect(() => {
+    if (!product) return;
 
-<Link to={`/product/${product._id}`}>
+    const saved = JSON.parse(localStorage.getItem("wishlist")) || [];
+    if (saved.includes(product._id)) {
+      setWishlist(true);
+    }
+  }, [product]);
 
-<img
-src={`http://localhost:3001/uploads/${product.image}`}
-alt={product.name}
-className="img-fluid"
-/>
+  if (!product) return null;
 
-<h5 className="mt-2">{product.name}</h5>
+  // IMAGE
+  const image1 = product.image
+    ? `http://localhost:3001/uploads/${product.image}`
+    : "https://via.placeholder.com/300";
 
-</Link>
+  const image2 = product.image2
+    ? `http://localhost:3001/uploads/${product.image2}`
+    : image1;
 
-<p className="text-danger fw-bold">
-${product.price}
-</p>
+  // WISHLIST
+  const toggleWishlist = () => {
+    const saved = JSON.parse(localStorage.getItem("wishlist")) || [];
+    let updated;
 
-</div>
+    if (wishlist) {
+      updated = saved.filter((id) => id !== product._id);
+    } else {
+      updated = [...saved, product._id];
+    }
 
-);
+    localStorage.setItem("wishlist", JSON.stringify(updated));
+    setWishlist(!wishlist);
+  };
 
+  // ADD CART
+  const handleAddCart = () => {
+    dispatch(
+      addToCart({
+        productId: product._id,
+        name: product.name,
+        price: product.price,
+        image: product.image,
+        qty: 1,
+      })
+    );
+
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1200);
+  };
+
+  return (
+    <>
+      <div className="group bg-white rounded-xl shadow-md hover:shadow-xl transition duration-300 overflow-hidden relative">
+        
+        {/* IMAGE */}
+        <Link to={`/product/${product._id}`}>
+          <div className="relative h-[260px] overflow-hidden">
+
+            <img
+              src={image1}
+              alt={product.name}
+              className="absolute w-full h-full object-cover transition duration-300 group-hover:opacity-0"
+            />
+
+            <img
+              src={image2}
+              alt={product.name}
+              className="w-full h-full object-cover opacity-0 group-hover:opacity-100 transition duration-300"
+            />
+
+            {product?.sold > 50 && (
+              <span className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded">
+                🔥 Best Seller
+              </span>
+            )}
+
+          </div>
+        </Link>
+
+        {/* WISHLIST */}
+        <button
+          onClick={toggleWishlist}
+          className="absolute top-3 right-3 bg-white p-2 rounded-full shadow hover:scale-110 transition"
+        >
+          {wishlist ? (
+            <FaHeart className="text-red-500" />
+          ) : (
+            <FaRegHeart className="text-gray-500" />
+          )}
+        </button>
+
+        {/* QUICK VIEW */}
+        <button
+          onClick={() => setShowQuickView(true)}
+          className="absolute bottom-3 right-3 bg-black text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition"
+        >
+          <FaEye />
+        </button>
+
+        {/* INFO */}
+        <div className="p-4">
+
+          <Link to={`/product/${product._id}`}>
+            <h3 className="text-sm font-medium text-gray-800 line-clamp-2 min-h-[40px] group-hover:text-red-500">
+              {product.name}
+            </h3>
+          </Link>
+
+          {/* RATING */}
+          <div className="flex items-center mt-1 text-yellow-400 text-xs">
+
+            {[...Array(5)].map((_, i) => (
+              <FaStar
+                key={i}
+                className={i < (product.rating || 4) ? "" : "text-gray-300"}
+              />
+            ))}
+
+            <span className="text-gray-500 ml-1">
+              ({product.rating || 4})
+            </span>
+
+          </div>
+
+          {/* PRICE */}
+          <div className="mt-2">
+            <span className="text-red-500 font-bold text-lg">
+              {product.price?.toLocaleString()}đ
+            </span>
+          </div>
+
+        </div>
+
+        {/* ADD CART */}
+        <div className="px-4 pb-4 ">
+
+          <button
+            onClick={handleAddCart}
+            className={`w-full flex items-center justify-center gap-2 text-white font-semibold py-2.5 rounded-lg shadow-md transition ${
+              added
+                ? "bg-green-500"
+                : "bg-red-600 hover:bg-red-700"
+            }`}
+          >
+            <FaShoppingCart />
+            {added ? "Đã thêm" : "Thêm vào giỏ hàng"}
+          </button>
+
+        </div>
+
+      </div>
+
+      {/* QUICK VIEW MODAL */}
+      {showQuickView && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+
+          <div className="bg-white rounded-lg p-6 w-[420px] relative">
+
+            <button
+              onClick={() => setShowQuickView(false)}
+              className="absolute top-3 right-3 text-gray-500 text-lg"
+            >
+              ✕
+            </button>
+
+            <img
+              src={image1}
+              alt={product.name}
+              className="w-full h-[240px] object-cover rounded"
+            />
+
+            <h3 className="font-bold text-lg mt-3">
+              {product.name}
+            </h3>
+
+            <p className="text-red-500 text-xl font-bold mt-1">
+              {product.price?.toLocaleString()}đ
+            </p>
+
+            <button
+              onClick={handleAddCart}
+              className="mt-4 w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg"
+            >
+              Thêm vào giỏ
+            </button>
+
+          </div>
+
+        </div>
+      )}
+    </>
+  );
 };
 
 export default Product;
