@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 import Product from "../../components/Product/Product";
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 15;
 
 const normalize = (str = "") =>
   str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
