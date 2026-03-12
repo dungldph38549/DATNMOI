@@ -7,7 +7,6 @@ import {
   setQty,
 } from "../../redux/cartSlice";
 
-
 const ShoppingCartPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -21,9 +20,9 @@ const ShoppingCartPage = () => {
           <div className="breadcrumb-inner">
             <ul className="list-inline list-unstyled">
               <li>
-                <Link to="/">Home</Link>
+                <Link to="/">Trang chủ</Link>
               </li>
-              <li className="active">Shopping Cart</li>
+              <li className="active">Giỏ hàng</li>
             </ul>
           </div>
         </div>
@@ -38,13 +37,13 @@ const ShoppingCartPage = () => {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th className="cart-romove item">Remove</th>
-                        <th className="cart-description item">Image</th>
-                        <th className="cart-product-name item">Product Name</th>
-                        <th className="cart-edit item">Edit</th>
-                        <th className="cart-qty item">Quantity</th>
-                        <th className="cart-sub-total item">Subtotal</th>
-                        <th className="cart-total last-item">Grandtotal</th>
+                        <th className="cart-romove item">Xóa</th>
+                        <th className="cart-description item">Hình ảnh</th>
+                        <th className="cart-product-name item">Tên sản phẩm</th>
+                        <th className="cart-edit item">Chi tiết</th>
+                        <th className="cart-qty item">Số lượng</th>
+                        <th className="cart-sub-total item">Tạm tính</th>
+                        <th className="cart-total last-item">Thành tiền</th>
                       </tr>
                     </thead>
                     <tfoot>
@@ -56,7 +55,7 @@ const ShoppingCartPage = () => {
                                 to="/product"
                                 className="btn btn-upper btn-primary outer-left-xs"
                               >
-                                Continue Shopping
+                                Tiếp tục mua sắm
                               </Link>
                             </span>
                           </div>
@@ -100,7 +99,10 @@ const ShoppingCartPage = () => {
                                 className="entry-thumbnail"
                                 to={`/product/${item.productId}`}
                               >
-                                <img src={item.image} alt={item.name} />
+                                <img
+                                  src={`http://localhost:3001/uploads/${item.image}`}
+                                  alt={item.name}
+                                />
                               </Link>
                             </td>
 
@@ -117,7 +119,7 @@ const ShoppingCartPage = () => {
                                 to={`/product/${item.productId}`}
                                 className="product-edit"
                               >
-                                View
+                                Xem
                               </Link>
                             </td>
 
@@ -163,9 +165,11 @@ const ShoppingCartPage = () => {
                     <tr>
                       <th>
                         <span className="estimate-title">
-                          Estimate shipping and tax
+                          Ước tính phí vận chuyển và thuế
                         </span>
-                        <p>Enter your destination to get shipping and tax.</p>
+                        <p>
+                          Nhập địa chỉ của bạn để tính phí vận chuyển và thuế.
+                        </p>
                       </th>
                     </tr>
                   </thead>
@@ -174,10 +178,10 @@ const ShoppingCartPage = () => {
                       <td>
                         <div className="form-group">
                           <label className="info-title control-label">
-                            Country <span>*</span>
+                            Quốc gia <span>*</span>
                           </label>
                           <select className="form-control unicase-form-control selectpicker">
-                            <option>--Select options--</option>
+                            <option>--Chọn quốc gia--</option>
                             <option>India</option>
                             <option>SriLanka</option>
                             <option>united kingdom</option>
@@ -187,10 +191,10 @@ const ShoppingCartPage = () => {
                         </div>
                         <div className="form-group">
                           <label className="info-title control-label">
-                            State/Province <span>*</span>
+                            Tỉnh / Thành phố <span>*</span>
                           </label>
                           <select className="form-control unicase-form-control selectpicker">
-                            <option>--Select options--</option>
+                            <option>--Chọn khu vực--</option>
                             <option>TamilNadu</option>
                             <option>Kerala</option>
                             <option>Andhra Pradesh</option>
@@ -200,7 +204,7 @@ const ShoppingCartPage = () => {
                         </div>
                         <div className="form-group">
                           <label className="info-title control-label">
-                            Zip/Postal Code
+                            Mã bưu điện
                           </label>
                           <input
                             type="text"
@@ -213,7 +217,7 @@ const ShoppingCartPage = () => {
                             type="submit"
                             className="btn-upper btn btn-primary"
                           >
-                            GET A QOUTE
+                            TÍNH PHÍ
                           </button>
                         </div>
                       </td>
@@ -227,8 +231,8 @@ const ShoppingCartPage = () => {
                   <thead>
                     <tr>
                       <th>
-                        <span className="estimate-title">Discount Code</span>
-                        <p>Enter your coupon code if you have one..</p>
+                        <span className="estimate-title">Mã giảm giá</span>
+                        <p>Nhập mã khuyến mãi nếu bạn có.</p>
                       </th>
                     </tr>
                   </thead>
@@ -239,7 +243,7 @@ const ShoppingCartPage = () => {
                           <input
                             type="text"
                             className="form-control unicase-form-control text-input"
-                            placeholder="You Coupon.."
+                            placeholder="Mã giảm giá..."
                           />
                         </div>
                         <div className="clearfix pull-right">
@@ -247,7 +251,7 @@ const ShoppingCartPage = () => {
                             type="submit"
                             className="btn-upper btn btn-primary"
                           >
-                            APPLY COUPON
+                            ÁP DỤNG MÃ
                           </button>
                         </div>
                       </td>
@@ -262,13 +266,13 @@ const ShoppingCartPage = () => {
                     <tr>
                       <th>
                         <div className="cart-sub-total">
-                          Subtotal
+                          Tạm tính
                           <span className="inner-left-md">
                             ${subtotal.toFixed(2)}
                           </span>
                         </div>
                         <div className="cart-grand-total">
-                          Grand Total
+                          Tổng cộng
                           <span className="inner-left-md">
                             ${subtotal.toFixed(2)}
                           </span>
@@ -286,123 +290,14 @@ const ShoppingCartPage = () => {
                             disabled={items.length === 0}
                             onClick={() => navigate("/checkout")}
                           >
-                            PROCCED TO CHEKOUT
+                            TIẾN HÀNH THANH TOÁN
                           </button>
-                          <span>Checkout with multiples address!</span>
+                          <span>Thanh toán với nhiều địa chỉ!</span>
                         </div>
                       </td>
                     </tr>
                   </tbody>
                 </table>
-              </div>
-            </div>
-          </div>
-
-          <div id="brands-carousel" className="logo-slider wow fadeInUp">
-            <div className="logo-slider-inner">
-              <div
-                id="brand-slider"
-                className="owl-carousel brand-slider custom-carousel owl-theme"
-              >
-                <div className="item m-t-15">
-                  <a href="#" className="image">
-                    <img
-                      data-echo="assets/images/brands/brand1.png"
-                      src="assets/images/blank.gif"
-                      alt=""
-                    />
-                  </a>
-                </div>
-
-                <div className="item m-t-10">
-                  <a href="#" className="image">
-                    <img
-                      data-echo="assets/images/brands/brand2.png"
-                      src="assets/images/blank.gif"
-                      alt=""
-                    />
-                  </a>
-                </div>
-
-                <div className="item">
-                  <a href="#" className="image">
-                    <img
-                      data-echo="assets/images/brands/brand3.png"
-                      src="assets/images/blank.gif"
-                      alt=""
-                    />
-                  </a>
-                </div>
-
-                <div className="item">
-                  <a href="#" className="image">
-                    <img
-                      data-echo="assets/images/brands/brand4.png"
-                      src="assets/images/blank.gif"
-                      alt=""
-                    />
-                  </a>
-                </div>
-
-                <div className="item">
-                  <a href="#" className="image">
-                    <img
-                      data-echo="assets/images/brands/brand5.png"
-                      src="assets/images/blank.gif"
-                      alt=""
-                    />
-                  </a>
-                </div>
-
-                <div className="item">
-                  <a href="#" className="image">
-                    <img
-                      data-echo="assets/images/brands/brand6.png"
-                      src="assets/images/blank.gif"
-                      alt=""
-                    />
-                  </a>
-                </div>
-
-                <div className="item">
-                  <a href="#" className="image">
-                    <img
-                      data-echo="assets/images/brands/brand2.png"
-                      src="assets/images/blank.gif"
-                      alt=""
-                    />
-                  </a>
-                </div>
-
-                <div className="item">
-                  <a href="#" className="image">
-                    <img
-                      data-echo="assets/images/brands/brand4.png"
-                      src="assets/images/blank.gif"
-                      alt=""
-                    />
-                  </a>
-                </div>
-
-                <div className="item">
-                  <a href="#" className="image">
-                    <img
-                      data-echo="assets/images/brands/brand1.png"
-                      src="assets/images/blank.gif"
-                      alt=""
-                    />
-                  </a>
-                </div>
-
-                <div className="item">
-                  <a href="#" className="image">
-                    <img
-                      data-echo="assets/images/brands/brand5.png"
-                      src="assets/images/blank.gif"
-                      alt=""
-                    />
-                  </a>
-                </div>
               </div>
             </div>
           </div>
@@ -413,5 +308,3 @@ const ShoppingCartPage = () => {
 };
 
 export default ShoppingCartPage;
-
-

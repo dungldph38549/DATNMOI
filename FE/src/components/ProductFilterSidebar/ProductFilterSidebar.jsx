@@ -9,13 +9,13 @@ const ProductFilterSidebar = ({ selectedSize, onChangeSize }) => {
             <span className="material-symbols-outlined text-primary">
               filter_list
             </span>
-            Filters
+            Bộ lọc
           </h3>
           <div className="space-y-6">
             {/* Brand */}
             <div>
               <h4 className="text-sm font-semibold mb-3 uppercase tracking-wider text-slate-400">
-                Brand
+                Thương hiệu
               </h4>
               <div className="space-y-2">
                 {["Nike", "Adidas", "New Balance", "Puma"].map((brand) => (
@@ -39,15 +39,15 @@ const ProductFilterSidebar = ({ selectedSize, onChangeSize }) => {
             {/* Price Range */}
             <div>
               <h4 className="text-sm font-semibold mb-3 uppercase tracking-wider text-slate-400">
-                Price Range
+                Khoảng giá
               </h4>
               <input
                 type="range"
                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary"
               />
               <div className="flex justify-between mt-2 text-xs font-medium">
-                <span>$0</span>
-                <span>$500+</span>
+                <span>0₫</span>
+                <span>500$+</span>
               </div>
             </div>
 

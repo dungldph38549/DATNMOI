@@ -6,7 +6,7 @@ import HomePages from "../pages/HomePages/HomePages.jsx";
 import Login from "../pages/Login/Login.jsx";
 import Register from "../pages/Register/Register.jsx";
 import CartPage from "../pages/CartPage/CartPage.jsx";
-import AdminPage from "../admin/AdminPage.jsx";
+import AdminPage from "../Admin/AdminPage.jsx";
 import CheckoutPage from "../pages/CheckOutPage/CheckOutPage.jsx";
 import OrderPage from "../pages/OrderPage/OrderPage.jsx";
 import OrderDetailPage from "../pages/OrderDetailPage/OrderDetailPage.jsx";
@@ -14,6 +14,8 @@ import AdminOrderDetailPage from "../admin/AdminOrderDetail.jsx";
 import ReturnPayment from "../pages/ReturnPayment/ReturnPayment.jsx";
 import CustommerPage from "../pages/CustommerPage/CustommerPage.jsx";
 import OrderHistoryPage from "../pages/OrderHistoryPage/OrderHistoryPage.jsx";
+import InventoryDashboard from "../Admin/Inventorydashboard.jsx";
+import User from "../pages/User/index.jsx";
 export const routers = [
   {
     path: "/",
@@ -61,13 +63,18 @@ export const routers = [
     isShowHeader: true,
   },
   {
-    path: "*",
-    page: NotFoundPage,
+    path: "/admin",
+    page: AdminPage,
     isShowHeader: false,
   },
   {
-    path: "/admin",
-    page: AdminPage,
+    path: "/admin/order/:id",
+    page: AdminOrderDetailPage,
+    isShowHeader: false,
+  },
+  {
+    path: "/admin/users",
+    page: User,
     isShowHeader: false,
   },
   {
@@ -90,9 +97,20 @@ export const routers = [
     page: OrderDetailPage,
     isShowHeader: true,
   },
+
+  
   {
-    path: "/admin/order/:id",
-    page: AdminOrderDetailPage,
+    path: "*",
+    page: NotFoundPage,
+    isShowHeader: false,
+  },
+
+  {
+    path: "/InventoryDashboard",
+    page: InventoryDashboard,
     isShowHeader: false,
   },
 ];
+
+];
+

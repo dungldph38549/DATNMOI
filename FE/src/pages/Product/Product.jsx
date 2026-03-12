@@ -83,7 +83,7 @@ const ShopPage = () => {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full h-12 px-4 bg-slate-100 rounded-xl focus:ring-2 focus:ring-orange-400"
-          placeholder="Search shoes..."
+          placeholder="Tìm kiếm giày..."
         />
       </div>
 
@@ -95,7 +95,7 @@ const ShopPage = () => {
           ))
         ) : (
           <p className="col-span-2 text-center text-slate-400">
-            No products found
+            Không tìm thấy sản phẩm
           </p>
         )}
       </main>

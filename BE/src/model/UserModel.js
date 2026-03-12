@@ -24,8 +24,10 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    phone: {
-      type: String, // Changed to String as phone numbers can have leading zeros
+    phone: { // Changed to String as phone numbers can have leading zeros
+      type: String,        // 🔥 đổi Number -> String
+      required: true,
+
     },
     googleId: {
       type: String,
@@ -34,16 +36,18 @@ const userSchema = new mongoose.Schema(
     },
     avatar: {
       type: String,
+      default: null,       // 🔥 bỏ required
+
     },
     refresh_token: {
       type: String,
+      default: null,       // 🔥 bỏ required
+
     },
   },
   {
     timestamps: true,
-  },
+  }
 );
 
-const User = mongoose.model("User", userSchema);
-
-module.exports = User;
+module.exports = mongoose.model("User", userSchema);

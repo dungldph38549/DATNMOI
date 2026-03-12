@@ -17,6 +17,8 @@ const routes = (app) => {
   app.use("/api/admin", AdminReviewRouter);
   app.use("/api/size", SizeRouter);
   app.use("/api/color", ColorRouter);
+  
+  // Dùng /api/user (không có "s") để khớp với API gọi từ Frontend
   app.use("/api/user", UserRouter);
 };
 

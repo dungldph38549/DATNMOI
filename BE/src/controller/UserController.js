@@ -1,161 +1,107 @@
-const UserService = require("../service/UserService");
-const User = require("../model/UserModel");
 
-const register = async (req, res) => {
-    try {
-        const { name, email, password, phone } = req.body;
-        const reg = /^\w+([-+.']\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$/;
-        const isCheckEmail = reg.test(email);
 
-        if (!name || !email || !password || !phone) {
-            return res.status(200).json({
-                status: "ERR",
-                message: "Vui lòng nhập đầy đủ thông tin",
-            });
-        } else if (!isCheckEmail) {
-            return res.status(200).json({
-                status: "ERR",
-                message: "Email không hợp lệ",
-            });
-        }
+const User = require("../models/UserModel");
 
-        const result = await UserService.registerUser(req.body);
-        return res.status(200).json(result);
-    } catch (err) {
-        console.error("Register Error:", err);
-        return res.status(500).json({
-            status: "ERR",
-            message: err.message || "Lỗi hệ thống",
-        });
+
+// ================== GET ALL ==================
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find().select("-password");
+    res.status(200).json(users);
+  } catch (error) {
+    console.error("GET ALL ERROR:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+// ================== GET BY ID ==================
+exports.getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
+
+    res.status(200).json(user);
+  } catch (error) {
+    console.error("GET BY ID ERROR:", error);
+    res.status(500).json({ message: error.message });
+  }
 };
 
-const login = async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        const reg = /^\w+([-+.']\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$/;
-        const isCheckEmail = reg.test(email);
 
-        if (!email || !password) {
-            return res.status(200).json({
-                status: "ERR",
-                message: "Vui lòng nhập email và mật khẩu",
-            });
-        } else if (!isCheckEmail) {
-            return res.status(200).json({
-                status: "ERR",
-                message: "Email không hợp lệ",
-            });
-        }
+// ================== CREATE ==================
+exports.createUser = async (req, res) => {
+  try {
+    console.log("BODY NHẬN ĐƯỢC:", req.body);
 
-        const result = await UserService.loginUser(req.body);
-        return res.status(200).json(result);
-    } catch (err) {
-        console.error("Login Error:", err);
-        return res.status(500).json({
-            status: "ERR",
-            message: err.message || "Lỗi hệ thống",
-        });
+    const { name, email, password, role, phone } = req.body;
+
+    // check thiếu dữ liệu
+    if (!name || !email || !password || !phone) {
+      return res.status(400).json({ message: "Missing required fields" });
     }
-};
 
-const logout = async (req, res) => {
-    try {
-        const userId = req.user._id;
-        await User.findByIdAndUpdate(userId, { refresh_token: null });
-
-        return res.status(200).json({
-            status: "OK",
-            message: "Đăng xuất thành công",
-        });
-    } catch (err) {
-        console.error("Logout Error:", err);
-        return res.status(500).json({
-            status: "ERR",
-            message: err.message || "Lỗi hệ thống",
-        });
+    // check email tồn tại
+    const existEmail = await User.findOne({ email });
+    if (existEmail) {
+      return res.status(400).json({ message: "Email already exists" });
     }
+
+    const newUser = new User({
+      name,
+      email,
+      password,
+      phone,
+      isAdmin: role === "admin" ? true : false
+    });
+
+    const savedUser = await newUser.save();
+
+    res.status(201).json(savedUser);
+  } catch (error) {
+    console.error("CREATE ERROR:", error);
+    res.status(500).json({ message: error.message });
+  }
 };
 
-const refreshToken = async (req, res) => {
-    try {
-        const token = req.body.token || req.headers.token;
-        if (!token) {
-            return res.status(200).json({
-                status: "ERR",
-                message: "Vui lòng cung cấp Refresh Token",
-            });
-        }
 
-        const result = await UserService.refreshTokenService(token);
-        return res.status(200).json(result);
-    } catch (err) {
-        console.error("Refresh Token Error:", err);
-        return res.status(500).json({
-            status: "ERR",
-            message: err.message || "Lỗi hệ thống",
-        });
+// ================== UPDATE ==================
+exports.updateUser = async (req, res) => {
+  try {
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
     }
+
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    console.error("UPDATE ERROR:", error);
+    res.status(500).json({ message: error.message });
+  }
 };
 
-const getDetailsUser = async (req, res) => {
-    try {
-        const userId = req.user._id;
-        const user = await User.findById(userId).select("-password -refresh_token");
 
-        if (!user) {
-            return res.status(200).json({
-                status: "ERR",
-                message: "Người dùng không tồn tại",
-            });
-        }
+// ================== DELETE ==================
+exports.deleteUser = async (req, res) => {
+  try {
+    const deletedUser = await User.findByIdAndDelete(req.params.id);
 
-        return res.status(200).json({
-            status: "OK",
-            message: "Lấy thông tin người dùng thành công",
-            data: user,
-        });
-    } catch (err) {
-        console.error("Get Details Error:", err);
-        return res.status(500).json({
-            status: "ERR",
-            message: err.message || "Lỗi hệ thống",
-        });
+    if (!deletedUser) {
+      return res.status(404).json({ message: "User not found" });
     }
+
+    res.status(200).json({ message: "User deleted successfully" });
+  } catch (error) {
+    console.error("DELETE ERROR:", error);
+    res.status(500).json({ message: error.message });
+  }
 };
 
-const googleCallback = async (req, res) => {
-    try {
-        const { googleId, email, name, avatar } = req.body;
-
-        if (!googleId || !email) {
-            return res.status(200).json({
-                status: "ERR",
-                message: "Thông tin Google không đầy đủ",
-            });
-        }
-
-        const result = await UserService.googleLoginOrRegister({
-            googleId,
-            email,
-            name,
-            avatar,
-        });
-        return res.status(200).json(result);
-    } catch (err) {
-        console.error("Google Callback Error:", err);
-        return res.status(500).json({
-            status: "ERR",
-            message: err.message || "Lỗi hệ thống",
-        });
-    }
-};
-
-module.exports = {
-    register,
-    login,
-    logout,
-    refreshToken,
-    getDetailsUser,
-    googleCallback,
-};
