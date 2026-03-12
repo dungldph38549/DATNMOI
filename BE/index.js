@@ -5,6 +5,9 @@ const cors = require("cors");
 const routes = require("./src/routers");
 const app = express();
 const port = process.env.PORT || 3001;
+const mongoURI = process.env.MONGO_DB;
+
+
 // Middlewares
 app.use(cors());
 app.use(express.json());
@@ -25,10 +28,7 @@ const colorRouter = require("./src/routers/ColorRouter");
 const cartRouter = require("./src/routers/CartRouter");
 const orderRouter = require("./src/routers/OrderRouter");
 
-const app = express();
 
-const port = process.env.PORT || 3001;
-const mongoURI = process.env.MONGO_DB;
 
 // Middleware
 app.use(express.json());
@@ -78,7 +78,6 @@ const startServer = async () => {
 };
 
 startServer();
-=======
 // Routes
 app.use("/api/product", productRouter);
 app.use("/api/brand", brandRouter);
