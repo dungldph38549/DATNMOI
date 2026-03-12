@@ -1,4 +1,6 @@
-const User = require("../model/UserModel");
+
+
+const User = require("../models/UserModel");
 
 
 // ================== GET ALL ==================
@@ -102,3 +104,4 @@ exports.deleteUser = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
