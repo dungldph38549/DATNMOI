@@ -1,107 +1,165 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import {
+FaShoppingCart,
+FaSearch,
+FaUser,
+FaClipboardList
+} from "react-icons/fa";
 import { useSelector } from "react-redux";
-import { selectCartCount } from "../../redux/cartSlice";
 
-const HeaderComponent = () => {
-  const navigate = useNavigate();
-  const [search, setSearch] = useState("");
-  const cartCount = useSelector(selectCartCount);
+const Header = () => {
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    const keyword = search.trim();
-    if (keyword) {
-      navigate(`/category?keyword=${encodeURIComponent(keyword)}`);
-    }
-  };
+const navigate = useNavigate();
 
-  return (
-    <header className="sticky top-0 z-50 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-primary/10 px-6 lg:px-20 py-4">
-      <div className="w-full px-6 lg:px-20 flex items-center justify-between gap-8 font-display">
-        <div className="flex items-center gap-10">
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="bg-primary p-1 rounded">
-              <span className="material-symbols-outlined text-background-light">
-                vertical_split
-              </span>
-            </div>
-            <h2 className="text-xl font-bold tracking-tight">SNEAKERHOUSE</h2>
-          </Link>
+const cart = useSelector((state) => state.cart.items || []);
+const user = useSelector((state) => state.user?.user);
 
-          <nav className="hidden md:flex items-center gap-8">
-            <Link
-              to="/"
-              className="text-sm font-medium hover:text-primary transition-colors"
-            >
-              Sản phẩm mới
-            </Link>
-            <Link
-              to="/product"
-              className="text-sm font-medium hover:text-primary transition-colors"
-            >
-              Cửa hàng
-            </Link>
-            <Link
-              to="/category"
-              className="text-sm font-medium hover:text-primary transition-colors"
-            >
-              Bộ sưu tập
-            </Link>
-            <Link
-              to="/contact"
-              className="text-sm font-medium hover:text-primary transition-colors"
-            >
-              Liên hệ
-            </Link>
-          </nav>
-        </div>
+const [keyword,setKeyword] = useState("");
 
-        <div className="flex flex-1 justify-end items-center gap-6">
-          <form
-            onSubmit={handleSearch}
-            className="relative hidden lg:block w-full max-w-xs"
-          >
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-              search
-            </span>
-            <input
-              type="text"
-              placeholder="Tìm kiếm giày..."
-              className="w-full bg-primary/5 border-none rounded-full py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary outline-none"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </form>
+const total = cart.reduce((sum,item)=> sum + item.price * item.qty,0);
 
-          <div className="flex items-center gap-4">
-            <Link
-              to="/cart"
-              className="p-2 hover:bg-primary/10 rounded-full transition-colors relative"
-            >
-              <span className="material-symbols-outlined">shopping_cart</span>
-              {cartCount > 0 && (
-                <span className="absolute top-1 right-1 bg-primary text-[10px] font-bold text-white w-4 h-4 flex items-center justify-center rounded-full">
-                  {cartCount}
-                </span>
-              )}
-            </Link>
-            <button className="p-2 hover:bg-primary/10 rounded-full transition-colors lg:hidden">
-              <span className="material-symbols-outlined">menu</span>
-            </button>
-            <div className="hidden sm:block h-10 w-10 rounded-full bg-primary/20 overflow-hidden border-2 border-primary/20">
-              <img
-                className="w-full h-full object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9DzuLQz6u54X1lGuH_gsmIBF2bnJCCJeoXQu38Jj6br-NispQsAR3n-K1b8U4Hx5XIR3aGPf1Kzm-UD3sKkj6ZCgYjKSEHQt4Uz2gGFBbidWv3ZS7fG-JcHeJ7NkLYBm5AeweoNItTTG95e77-HVQ0kH7XeEMCFFjGLlV9uE-pJN2Xlz2CcVtgLzq4TT9s4obE9E_PRMmBItfwOSYnJMZDYSPM8bE3pc8mEdZnCaUXZor1hTrJ8t_S0KEJ404LbUsC8XzueJVkyw"
-                alt="User profile"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </header>
-  );
+
+/* ================= NAVIGATION ================= */
+
+const goHome = ()=> navigate("/");
+const goCart = ()=> navigate("/cart");
+const goOrders = ()=> navigate("/orders");
+const goLogin = ()=> navigate("/login");
+
+
+/* ================= SEARCH ================= */
+
+const handleSearch=(e)=>{
+
+e.preventDefault();
+
+if(keyword.trim()==="") return;
+
+navigate(`/search?q=${keyword}`);
+
 };
 
-export default HeaderComponent;
 
+return(
+
+<header className="bg-white shadow-md sticky top-0 z-50">
+
+<div className="max-w-[1400px] mx-auto flex items-center justify-between px-10 py-6">
+
+{/* LOGO */}
+
+<div
+onClick={goHome}
+className="flex items-center gap-4 cursor-pointer"
+>
+
+<div className="bg-black text-white px-4 py-2 rounded-xl text-xl font-bold">
+EO
+</div>
+
+<span className="font-bold text-2xl">
+SNEAKERHOUSE
+</span>
+
+</div>
+
+
+{/* SEARCH */}
+
+<form
+onSubmit={handleSearch}
+className="flex items-center bg-gray-100 rounded-full px-6 py-3 w-[550px]"
+>
+
+<FaSearch className="text-gray-400 mr-3"/>
+
+<input
+value={keyword}
+onChange={(e)=>setKeyword(e.target.value)}
+placeholder="Tìm kiếm sản phẩm..."
+className="bg-transparent outline-none w-full"
+/>
+
+</form>
+
+
+{/* RIGHT MENU */}
+
+<div className="flex items-center gap-10 text-lg">
+
+
+{/* CART */}
+
+<div
+onClick={goCart}
+className="flex items-center gap-2 cursor-pointer hover:text-blue-600"
+>
+
+<FaShoppingCart className="text-2xl"/>
+
+<span>Giỏ hàng</span>
+
+{cart.length>0 &&(
+
+<span className="bg-red-500 text-white text-xs px-2 rounded-full">
+{cart.length}
+</span>
+
+)}
+
+</div>
+
+
+{/* ORDERS */}
+
+<div
+onClick={goOrders}
+className="flex items-center gap-2 cursor-pointer hover:text-blue-600"
+>
+
+<FaClipboardList/>
+
+<span>Đơn hàng</span>
+
+</div>
+
+
+{/* USER */}
+
+{user ? (
+
+<div className="flex items-center gap-2">
+
+<FaUser/>
+
+<span>{user.name}</span>
+
+</div>
+
+):( 
+
+<div
+onClick={goLogin}
+className="flex items-center gap-2 cursor-pointer hover:text-blue-600"
+>
+
+<FaUser/>
+
+<span>Đăng nhập</span>
+
+</div>
+
+)}
+
+</div>
+
+</div>
+
+</header>
+
+);
+
+};
+
+export default Header;
