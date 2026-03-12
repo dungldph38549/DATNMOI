@@ -1,59 +1,46 @@
-// index.js
 require("dotenv").config();
 const express = require("express");
-const dotenv = require("dotenv");
 const mongoose = require("mongoose");
-
-const productRouter = require("./src/routers/ProductRouter");
-const brandRouter = require("./src/routers/BrandRouter");
-const voucherRouter = require("./src/routers/VoucherRouter");
-const categoryRouter = require("./src/routers/CategoryRouter");
-
-const reviewRouter = require("./src/routers/ReviewRouter");
-const adminReviewRouter = require("./src/routers/adminReviewRoutes");
-
-const sizeRouter = require("./src/routers/SizeRouter");
-const colorRouter = require("./src/routers/ColorRouter");
-
-
-dotenv.config(); // Đọc các biến từ file .env
+const cors = require("cors");
+const routes = require("./src/routers");
 
 const app = express();
+const port = process.env.PORT || 3001;
+
+// Middlewares
+app.use(cors());
 app.use(express.json());
 
-const port = process.env.PORT || 3001;
-const mongoURI = process.env.MONGO_DB; // Lấy kết nối MongoDB từ file .env
-
-if (!mongoURI) {
-  console.error("MONGO_DB is not defined in .env");
-  process.exit(1);
-}
-
+// Main route
 app.get("/", (req, res) => {
-  res.send("Hello API");
+  res.send("--- HELLO! BACKEND CHAY THANH CONG TRENT PORT 3001 ---");
 });
 
-// Sử dụng các router cho các API
-app.use("/api/product", productRouter);
-app.use("/api/brand", brandRouter);
-app.use("/api/voucher", voucherRouter);
-app.use("/api/category", categoryRouter);
-app.use("/api/reviews", reviewRouter); //
-app.use("/api/admin", adminReviewRouter);//
-app.use("/api/size", sizeRouter);//
-app.use("/api/color", colorRouter);//
+// Use consolidated routes
+routes(app);
 
+// Startup sequence
+const startServer = async () => {
+  try {
+    const mongoURI = process.env.MONGO_DB;
+    const accessTokenSecret = process.env.ACCESS_TOKEN_SECRET;
+    const refreshTokenSecret = process.env.REFRESH_TOKEN_SECRET;
 
-// Kết nối MongoDB và khởi động server
-mongoose
-  .connect(mongoURI)
-  .then(() => {
-    console.log("Connected to MongoDB");
+    if (!mongoURI) throw new Error("MONGO_DB is not defined in .env");
+    if (!accessTokenSecret) throw new Error("ACCESS_TOKEN_SECRET is not defined in .env");
+    if (!refreshTokenSecret) throw new Error("REFRESH_TOKEN_SECRET is not defined in .env");
+
+    console.log("⏳ Connecting to MongoDB...");
+    await mongoose.connect(mongoURI);
+    console.log("✅ Connected to MongoDB successfully!");
 
     app.listen(port, () => {
-      console.log("Server running at port", port);
+      console.log(`🚀 Server running at http://localhost:${port}`);
     });
-  })
-  .catch((err) => {
-    console.error("MongoDB error:", err.message);
-  });
+  } catch (err) {
+    console.error("❌ Failed to start server:", err.message);
+    process.exit(1);
+  }
+};
+
+startServer();

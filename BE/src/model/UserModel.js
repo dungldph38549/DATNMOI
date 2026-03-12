@@ -7,7 +7,6 @@ const userSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-
     email: {
       type: String,
       required: true,
@@ -15,30 +14,29 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
-
     password: {
       type: String,
-      required: true,
+      required: function () {
+        return !this.googleId; // Password only required if not Google login
+      },
     },
-
     isAdmin: {
       type: Boolean,
       default: false,
     },
-
     phone: {
-      type: Number,
-      required: true,
+      type: String, // Changed to String as phone numbers can have leading zeros
     },
-
-    access_token: {
+    googleId: {
       type: String,
-      required: true,
+      unique: true,
+      sparse: true, // Allows null/missing values to be ignored in unique index
     },
-
+    avatar: {
+      type: String,
+    },
     refresh_token: {
       type: String,
-      required: true,
     },
   },
   {
