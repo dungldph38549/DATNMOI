@@ -22,7 +22,7 @@ const protect = async (req, res, next) => {
     }
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN || "access_token");
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
     // Tìm user từ token
     const user = await User.findById(decoded.id || decoded._id).select(
