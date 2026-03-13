@@ -1,19 +1,23 @@
 const ProductService = require("../service/ProductService");
+const Product = require("../model/ProductModel");
+
 
 const getAllProducts = async (req, res) => {
   try {
-    const response = await ProductService.getAllProducts();
 
-    if (response.status === "ERR") {
-      return res.status(400).json(response);
-    }
+    const search = req.query.search || "";
+
+    const response = await ProductService.getAllProducts(search);
 
     return res.status(200).json(response);
+
   } catch (e) {
+
     return res.status(500).json({
       status: "ERR",
-      message: e.message || "Internal server error",
+      message: e.message
     });
+
   }
 };
 

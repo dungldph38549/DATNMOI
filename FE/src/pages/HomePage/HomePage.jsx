@@ -1,263 +1,471 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useDispatch } from "react-redux";
-import { addToCart } from "../../redux/cartSlice";
 
 const HomePage = () => {
-  const dispatch = useDispatch();
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+const [products,setProducts] = useState([])
+const [selectedBrand,setSelectedBrand] = useState("")
+const [selectedCategory,setSelectedCategory] = useState("")
+const [sort,setSort] = useState("new")
+const [slide,setSlide] = useState(0)
 
-        const res = await fetch("/api/product");
+const banners = [
+"https://images.unsplash.com/photo-1542291026-7eec264c27ff",
+"https://images.unsplash.com/photo-1600185365926-3a2ce3cdb9eb",
+"https://images.unsplash.com/photo-1606813907291-d86efa9b94db"
+]
 
-        if (!res.ok) {
-          throw new Error("Không thể tải danh sách sản phẩm từ server.");
-        }
+/* SLIDER */
 
-        let data;
-        try {
-          data = await res.json();
-        } catch (parseError) {
-          // Log chi tiết để debug nhưng không hiển thị thông báo kỹ thuật cho người dùng
-          console.error("Lỗi parse JSON sản phẩm:", parseError);
-          throw new Error("Dữ liệu sản phẩm trả về không hợp lệ.");
-        }
+useEffect(()=>{
 
-        if (data.status !== "OK") {
-          throw new Error(
-            data.message || "Không thể tải danh sách sản phẩm.",
-          );
-        }
+const interval = setInterval(()=>{
+setSlide(prev => (prev + 1) % banners.length)
+},4000)
 
-        setProducts((data.data || []).slice(0, 8));
-      } catch (err) {
-        console.error("Lỗi khi tải sản phẩm:", err);
-        setError("Hiện không thể tải sản phẩm. Vui lòng thử lại sau.");
-      } finally {
-        setLoading(false);
-      }
-    };
+return ()=> clearInterval(interval)
 
-    fetchProducts();
-  }, []);
+},[])
 
-  return (
-    <main className="flex-1 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
-      {/* Hero Section */}
-      <section className="px-6 lg:px-20 py-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="relative min-h-[560px] flex flex-col justify-center overflow-hidden rounded-xl lg:rounded-xl p-8 lg:p-16 bg-slate-900 text-white group">
-            <div className="absolute inset-0 z-0 overflow-hidden">
-              <img
-                className="w-full h-full object-cover opacity-60 scale-105 group-hover:scale-100 transition-transform duration-700"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAByHuzHMnvd_c6UEq7pqpzJTrxMD9z9JIJKouQIoyk1cbx4QeiCkydo6hBRKkJ2uVvSAPPQZE1WrOfdK7bcax8dvc7dF6eL27KVHey-a62O58MyxnrSegKcPlEmHfajJLEx0iKCaBMgMDm6NsUosmSS8Z7lb6BfydR3lgLDyS4bedy52vNPI5xI8DLEoYf27buPwELW7luLayp0-PM_eu3fQSq7RObMunX9lLksLPt4e-Qp-mosurWDmmefd3-yozfEQReA-CkQnU"
-                alt="Premium orange and black sneakers"
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-background-dark/80 via-background-dark/40 to-transparent" />
-            </div>
-            <div className="relative z-10 max-w-xl space-y-6">
-              <span className="inline-block px-4 py-1 bg-primary text-background-dark text-xs font-bold uppercase tracking-widest rounded-full">
-                Phiên bản giới hạn
-              </span>
-              <h1 className="text-5xl lg:text-7xl font-black leading-tight">
-                Nâng tầm từng bước chân
-              </h1>
-              <p className="text-lg text-slate-200">
-                Dòng Air Pulse phiên bản giới hạn đã có mặt. Tối ưu cho hiệu năng,
-                thiết kế cho phong cách đường phố.
-              </p>
-              <div className="flex flex-wrap gap-4 pt-4">
-                <Link
-                  to="/product"
-                  className="px-8 py-4 bg-primary text-background-dark font-bold rounded-full hover:shadow-lg hover:shadow-primary/30 transition-all flex items-center gap-2"
-                >
-                  Mua ngay
-                  <span className="material-symbols-outlined">
-                    arrow_forward
-                  </span>
-                </Link>
-                <Link
-                  to="/category"
-                  className="px-8 py-4 bg-white/10 backdrop-blur-md text-white font-bold rounded-full border border-white/20 hover:bg-white/20 transition-all"
-                >
-                  Xem bộ sưu tập
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+/* FETCH PRODUCTS */
 
-      {/* Featured Categories */}
-      <section className="px-6 lg:px-20 py-12">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-end justify-between mb-8">
-            <div>
-              <h2 className="text-3xl font-bold">Mua sắm theo danh mục</h2>
-              <p className="text-slate-500 mt-1">
-                Tìm đôi giày phù hợp với phong cách sống của bạn
-              </p>
-            </div>
-            <Link
-              to="/category"
-              className="text-primary font-bold flex items-center gap-1 hover:underline"
-            >
-              Xem tất cả danh mục{" "}
-              <span className="material-symbols-outlined text-sm">
-                open_in_new
-              </span>
-            </Link>
-          </div>
+useEffect(()=>{
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Category Card 1 */}
-            <Link
-              to="/category?type=Running"
-              className="group relative aspect-[4/5] rounded-xl overflow-hidden cursor-pointer block"
-            >
-              <img
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDbtKp14mxnTdhy2GJG9uWRJcEgWpCU8ATDQEZF1tif4LVrtXTc-bWK2-DrpZlOpsCu3Ub7SoKdmR8e8LgJapBQs2044XxeCkqlBMhqiSoyiorQ76WCEUR-0fflMeXbllB0AYLviJxL9F3VY6OZdHC5BMfqFi820XGxvdNxYa6P6qUGmTfPK6cvpiVHwaMHMo8UHu2ELXyGZAbLWk5uIbDh1_wEsk4Y3SgdN196WNFnONhv9w-sMIYuXA5aYSPR8D1tLLSgx8s0RWo"
-                alt="Red performance running shoe close up"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-              <div className="absolute bottom-6 left-6">
-                <h3 className="text-2xl font-bold text-white mb-2">Running</h3>
-                <button className="text-white text-sm font-semibold py-2 px-4 bg-white/20 backdrop-blur-md rounded-lg hover:bg-primary hover:text-background-dark transition-colors">
-                  Khám phá
-                </button>
-              </div>
-            </Link>
+const fetchProducts = async()=>{
 
-            {/* Category Card 2 */}
-            <Link
-              to="/category?type=Basketball"
-              className="group relative aspect-[4/5] rounded-xl overflow-hidden cursor-pointer block"
-            >
-              <img
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAMBkXX8P53hvH3Ml0MhVpf-6G9NwCPu1USfMz5s4qmjBLn8EbPZ6iiOmJwX6GI9DmjIChlkma8Tjy38JJ6Njhq0lx_EwC8fYyQlst-_XSUqwFL2jXjb5D4J0GwWarsNExUTPDiWxhmuj0pgJtQMLoVHwC7hHfDxDVZlQdk6J1mCAofoMkWzRAY1_01xbOHJd_H6uJo8PQinGVQerhukUJpJ1ilJ8IbudpVwCuePHpG9H1CZRQM3Ux-QGFhsE1rF9bZolsiSoyjCao"
-                alt="Modern high top basketball sneakers"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-              <div className="absolute bottom-6 left-6">
-                <h3 className="text-2xl font-bold text-white mb-2">
-                  Basketball
-                </h3>
-                <button className="text-white text-sm font-semibold py-2 px-4 bg-white/20 backdrop-blur-md rounded-lg hover:bg-primary hover:text-background-dark transition-colors">
-                  Khám phá
-                </button>
-              </div>
-            </Link>
+const res = await fetch("http://localhost:3001/api/product")
+const data = await res.json()
 
-            {/* Category Card 3 */}
-            <Link
-              to="/category?type=Lifestyle"
-              className="group relative aspect-[4/5] rounded-xl overflow-hidden cursor-pointer block"
-            >
-              <img
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDgZicS_k_2tddPzM9kgzUuoG4NNTwGeQLpmm3nfXibtyWxs9jRb0Hn8leieLwbcvoP6L36CUsWIyvWBuf8ccJNK8YjdJk2ZGSfjhtD5ghBrwrcygPfKOCEcYx1JN6ixOOMfVhazXi20UMyFI434jMrnc4-GH5Js9gd8j06InFFSNwY4EvzesHfm4rEMOm7GUFbISR7D3g0JvaKwXNP3ZfnNa_AGmTBoD--awfOe-z6D4PgYF4gqtktbPLzKII82bqm4bXenSj5Kbk"
-                alt="Casual lifestyle sneakers on a minimalist background"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-              <div className="absolute bottom-6 left-6">
-                <h3 className="text-2xl font-bold text-white mb-2">
-                  Lifestyle
-                </h3>
-                <button className="text-white text-sm font-semibold py-2 px-4 bg-white/20 backdrop-blur-md rounded-lg hover:bg-primary hover:text-background-dark transition-colors">
-                  Khám phá
-                </button>
-              </div>
-            </Link>
-          </div>
-        </div>
-      </section>
+setProducts(data.data || [])
 
-      {/* New Arrivals Grid */}
-      <section className="px-6 lg:px-20 py-12 bg-primary/5">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold mb-10 text-center">Xu hướng hiện nay</h2>
-          {loading && (
-            <p className="text-sm text-slate-500 text-center">
-              Đang tải sản phẩm...
-            </p>
-          )}
+}
 
-          {error && (
-            <p className="text-sm text-red-500 text-center mb-6">
-              Lỗi: {error}
-            </p>
-          )}
+fetchProducts()
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {products.map((p) => (
-              <div
-                key={p._id}
-                className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-primary/5 hover:shadow-xl transition-shadow group"
-              >
-                <Link to={`/product/${p._id}`}>
-                  <div className="relative aspect-square bg-slate-100 dark:bg-slate-700 p-6">
-                    <img
-                      className="w-full h-full object-contain group-hover:scale-110 transition-transform"
-                      src={p.image}
-                      alt={p.name}
-                    />
-                  </div>
-                </Link>
-                <div className="p-4">
-                  <p className="text-xs text-slate-500 uppercase font-bold tracking-widest mb-1">
-                    {p.type}
-                  </p>
-                  <h4 className="font-bold text-lg mb-2 truncate">{p.name}</h4>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-black text-primary">
-                      ${Number(p.price || 0).toFixed(2)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        dispatch(
-                          addToCart({
-                            productId: p._id,
-                            name: p.name,
-                            image: p.image,
-                            price: p.price,
-                            qty: 1,
-                          }),
-                        )
-                      }
-                      className="bg-primary/20 hover:bg-primary p-2 rounded-lg transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-sm">
-                        add_shopping_cart
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+},[])
 
-          <div className="text-center mt-12">
-            <Link
-              to="/product"
-              className="inline-block px-10 py-3 border-2 border-primary text-primary font-bold rounded-full hover:bg-primary hover:text-background-dark transition-all"
-            >
-              Xem toàn bộ bộ sưu tập
-            </Link>
-          </div>
-        </div>
-      </section>
-    </main>
-  );
-};
+/* FILTER */
 
-export default HomePage;
+let filterProducts = [...products]
+
+if(selectedBrand){
+filterProducts = filterProducts.filter(p => p.brand === selectedBrand)
+}
+
+if(selectedCategory){
+filterProducts = filterProducts.filter(p => p.category === selectedCategory)
+}
+
+/* SORT */
+
+if(sort === "low"){
+filterProducts.sort((a,b)=>a.price-b.price)
+}
+
+if(sort === "high"){
+filterProducts.sort((a,b)=>b.price-a.price)
+}
+
+if(sort === "sold"){
+filterProducts.sort((a,b)=>(b.sold||0)-(a.sold||0))
+}
+
+const hotProducts = filterProducts.slice(0,8)
+const newProducts = filterProducts.slice(8,16)
+
+const isFiltering = selectedBrand || selectedCategory
+
+return(
+
+<main className="bg-gray-50 min-h-screen">
+
+{/* HERO */}
+
+<section className="relative h-[520px] overflow-hidden">
+
+{banners.map((img,index)=>(
+
+<img
+key={index}
+src={img}
+className={`absolute w-full h-full object-cover transition-opacity duration-1000 ${slide===index ? "opacity-100":"opacity-0"}`}
+/>
+
+))}
+
+<div className="absolute inset-0 bg-black/50"/>
+
+<div className="absolute inset-0 flex items-center justify-center text-white text-center">
+
+<div>
+
+<h1 className="text-5xl font-black mb-6">
+Sneaker Store
+</h1>
+
+<p className="text-lg mb-8">
+Phong cách bắt đầu từ đôi giày
+</p>
+
+<Link
+to="/product"
+className="bg-yellow-400 text-black px-10 py-4 rounded-full font-bold hover:scale-105 transition"
+>
+Mua ngay
+</Link>
+
+</div>
+
+</div>
+
+</section>
+
+{/* MAIN */}
+
+<section className="max-w-[1500px] mx-auto px-6 py-20 grid grid-cols-12 gap-14">
+
+{/* SIDEBAR */}
+
+<div className="col-span-3 space-y-8">
+
+{/* BRAND */}
+
+<div className="bg-white rounded-xl shadow p-6">
+
+<h3 className="text-2xl font-bold mb-6 text-black">
+Thương hiệu
+</h3>
+
+<ul className="space-y-6 text-lg">
+
+<li
+onClick={()=>setSelectedBrand("Puma")}
+className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p-2 rounded-lg transition"
+>
+
+<img
+src="https://cdn.worldvectorlogo.com/logos/puma-logo.svg"
+className="w-8 h-8 object-contain grayscale"
+/>
+
+Puma
+
+</li>
+
+<li
+onClick={()=>setSelectedBrand("Jordan Brand")}
+className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p-2 rounded-lg transition"
+>
+
+<img
+src="https://upload.wikimedia.org/wikipedia/en/3/37/Jumpman_logo.svg"
+className="w-8 h-8 object-contain grayscale"
+/>
+
+Jordan Brand
+
+</li>
+
+<li
+onClick={()=>setSelectedBrand("Adidas")}
+className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p-2 rounded-lg transition"
+>
+
+<img
+src="https://upload.wikimedia.org/wikipedia/commons/2/20/Adidas_Logo.svg"
+className="w-8 h-8 object-contain grayscale"
+/>
+
+Adidas
+
+</li>
+
+<li
+onClick={()=>setSelectedBrand("Nike")}
+className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p-2 rounded-lg transition"
+>
+
+<img
+src="https://upload.wikimedia.org/wikipedia/commons/a/a6/Logo_NIKE.svg"
+className="w-8 h-8 object-contain grayscale"
+/>
+
+Nike
+
+</li>
+
+</ul>
+
+</div>
+
+{/* CATEGORY */}
+
+<div className="bg-white rounded-xl shadow p-6">
+
+<h3 className="text-2xl font-bold mb-6 text-black">
+Danh mục
+</h3>
+
+<ul className="space-y-6 text-lg">
+
+<li
+onClick={()=>setSelectedCategory("Quần áo")}
+className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p-2 rounded-lg transition"
+>
+
+<span className="text-2xl grayscale">
+👕
+</span>
+
+Quần áo
+
+</li>
+
+<li
+onClick={()=>setSelectedCategory("Giày")}
+className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p-2 rounded-lg transition"
+>
+
+<span className="text-2xl grayscale">
+👟
+</span>
+
+Giày
+
+</li>
+
+<li
+onClick={()=>setSelectedCategory("Balo")}
+className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p-2 rounded-lg transition"
+>
+
+<span className="text-2xl grayscale">
+🎒
+</span>
+
+Balo
+
+</li>
+
+<li
+onClick={()=>setSelectedCategory("Phụ kiện")}
+className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p-2 rounded-lg transition"
+>
+
+<span className="text-2xl grayscale">
+⚽
+</span>
+
+Phụ kiện khác
+
+</li>
+
+</ul>
+
+</div>
+
+</div>
+
+{/* PRODUCT AREA */}
+
+<div className="col-span-9">
+
+{/* SORT */}
+
+<div className="flex items-center gap-6 mb-12">
+
+<p className="text-2xl font-bold">
+Sắp xếp theo:
+</p>
+
+<button
+onClick={()=>setSort("new")}
+className={`px-6 py-3 rounded-lg font-semibold shadow transition
+${sort==="new" ? "bg-blue-500 text-white":"bg-gray-200 hover:bg-gray-300"}
+`}
+>
+Mới nhất
+</button>
+
+<button
+onClick={()=>setSort("sold")}
+className={`px-6 py-3 rounded-lg font-semibold shadow transition
+${sort==="sold" ? "bg-blue-500 text-white":"bg-gray-200 hover:bg-gray-300"}
+`}
+>
+Bán chạy
+</button>
+
+<button
+onClick={()=>setSort("low")}
+className={`px-6 py-3 rounded-lg font-semibold shadow transition
+${sort==="low" ? "bg-blue-500 text-white":"bg-gray-200 hover:bg-gray-300"}
+`}
+>
+Giá thấp → cao
+</button>
+
+<button
+onClick={()=>setSort("high")}
+className={`px-6 py-3 rounded-lg font-semibold shadow transition
+${sort==="high" ? "bg-blue-500 text-white":"bg-gray-200 hover:bg-gray-300"}
+`}
+>
+Giá cao → thấp
+</button>
+
+</div>
+
+{/* HOT PRODUCTS */}
+
+{!isFiltering && (
+
+<>
+
+<h2 className="text-4xl font-bold text-center mb-12">
+🔥 SẢN PHẨM BÁN CHẠY
+</h2>
+
+<div className="grid md:grid-cols-3 lg:grid-cols-4 gap-8 mb-20">
+
+{hotProducts.map(p=>(
+
+<Link
+to={`/product/${p._id}`}
+key={p._id}
+className="bg-white rounded-2xl shadow hover:shadow-2xl transition p-6 block"
+>
+
+<img
+src={`http://localhost:3001/uploads/${p.image}`}
+className="h-80 mx-auto object-contain"
+/>
+
+<h3 className="font-semibold text-lg mt-4 line-clamp-2">
+{p.name}
+</h3>
+
+<p className="text-red-500 font-bold text-xl mt-2">
+{Number(p.price).toLocaleString()}đ
+</p>
+
+</Link>
+
+))}
+
+</div>
+
+</>
+
+)}
+
+{/* NEW PRODUCTS */}
+
+{!isFiltering && (
+
+<>
+
+<h2 className="text-4xl font-bold text-center mb-12">
+✨ SẢN PHẨM MỚI
+</h2>
+
+<div className="grid md:grid-cols-3 lg:grid-cols-4 gap-8">
+
+{newProducts.map(p=>(
+
+<Link
+to={`/product/${p._id}`}
+key={p._id}
+className="bg-white rounded-2xl shadow hover:shadow-2xl transition p-6 block"
+>
+
+<img
+src={`http://localhost:3001/uploads/${p.image}`}
+className="h-80 mx-auto object-contain"
+/>
+
+<h3 className="font-semibold text-lg mt-4 line-clamp-2">
+{p.name}
+</h3>
+
+<p className="text-red-500 font-bold text-xl mt-2">
+{Number(p.price).toLocaleString()}đ
+</p>
+
+</Link>
+
+))}
+
+</div>
+
+</>
+
+)}
+
+{/* FILTER PRODUCTS */}
+
+{isFiltering && (
+
+<>
+
+<h2 className="text-4xl font-bold text-center mb-12">
+🛍 SẢN PHẨM
+</h2>
+
+<div className="grid md:grid-cols-3 lg:grid-cols-4 gap-8">
+
+{filterProducts.map(p=>(
+
+<Link
+to={`/product/${p._id}`}
+key={p._id}
+className="bg-white rounded-2xl shadow hover:shadow-2xl transition p-6 block"
+>
+
+<img
+src={`http://localhost:3001/uploads/${p.image}`}
+className="h-80 mx-auto object-contain"
+/>
+
+<h3 className="font-semibold text-lg mt-4 line-clamp-2">
+{p.name}
+</h3>
+
+<p className="text-red-500 font-bold text-xl mt-2">
+{Number(p.price).toLocaleString()}đ
+</p>
+
+</Link>
+
+))}
+
+</div>
+
+</>
+
+)}
+
+{/* VIEW ALL */}
+
+<div className="flex justify-center mt-20">
+
+<Link
+to="/product"
+className="bg-black text-white px-12 py-4 rounded-full font-bold hover:bg-red-500 transition"
+>
+Xem tất cả sản phẩm →
+</Link>
+
+</div>
+
+</div>
+
+</section>
+
+</main>
+
+)
+
+}
+
+export default HomePage
