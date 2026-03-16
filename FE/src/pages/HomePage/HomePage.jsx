@@ -25,7 +25,7 @@ setSlide(prev => (prev + 1) % banners.length)
 
 return ()=> clearInterval(interval)
 
-},[])
+},[banners.length])
 
 /* FETCH PRODUCTS */
 
@@ -75,6 +75,14 @@ const newProducts = filterProducts.slice(8,16)
 
 const isFiltering = selectedBrand || selectedCategory
 
+const PLACEHOLDER_IMG = "https://via.placeholder.com/300x300/f0f0f0/999?text=No+Image"
+const getProductImageUrl = (p) => {
+  if (!p?.image || typeof p.image !== "string") return PLACEHOLDER_IMG
+  if (p.image.startsWith("http://") || p.image.startsWith("https://")) return p.image
+  return `http://localhost:3001/uploads/${p.image}`
+}
+const onImgError = (e) => { e.target.onerror = null; e.target.src = PLACEHOLDER_IMG }
+
 return(
 
 <main className="bg-gray-50 min-h-screen">
@@ -88,6 +96,7 @@ return(
 <img
 key={index}
 src={img}
+alt=""
 className={`absolute w-full h-full object-cover transition-opacity duration-1000 ${slide===index ? "opacity-100":"opacity-0"}`}
 />
 
@@ -145,6 +154,7 @@ className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p
 
 <img
 src="https://cdn.worldvectorlogo.com/logos/puma-logo.svg"
+alt="Puma"
 className="w-8 h-8 object-contain grayscale"
 />
 
@@ -159,6 +169,7 @@ className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p
 
 <img
 src="https://upload.wikimedia.org/wikipedia/en/3/37/Jumpman_logo.svg"
+alt="Jordan Brand"
 className="w-8 h-8 object-contain grayscale"
 />
 
@@ -173,6 +184,7 @@ className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p
 
 <img
 src="https://upload.wikimedia.org/wikipedia/commons/2/20/Adidas_Logo.svg"
+alt="Adidas"
 className="w-8 h-8 object-contain grayscale"
 />
 
@@ -187,6 +199,7 @@ className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p
 
 <img
 src="https://upload.wikimedia.org/wikipedia/commons/a/a6/Logo_NIKE.svg"
+alt="Nike"
 className="w-8 h-8 object-contain grayscale"
 />
 
@@ -337,8 +350,10 @@ className="bg-white rounded-2xl shadow hover:shadow-2xl transition p-6 block"
 >
 
 <img
-src={`http://localhost:3001/uploads/${p.image}`}
+src={getProductImageUrl(p)}
+alt={p.name}
 className="h-80 mx-auto object-contain"
+onError={onImgError}
 />
 
 <h3 className="font-semibold text-lg mt-4 line-clamp-2">
@@ -380,8 +395,10 @@ className="bg-white rounded-2xl shadow hover:shadow-2xl transition p-6 block"
 >
 
 <img
-src={`http://localhost:3001/uploads/${p.image}`}
+src={getProductImageUrl(p)}
+alt={p.name}
 className="h-80 mx-auto object-contain"
+onError={onImgError}
 />
 
 <h3 className="font-semibold text-lg mt-4 line-clamp-2">
@@ -423,8 +440,10 @@ className="bg-white rounded-2xl shadow hover:shadow-2xl transition p-6 block"
 >
 
 <img
-src={`http://localhost:3001/uploads/${p.image}`}
+src={getProductImageUrl(p)}
+alt={p.name}
 className="h-80 mx-auto object-contain"
+onError={onImgError}
 />
 
 <h3 className="font-semibold text-lg mt-4 line-clamp-2">

@@ -79,11 +79,20 @@ const loginUser = async (userLogin) => {
     // Save refresh token to DB
     await User.findByIdAndUpdate(checkUser._id, { refresh_token });
 
+    const user = {
+        _id: checkUser._id,
+        name: checkUser.name,
+        email: checkUser.email,
+        phone: checkUser.phone,
+        isAdmin: checkUser.isAdmin,
+    };
+
     return {
         status: "OK",
         message: "Đăng nhập thành công",
         access_token,
         refresh_token,
+        user,
     };
 };
 

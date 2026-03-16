@@ -27,6 +27,10 @@ fetchProduct()
 
 if(!product) return <p className="text-center mt-10">Loading...</p>
 
+const PLACEHOLDER_IMG = "https://via.placeholder.com/400x400/f0f0f0/999?text=No+Image"
+const imageUrl = (product.image && (product.image.startsWith("http") ? product.image : `http://localhost:3001/uploads/${product.image}`)) || PLACEHOLDER_IMG
+const onImgError = (e) => { e.target.onerror = null; e.target.src = PLACEHOLDER_IMG }
+
 return(
 
 <div className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-2 gap-10">
@@ -34,8 +38,10 @@ return(
 <div className="bg-gray-100 p-10 rounded">
 
 <img
-src={`http://localhost:3001/uploads/${product.image}`}
+src={imageUrl}
+alt={product.name}
 className="w-full object-contain"
+onError={onImgError}
 />
 
 </div>

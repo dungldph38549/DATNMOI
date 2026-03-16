@@ -1,4 +1,5 @@
 const User = require("../model/UserModel");
+const UserService = require("../service/UserService");
 
 
 // ================== GET ALL ==================
@@ -210,8 +211,20 @@ exports.deleteUser = async (req, res) => {
 // ================== REGISTER ==================
 exports.register = async (req, res) => {
   try {
-    res.json({ message: "Register API working" });
+    const { name, email, password, phone } = req.body;
+    if (!name || !email || !password || !phone) {
+      return res.status(400).json({
+        status: "ERR",
+        message: "Vui lòng điền đầy đủ: Họ tên, Email, Mật khẩu, Số điện thoại",
+      });
+    }
+    const result = await UserService.registerUser({ name, email, password, phone });
+    if (result.status === "ERR") {
+      return res.status(400).json({ status: result.status, message: result.message });
+    }
+    res.status(200).json({ status: result.status, message: result.message });
   } catch (error) {
+    console.error("REGISTER ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -219,8 +232,26 @@ exports.register = async (req, res) => {
 // ================== LOGIN ==================
 exports.login = async (req, res) => {
   try {
-    res.json({ message: "Login API working" });
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({
+        status: "ERR",
+        message: "Vui lòng nhập email và mật khẩu",
+      });
+    }
+    const result = await UserService.loginUser({ email, password });
+    if (result.status === "ERR") {
+      return res.status(400).json({ status: result.status, message: result.message });
+    }
+    res.status(200).json({
+      status: result.status,
+      message: result.message,
+      access_token: result.access_token,
+      refresh_token: result.refresh_token,
+      user: result.user,
+    });
   } catch (error) {
+    console.error("LOGIN ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
