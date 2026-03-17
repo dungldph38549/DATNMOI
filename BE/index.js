@@ -3,106 +3,142 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const path = require("path");
+const fs = require("fs");
+const http = require("http");
+const multer = require("multer");
+const { Server } = require("socket.io");
 
-const productRouter = require("./src/routers/ProductRouter");
-const brandRouter = require("./src/routers/BrandRouter");
-const voucherRouter = require("./src/routers/VoucherRouter");
-const categoryRouter = require("./src/routers/CategoryRouter");
-const userRouter = require("./src/routers/UserRouter");
-const reviewRouter = require("./src/routers/ReviewRouter");
-const adminReviewRouter = require("./src/routers/adminReviewRoutes");
-const sizeRouter = require("./src/routers/SizeRouter");
-const colorRouter = require("./src/routers/ColorRouter");
-
-const inventoryRoutes = require("./routes/inventoryRoutes");
-const { initSocket } = require("./socket/inventorySocket");
-const { scheduleLowStockScan } = require("./jobs/alertJob");
-
-dotenv.config(); // Đọc các biến từ file .env
-
-const orderRouter = require("./src/routers/OrderRouter");
+// Import Route tổng hợp và Socket/Jobs
+const routes = require("./src/routers");
+const { initSocket } = require("./src/socket/inventorySocket");
+const { scheduleLowStockScan } = require("./src/jobs/alertJob");
 
 const app = express();
+const server = http.createServer(app);
 
-const port = process.env.PORT || 3001;
-const mongoURI = process.env.MONGO_DB;
-
-// Middleware
-app.use(express.json());
-
-app.use(
-  cors({
-    origin: "http://localhost:3000",
+// ==========================================
+// 1. CẤU HÌNH SOCKET.IO
+// ==========================================
+const io = new Server(server, {
+  cors: {
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://localhost:5173",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,
-  })
-);
-
-// Static folder cho ảnh
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-// Test API
-app.get("/", (req, res) => {
-  res.send("Hello API");
+  },
 });
 
-// Routes
-app.use("/api/product", productRouter);
-app.use("/api/brand", brandRouter);
-app.use("/api/voucher", voucherRouter);
-app.use("/api/category", categoryRouter);
-app.use("/api/users", userRouter);
-app.use("/api/reviews", reviewRouter);
-app.use("/api/admin", adminReviewRouter);
-app.use("/api/size", sizeRouter);
-app.use("/api/color", colorRouter);
-app.use("/api/inventory", inventoryRoutes);
-// ── Global Error Handler ──────────────────────────────────────
+// ==========================================
+// 2. MIDDLEWARES & STATIC FILES
+// ==========================================
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://localhost:5173",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    credentials: true,
+  }),
+);
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+// Cho phép truy cập thư mục public
+app.use("/uploads", express.static(path.join(__dirname, "../public/uploads")));
+
+// Cấu hình thư mục lưu trữ ảnh công khai
+const uploadDir = path.join(__dirname, "public/uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+app.use("/uploads", express.static(uploadDir));
+
+// ==========================================
+// 3. CẤU HÌNH MULTER (UPLOAD FILE)
+// ==========================================
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(
+      null,
+      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname),
+    );
+  },
+});
+const upload = multer({ storage });
+
+// ==========================================
+// 4. ROUTES TRỰC TIẾP (CHO UPLOAD)
+// ==========================================
+// API Upload 1 ảnh
+app.post("/api/upload", upload.single("file"), (req, res) => {
+  if (!req.file) return res.status(400).json({ message: "Không có file" });
+  res.status(200).json({
+    success: true,
+    message: "Tải lên thành công",
+    path: req.file.filename,
+  });
+});
+
+// API Upload nhiều ảnh
+app.post("/api/uploads/multiple", upload.array("files", 10), (req, res) => {
+  if (!req.files || req.files.length === 0)
+    return res.status(400).json({ message: "Không có ảnh" });
+  const filePaths = req.files.map((file) => file.filename);
+  res.status(200).json({ success: true, paths: filePaths });
+});
+
+// Gọi các route nghiệp vụ khác từ src/routers/index.js
+routes(app);
+
+// ==========================================
+// 5. GLOBAL ERROR HANDLER
+// ==========================================
 app.use((err, req, res, next) => {
   const status = err.status || 500;
   const message = err.message || "Lỗi máy chủ";
 
-  if (err.name === "ValidationError") {
-    const errors = Object.fromEntries(
-      Object.entries(err.errors).map(([k, v]) => [k, v.message]),
-    );
+  if (err instanceof multer.MulterError) {
     return res
       .status(400)
-      .json({ success: false, message: "Dữ liệu không hợp lệ", errors });
+      .json({ success: false, message: "Lỗi tải file: " + err.message });
   }
 
-  if (err.code === 11000) {
-    const field = Object.keys(err.keyValue)[0];
-    return res
-      .status(409)
-      .json({ success: false, message: `${field} đã tồn tại` });
-  }
-
-  return res.status(status).json({
+  res.status(status).json({
     success: false,
     message,
     ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
   });
 });
 
-// ── Socket.io ─────────────────────────────────────────────────
+// ==========================================
+// 6. KHỞI CHẠY HỆ THỐNG
+// ==========================================
 initSocket(io);
-
-// ── Cron Jobs ─────────────────────────────────────────────────
 scheduleLowStockScan();
-=======
-app.use("/api/order", orderRouter);
 
+const MONGO_URI = process.env.MONGO_DB;
+const PORT = process.env.PORT || 3001;
 
-// MongoDB
+if (!MONGO_URI) {
+  console.error("❌ MONGO_DB chưa được định nghĩa trong file .env");
+  process.exit(1);
+}
+
 mongoose
-  .connect(mongoURI)
+  .connect(MONGO_URI)
   .then(() => {
     console.log("✅ Connected to MongoDB");
-
-    app.listen(port, () => {
-      console.log(`🚀 Server running: http://localhost:${port}`);
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on: http://localhost:${PORT}`);
     });
   })
   .catch((err) => {
-    console.error("❌ MongoDB error:", err.message);
+    console.error("❌ Failed to connect MongoDB:", err);
+    process.exit(1);
   });

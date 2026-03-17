@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { addToCart } from "../../redux/cartSlice";
+import { addToCart } from "../../redux/cart/cartSlice";
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -58,12 +58,12 @@ const ProductDetail = () => {
         </nav>
 
         {loading && (
-          <p className="text-sm text-slate-500">Đang tải chi tiết sản phẩm...</p>
+          <p className="text-sm text-slate-500">
+            Đang tải chi tiết sản phẩm...
+          </p>
         )}
 
-        {error && (
-          <p className="text-sm text-red-500 mb-4">Lỗi: {error}</p>
-        )}
+        {error && <p className="text-sm text-red-500 mb-4">Lỗi: {error}</p>}
 
         {!loading && !error && !product && (
           <p className="text-sm text-slate-500">Không tìm thấy sản phẩm.</p>
@@ -74,15 +74,15 @@ const ProductDetail = () => {
           {/* Image Gallery */}
           <div className="space-y-4">
             <div className="aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800">
-            <img
-              className="w-full h-full object-cover"
-              alt={product?.name}
-              src={
-                product?.image
-                  ? `http://localhost:3001/uploads/${product.image}`
-                  : null
-              }
-            />
+              <img
+                className="w-full h-full object-cover"
+                alt={product?.name}
+                src={
+                  product?.image
+                    ? `http://localhost:3001/uploads/${product.image}`
+                    : null
+                }
+              />
             </div>
             <div className="grid grid-cols-4 gap-4">
               <div className="aspect-square rounded-lg overflow-hidden border-2 border-primary cursor-pointer">
@@ -244,7 +244,9 @@ const ProductDetail = () => {
         <section className="border-t border-slate-200 dark:border-slate-800 pt-16 pb-24">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
             <div>
-              <h2 className="text-3xl font-black mb-2">Đánh giá từ khách hàng</h2>
+              <h2 className="text-3xl font-black mb-2">
+                Đánh giá từ khách hàng
+              </h2>
               <p className="text-slate-500">
                 Những phản hồi thực tế từ cộng đồng yêu giày.
               </p>
@@ -388,19 +390,20 @@ const ProductDetail = () => {
                       </div>
                     </div>
                   </div>
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 uppercase tracking-wider">
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 uppercase tracking-wider">
                     <span className="material-symbols-outlined text-xs">
                       verified
                     </span>{" "}
-                        ĐÃ MUA HÀNG
+                    ĐÃ MUA HÀNG
                   </span>
                 </div>
                 <h5 className="font-bold mb-2">
                   Đôi giày chạy tốt nhất tôi từng có!
                 </h5>
                 <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-                  Độ êm của đôi này thực sự ấn tượng. Tôi đã chạy với nó hai tuần
-                  và chân vẫn rất dễ chịu. Màu cam ra ngoài nhìn cũng rất nổi bật!
+                  Độ êm của đôi này thực sự ấn tượng. Tôi đã chạy với nó hai
+                  tuần và chân vẫn rất dễ chịu. Màu cam ra ngoài nhìn cũng rất
+                  nổi bật!
                 </p>
                 <div className="flex items-center gap-4">
                   <button className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-primary">
@@ -450,11 +453,11 @@ const ProductDetail = () => {
                       </div>
                     </div>
                   </div>
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 uppercase tracking-wider">
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 uppercase tracking-wider">
                     <span className="material-symbols-outlined text-xs">
                       verified
                     </span>{" "}
-                        ĐÃ MUA HÀNG
+                    ĐÃ MUA HÀNG
                   </span>
                 </div>
                 <h5 className="font-bold mb-2">
@@ -462,7 +465,8 @@ const ProductDetail = () => {
                 </h5>
                 <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
                   Rất đa dụng. Tôi có thể mang đi tập HIIT rồi đi cà phê luôn.
-                  Điểm trừ nhỏ là form hơi ôm chân, ai bàn chân rộng nên tăng lên nửa size.
+                  Điểm trừ nhỏ là form hơi ôm chân, ai bàn chân rộng nên tăng
+                  lên nửa size.
                 </p>
                 <div className="flex items-center gap-4">
                   <button className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-primary">

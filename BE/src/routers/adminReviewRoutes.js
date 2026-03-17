@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const ctrl = require("../controller/reviewController");
-const { protect, restrictTo } = require("../middleware/auth");
+const ctrl = require("../controllers/reviewController");
+const { protect, restrictTo } = require("../middlewares/authMiddleware.js");
 
 // Tất cả routes dưới đây đều yêu cầu đăng nhập + role admin
 router.use(protect, restrictTo("admin"));

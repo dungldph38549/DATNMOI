@@ -21,9 +21,8 @@ import CheckOut from "./pages/CheckOut/CheckOut";
 import CategoryPage from "./pages/Category/CategoryPage";
 
 //  IMPORT TRANG ADMIN USERS
-import User from "./pages/User"; 
-// Nếu file của bạn là ./pages/user/index.jsx thì đổi lại cho đúng:
-// import User from "./pages/user";
+import User from "./pages/User";
+import AdminPage from "./Admin/AdminPage";
 
 function App() {
   return (
@@ -33,7 +32,6 @@ function App() {
 
         <div className="content">
           <Routes>
-
             {/* CLIENT ROUTES */}
             <Route path="/" element={<HomePage />} />
             <Route path="/product" element={<ProductPage />} />
@@ -46,10 +44,11 @@ function App() {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/terms" element={<TermsConditionsPage />} />
 
-            {/*  ADMIN ROUTE */}
+            {/* ADMIN ROUTE */}
             <Route path="/admin/users" element={<User />} />
+            <Route path="/admin" element={<AdminPage />} />
 
-            {/* 404 */}
+            {/* 404 - Đã sửa thành <Route> */}
             <Route
               path="*"
               element={
@@ -59,7 +58,6 @@ function App() {
                 </div>
               }
             />
-
           </Routes>
         </div>
 

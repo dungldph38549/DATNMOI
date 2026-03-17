@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { addToCart } from "../../redux/cartSlice";
+import { addToCart } from "../../redux/cart/cartSlice";
 
 const HomePage = () => {
   const dispatch = useDispatch();
@@ -31,9 +31,7 @@ const HomePage = () => {
         }
 
         if (data.status !== "OK") {
-          throw new Error(
-            data.message || "Không thể tải danh sách sản phẩm.",
-          );
+          throw new Error(data.message || "Không thể tải danh sách sản phẩm.");
         }
 
         setProducts((data.data || []).slice(0, 8));
@@ -70,8 +68,8 @@ const HomePage = () => {
                 Nâng tầm từng bước chân
               </h1>
               <p className="text-lg text-slate-200">
-                Dòng Air Pulse phiên bản giới hạn đã có mặt. Tối ưu cho hiệu năng,
-                thiết kế cho phong cách đường phố.
+                Dòng Air Pulse phiên bản giới hạn đã có mặt. Tối ưu cho hiệu
+                năng, thiết kế cho phong cách đường phố.
               </p>
               <div className="flex flex-wrap gap-4 pt-4">
                 <Link
@@ -184,7 +182,9 @@ const HomePage = () => {
       {/* New Arrivals Grid */}
       <section className="px-6 lg:px-20 py-12 bg-primary/5">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold mb-10 text-center">Xu hướng hiện nay</h2>
+          <h2 className="text-3xl font-bold mb-10 text-center">
+            Xu hướng hiện nay
+          </h2>
           {loading && (
             <p className="text-sm text-slate-500 text-center">
               Đang tải sản phẩm...
