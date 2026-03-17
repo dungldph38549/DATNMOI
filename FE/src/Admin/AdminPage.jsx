@@ -221,9 +221,9 @@ const AdminPage = () => {
       //     return <OrderReturn />;
       //   case "comments":
       //     return <Comments />;
-      //   case "inventory":
-      //     return <InventoryManagement />;
-      //   case "staff":
+      case "inventory":
+        return <InventoryDashboard />;
+      case "staff":
       //     return <StaffManagement />;
       default:
         return (
