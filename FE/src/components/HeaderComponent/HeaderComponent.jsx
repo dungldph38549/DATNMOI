@@ -6,17 +6,19 @@ import {
   FaUser,
   FaClipboardList,
 } from "react-icons/fa";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+import { clearUser } from "../../redux/user";
 
 const Header = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const cart = useSelector((state) => state.cart.items || []);
-  const user = useSelector((state) => state.user?.user);
+  const user = useSelector((state) => state.user);
+  const isLoggedIn = !!(user?.login && user?.token);
 
   const [keyword, setKeyword] = useState("");
-
-  const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const cartTotal = cart.reduce((sum, item) => sum + (item.price || 0) * (item.qty || 0), 0);
 
   /* ================= NAVIGATION ================= */
 
@@ -24,6 +26,10 @@ const Header = () => {
   const goCart = () => navigate("/cart");
   const goOrders = () => navigate("/orders");
   const goLogin = () => navigate("/login");
+  const handleLogout = () => {
+    dispatch(clearUser());
+    navigate("/", { replace: true });
+  };
 
   /* ================= SEARCH ================= */
 
@@ -81,9 +87,14 @@ const Header = () => {
             <span>Giỏ hàng</span>
 
             {cart.length > 0 && (
-              <span className="bg-red-500 text-white text-xs px-2 rounded-full">
-                {cart.length}
-              </span>
+              <>
+                <span className="bg-red-500 text-white text-xs px-2 rounded-full">
+                  {cart.length}
+                </span>
+                <span className="text-sm text-slate-600">
+                  ({cartTotal.toLocaleString("vi-VN")}₫)
+                </span>
+              </>
             )}
           </div>
 
@@ -100,11 +111,22 @@ const Header = () => {
 
           {/* USER */}
 
-          {user ? (
-            <div className="flex items-center gap-2">
-              <FaUser />
-
-              <span>{user.name}</span>
+          {isLoggedIn ? (
+            <div className="flex items-center gap-4">
+              <div
+                className="flex items-center gap-2"
+                title={user?.email}
+              >
+                <FaUser />
+                <span>{user?.name || user?.email || "Tài khoản"}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="text-sm px-3 py-1 rounded-full border border-slate-300 hover:bg-slate-100"
+              >
+                Đăng xuất
+              </button>
             </div>
           ) : (
             <div
@@ -112,7 +134,6 @@ const Header = () => {
               className="flex items-center gap-2 cursor-pointer hover:text-blue-600"
             >
               <FaUser />
-
               <span>Đăng nhập</span>
             </div>
           )}

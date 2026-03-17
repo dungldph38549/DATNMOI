@@ -21,22 +21,31 @@ const FooterComponent = () => {
             </p>
             <div className="flex gap-4">
               <a
-                href="#"
+                href="https://facebook.com"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary transition-colors"
+                aria-label="Facebook"
               >
                 <span className="material-symbols-outlined text-sm">public</span>
               </a>
               <a
-                href="#"
+                href="https://instagram.com"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary transition-colors"
+                aria-label="Instagram"
               >
                 <span className="material-symbols-outlined text-sm">
                   photo_camera
                 </span>
               </a>
               <a
-                href="#"
+                href="https://youtube.com"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary transition-colors"
+                aria-label="YouTube"
               >
                 <span className="material-symbols-outlined text-sm">
                   play_circle
@@ -50,27 +59,27 @@ const FooterComponent = () => {
             <h4 className="text-lg font-bold mb-6">Liên kết nhanh</h4>
             <ul className="space-y-4 text-slate-400">
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <a href="/" className="hover:text-primary transition-colors">
                   Sản phẩm mới
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <a href="/" className="hover:text-primary transition-colors">
                   Bán chạy nhất
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <a href="/" className="hover:text-primary transition-colors">
                   Lịch phát hành
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <a href="/" className="hover:text-primary transition-colors">
                   Chăm sóc giày
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <a href="/" className="hover:text-primary transition-colors">
                   Hướng dẫn chọn size
                 </a>
               </li>
@@ -82,27 +91,27 @@ const FooterComponent = () => {
             <h4 className="text-lg font-bold mb-6">Hỗ trợ khách hàng</h4>
             <ul className="space-y-4 text-slate-400">
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <a href="/orders" className="hover:text-primary transition-colors">
                   Tra cứu đơn hàng
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <a href="/" className="hover:text-primary transition-colors">
                   Đổi trả &amp; bảo hành
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <a href="/" className="hover:text-primary transition-colors">
                   Thông tin giao hàng
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <a href="/" className="hover:text-primary transition-colors">
                   Liên hệ
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <a href="/" className="hover:text-primary transition-colors">
                   Câu hỏi thường gặp
                 </a>
               </li>
@@ -136,13 +145,13 @@ const FooterComponent = () => {
         <div className="pt-10 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 text-slate-500 text-sm">
           <p>© 2026 SNEAKERHOUSE INC. Đã đăng ký bản quyền.</p>
           <div className="flex gap-8">
-            <a href="#" className="hover:text-white transition-colors">
+            <a href="/terms" className="hover:text-white transition-colors">
               Chính sách bảo mật
             </a>
-            <a href="#" className="hover:text-white transition-colors">
+            <a href="/terms" className="hover:text-white transition-colors">
               Điều khoản sử dụng
             </a>
-            <a href="#" className="hover:text-white transition-colors">
+            <a href="/" className="hover:text-white transition-colors">
               Hỗ trợ truy cập
             </a>
           </div>

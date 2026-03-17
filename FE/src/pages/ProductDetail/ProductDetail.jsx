@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { addToCart } from "../../redux/cartSlice";
+import { addToCart } from "../../redux/cart/cartSlice";
+import { getProductById } from "../../api";
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -10,13 +11,16 @@ const ProductDetail = () => {
   const [product, setProduct] = useState(null);
 
   useEffect(() => {
+    if (!id) return;
     const fetchProduct = async () => {
-      const res = await fetch(`http://localhost:3001/api/product/${id}`);
-      const data = await res.json();
-
-      setProduct(data.data);
+      try {
+        const data = await getProductById(id);
+        setProduct(data?.data ?? data);
+      } catch (err) {
+        console.error(err);
+        setProduct(null);
+      }
     };
-
     fetchProduct();
   }, [id]);
 

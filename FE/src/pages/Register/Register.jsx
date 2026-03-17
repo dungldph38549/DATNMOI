@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-
-const API_REGISTER = "http://localhost:3001/api/user/register";
+import { registerUser } from "../../api";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -35,26 +34,21 @@ const Register = () => {
 
     setLoading(true);
     try {
-      const res = await fetch(API_REGISTER, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name,
-          email: form.email,
-          password: form.password,
-          phone: form.phone,
-        }),
+      const resData = await registerUser({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        phone: form.phone,
       });
-      const data = await res.json();
-
-      if (!res.ok || data.status === "ERR") {
-        setError(data.message || "Đăng ký thất bại.");
+      // BE trả về { status: true, message, data }
+      if (resData && resData.status === false) {
+        setError(resData.message || "Đăng ký thất bại.");
         return;
       }
-      // Đăng ký thành công → chuyển về trang đăng nhập
-      navigate("/login");
+      navigate("/login", { replace: true });
     } catch (err) {
-      setError("Lỗi kết nối. Vui lòng thử lại.");
+      const msg = err?.response?.data?.message || "Lỗi kết nối. Vui lòng thử lại.";
+      setError(msg);
     } finally {
       setLoading(false);
     }

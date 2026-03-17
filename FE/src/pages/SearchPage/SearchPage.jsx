@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import axios from "axios";
 import Product from "../../components/Product/Product";
+import { searchProducts } from "../../api";
 
 const PAGE_SIZE = 15;
 
@@ -9,9 +9,8 @@ const normalize = (str = "") =>
   str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 const SearchPage = () => {
-
   const [searchParams] = useSearchParams();
-  const keyword = searchParams.get("q") || "";
+  const keyword = (searchParams.get("q") || "").trim();
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -23,30 +22,28 @@ const SearchPage = () => {
   const [page, setPage] = useState(1);
 
   useEffect(() => {
-
-    const timer = setTimeout(async () => {
-
-      try {
-
-        setLoading(true);
-
-        const res = await axios.get(
-          `http://localhost:3001/api/product?search=${keyword}`
-        );
-
-        setProducts(res.data.data || []);
-        setPage(1);
-
-      } catch (err) {
-        console.log(err);
-      }
-
+    if (!keyword) {
+      setProducts([]);
       setLoading(false);
-
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        setLoading(true);
+        const res = await searchProducts({
+          keyword,
+          limit: 100,
+          page: 0,
+        });
+        setProducts(res?.data ?? []);
+        setPage(1);
+      } catch (err) {
+        console.error(err);
+        setProducts([]);
+      }
+      setLoading(false);
     }, 300);
-
     return () => clearTimeout(timer);
-
   }, [keyword]);
 
 

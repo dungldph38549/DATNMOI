@@ -12,6 +12,22 @@ const {
 // PUBLIC — Khách hàng không cần đăng nhập
 // ================================================================
 
+// Trang gốc /api/product — trả về thông tin API (tránh "Cannot GET /api/product")
+router.get("/", (req, res) => {
+  res.status(200).json({
+    message: "Product API đang chạy",
+    endpoints: {
+      "GET /api/product/featured": "Sản phẩm nổi bật",
+      "GET /api/product/new-arrivals": "Hàng mới về",
+      "GET /api/product/best-sellers": "Bán chạy nhất",
+      "GET /api/product/search": "Tìm kiếm (?keyword=...)",
+      "GET /api/product/category/:categoryId": "Theo danh mục",
+      "GET /api/product/:id": "Chi tiết sản phẩm",
+      "POST /api/product/get-products": "Danh sách (filter + phân trang)",
+    },
+  });
+});
+
 // Sản phẩm nổi bật (trang chủ)          GET /product/featured
 router.get("/featured", PC.getFeaturedProducts);
 

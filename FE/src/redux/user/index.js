@@ -14,9 +14,11 @@ let initialState = {
   token: "",
   refreshToken: "",
 };
-if (user) {
+if (user && typeof user === "object") {
   initialState = {
+    ...initialState,
     ...user,
+    login: !!(user.token && (user.name || user.email)) || !!user.login,
   };
 }
 

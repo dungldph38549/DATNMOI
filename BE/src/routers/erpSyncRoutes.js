@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { authAdminMiddleware } = require("../middlewares/auth");
+const { authAdminMiddleware } = require("../middlewares/authMiddleware");
 
 // Webhook: public (dùng signature verify thay vì JWT)
 router.post("/erp/webhook", exports.webhook);

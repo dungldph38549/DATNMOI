@@ -8,7 +8,7 @@ import {
   FaEye,
 } from "react-icons/fa";
 import { useDispatch } from "react-redux";
-import { addToCart } from "../../redux/cartSlice";
+import { addToCart } from "../../redux/cart/cartSlice";
 
 const Product = ({ product }) => {
   const dispatch = useDispatch();

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Form, Input, Switch, Spin } from "antd";
+import { Form, Input, Switch } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAllUser, updateUserById } from "../api/index";
 

@@ -1,7 +1,206 @@
-import React from "react";
+import React, { useState } from "react";
+import { Table, Select, Button, message } from "antd";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  getAllOrders,
+  updateOrderStatus,
+  acceptReturn,
+  rejectReturn,
+} from "../api/index";
 
-const Order = () => {
-  return <div></div>;
+const STATUS_OPTIONS = [
+  { value: "pending", label: "Chờ xử lý" },
+  { value: "confirmed", label: "Đã xác nhận" },
+  { value: "shipped", label: "Đang giao" },
+  { value: "delivered", label: "Đã giao" },
+  { value: "canceled", label: "Đã hủy" },
+  { value: "return-request", label: "Yêu cầu hoàn hàng" },
+  { value: "accepted", label: "Chấp nhận hoàn hàng" },
+  { value: "rejected", label: "Từ chối hoàn hàng" },
+];
+
+const TRANSITIONS = {
+  pending: ["confirmed", "canceled"],
+  confirmed: ["shipped", "canceled"],
+  shipped: ["delivered"],
+  delivered: ["return-request"],
+  canceled: [],
+  "return-request": ["accepted", "rejected"],
+  accepted: [],
+  rejected: [],
 };
 
-export default Order;
+export default function Order() {
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(0);
+  const [limit] = useState(10);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-orders", page, limit],
+    queryFn: () => getAllOrders(page, limit),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, body }) => updateOrderStatus(id, body),
+    onSuccess: () => {
+      message.success("Cập nhật trạng thái thành công");
+      queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+    },
+    onError: (err) => {
+      message.error(err?.response?.data?.message || "Lỗi cập nhật");
+    },
+  });
+
+  const acceptReturnMutation = useMutation({
+    mutationFn: (id) => acceptReturn(id),
+    onSuccess: () => {
+      message.success("Đã chấp nhận hoàn hàng");
+      queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+    },
+    onError: (err) => {
+      message.error(err?.response?.data?.message || "Lỗi");
+    },
+  });
+
+  const rejectReturnMutation = useMutation({
+    mutationFn: (id) => rejectReturn(id),
+    onSuccess: () => {
+      message.success("Đã từ chối hoàn hàng");
+      queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+    },
+    onError: (err) => {
+      message.error(err?.response?.data?.message || "Lỗi");
+    },
+  });
+
+  const orders = data?.data || [];
+  const total = data?.total || 0;
+
+  const allowedNext = (current) => TRANSITIONS[current] || [];
+
+  const columns = [
+    {
+      title: "Mã đơn",
+      dataIndex: "_id",
+      key: "_id",
+      width: 120,
+      render: (id) => (id ? `#${String(id).slice(-8).toUpperCase()}` : "-"),
+    },
+    {
+      title: "Khách hàng",
+      key: "customer",
+      render: (_, record) =>
+        record.fullName || record.userId?.name || record.email || "-",
+    },
+    {
+      title: "Tổng tiền",
+      dataIndex: "totalAmount",
+      key: "totalAmount",
+      width: 120,
+      render: (v) => (v != null ? `${Number(v).toLocaleString()}đ` : "-"),
+    },
+    {
+      title: "Thanh toán",
+      key: "payment",
+      width: 100,
+      render: (_, record) =>
+        record.paymentMethod === "vnpay" ? "VNPay" : "COD",
+    },
+    {
+      title: "Trạng thái",
+      dataIndex: "status",
+      key: "status",
+      width: 180,
+      render: (status, record) => {
+        const next = allowedNext(status);
+        if (next.length === 0) {
+          return (
+            <span
+              style={{
+                padding: "2px 8px",
+                borderRadius: 4,
+                fontSize: 12,
+                background: "#f0f0f0",
+              }}
+            >
+              {STATUS_OPTIONS.find((o) => o.value === status)?.label || status}
+            </span>
+          );
+        }
+        return (
+          <Select
+            size="small"
+            value={status}
+            style={{ width: 160 }}
+            options={[
+              { value: status, label: STATUS_OPTIONS.find((o) => o.value === status)?.label || status },
+              ...next.map((v) => ({
+                value: v,
+                label: STATUS_OPTIONS.find((o) => o.value === v)?.label || v,
+              })),
+            ]}
+            onChange={(newStatus) => {
+              updateMutation.mutate({
+                id: record._id,
+                body: { status: newStatus },
+              });
+            }}
+          />
+        );
+      },
+    },
+    {
+      title: "Ngày đặt",
+      dataIndex: "createdAt",
+      key: "createdAt",
+      width: 110,
+      render: (v) => (v ? new Date(v).toLocaleDateString("vi-VN") : "-"),
+    },
+    {
+      title: "Hoàn hàng",
+      key: "return",
+      width: 140,
+      render: (_, record) => {
+        if (record.status !== "return-request") return null;
+        return (
+          <div style={{ display: "flex", gap: 4 }}>
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => acceptReturnMutation.mutate(record._id)}
+              loading={acceptReturnMutation.isPending}
+            >
+              Chấp nhận
+            </Button>
+            <Button
+              size="small"
+              danger
+              onClick={() => rejectReturnMutation.mutate(record._id)}
+              loading={rejectReturnMutation.isPending}
+            >
+              Từ chối
+            </Button>
+          </div>
+        );
+      },
+    },
+  ];
+
+  return (
+    <div style={{ padding: 24 }}>
+      <h2 style={{ marginBottom: 16 }}>Quản lý đơn hàng</h2>
+      <Table
+        rowKey="_id"
+        loading={isLoading}
+        dataSource={orders}
+        columns={columns}
+        pagination={{
+          current: page + 1,
+          total,
+          pageSize: limit,
+          onChange: (p) => setPage(p - 1),
+        }}
+      />
+    </div>
+  );
+}

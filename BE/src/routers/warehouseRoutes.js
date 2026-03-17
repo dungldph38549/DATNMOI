@@ -1,7 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const ctrl = exports; // same file demo — tách ra thực tế
-const { authMiddleware, authAdminMiddleware } = require("../middlewares/auth");
+const {
+  authMiddleware,
+  authAdminMiddleware,
+} = require("../middlewares/authMiddleware");
 
 router.get("/", authMiddleware, ctrl.getAll);
 router.get("/:id", authMiddleware, ctrl.getById);

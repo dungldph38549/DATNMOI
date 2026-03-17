@@ -5,20 +5,20 @@ const orderController = require("../controllers/OrderController.js");
 const {
   authMiddleware,
   authAdminMiddleware,
-} = require("../middleware/authMiddleware.js");
+} = require("../middlewares/authMiddleware");
 
 // =================== BASIC ORDER MANAGEMENT ===================
 
 // Tạo đơn hàng mới
 router.post("/", orderController.createOrder);
 
+// VNPay return URL (public - VNPay redirect về đây)
+router.get("/return-payment", orderController.returnPayment);
+
 // Lấy tất cả đơn hàng (Admin only)
 router.get("/", authAdminMiddleware, orderController.getAllOrders);
 
-// Xử lý thanh toán VNPay return
-// router.get("/return-payment", orderController.returnPayment);
-
-// Lấy đơn hàng theo user hoặc guest
+// Lấy đơn hàng theo user (cần đăng nhập) hoặc guest
 router.get("/user", orderController.getOrdersByUserOrGuest);
 
 // =================== ANALYTICS & REPORTING ===================
@@ -39,29 +39,20 @@ router.get(
   orderController.paymentMethod,
 );
 
-// =================== RETURN SYSTEM ===================
-
-// Lấy danh sách đơn hoàn hàng (Admin)
-//router.get("/order-return", authAdminMiddleware, orderController.orderReturn);
-
-// Tạo yêu cầu hoàn hàng (User)
-// router.post(
-//   "/returnOrderRequest",
-//   authMiddleware,
-//   orderController.returnOrderRequest
-// );
-
-// Admin xử lý yêu cầu hoàn hàng
-// router.post(
-//   "/acceptOrRejectReturn",
-//   authAdminMiddleware,
-//   orderController.acceptOrRejectReturn
-// );
-
 // =================== ORDER DETAILS & UPDATES ===================
 
 // Chi tiết đơn hàng
 router.get("/:id", orderController.getOrderById);
+
+// VNPay: Tạo URL thanh toán cho đơn (user hoặc guest)
+router.post("/:id/create-vnpay-url", orderController.createVnpayUrl);
+
+// User: Yêu cầu hoàn hàng
+router.post("/:id/return-request", authMiddleware, orderController.returnOrderRequest);
+
+// Admin: Chấp nhận / Từ chối hoàn hàng
+router.put("/:id/accept-return", authAdminMiddleware, orderController.acceptOrRejectReturn);
+router.put("/:id/reject-return", authAdminMiddleware, orderController.acceptOrRejectReturn);
 
 // Cập nhật đơn hàng từ admin
 router.put("/:id", authAdminMiddleware, orderController.updateOrder);

@@ -9,12 +9,9 @@ export const store = configureStore({
   reducer: {
     checkout: checkoutReducer,
     counter: counterReducer,
-    user: userReducer,
     cart: cartReducer,
-
-    general: generalReducer,
-
     user: userReducer,
+    general: generalReducer,
   },
 });
 
@@ -27,7 +24,7 @@ store.subscribe(() => {
     const user = state.user;
     localStorage.setItem("user", JSON.stringify(user));
 
-    const cart = state.cart.products;
+    const cart = state.cart.items;
     localStorage.setItem("cart", JSON.stringify(cart));
   } catch (e) {
     console.error("Không thể lưu vào localStorage", e);
