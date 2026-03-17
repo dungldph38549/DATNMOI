@@ -1,17 +1,44 @@
 const mongoose = require("mongoose");
 const Product = require("../models/ProductModel");
 
-const getAllProducts = async () => {
+
+const removeVietnameseTones = (str) => {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase();
+};
+
+const getAllProducts = async (search) => {
   try {
-    const products = await Product.find().sort({ createdAt: -1 });
+
+    const products = await Product.find();
+
+    if (!search) {
+      return {
+        status: "OK",
+        data: products
+      };
+    }
+
+    const keyword = removeVietnameseTones(search);
+
+    const filtered = products.filter((p) =>
+      removeVietnameseTones(p.name).includes(keyword)
+    );
 
     return {
       status: "OK",
-      message: "SUCCESS",
-      data: products,
+      data: filtered
     };
+
   } catch (e) {
-    throw e;
+    return {
+      status: "ERR",
+      message: e.message
+    };
   }
 };
 

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
@@ -117,6 +118,56 @@ const Login = () => {
     </svg>
   );
 
+=======
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { setUser } from "../../redux/userSlice";
+
+const API_LOGIN = "http://localhost:3001/api/user/login";
+
+const Login = () => {
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!email.trim() || !password) {
+      setError("Vui lòng nhập email và mật khẩu.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(API_LOGIN, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status === "ERR") {
+        setError(data.message || "Đăng nhập thất bại.");
+        return;
+      }
+      dispatch(setUser({
+        user: data.user,
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      }));
+      navigate("/");
+    } catch (err) {
+      setError("Lỗi kết nối. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+>>>>>>> 69d3025448de52314166dd27de6dc537b1cce1e7
   return (
     <main className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary/30 to-background-light dark:from-primary/20 dark:to-background-dark px-4">
       <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-10">
@@ -136,9 +187,19 @@ const Login = () => {
           </p>
         </div>
 
+        {error && (
+          <div className="mb-4 p-3 rounded-xl bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm">
+            {error}
+          </div>
+        )}
+
         {/* Form */}
+<<<<<<< HEAD
         <form className="space-y-5" onSubmit={handleSubmit} noValidate>
           {/* Email */}
+=======
+        <form className="space-y-7" onSubmit={handleSubmit}>
+>>>>>>> 69d3025448de52314166dd27de6dc537b1cce1e7
           <div>
             <label className="block text-sm font-medium mb-1.5" htmlFor="email">
               Email <span className="text-red-500">*</span>
@@ -147,11 +208,19 @@ const Login = () => {
               id="email"
               name="email"
               type="email"
+<<<<<<< HEAD
               autoComplete="email"
               placeholder="name@example.com"
               value={formData.email}
               onChange={handleChange}
               className={errors.email ? inputError : inputNormal}
+=======
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setError(""); }}
+              placeholder="name@example.com"
+              className="w-full px-5 py-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent focus:ring-2 focus:ring-primary outline-none text-base"
+              required
+>>>>>>> 69d3025448de52314166dd27de6dc537b1cce1e7
             />
             {errors.email && (
               <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
@@ -163,6 +232,7 @@ const Login = () => {
 
           {/* Mật khẩu */}
           <div>
+<<<<<<< HEAD
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-sm font-medium" htmlFor="password">
                 Mật khẩu <span className="text-red-500">*</span>
@@ -200,11 +270,23 @@ const Login = () => {
                 {errors.password}
               </p>
             )}
+=======
+            <label className="block text-sm font-medium mb-2">Mật khẩu</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => { setPassword(e.target.value); setError(""); }}
+              placeholder="••••••••"
+              className="w-full px-5 py-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent focus:ring-2 focus:ring-primary outline-none text-base"
+              required
+            />
+>>>>>>> 69d3025448de52314166dd27de6dc537b1cce1e7
           </div>
 
           {/* Submit */}
           <button
             type="submit"
+<<<<<<< HEAD
             disabled={isPending}
             className="w-full bg-primary text-slate-900 font-bold py-4 rounded-xl shadow-lg hover:bg-primary/90 active:scale-[0.98] transition-all text-base flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed mt-2"
           >
@@ -234,6 +316,12 @@ const Login = () => {
             ) : (
               "Đăng nhập"
             )}
+=======
+            disabled={loading}
+            className="w-full bg-primary text-slate-900 font-bold py-4 rounded-xl shadow-lg hover:bg-primary/90 transition-all text-lg disabled:opacity-60"
+          >
+            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+>>>>>>> 69d3025448de52314166dd27de6dc537b1cce1e7
           </button>
         </form>
 

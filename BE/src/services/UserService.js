@@ -1,224 +1,228 @@
 // ================================================================
-// services/UserService.js — SneakerHouse
+// services/UserService.js — SneakerHouse (Merged Version)
 // ================================================================
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs"); // Dùng bcryptjs đồng bộ với bản 69d302
 const User = require("../models/UserModel");
 
 // ── Helper: Validate ObjectId ──────────────────────────────────
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-// ── Helper: Tạo access token + refresh token ──────────────────
-const generateTokens = (userId) => {
-  const payload = { id: userId };
+// ── Helper: Tạo Access Token ──────────────────
+const generateAccessToken = (payload) => {
+    return jwt.sign({ payload }, process.env.ACCESS_TOKEN || "access_secret", {
+        expiresIn: "7d", // Bạn có thể chỉnh lại 15m nếu muốn bảo mật cao hơn
+    });
+};
 
-  // Đã sửa "acess_token" thành "access_token" cho đúng chuẩn
-  const access_token = jwt.sign({ payload }, process.env.ACCESS_TOKEN, {
-    expiresIn: "7d",
-  });
-
-  const refresh_token = jwt.sign(
-    { payload },
-    process.env.REFRESH_TOKEN || process.env.ACCESS_TOKEN,
-    { expiresIn: "30d" },
-  );
-
-  return { access_token, refresh_token };
+// ── Helper: Tạo Refresh Token ──────────────────
+const generateRefreshToken = (payload) => {
+    return jwt.sign({ payload }, process.env.REFRESH_TOKEN || "refresh_secret", {
+        expiresIn: "30d",
+    });
 };
 
 // ── Helper: Loại bỏ các field nhạy cảm trước khi trả về ───────
 const sanitize = (user) => {
-  const obj = user.toObject ? user.toObject() : { ...user };
-  delete obj.password;
-  delete obj.passwordResetToken;
-  delete obj.emailVerificationToken;
-  return obj;
+    const obj = user.toObject ? user.toObject() : { ...user };
+    delete obj.password;
+    delete obj.passwordResetToken;
+    delete obj.emailVerificationToken;
+    delete obj.refresh_token;
+    return obj;
 };
 
 // ================================================================
-// AUTH (ĐĂNG KÝ & ĐĂNG NHẬP)
+// AUTH (ĐĂNG KÝ, ĐĂNG NHẬP, GOOGLE, REFRESH)
 // ================================================================
 
 /**
- * Đăng ký tài khoản mới (Khách hàng)
+ * Đăng ký tài khoản mới
  */
-exports.createUser = async (payload) => {
-  const { name, email, password, phone } = payload;
+const registerUser = async (newUserData) => {
+    const { name, email, password, phone } = newUserData;
+    const existingUser = await User.findOne({ email });
 
-  // 1. Kiểm tra xem email đã tồn tại trong hệ thống chưa
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    throw { status: 409, message: "Email này đã được sử dụng!" };
-  }
+    if (existingUser) {
+        throw { status: 409, message: "Email này đã được sử dụng!" };
+    }
 
-  // 2. Tạo User mới (Dùng new User + .save() để kích hoạt bcrypt)
-  const newUser = new User({
-    name,
-    email,
-    password,
-    phone,
-  });
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    const createdUser = await User.create({
+        name,
+        email,
+        password: hashedPassword,
+        phone,
+    });
 
-  const savedUser = await newUser.save();
-
-  // 3. Tạo token cho user mới
-  const tokens = generateTokens(savedUser._id);
-
-  // 4. Lưu refresh_token vào lại DB để quản lý đăng nhập
-  savedUser.refresh_token = tokens.refresh_token;
-  await savedUser.save();
-
-  // 5. Trả về data (đã xoá pass) và kèm token
-  return {
-    data: sanitize(savedUser),
-    access_token: tokens.access_token,
-  };
+    return {
+        status: "OK",
+        message: "Đăng ký thành công",
+        data: sanitize(createdUser),
+    };
 };
 
 /**
- * Đăng nhập tài khoản
+ * Đăng nhập tài khoản thông thường
  */
-exports.loginUser = async (payload) => {
-  const { email, password } = payload;
+const loginUser = async (userLogin) => {
+    const { email, password } = userLogin;
+    const user = await User.findOne({ email, deletedAt: null });
 
-  // 1. Tìm user theo email
-  const user = await User.findOne({ email, deletedAt: null });
-  if (!user) {
-    throw { status: 404, message: "Tài khoản không tồn tại!" };
-  }
+    if (!user) {
+        throw { status: 404, message: "Người dùng không tồn tại" };
+    }
 
-  // 2. Kiểm tra tài khoản có bị khoá không
-  if (user.isBanned) {
-    throw { status: 403, message: "Tài khoản của bạn đã bị khoá!" };
-  }
+    if (user.googleId && !user.password) {
+        throw { status: 400, message: "Tài khoản này đã được đăng ký bằng Google. Vui lòng đăng nhập bằng Google." };
+    }
 
-  // 3. Kiểm tra mật khẩu (Sử dụng hàm comparePassword nếu có trong model hoặc dùng bcrypt.compare)
-  let isMatch = false;
-  if (user.comparePassword) {
-    isMatch = await user.comparePassword(password);
-  } else {
-    isMatch = await bcrypt.compare(password, user.password);
-  }
+    if (user.isBanned) {
+        throw { status: 403, message: "Tài khoản của bạn đã bị khoá!" };
+    }
 
-  if (!isMatch) {
-    throw { status: 401, message: "Mật khẩu không chính xác!" };
-  }
+    const isMatch = bcrypt.compareSync(password, user.password);
+    if (!isMatch) {
+        throw { status: 401, message: "Mật khẩu không chính xác" };
+    }
 
-  // 4. Tạo token mới
-  const tokens = generateTokens(user._id);
+    const access_token = generateAccessToken({ id: user._id, isAdmin: user.isAdmin });
+    const refresh_token = generateRefreshToken({ id: user._id, isAdmin: user.isAdmin });
 
-  // 5. Cập nhật lại refresh_token và lastLogin
-  user.refresh_token = tokens.refresh_token;
-  user.lastLogin = new Date();
-  user.loginCount = (user.loginCount || 0) + 1;
-  await user.save();
+    // Lưu refresh token và cập nhật login info
+    user.refresh_token = refresh_token;
+    user.lastLogin = new Date();
+    user.loginCount = (user.loginCount || 0) + 1;
+    await user.save();
 
-  // 6. Trả về kết quả
-  return {
-    data: sanitize(user),
-    access_token: tokens.access_token,
-  };
+    return {
+        status: "OK",
+        message: "Đăng nhập thành công",
+        access_token,
+        refresh_token,
+        user: sanitize(user),
+    };
+};
+
+/**
+ * Đăng nhập hoặc Đăng ký bằng Google
+ */
+const googleLoginOrRegister = async (googleUser) => {
+    const { googleId, email, name, avatar } = googleUser;
+    let user = await User.findOne({ email });
+
+    if (!user) {
+        user = await User.create({
+            googleId,
+            email,
+            name,
+            avatar,
+            isAdmin: false,
+        });
+    } else if (!user.googleId) {
+        user.googleId = googleId;
+        user.avatar = avatar;
+        await user.save();
+    }
+
+    const access_token = generateAccessToken({ id: user._id, isAdmin: user.isAdmin });
+    const refresh_token = generateRefreshToken({ id: user._id, isAdmin: user.isAdmin });
+
+    await User.findByIdAndUpdate(user._id, { refresh_token });
+
+    return {
+        status: "OK",
+        message: "Đăng nhập Google thành công",
+        access_token,
+        refresh_token,
+        user: sanitize(user),
+    };
+};
+
+/**
+ * Làm mới Access Token từ Refresh Token
+ */
+const refreshTokenService = async (token) => {
+    try {
+        const decoded = jwt.verify(token, process.env.REFRESH_TOKEN || "refresh_secret");
+        const user = await User.findById(decoded.payload.id);
+
+        if (!user || user.refresh_token !== token) {
+            throw new Error();
+        }
+
+        const access_token = generateAccessToken({ id: user._id, isAdmin: user.isAdmin });
+
+        return {
+            status: "OK",
+            message: "Làm mới Access Token thành công",
+            access_token,
+        };
+    } catch (err) {
+        throw { status: 401, message: "Refresh Token không hợp lệ hoặc hết hạn. Vui lòng đăng nhập lại." };
+    }
 };
 
 // ================================================================
 // QUẢN LÝ NGƯỜI DÙNG (ADMIN / USER)
 // ================================================================
 
-/**
- * Khách hàng tự cập nhật profile cá nhân
- */
-exports.updateCustomer = async (id, payload) => {
-  if (!isValidId(id)) throw { status: 400, message: "ID không hợp lệ" };
-
-  const { name, phone, address, avatar } = payload;
-
-  // Không cho phép user tự update quyền admin, role hay email qua API này
-  const updateData = {};
-  if (name) updateData.name = name;
-  if (phone) updateData.phone = phone;
-  if (address) updateData.address = address;
-  if (avatar) updateData.avatar = avatar;
-
-  const updatedUser = await User.findByIdAndUpdate(id, updateData, {
-    new: true,
-  });
-  if (!updatedUser) throw { status: 404, message: "Không tìm thấy người dùng" };
-
-  return sanitize(updatedUser);
+const updateCustomer = async (id, payload) => {
+    if (!isValidId(id)) throw { status: 400, message: "ID không hợp lệ" };
+    
+    // Chỉ cho phép update các field cơ bản
+    const { name, phone, address, avatar } = payload;
+    const updatedUser = await User.findByIdAndUpdate(id, { name, phone, address, avatar }, { new: true });
+    
+    if (!updatedUser) throw { status: 404, message: "Không tìm thấy người dùng" };
+    return sanitize(updatedUser);
 };
 
-/**
- * Admin cập nhật thông tin User (kể cả phân quyền)
- */
-exports.updateUser = async (id, payload) => {
-  if (!isValidId(id)) throw { status: 400, message: "ID không hợp lệ" };
-
-  // Loại bỏ password ra khỏi payload (nếu muốn đổi pass phải có API riêng)
-  const { password, ...updateData } = payload;
-
-  const updatedUser = await User.findByIdAndUpdate(id, updateData, {
-    new: true,
-  });
-  if (!updatedUser) throw { status: 404, message: "Không tìm thấy người dùng" };
-
-  return sanitize(updatedUser);
+const updateUser = async (id, payload) => {
+    if (!isValidId(id)) throw { status: 400, message: "ID không hợp lệ" };
+    const { password, ...updateData } = payload; // Không cho phép đổi pass qua đây
+    
+    const updatedUser = await User.findByIdAndUpdate(id, updateData, { new: true });
+    if (!updatedUser) throw { status: 404, message: "Không tìm thấy người dùng" };
+    return sanitize(updatedUser);
 };
 
-/**
- * Lấy danh sách user có phân trang (Cho trang quản lý của Admin)
- * Khớp với: controller.listUser → GET /user/list?page=0&limit=10
- */
-exports.listUser = async (page = 0, limit = 10) => {
-  const filter = { deletedAt: null };
+const listUser = async (page = 0, limit = 10) => {
+    const filter = { deletedAt: null };
+    const [users, total] = await Promise.all([
+        User.find(filter)
+            .select("-password -refresh_token")
+            .sort({ createdAt: -1 })
+            .skip(page * limit)
+            .limit(limit),
+        User.countDocuments(filter),
+    ]);
 
-  const [users, total] = await Promise.all([
-    User.find(filter)
-      .select(
-        "-password -passwordResetToken -emailVerificationToken -attendance -salaryHistory",
-      )
-      .sort({ createdAt: -1 })
-      .skip(page * limit)
-      .limit(limit),
-    User.countDocuments(filter),
-  ]);
-
-  return {
-    data: users,
-    total,
-    page,
-    limit,
-    pages: Math.ceil(total / limit),
-  };
+    return { data: users, total, page, limit, pages: Math.ceil(total / limit) };
 };
 
-/**
- * Toàn bộ user không phân trang
- * Khớp với: controller.getAllUser → GET /user/admin/all
- * Dùng cho: dropdown chọn user, export danh sách
- */
-exports.getAllUser = async () => {
-  return User.find({ deletedAt: null })
-    .select(
-      "-password -passwordResetToken -emailVerificationToken -attendance -salaryHistory",
-    )
-    .sort({ createdAt: -1 });
+const getAllUser = async () => {
+    return User.find({ deletedAt: null }).select("-password -refresh_token").sort({ createdAt: -1 });
 };
 
-/**
- * Soft delete — ghi deletedAt, không xoá khỏi DB
- * Khớp với: controller.deleteUser → DELETE /user/admin/:id
- */
-exports.deleteUser = async (id) => {
-  if (!isValidId(id)) throw { status: 400, message: "ID không hợp lệ" };
+const deleteUser = async (id) => {
+    if (!isValidId(id)) throw { status: 400, message: "ID không hợp lệ" };
+    const user = await User.findByIdAndUpdate(id, { deletedAt: new Date(), isActive: false }, { new: true });
+    if (!user) throw { status: 404, message: "Không tìm thấy người dùng" };
+    return sanitize(user);
+};
 
-  const user = await User.findByIdAndUpdate(
-    id,
-    { deletedAt: new Date(), isActive: false },
-    { new: true },
-  );
-
-  if (!user) throw { status: 404, message: "Không tìm thấy người dùng" };
-
-  return sanitize(user);
+module.exports = {
+    registerUser,
+    loginUser,
+    googleLoginOrRegister,
+    refreshTokenService,
+    updateCustomer,
+    updateUser,
+    listUser,
+    getAllUser,
+    deleteUser,
+    generateAccessToken,
+    generateRefreshToken,
 };

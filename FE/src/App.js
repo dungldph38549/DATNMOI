@@ -19,6 +19,8 @@ import TermsConditionsPage from "./pages/TermsConditionsPage/TermsConditionsPage
 import ContactPage from "./pages/ContactPage/ContactPage";
 import CheckOut from "./pages/CheckOut/CheckOut";
 import CategoryPage from "./pages/Category/CategoryPage";
+import SearchPage from "./pages/SearchPage/SearchPage";
+
 
 //  IMPORT TRANG ADMIN USERS
 import User from "./pages/User";
@@ -43,6 +45,7 @@ function App() {
             <Route path="/checkout" element={<CheckOut />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/terms" element={<TermsConditionsPage />} />
+            <Route path="/search" element={<SearchPage />} />
 
             {/* ADMIN ROUTE */}
             <Route path="/admin/users" element={<User />} />

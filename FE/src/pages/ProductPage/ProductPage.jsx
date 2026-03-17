@@ -1,138 +1,225 @@
-import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import ProductFilterSidebar from "../../components/ProductFilterSidebar/ProductFilterSidebar";
-import { useDispatch } from "react-redux";
-import { addToCart } from "../../redux/cart/cartSlice";
+import React, { useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import Product from "../../components/Product/Product";
 
-const API_URL = "http://localhost:3001";
+const PAGE_SIZE = 30;
 
 const ProductPage = () => {
-  const [selectedSize, setSelectedSize] = useState(9);
   const [products, setProducts] = useState([]);
-  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
 
-  const dispatch = useDispatch();
+  const [sort, setSort] = useState("");
+  const [price, setPrice] = useState("");
+  const [rating, setRating] = useState("");
+
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/product`);
-        const data = await res.json();
-        setProducts(data.data || []);
-      } catch (error) {
-        console.log(error);
+        setLoading(true);
+
+        const res = await axios.get("http://localhost:3001/api/product");
+
+        setProducts(res.data.data || []);
+      } catch (err) {
+        console.log(err);
       }
+
+      setLoading(false);
     };
 
     fetchProducts();
   }, []);
 
+  const filteredProducts = useMemo(() => {
+    let data = [...products];
+
+    if (price === "low") data = data.filter((p) => p.price < 500000);
+
+    if (price === "mid")
+      data = data.filter((p) => p.price >= 500000 && p.price <= 1000000);
+
+    if (price === "high") data = data.filter((p) => p.price > 1000000);
+
+    if (rating === "4") data = data.filter((p) => p.rating >= 4);
+
+    if (rating === "3") data = data.filter((p) => p.rating >= 3);
+
+    if (sort === "priceAsc") data.sort((a, b) => a.price - b.price);
+
+    if (sort === "priceDesc") data.sort((a, b) => b.price - a.price);
+
+    if (sort === "rating") data.sort((a, b) => b.rating - a.rating);
+
+    if (sort === "new")
+      data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    return data;
+  }, [products, price, rating, sort]);
+
+  const totalPage = Math.ceil(filteredProducts.length / PAGE_SIZE);
+
+  const showProducts = filteredProducts.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
+
+  const clearAllFilter = () => {
+    setPrice("");
+    setRating("");
+    setSort("");
+  };
+
   return (
-    <main className="flex-grow w-full px-10 lg:px-20 py-8 font-display">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 mb-6 text-sm text-slate-500">
-        <Link to="/" className="hover:text-primary">
-          Home
-        </Link>
+    <div className="bg-gray-50 min-h-screen">
+      {/* HEADER */}
 
-        <span className="material-symbols-outlined text-xs">chevron_right</span>
+      <div className="bg-white border-b">
+        <div className="max-w-[1400px] mx-auto px-6 py-6 flex justify-between items-center">
+          <h2 className="text-xl font-bold">Tất cả sản phẩm</h2>
 
-        <span className="text-slate-900 font-medium">Sneakers</span>
-      </div>
-
-      <div className="flex flex-col lg:flex-row gap-8">
-        {/* Sidebar Filter */}
-        <ProductFilterSidebar
-          selectedSize={selectedSize}
-          onChangeSize={setSelectedSize}
-        />
-
-        {/* Product List */}
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold mb-6">Sản phẩm</h1>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {products.map((product) => (
-              <div
-                key={product._id}
-                className="bg-white rounded-xl shadow hover:shadow-lg transition"
-              >
-                <Link to={`/product/${product._id}`}>
-                  <div className="aspect-square overflow-hidden">
-                    <img
-                      className="w-full h-full object-cover"
-                      src={`${API_URL}/uploads/${product.image}`}
-                      alt={product.name}
-                    />
-                  </div>
-
-                  <div className="p-4">
-                    <h3 className="font-bold text-lg">{product.name}</h3>
-
-                    <p className="text-primary font-bold mt-2">
-                      ${product.price}
-                    </p>
-
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-
-                        dispatch(
-                          addToCart({
-                            productId: product._id,
-                            name: product.name,
-                            image: `${API_URL}/uploads/${product.image}`,
-                            price: product.price,
-                            qty: 1,
-                          }),
-                        );
-                      }}
-                      className="mt-3 bg-primary text-white px-3 py-2 rounded hover:bg-orange-500"
-                    >
-                      Thêm giỏ
-                    </button>
-                  </div>
-                </Link>
-              </div>
-            ))}
-          </div>
-
-          {/* Pagination */}
-          <div className="mt-12 flex justify-center">
-            <nav className="flex items-center gap-2">
-              <button
-                onClick={() => setPage(page - 1)}
-                disabled={page === 1}
-                className="size-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-50"
-              >
-                <span className="material-symbols-outlined">chevron_left</span>
-              </button>
-
-              {[1, 2, 3].map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  className={`size-10 flex items-center justify-center rounded-lg ${
-                    page === p
-                      ? "bg-primary text-white"
-                      : "border border-slate-200 hover:bg-slate-100"
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-
-              <button
-                onClick={() => setPage(page + 1)}
-                className="size-10 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-100"
-              >
-                <span className="material-symbols-outlined">chevron_right</span>
-              </button>
-            </nav>
-          </div>
+          <select
+            onChange={(e) => setSort(e.target.value)}
+            className="border px-3 py-2 rounded"
+          >
+            <option value="">Sắp xếp</option>
+            <option value="priceAsc">Giá thấp → cao</option>
+            <option value="priceDesc">Giá cao → thấp</option>
+            <option value="rating">Rating cao</option>
+            <option value="new">Mới nhất</option>
+          </select>
         </div>
       </div>
-    </main>
+
+      <div className="max-w-[1400px] mx-auto px-6 py-8 flex gap-8">
+        {/* FILTER */}
+
+        <div className="w-[230px] bg-white p-5 rounded-lg shadow-sm h-fit">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-bold">Bộ lọc</h3>
+
+            {(price || rating || sort) && (
+              <button
+                onClick={clearAllFilter}
+                className="text-sm text-red-500 hover:underline"
+              >
+                Xóa tất cả
+              </button>
+            )}
+          </div>
+
+          {/* PRICE */}
+
+          <p className="text-sm font-medium mb-2">Khoảng giá</p>
+
+          <div className="space-y-2 text-sm mb-5">
+            <label className="flex gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={price === "low"}
+                onChange={() => setPrice("low")}
+              />
+              Dưới 500k
+            </label>
+
+            <label className="flex gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={price === "mid"}
+                onChange={() => setPrice("mid")}
+              />
+              500k - 1 triệu
+            </label>
+
+            <label className="flex gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={price === "high"}
+                onChange={() => setPrice("high")}
+              />
+              Trên 1 triệu
+            </label>
+          </div>
+
+          {/* RATING */}
+
+          <p className="text-sm font-medium mb-2">Đánh giá</p>
+
+          <div className="space-y-2 text-sm">
+            <label className="flex gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={rating === "4"}
+                onChange={() => setRating("4")}
+              />
+              ⭐ 4 sao trở lên
+            </label>
+
+            <label className="flex gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={rating === "3"}
+                onChange={() => setRating("3")}
+              />
+              ⭐ 3 sao trở lên
+            </label>
+          </div>
+        </div>
+
+        {/* PRODUCT LIST */}
+
+        <div className="flex-1">
+          {loading && (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+              {[...Array(10)].map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-xl shadow h-[340px] animate-pulse"
+                />
+              ))}
+            </div>
+          )}
+
+          {!loading && showProducts.length === 0 && (
+            <div className="text-center py-20 text-gray-500">
+              Không có sản phẩm
+            </div>
+          )}
+
+          {!loading && showProducts.length > 0 && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                {showProducts.map((item) => (
+                  <div
+                    key={item._id}
+                    className="hover:scale-105 transition duration-300"
+                  >
+                    <Product product={item} />
+                  </div>
+                ))}
+              </div>
+
+              {/* PAGINATION */}
+
+              <div className="flex justify-center gap-2 mt-10 flex-wrap">
+                {[...Array(totalPage)].map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setPage(i + 1)}
+                    className={`px-4 py-2 border rounded ${
+                      page === i + 1 ? "bg-red-500 text-white" : "bg-white"
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
 

@@ -75,16 +75,19 @@ const CategoryPage = () => {
             <div className="search-result-container">
               <div className="category-product">
                 <div className="row">
-                  {products.map((product) => (
+                  {products.map((product) => {
+                    const imgUrl = (product.image && (product.image.startsWith("http") ? product.image : `http://localhost:3001/uploads/${product.image}`)) || "https://via.placeholder.com/300/f0f0f0/999?text=No+Image"
+                    return (
                     <div key={product.id} className="col-sm-6 col-md-4">
                       <div className="product">
                         <div className="product-image">
                           <div className="image">
                             <a href="/detail">
                               <img
-                                src={product.image}
+                                src={imgUrl}
                                 alt={product.name}
                                 className="img-responsive"
+                                onError={(e) => { e.target.onerror = null; e.target.src = "https://via.placeholder.com/300/f0f0f0/999?text=No+Image" }}
                               />
                             </a>
                           </div>
@@ -115,7 +118,7 @@ const CategoryPage = () => {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  ); })}
                 </div>
               </div>
             </div>

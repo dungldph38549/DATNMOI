@@ -8,17 +8,16 @@ const http = require("http");
 const multer = require("multer");
 const { Server } = require("socket.io");
 
-// Import Route tổng hợp và Socket/Jobs
+// 1. Import Routes và Cấu hình hệ thống
 const routes = require("./src/routers");
 const { initSocket } = require("./src/socket/inventorySocket");
 const { scheduleLowStockScan } = require("./src/jobs/alertJob");
 
 const app = express();
 const server = http.createServer(app);
+const PORT = process.env.PORT || 3001;
 
-// ==========================================
-// 1. CẤU HÌNH SOCKET.IO
-// ==========================================
+// 2. Cấu hình Socket.io
 const io = new Server(server, {
   cors: {
     origin: [
@@ -31,9 +30,7 @@ const io = new Server(server, {
   },
 });
 
-// ==========================================
-// 2. MIDDLEWARES & STATIC FILES
-// ==========================================
+// 3. Middlewares
 app.use(
   cors({
     origin: [
@@ -47,19 +44,14 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-// Cho phép truy cập thư mục public
-app.use("/uploads", express.static(path.join(__dirname, "../public/uploads")));
 
-// Cấu hình thư mục lưu trữ ảnh công khai
+// 4. Cấu hình Static folder & Multer (Upload ảnh)
 const uploadDir = path.join(__dirname, "public/uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 app.use("/uploads", express.static(uploadDir));
 
-// ==========================================
-// 3. CẤU HÌNH MULTER (UPLOAD FILE)
-// ==========================================
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
@@ -72,20 +64,22 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// ==========================================
-// 4. ROUTES TRỰC TIẾP (CHO UPLOAD)
-// ==========================================
-// API Upload 1 ảnh
-app.post("/api/upload", upload.single("file"), (req, res) => {
-  if (!req.file) return res.status(400).json({ message: "Không có file" });
-  res.status(200).json({
-    success: true,
-    message: "Tải lên thành công",
-    path: req.file.filename,
-  });
+// 5. Routes trực tiếp (Upload & Test)
+app.get("/", (req, res) => {
+  res.send("--- HELLO! BACKEND SNEAKERHOUSE CHẠY THÀNH CÔNG ---");
 });
 
-// API Upload nhiều ảnh
+app.post("/api/upload", upload.single("file"), (req, res) => {
+  if (!req.file) return res.status(400).json({ message: "Không có file" });
+  res
+    .status(200)
+    .json({
+      success: true,
+      message: "Tải lên thành công",
+      path: req.file.filename,
+    });
+});
+
 app.post("/api/uploads/multiple", upload.array("files", 10), (req, res) => {
   if (!req.files || req.files.length === 0)
     return res.status(400).json({ message: "Không có ảnh" });
@@ -93,15 +87,14 @@ app.post("/api/uploads/multiple", upload.array("files", 10), (req, res) => {
   res.status(200).json({ success: true, paths: filePaths });
 });
 
-// Gọi các route nghiệp vụ khác từ src/routers/index.js
+// 6. Sử dụng Routes tập trung (Consolidated Routes)
+// Hàm routes(app) này sẽ tự động gọi tất cả: productRouter, userRouter, cartRouter...
 routes(app);
 
-// ==========================================
-// 5. GLOBAL ERROR HANDLER
-// ==========================================
+// 7. Global Error Handler
 app.use((err, req, res, next) => {
   const status = err.status || 500;
-  const message = err.message || "Lỗi máy chủ";
+  const message = err.message || "Lỗi máy chủ nội bộ";
 
   if (err instanceof multer.MulterError) {
     return res
@@ -116,29 +109,27 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ==========================================
-// 6. KHỞI CHẠY HỆ THỐNG
-// ==========================================
+// 8. Khởi chạy Socket & Jobs
 initSocket(io);
 scheduleLowStockScan();
 
-const MONGO_URI = process.env.MONGO_DB;
-const PORT = process.env.PORT || 3001;
+// 9. Kết nối MongoDB và Start Server
+const startServer = async () => {
+  try {
+    const mongoURI = process.env.MONGO_DB;
+    if (!mongoURI) throw new Error("MONGO_DB is not defined in .env");
 
-if (!MONGO_URI) {
-  console.error("❌ MONGO_DB chưa được định nghĩa trong file .env");
-  process.exit(1);
-}
+    console.log("⏳ Connecting to MongoDB...");
+    await mongoose.connect(mongoURI);
+    console.log("✅ Connected to MongoDB successfully!");
 
-mongoose
-  .connect(MONGO_URI)
-  .then(() => {
-    console.log("✅ Connected to MongoDB");
     server.listen(PORT, () => {
-      console.log(`🚀 Server running on: http://localhost:${PORT}`);
+      console.log(`🚀 Server running at http://localhost:${PORT}`);
     });
-  })
-  .catch((err) => {
-    console.error("❌ Failed to connect MongoDB:", err);
+  } catch (err) {
+    console.error("❌ Failed to start server:", err.message);
     process.exit(1);
-  });
+  }
+};
+
+startServer();
