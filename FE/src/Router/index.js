@@ -98,7 +98,6 @@ export const routers = [
     isShowHeader: true,
   },
 
-  
   {
     path: "*",
     page: NotFoundPage,
@@ -111,6 +110,3 @@ export const routers = [
     isShowHeader: false,
   },
 ];
-
-];
-

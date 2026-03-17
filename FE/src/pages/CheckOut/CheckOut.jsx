@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { clearCart, selectCartSubtotal } from "../../redux/cartSlice";
+import { clearCart, selectCartSubtotal } from "../../redux/cart/cartSlice";
 import { createOrder } from "../../services/OrderService";
 
 const CheckOut = () => {
@@ -91,7 +91,6 @@ const CheckOut = () => {
   return (
     <div className="body-content outer-top-xs">
       <div className="container">
-
         <div className="breadcrumb">
           <div className="breadcrumb-inner">
             <ul className="list-inline list-unstyled">
@@ -104,13 +103,11 @@ const CheckOut = () => {
         </div>
 
         <div className="row">
-
           <div className="col-md-8">
             <div className="checkout-box">
               <h2>Thông tin giao hàng</h2>
 
               <form onSubmit={onPlaceOrder}>
-
                 <div className="form-group">
                   <label>Họ và tên</label>
                   <input
@@ -153,9 +150,7 @@ const CheckOut = () => {
                     className="form-control"
                     rows={4}
                     value={form.note}
-                    onChange={(e) =>
-                      setForm({ ...form, note: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, note: e.target.value })}
                   />
                 </div>
 
@@ -198,19 +193,16 @@ const CheckOut = () => {
                 <Link className="btn btn-default" to="/cart">
                   Quay lại giỏ hàng
                 </Link>
-
               </form>
             </div>
           </div>
 
           <div className="col-md-4">
             <div className="checkout-summary">
-
               <h2>Đơn hàng</h2>
 
               <table className="table">
                 <tbody>
-
                   {items.map((i, index) => (
                     <tr key={i._id || index}>
                       <td>
@@ -237,18 +229,17 @@ const CheckOut = () => {
                   </tr>
 
                   <tr>
-                    <td><strong>Tổng</strong></td>
+                    <td>
+                      <strong>Tổng</strong>
+                    </td>
                     <td className="text-right">
                       <strong>{total.toLocaleString()} đ</strong>
                     </td>
                   </tr>
-
                 </tbody>
               </table>
-
             </div>
           </div>
-
         </div>
       </div>
     </div>

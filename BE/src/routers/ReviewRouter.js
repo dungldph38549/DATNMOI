@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const ctrl = require("../controller/reviewController");
-const { protect } = require("../middleware/auth");
+const ctrl = require("../controllers/reviewController");
+const { protect } = require("../middlewares/authMiddleware.js");
 
 // ── Public ───────────────────────────────────────────────────
 router.get("/stats/:productId", ctrl.getStats); // GET  /api/reviews/stats/:productId

@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const VoucherController = require("../controller/VoucherController");
+const VoucherController = require("../controllers/VoucherController");
 
 // POST /api/voucher/create
 router.post("/create", VoucherController.createVoucher);
@@ -14,4 +14,3 @@ router.put("/:id", VoucherController.updateVoucher);
 router.delete("/:id", VoucherController.deleteVoucher);
 
 module.exports = router;
-
