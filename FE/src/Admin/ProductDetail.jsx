@@ -13,6 +13,15 @@ import {
   getAllCategories,
 } from "./../api/index";
 
+// Backend đang chạy tại 3002. Nếu build/ENV bị lệch (vẫn còn 3001), ảnh sẽ request sai port và lỗi ERR_CONNECTION_REFUSED.
+// Ép URL base về đúng port để admin luôn load được ảnh.
+const BACKEND_BASE_URL = (
+  process.env.REACT_APP_API_URL_BACKEND || "http://localhost:3002/api"
+)
+  .replace(/\/api\/?$/, "")
+  .replace(/localhost:\d+/, "localhost:3002")
+  .replace(/127\.0\.0\.1:\d+/, "127.0.0.1:3002");
+
 // ── Toggle Switch ───────────────────────────────────────────────
 const Toggle = ({ checked, onChange, label, sub }) => (
   <div
@@ -163,18 +172,55 @@ const ProductDetail = ({ productId = null, onClose }) => {
       onClose();
     },
     onError: (err) => {
-      if (err.response?.data?.message)
-        Swal.fire("Thất bại", err.response.data.message, "warning");
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.response?.data?.errors?.[0]?.msg ||
+        err?.message ||
+        "Không thể lưu sản phẩm";
+
+      // Hiển thị thêm body lỗi để bắt đúng field/sai payload
+      const raw = err?.response?.data;
+      const detail = raw
+        ? `\n\nChi tiết:\n${JSON.stringify(raw, null, 2)}`
+        : "";
+
+      const status = err?.response?.status;
+      const url = err?.config?.url;
+      const baseURL = err?.config?.baseURL;
+      const where =
+        status || url
+          ? `\n\nEndpoint: ${baseURL ? baseURL : ""}${url ? url : ""}${
+              status ? ` (status ${status})` : ""
+            }`
+          : "";
+
+      Swal.fire("Thất bại", msg + detail + where, "warning");
+      // eslint-disable-next-line no-console
+      console.error("[ProductDetail] save product failed:", err);
     },
   });
 
   useEffect(() => {
     if (productData) {
+      // Backend ProductModel dùng `stock` còn FE form đang dùng `countInStock` (alias ở UI).
+      // Khi edit sản phẩm, nếu không map lại thì payload gửi lên có thể thiếu `countInStock`
+      // và backend sẽ fail validation.
+      const isHasVariants = !!productData.hasVariants;
       form.setFieldsValue({
         ...productData,
         countInStock: productData.stock ?? productData.countInStock,
         attributes: productData.attributes || [],
         variants: productData.variants || [],
+        ...(isHasVariants
+          ? {}
+          : {
+              countInStock:
+                productData.stock ??
+                productData.countInStock ??
+                form.getFieldValue("countInStock") ??
+                0,
+            }),
       });
       setHasVar(!!productData.hasVariants);
       setVisible(productData.isVisible ?? true);
@@ -207,16 +253,43 @@ const ProductDetail = ({ productId = null, onClose }) => {
   };
 
   const onFinish = (values) => {
-    mutation.mutate({
-      id: productId !== "create" ? productId : undefined,
-      payload: {
-        ...values,
-        hasVariants: hasVar,
-        isVisible: visible,
-        isFeatured: featured,
-        srcImages: form.getFieldValue("srcImages"),
-      },
-    });
+    const payload = {
+      ...values,
+      hasVariants: hasVar,
+      isVisible: visible,
+      isFeatured: featured,
+      srcImages: form.getFieldValue("srcImages"),
+    };
+
+    // Normalize attributes/variants để tránh lỗi validate khi FE bị trùng tag/whitespace.
+    if (hasVar) {
+      const normalizedAttrs = (payload.attributes || [])
+        .map((a) => `${a}`.trim())
+        .filter(Boolean);
+      const uniqueAttrs = Array.from(new Set(normalizedAttrs));
+
+      payload.attributes = uniqueAttrs;
+      if (Array.isArray(payload.variants)) {
+        payload.variants = payload.variants.map((v) => {
+          const attrsObj = v?.attributes || {};
+          const remapped = {};
+          Object.entries(attrsObj).forEach(([k, val]) => {
+            const nk = `${k}`.trim();
+            if (!nk) return;
+            remapped[nk] = val;
+          });
+          return { ...v, attributes: remapped };
+        });
+      }
+    }
+
+    // createProduct expects `payload` directly
+    // updateProduct expects `{ id, payload }`
+    if (productId !== "create") {
+      mutation.mutate({ id: productId, payload });
+    } else {
+      mutation.mutate(payload);
+    }
   };
 
   const isEdit = productId !== "create";
@@ -450,7 +523,8 @@ const ProductDetail = ({ productId = null, onClose }) => {
                     >
                       <Form.Item
                         name="price"
-                        rules={[{ required: true, type: "number", min: 0 }]}
+                        // Backend validate: price phải > 0 (không cho phép 0)
+                        rules={[{ required: true, type: "number", min: 1 }]}
                       >
                         <div>
                           <FieldLabel>Giá (₫)</FieldLabel>
@@ -823,7 +897,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                   {({ getFieldValue }) =>
                     getFieldValue("image") ? (
                       <img
-                        src={`${process.env.REACT_APP_API_URL_BACKEND}/image/${getFieldValue("image")}`}
+                        src={`${BACKEND_BASE_URL}/uploads/${getFieldValue("image")}`}
                         alt="Preview"
                         style={{
                           width: "100%",
@@ -870,7 +944,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                               }}
                             >
                               <img
-                                src={`${process.env.REACT_APP_API_URL_BACKEND}/image/${imgPath}`}
+                                src={`${BACKEND_BASE_URL}/uploads/${imgPath}`}
                                 alt={`Ảnh phụ ${idx + 1}`}
                                 style={{
                                   width: "100%",

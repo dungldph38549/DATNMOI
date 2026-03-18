@@ -35,5 +35,13 @@ export const PAYMENT_METHOD: Record<string, string> = {
 };
 
 export const GET_IMAGE = (path_name: string) => {
-  return process.env.REACT_APP_API_URL_BACKEND + "/image/" + path_name;
+  // Backend server đang serve file upload ở `/uploads/:filename`
+  const base =
+    (
+      process.env.REACT_APP_API_URL_BACKEND || "http://localhost:3002/api"
+    )
+      .replace(/\/api\/?$/, "")
+      .replace(/localhost:\d+/, "localhost:3002")
+      .replace(/127\.0\.0\.1:\d+/, "127.0.0.1:3002");
+  return base + "/uploads/" + path_name;
 };

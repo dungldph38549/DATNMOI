@@ -5,6 +5,7 @@ const Voucher = require("../models/VoucherModel.js");
 const OrderStatusHistory = require("../models/orderStatusHistory.js");
 const { successResponse, errorResponse } = require("../utils/response.js");
 const User = require("../models/UserModel.js");
+const inventoryService = require("../services/inventoryService");
 const { VNPay } = require("vnpay");
 
 const getVnpayClient = () =>
@@ -83,6 +84,7 @@ exports.createOrder = async (req, res) => {
     const shippingFee = shippingMethod === "fast" ? 30000 : 0;
     const mappedProducts = [];
 
+    // Đầu tiên kiểm tra và chuẩn hóa dữ liệu sản phẩm
     for (const item of products) {
       const product = await Product.findById(item.productId).session(session);
       if (!product) {
@@ -110,13 +112,7 @@ exports.createOrder = async (req, res) => {
             message: `Không tìm thấy biến thể SKU ${item.sku} cho sản phẩm ${product.name}`,
           });
         }
-        if (item.quantity > variant.stock) {
-          await session.abortTransaction();
-          session.endSession();
-          return res.status(400).json({
-            message: `Biến thể ${item.sku} chỉ còn ${variant.stock} trong kho`,
-          });
-        }
+
         mappedProducts.push({
           productId: item.productId,
           sku: variant.sku,
@@ -124,17 +120,7 @@ exports.createOrder = async (req, res) => {
           price: variant.price,
           attributes: Object.fromEntries(variant.attributes),
         });
-        variant.stock -= item.quantity;
-        variant.sold += item.quantity;
-        await product.save({ session });
       } else {
-        if (item.quantity > product.countInStock) {
-          await session.abortTransaction();
-          session.endSession();
-          return res.status(400).json({
-            message: `Sản phẩm ${product.name} chỉ còn ${product.countInStock} trong kho`,
-          });
-        }
         mappedProducts.push({
           productId: item.productId,
           sku: null,
@@ -142,10 +128,18 @@ exports.createOrder = async (req, res) => {
           price: product.price,
           attributes: {},
         });
-        product.countInStock -= item.quantity;
-        product.sold += item.quantity;
-        await product.save({ session });
       }
+    }
+
+    // Sau khi đã đảm bảo dữ liệu hợp lệ, tiến hành reserve tồn kho cho các SKU có Inventory
+    for (const item of mappedProducts) {
+      if (!item.sku) continue;
+      await inventoryService.reserveBySku(
+        item.sku,
+        item.quantity,
+        null,
+        userId || guestId || null,
+      );
     }
 
     const newOrder = new Order({
@@ -183,6 +177,22 @@ exports.createOrder = async (req, res) => {
     session.endSession();
     return res.status(201).json(savedOrder);
   } catch (err) {
+    // Nếu tạo đơn thất bại, cố gắng giải phóng phần hàng đã reserve (nếu có)
+    try {
+      if (Array.isArray(req.body?.products)) {
+        for (const item of req.body.products) {
+          if (!item.sku || !item.quantity) continue;
+          await inventoryService.releaseBySku(
+            item.sku,
+            item.quantity,
+            null,
+            req.body.userId || req.body.guestId || null,
+          );
+        }
+      }
+    } catch (_) {
+      // bỏ qua lỗi release trong khối catch
+    }
     await session.abortTransaction();
     session.endSession();
     return res.status(500).json({ message: err.message });
@@ -409,7 +419,42 @@ exports.updateOrder = async (req, res) => {
       { new: true, session },
     ).populate("products.productId");
 
+    // Đồng bộ tồn kho Inventory theo vòng đời đơn hàng
     if (status && status !== order.status) {
+      // Nếu đơn bị hủy từ trạng thái có thể đang giữ hàng, release reserve
+      if (status === "canceled") {
+        for (const item of order.products) {
+          if (!item.sku || !item.quantity) continue;
+          await inventoryService.releaseBySku(
+            item.sku,
+            item.quantity,
+            order._id,
+            null,
+          );
+        }
+      }
+
+      // Khi chuyển sang shipped: xuất kho thực tế, đồng thời giải phóng phần đã giữ
+      if (status === "shipped") {
+        for (const item of order.products) {
+          if (!item.sku || !item.quantity) continue;
+          await inventoryService.releaseBySku(
+            item.sku,
+            item.quantity,
+            order._id,
+            null,
+          );
+          await inventoryService.exportBySku(
+            item.sku,
+            item.quantity,
+            order._id,
+            null,
+            null,
+            `Xuất kho theo đơn hàng #${order._id}`,
+          );
+        }
+      }
+
       await OrderStatusHistory.create(
         [
           {
@@ -812,7 +857,9 @@ exports.returnPayment = async (req, res) => {
 
     if (result.isVerified && result.isSuccess) {
       await Order.findByIdAndUpdate(orderId, { paymentStatus: "paid" });
-      return res.redirect(`${feUrl}/payment/return?success=1&orderId=${orderId}`);
+      return res.redirect(
+        `${feUrl}/payment/return?success=1&orderId=${orderId}`,
+      );
     }
     return res.redirect(`${feUrl}/payment/return?success=0&orderId=${orderId}`);
   } catch (err) {

@@ -21,6 +21,11 @@ exports.getLowStock = catchAsync(async (req, res) => {
   ok(res, await svc.getLowStock());
 });
 
+// GET /api/inventory/admin/list (admin only — đăng ký route sau authAdminMiddleware)
+exports.getList = catchAsync(async (req, res) => {
+  ok(res, await svc.getList(req.query));
+});
+
 // GET /api/inventory/sku/:sku
 exports.getBySku = catchAsync(async (req, res) => {
   ok(res, await svc.getBySku(req.params.sku));

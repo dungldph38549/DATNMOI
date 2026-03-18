@@ -29,7 +29,8 @@ const Product = ({ product }) => {
 
   if (!product) return null;
 
-  const PLACEHOLDER = "https://via.placeholder.com/300x300/f0f0f0/999?text=No+Image";
+  const PLACEHOLDER =
+    "https://via.placeholder.com/300x300/f0f0f0/999?text=No+Image";
   const getImageUrl = (img) => {
     if (!img || typeof img !== "string") return PLACEHOLDER;
     if (img.startsWith("http://") || img.startsWith("https://")) return img;
@@ -67,7 +68,7 @@ const Product = ({ product }) => {
         price: product.price,
         image: product.image,
         qty: 1,
-      })
+      }),
     );
 
     setAdded(true);
@@ -77,11 +78,9 @@ const Product = ({ product }) => {
   return (
     <>
       <div className="group bg-white rounded-xl shadow-md hover:shadow-xl transition duration-300 overflow-hidden relative">
-        
         {/* IMAGE */}
         <Link to={`/product/${product._id}`}>
           <div className="relative h-[260px] overflow-hidden">
-
             <img
               src={image1}
               alt={product.name}
@@ -101,7 +100,6 @@ const Product = ({ product }) => {
                 🔥 Best Seller
               </span>
             )}
-
           </div>
         </Link>
 
@@ -127,7 +125,6 @@ const Product = ({ product }) => {
 
         {/* INFO */}
         <div className="p-4">
-
           <Link to={`/product/${product._id}`}>
             <h3 className="text-sm font-medium text-gray-800 line-clamp-2 min-h-[40px] group-hover:text-red-500">
               {product.name}
@@ -136,7 +133,6 @@ const Product = ({ product }) => {
 
           {/* RATING */}
           <div className="flex items-center mt-1 text-yellow-400 text-xs">
-
             {[...Array(5)].map((_, i) => (
               <FaStar
                 key={i}
@@ -144,10 +140,7 @@ const Product = ({ product }) => {
               />
             ))}
 
-            <span className="text-gray-500 ml-1">
-              ({product.rating || 4})
-            </span>
-
+            <span className="text-gray-500 ml-1">({product.rating || 4})</span>
           </div>
 
           {/* PRICE */}
@@ -156,34 +149,26 @@ const Product = ({ product }) => {
               {product.price?.toLocaleString()}đ
             </span>
           </div>
-
         </div>
 
         {/* ADD CART */}
         <div className="px-4 pb-4 ">
-
           <button
             onClick={handleAddCart}
             className={`w-full flex items-center justify-center gap-2 text-white font-semibold py-2.5 rounded-lg shadow-md transition ${
-              added
-                ? "bg-green-500"
-                : "bg-red-600 hover:bg-red-700"
+              added ? "bg-green-500" : "bg-red-600 hover:bg-red-700"
             }`}
           >
             <FaShoppingCart />
             {added ? "Đã thêm" : "Thêm vào giỏ hàng"}
           </button>
-
         </div>
-
       </div>
 
       {/* QUICK VIEW MODAL */}
       {showQuickView && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-
           <div className="bg-white rounded-lg p-6 w-[420px] relative">
-
             <button
               onClick={() => setShowQuickView(false)}
               className="absolute top-3 right-3 text-gray-500 text-lg"
@@ -198,9 +183,7 @@ const Product = ({ product }) => {
               onError={onImageError}
             />
 
-            <h3 className="font-bold text-lg mt-3">
-              {product.name}
-            </h3>
+            <h3 className="font-bold text-lg mt-3">{product.name}</h3>
 
             <p className="text-red-500 text-xl font-bold mt-1">
               {product.price?.toLocaleString()}đ
@@ -212,9 +195,7 @@ const Product = ({ product }) => {
             >
               Thêm vào giỏ
             </button>
-
           </div>
-
         </div>
       )}
     </>

@@ -39,50 +39,51 @@ const Login = () => {
   };
 
   const { mutate, isLoading } = useMutation({
-    mutationFn: loginUser,
+    mutationFn: (data) => loginUser(data),
     onSuccess: (resData) => {
-      // BE có thể trả về nhiều cấu trúc khác nhau (có hoặc không có `data` wrapper)
-      const rawData = resData?.data ?? resData;
-      const user = rawData?.user ?? rawData?.data ?? rawData;
-      const accessToken =
-        rawData?.access_token ?? rawData?.accessToken ?? rawData?.token ?? "";
-      const refreshToken =
-        rawData?.refresh_token ?? rawData?.refreshToken ?? "";
+      // Backend: { status: true, data: { status:"OK", access_token, refresh_token, user } }
+      const payload = resData?.data ?? resData;
+      const user = payload?.user;
 
-      const userInfo = {
-        id: user?._id || user?.id,
-        name: user?.name || "",
-        email: user?.email || "",
-        phone: user?.phone || "",
-        isAdmin: user?.isAdmin || false,
-        isGuest: false,
-        token: accessToken,
-        refreshToken,
-        address: user?.address || [],
-        login: true,
-        avatar: user?.avatar || "",
-      };
+      const access_token =
+        payload?.access_token ?? payload?.accessToken ?? "";
+      const refresh_token =
+        payload?.refresh_token ?? payload?.refreshToken ?? "";
 
-      // Cập nhật Redux và localStorage trước, sau đó chuyển về trang chủ (có user)
-      dispatch(updateUserInfo(userInfo));
-      localStorage.setItem("user", JSON.stringify(userInfo));
+      const isLoginOk =
+        (resData?.status === true || resData?.status === "OK") &&
+        (payload?.status === "OK" || payload?.access_token || access_token);
 
-      const targetPath = userInfo.isAdmin ? "/admin" : "/";
-      navigate(targetPath, { replace: true });
+      if (isLoginOk && user) {
+        const userInfo = {
+          ...user,
+          token: access_token,
+          refreshToken: refresh_token,
+          isAdmin: !!user?.isAdmin,
+          login: true,
+        };
 
-      Swal.fire({
-        title: "Đăng nhập thành công!",
-        icon: "success",
-        timer: 1200,
-        showConfirmButton: false,
-      });
+        dispatch(updateUserInfo(userInfo));
+        localStorage.setItem("user", JSON.stringify(userInfo));
+
+        Swal.fire("Thành công", "Đăng nhập thành công!", "success");
+        navigate(user?.isAdmin ? "/admin" : "/", { replace: true });
+      } else {
+        Swal.fire("Lỗi", resData?.message || "Đăng nhập thất bại", "error");
+      }
     },
     onError: (err) => {
-      Swal.fire(
-        "Lỗi",
-        err?.response?.data?.message || "Có lỗi xảy ra!",
-        "error",
-      );
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.response?.data?.errors?.[0]?.msg ||
+        err?.message ||
+        "Có lỗi xảy ra!";
+
+      const raw = err?.response?.data;
+      const detail = raw ? `\n\nChi tiết:\n${JSON.stringify(raw, null, 2)}` : "";
+
+      Swal.fire("Lỗi", msg + detail, "error");
     },
   });
 

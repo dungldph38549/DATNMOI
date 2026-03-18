@@ -9,7 +9,8 @@ const createOrder = async (userId, products, totalAmount) => {
   for (const item of products) {
     const product = await Product.findById(item.productId);
     if (!product) throw new Error(`Product ${item.productId} not found`);
-    if (item.quantity > product.countInStock) {
+    const availableStock = product.stock ?? product.countInStock ?? 0;
+    if (item.quantity > availableStock) {
       throw new Error(`Not enough stock for product ${product.name}`);
     }
   }

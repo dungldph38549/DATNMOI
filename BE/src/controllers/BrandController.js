@@ -50,7 +50,10 @@ const getBrandDetail = async (req, res) => {
 
 const updateBrand = async (req, res) => {
   try {
-    const { id } = req.params;
+    // Route `PUT /admin/update` không có `:id` nên FE gửi id trong body
+    const { id: idFromParams } = req.params || {};
+    const { id: idFromBody } = req.body || {};
+    const id = idFromParams || idFromBody;
     const response = await BrandService.updateBrand(id, req.body);
 
     if (response.status === "ERR") {

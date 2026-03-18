@@ -183,6 +183,25 @@ const getLowStock = async () => {
   return Inventory.getLowStock();
 };
 
+// ── GET /api/inventory/admin/list  — Danh sách tồn kho (admin) ─
+const getList = async ({ status, q } = {}) => {
+  const Product = require("../models/ProductModel");
+  const filter = {};
+  if (status) filter.status = status;
+  if (q && q.trim()) {
+    const regex = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    const productIds = await Product.find({ name: regex }).distinct("_id");
+    filter.$or = [{ sku: regex }];
+    if (productIds.length) filter.$or.push({ productId: { $in: productIds } });
+  }
+  const items = await Inventory.find(filter)
+    .populate("productId", "name")
+    .populate("warehouses.warehouseId", "name code location")
+    .sort({ status: 1, sku: 1 })
+    .lean();
+  return items;
+};
+
 // ── GET /api/inventory/:id/logs  — Lịch sử giao dịch ─────────
 const getAuditLogs = async (id, { page = 1, limit = 20, type } = {}) => {
   if (!isValid(id)) throw new AppError("ID không hợp lệ");
@@ -233,10 +252,24 @@ const releaseBySku = async (sku, qty, orderId, userId) => {
   return inv;
 };
 
+const exportBySku = async (sku, qty, orderId, userId, warehouseId, note) => {
+  const inv = await Inventory.findOne({ sku });
+  if (!inv) throw new AppError(`SKU "${sku}" không tồn tại`, 404);
+  await inv.exportStock(Number(qty), warehouseId, orderId, userId, note);
+  emitStockUpdate({
+    inventoryId: inv._id,
+    sku: inv.sku,
+    available: inv.available,
+    status: inv.status,
+  });
+  return inv;
+};
+
 module.exports = {
   getByProduct,
   getById,
   getBySku,
+  getList,
   createInventory,
   importStock,
   exportStock,
@@ -249,4 +282,5 @@ module.exports = {
   // internal
   reserveBySku,
   releaseBySku,
+  exportBySku,
 };

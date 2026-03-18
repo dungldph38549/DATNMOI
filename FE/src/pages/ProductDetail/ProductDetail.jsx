@@ -32,7 +32,7 @@ const ProductDetail = () => {
     (product.image &&
       (product.image.startsWith("http")
         ? product.image
-        : `http://localhost:3001/uploads/${product.image}`)) ||
+        : `http://localhost:3002/uploads/${product.image}`)) ||
     PLACEHOLDER_IMG;
   const onImgError = (e) => {
     e.target.onerror = null;

@@ -1,148 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-
-// ── Mock data ─────────────────────────────────────────────────
-const MOCK_WAREHOUSES = [
-  { _id: "wh1", name: "Kho Hà Nội", code: "HN", location: { city: "Hà Nội" } },
-  { _id: "wh2", name: "Kho TP.HCM", code: "HCM", location: { city: "TP.HCM" } },
-  {
-    _id: "wh3",
-    name: "Kho Đà Nẵng",
-    code: "DN",
-    location: { city: "Đà Nẵng" },
-  },
-];
-
-let _inv = [
-  {
-    _id: "i1",
-    sku: "SHIRT-RED-M",
-    productName: "Áo thun đỏ M",
-    totalQuantity: 120,
-    totalReserved: 10,
-    lowStockThreshold: 20,
-    status: "in_stock",
-    warehouses: [
-      { warehouseId: "wh1", quantity: 80 },
-      { warehouseId: "wh2", quantity: 40 },
-    ],
-    auditLogs: [],
-  },
-  {
-    _id: "i2",
-    sku: "PANTS-BLU-L",
-    productName: "Quần xanh L",
-    totalQuantity: 8,
-    totalReserved: 2,
-    lowStockThreshold: 15,
-    status: "low_stock",
-    warehouses: [{ warehouseId: "wh1", quantity: 8 }],
-    auditLogs: [],
-  },
-  {
-    _id: "i3",
-    sku: "SHOES-WHT-42",
-    productName: "Giày trắng 42",
-    totalQuantity: 0,
-    totalReserved: 0,
-    lowStockThreshold: 10,
-    status: "out_of_stock",
-    warehouses: [],
-    auditLogs: [],
-  },
-  {
-    _id: "i4",
-    sku: "HAT-BLK-ONE",
-    productName: "Mũ đen onesize",
-    totalQuantity: 55,
-    totalReserved: 5,
-    lowStockThreshold: 10,
-    status: "in_stock",
-    warehouses: [
-      { warehouseId: "wh2", quantity: 30 },
-      { warehouseId: "wh3", quantity: 25 },
-    ],
-    auditLogs: [],
-  },
-  {
-    _id: "i5",
-    sku: "JACKET-GRN-S",
-    productName: "Áo khoác xanh S",
-    totalQuantity: 12,
-    totalReserved: 0,
-    lowStockThreshold: 15,
-    status: "low_stock",
-    warehouses: [{ warehouseId: "wh3", quantity: 12 }],
-    auditLogs: [],
-  },
-];
-let _logId = 1;
-
-const delay = (ms = 300) => new Promise((r) => setTimeout(r, ms));
-
-const api = {
-  list: async (f = {}) => {
-    await delay();
-    let d = [..._inv];
-    if (f.status) d = d.filter((i) => i.status === f.status);
-    if (f.q)
-      d = d.filter(
-        (i) =>
-          i.sku.toLowerCase().includes(f.q.toLowerCase()) ||
-          i.productName.toLowerCase().includes(f.q.toLowerCase()),
-      );
-    return d;
-  },
-  import: async (id, qty, warehouseId, note) => {
-    await delay(500);
-    const inv = _inv.find((i) => i._id === id);
-    if (!inv) throw new Error("Not found");
-    inv.totalQuantity += qty;
-    const wh = inv.warehouses.find((w) => w.warehouseId === warehouseId);
-    if (wh) wh.quantity += qty;
-    else inv.warehouses.push({ warehouseId, quantity: qty });
-    inv.auditLogs.push({
-      _id: `log${_logId++}`,
-      type: "import",
-      quantity: qty,
-      beforeQty: inv.totalQuantity - qty,
-      afterQty: inv.totalQuantity,
-      createdAt: new Date().toISOString(),
-      note,
-    });
-    recalc(inv);
-    return inv;
-  },
-  adjust: async (id, newQty, note) => {
-    await delay(400);
-    const inv = _inv.find((i) => i._id === id);
-    if (!inv) throw new Error("Not found");
-    const before = inv.totalQuantity;
-    inv.totalQuantity = newQty;
-    inv.auditLogs.push({
-      _id: `log${_logId++}`,
-      type: "adjust",
-      quantity: newQty - before,
-      beforeQty: before,
-      afterQty: newQty,
-      createdAt: new Date().toISOString(),
-      note,
-    });
-    recalc(inv);
-    return inv;
-  },
-  getLogs: async (id) => {
-    await delay();
-    const inv = _inv.find((i) => i._id === id);
-    return [...(inv?.auditLogs || [])].reverse();
-  },
-};
-
-const recalc = (inv) => {
-  const avail = inv.totalQuantity - inv.totalReserved;
-  if (avail <= 0) inv.status = "out_of_stock";
-  else if (avail <= inv.lowStockThreshold) inv.status = "low_stock";
-  else inv.status = "in_stock";
-};
+import {
+  getInventoryList,
+  getWarehouses,
+  getInventoryLogs,
+  importInventoryStock,
+  adjustInventoryStock,
+} from "../api";
 
 // ── Components ────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -374,10 +237,14 @@ const ImportModal = ({ inv, warehouses, onClose, onDone }) => {
     if (!form.qty || !form.warehouseId) return;
     setLoading(true);
     try {
-      await api.import(inv._id, Number(form.qty), form.warehouseId, form.note);
+      await importInventoryStock(inv._id, {
+        qty: Number(form.qty),
+        warehouseId: form.warehouseId,
+        note: form.note || undefined,
+      });
       onDone("Nhập kho thành công!");
     } catch (e) {
-      onDone(e.message, "error");
+      onDone(e?.response?.data?.message || e?.message || "Lỗi nhập kho", "error");
     }
     setLoading(false);
     onClose();
@@ -437,10 +304,13 @@ const AdjustModal = ({ inv, onClose, onDone }) => {
   const submit = async () => {
     setLoading(true);
     try {
-      await api.adjust(inv._id, Number(form.newQty), form.note);
+      await adjustInventoryStock(inv._id, {
+        newQty: Number(form.newQty),
+        note: form.note || undefined,
+      });
       onDone("Điều chỉnh thành công!");
     } catch (e) {
-      onDone(e.message, "error");
+      onDone(e?.response?.data?.message || e?.message || "Lỗi điều chỉnh", "error");
     }
     setLoading(false);
     onClose();
@@ -499,10 +369,12 @@ const LogsModal = ({ inv, onClose }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getLogs(inv._id).then((l) => {
-      setLogs(l);
-      setLoading(false);
-    });
+    getInventoryLogs(inv._id)
+      .then((res) => {
+        setLogs(Array.isArray(res?.items) ? res.items : res || []);
+      })
+      .catch(() => setLogs([]))
+      .finally(() => setLoading(false));
   }, [inv._id]);
 
   const TYPE_COLOR = {
@@ -624,6 +496,7 @@ const LogsModal = ({ inv, onClose }) => {
 // ── Main Dashboard ────────────────────────────────────────────
 export default function InventoryDashboard() {
   const [inventory, setInventory] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState("");
   const [search, setSearch] = useState("");
@@ -637,9 +510,20 @@ export default function InventoryDashboard() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const data = await api.list({ status: filterStatus, q: search });
-    setInventory(data);
-    setLoading(false);
+    try {
+      const [listRes, whRes] = await Promise.all([
+        getInventoryList({ status: filterStatus || undefined, q: search || undefined }),
+        getWarehouses(),
+      ]);
+      setInventory(Array.isArray(listRes) ? listRes : []);
+      setWarehouses(Array.isArray(whRes) ? whRes : []);
+    } catch (e) {
+      setInventory([]);
+      setWarehouses([]);
+      notify(e?.response?.data?.message || e?.message || "Không tải được dữ liệu", "error");
+    } finally {
+      setLoading(false);
+    }
   }, [filterStatus, search]);
 
   useEffect(() => {
@@ -652,13 +536,20 @@ export default function InventoryDashboard() {
   };
 
   const stats = {
-    total: _inv.length,
-    in_stock: _inv.filter((i) => i.status === "in_stock").length,
-    low_stock: _inv.filter((i) => i.status === "low_stock").length,
-    out: _inv.filter((i) => i.status === "out_of_stock").length,
+    total: inventory.length,
+    in_stock: inventory.filter((i) => i.status === "in_stock").length,
+    low_stock: inventory.filter((i) => i.status === "low_stock").length,
+    out: inventory.filter((i) => i.status === "out_of_stock").length,
   };
 
-  const whName = (id) => MOCK_WAREHOUSES.find((w) => w._id === id)?.name || id;
+  const whName = (id) => {
+    if (!id) return "—";
+    const _id = typeof id === "object" ? id?._id : id;
+    const w = warehouses.find((w) => w._id === _id);
+    if (w) return w.name;
+    if (typeof id === "object" && id?.name) return id.name;
+    return _id || "—";
+  };
 
   return (
     <div
@@ -920,7 +811,7 @@ export default function InventoryDashboard() {
                         {inv.sku}
                       </td>
                       <td style={{ padding: "14px 16px", fontWeight: 500 }}>
-                        {inv.productName}
+                        {inv.productId?.name ?? inv.productName ?? "—"}
                       </td>
                       <td style={{ padding: "14px 16px", fontWeight: 700 }}>
                         {inv.totalQuantity}
@@ -1030,7 +921,7 @@ export default function InventoryDashboard() {
       {modal?.type === "import" && (
         <ImportModal
           inv={modal.inv}
-          warehouses={MOCK_WAREHOUSES}
+          warehouses={warehouses}
           onClose={closeModal}
           onDone={(msg, type) => {
             notify(msg, type);

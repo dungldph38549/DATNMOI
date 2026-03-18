@@ -33,7 +33,8 @@ export const getUserById = async (id) => {
 };
 
 export const updateUserById = async (id, payload) => {
-  const res = await axiosInstance.put(`/user/update/${id}`, payload);
+  // Backend admin update: PUT /api/user/admin/:id
+  const res = await axiosInstance.put(`/user/admin/${id}`, payload);
   return res.data;
 };
 
@@ -43,7 +44,8 @@ export const updateCustomerById = async (payload) => {
 };
 
 export const getAllUser = async (page, limit) => {
-  const res = await axiosInstance.get(`/user/list?page=${page}&limit=${limit}`);
+  // Backend staff list (có phân trang): GET /api/user/all?page=&limit=
+  const res = await axiosInstance.get(`/user/all?page=${page}&limit=${limit}`);
   return res.data;
 };
 // ================== Product API ==================
@@ -314,6 +316,54 @@ export const deleteCategories = async (ids) => {
   return res.data;
 };
 
+// ================== Inventory API (Admin) ==================
+
+const inventoryData = (res) => res?.data?.data ?? res?.data;
+
+/** GET /api/inventory/admin/list?status=&q= */
+export const getInventoryList = async (params = {}) => {
+  const res = await axiosInstance.get("/inventory/admin/list", { params });
+  return inventoryData(res);
+};
+
+/** GET /api/inventory/:id */
+export const getInventoryById = async (id) => {
+  const res = await axiosInstance.get(`/inventory/${id}`);
+  return inventoryData(res);
+};
+
+/** GET /api/inventory/:id/logs?page=&limit=&type= */
+export const getInventoryLogs = async (id, params = {}) => {
+  const res = await axiosInstance.get(`/inventory/${id}/logs`, { params });
+  return inventoryData(res);
+};
+
+/** POST /api/inventory/:id/import — body: { qty, warehouseId, note } */
+export const importInventoryStock = async (id, body) => {
+  const res = await axiosInstance.post(`/inventory/${id}/import`, body);
+  return inventoryData(res);
+};
+
+/** PATCH /api/inventory/:id/adjust — body: { newQty, warehouseId?, note } */
+export const adjustInventoryStock = async (id, body) => {
+  const res = await axiosInstance.patch(`/inventory/${id}/adjust`, body);
+  return inventoryData(res);
+};
+
+/** POST /api/inventory/:id/transfer — body: { qty, fromWarehouseId, toWarehouseId, note } */
+export const transferInventoryStock = async (id, body) => {
+  const res = await axiosInstance.post(`/inventory/${id}/transfer`, body);
+  return inventoryData(res);
+};
+
+// ================== Warehouse API ==================
+
+/** GET /api/warehouses */
+export const getWarehouses = async (params = {}) => {
+  const res = await axiosInstance.get("/warehouses", { params });
+  return res?.data?.data ?? res?.data ?? [];
+};
+
 // ================== Order API ==================
 
 export const createOrder = async (payload) => {
@@ -370,9 +420,7 @@ export const rejectReturn = async (id, note) => {
 
 // Admin: lấy tất cả đơn hàng
 export const getAllOrders = async (page = 0, limit = 10) => {
-  const res = await axiosInstance.get(
-    `/order?page=${page}&limit=${limit}`,
-  );
+  const res = await axiosInstance.get(`/order?page=${page}&limit=${limit}`);
   return res.data;
 };
 
