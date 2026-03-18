@@ -1,7 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const ctrl = require("../controllers/inventoryController");
-const { authMiddleware, authAdminMiddleware } = require("../middlewares/auth");
+const {
+  authMiddleware,
+  authAdminMiddleware,
+} = require("../middlewares/authMiddleware.js");
 
 // ── Public (hoặc internal service-to-service) ─────────────────
 router.get("/low-stock", ctrl.getLowStock); // GET  /api/inventory/low-stock

@@ -1,37 +1,60 @@
 const express = require("express");
 const router = express.Router();
+const UserController = require("../controllers/UserController");
 
-const UserController = require("../controller/UserController");
-const { protect } = require("../middleware/auth");
+// Dùng hệ thống auth mới (authMiddleware)
+const { protect, restrictTo } = require("../middlewares/authMiddleware");
 
 // ==========================================
-// 1. CÁC ROUTE XÁC THỰC (AUTH)
+// 1. PUBLIC (KHÔNG CẦN LOGIN)
 // ==========================================
-router.post("/register", UserController.register);
-router.post("/login", UserController.login);
-router.post("/logout", protect, UserController.logout);
+router.post("/register", UserController.createUser);
+router.post("/login", UserController.loginUser);
 router.post("/refresh-token", UserController.refreshToken);
-router.get("/get-details", protect, UserController.getDetailsUser);
-
-// Google OAuth2 Callback
 router.post("/google-login", UserController.googleCallback);
 
 // ==========================================
-// 2. CÁC ROUTE QUẢN LÝ USER (CRUD)
+// 2. USER (CẦN LOGIN)
 // ==========================================
-// Lấy danh sách tất cả user
-router.get("/", UserController.getAllUsers);
+router.post("/logout", protect, UserController.logout);
 
-// Lấy thông tin 1 user cụ thể
-router.get("/:id", UserController.getUserById);
+router.get("/get-details", protect, UserController.getDetailsUser);
 
-// Tạo user mới (từ Admin)
-router.post("/", UserController.createUser);
+router.put("/update", protect, UserController.updateCustomer);
 
-// Cập nhật thông tin user
-router.put("/:id", UserController.updateUser);
+// ==========================================
+// 3. ADMIN / STAFF
+// ==========================================
+router.get(
+  "/list",
+  protect,
+  restrictTo("admin", "staff"),
+  UserController.listUser,
+);
+router.get(
+  "/all",
+  protect,
+  restrictTo("admin", "staff"),
+  UserController.getAllUser,
+);
 
-// Xóa user
-router.delete("/:id", UserController.deleteUser);
+// ==========================================
+// 4. ADMIN ONLY
+// ==========================================
+router.post("/admin", protect, restrictTo("admin"), UserController.createUser);
+
+router.put("/admin/:id", protect, restrictTo("admin"), UserController.updateUser);
+
+router.delete(
+  "/admin/:id",
+  protect,
+  restrictTo("admin"),
+  UserController.deleteUser
+);
+
+// ==========================================
+// 5. GET USER BY ID (ĐỂ CUỐI)
+// ==========================================
+router.get("/:id", protect, UserController.getUserById);
 
 module.exports = router;

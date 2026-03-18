@@ -1,4 +1,5 @@
 const User = require("../model/UserModel");
+const UserService = require("../services/UserService");
 
 
 // ================== GET ALL ==================
@@ -210,18 +211,57 @@ exports.deleteUser = async (req, res) => {
 // ================== REGISTER ==================
 exports.register = async (req, res) => {
   try {
-    res.json({ message: "Register API working" });
+    const { name, email, password, phone } = req.body;
+    if (!name || !email || !password || !phone) {
+      return res.status(400).json({
+        status: "ERR",
+        message: "Vui lòng điền đầy đủ: Họ tên, Email, Mật khẩu, Số điện thoại",
+      });
+    }
+
+    const result = await UserService.registerUser({ name, email, password, phone });
+    return res.status(201).json(result);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("REGISTER ERROR:", error);
+    if (error && error.status) {
+      return res.status(error.status).json({
+        status: "ERR",
+        message: error.message || "Đăng ký thất bại",
+      });
+    }
+    return res.status(500).json({
+      status: "ERR",
+      message: error?.message || "Lỗi server khi đăng ký",
+    });
   }
 };
 
 // ================== LOGIN ==================
 exports.login = async (req, res) => {
   try {
-    res.json({ message: "Login API working" });
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({
+        status: "ERR",
+        message: "Vui lòng nhập email và mật khẩu",
+      });
+    }
+
+    const result = await UserService.loginUser({ email, password });
+
+    return res.status(200).json(result);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("LOGIN ERROR:", error);
+    if (error && error.status) {
+      return res.status(error.status).json({
+        status: "ERR",
+        message: error.message || "Đăng nhập thất bại",
+      });
+    }
+    return res.status(500).json({
+      status: "ERR",
+      message: error?.message || "Lỗi server khi đăng nhập",
+    });
   }
 };
 

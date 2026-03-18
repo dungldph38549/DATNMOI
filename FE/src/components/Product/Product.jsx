@@ -8,7 +8,7 @@ import {
   FaEye,
 } from "react-icons/fa";
 import { useDispatch } from "react-redux";
-import { addToCart } from "../../redux/cartSlice";
+import { addToCart } from "../../redux/cart/cartSlice";
 
 const Product = ({ product }) => {
   const dispatch = useDispatch();
@@ -29,14 +29,19 @@ const Product = ({ product }) => {
 
   if (!product) return null;
 
-  // IMAGE
-  const image1 = product.image
-    ? `http://localhost:3001/uploads/${product.image}`
-    : "https://via.placeholder.com/300";
+  const PLACEHOLDER = "https://via.placeholder.com/300x300/f0f0f0/999?text=No+Image";
+  const getImageUrl = (img) => {
+    if (!img || typeof img !== "string") return PLACEHOLDER;
+    if (img.startsWith("http://") || img.startsWith("https://")) return img;
+    return `http://localhost:3001/uploads/${img}`;
+  };
+  const image1 = getImageUrl(product.image);
+  const image2 = getImageUrl(product.image2) || image1;
 
-  const image2 = product.image2
-    ? `http://localhost:3001/uploads/${product.image2}`
-    : image1;
+  const onImageError = (e) => {
+    e.target.onerror = null;
+    e.target.src = PLACEHOLDER;
+  };
 
   // WISHLIST
   const toggleWishlist = () => {
@@ -81,12 +86,14 @@ const Product = ({ product }) => {
               src={image1}
               alt={product.name}
               className="absolute w-full h-full object-cover transition duration-300 group-hover:opacity-0"
+              onError={onImageError}
             />
 
             <img
               src={image2}
               alt={product.name}
               className="w-full h-full object-cover opacity-0 group-hover:opacity-100 transition duration-300"
+              onError={onImageError}
             />
 
             {product?.sold > 50 && (
@@ -188,6 +195,7 @@ const Product = ({ product }) => {
               src={image1}
               alt={product.name}
               className="w-full h-[240px] object-cover rounded"
+              onError={onImageError}
             />
 
             <h3 className="font-bold text-lg mt-3">

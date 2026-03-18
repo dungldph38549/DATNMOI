@@ -5,11 +5,12 @@ import App from "./App";
 import reportWebVitals from "./reportWebVitals";
 import { store } from "./redux/store";
 import { Provider } from "react-redux";
+
+// 1. Import QueryClient và QueryClientProvider
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
 import "antd/dist/reset.css";
 import "bootstrap/dist/css/bootstrap.min.css";
-
-import "bootstrap/dist/css/bootstrap.min.css";
-
 import "./assets/css/bootstrap.min.css";
 import "./assets/css/font-awesome.css";
 import "./assets/css/animate.min.css";
@@ -21,13 +22,18 @@ import "./assets/css/rateit.css";
 import "./assets/css/blue.css";
 import "./assets/css/main.css";
 
+// 2. Khởi tạo instance của QueryClient
+const queryClient = new QueryClient();
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <React.StrictMode>
-    <Provider store={store}>
-      <App />
-    </Provider>
+    <QueryClientProvider client={queryClient}>
+      <Provider store={store}>
+        {/* 3. Bọc QueryClientProvider bên ngoài App */}
+        <App />
+      </Provider>
+    </QueryClientProvider>
   </React.StrictMode>,
 );
 

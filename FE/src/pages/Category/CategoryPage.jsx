@@ -1,32 +1,27 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ProductFilterSidebar from "../../components/ProductFilterSidebar/ProductFilterSidebar";
-
-const products = [
-  {
-    id: 1,
-    name: "Simple Product",
-    price: 600,
-    image:
-      "https://images.unsplash.com/photo-1600185365926-3a2ce3cdb9eb?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: 2,
-    name: "Handbag Premium",
-    price: 450,
-    image:
-      "https://images.unsplash.com/photo-1588361861040-ac9b1018f6d5?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: 3,
-    name: "Fashion Bag",
-    price: 520,
-    image:
-      "https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?auto=format&fit=crop&w=800&q=80",
-  },
-];
+import Product from "../../components/Product/Product";
+import { fetchProducts } from "../../api";
 
 const CategoryPage = () => {
   const [selectedSize, setSelectedSize] = useState(9);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const res = await fetchProducts({ limit: 100, page: 0 });
+        setProducts(res?.data ?? []);
+      } catch (err) {
+        console.error(err);
+        setProducts([]);
+      }
+      setLoading(false);
+    };
+    load();
+  }, []);
 
   return (
     <div className="body-content outer-top-xs">
@@ -75,47 +70,17 @@ const CategoryPage = () => {
             <div className="search-result-container">
               <div className="category-product">
                 <div className="row">
-                  {products.map((product) => (
-                    <div key={product.id} className="col-sm-6 col-md-4">
-                      <div className="product">
-                        <div className="product-image">
-                          <div className="image">
-                            <a href="/detail">
-                              <img
-                                src={product.image}
-                                alt={product.name}
-                                className="img-responsive"
-                              />
-                            </a>
-                          </div>
-                        </div>
-
-                        <div className="product-info text-left">
-                          <h3 className="name">
-                            <a href="/detail">{product.name}</a>
-                          </h3>
-
-                          <div className="product-price">
-                            <span className="price">${product.price}</span>
-                          </div>
-                        </div>
-
-                        <div className="cart clearfix animate-effect">
-                          <div className="action">
-                            <button
-                              className="btn btn-primary cart-btn"
-                              onClick={() =>
-                                alert(`Added ${product.name} to cart`)
-                              }
-                            >
-                            <i className="fa fa-shopping-cart"></i> Thêm vào
-                            giỏ hàng
-                            </button>
-                          </div>
-                        </div>
+                  {loading ? (
+                    <div className="col-12 text-center py-5">Đang tải...</div>
+                  ) : products.length === 0 ? (
+                    <div className="col-12 text-center py-5 text-muted">Chưa có sản phẩm</div>
+                  ) : (
+                    products.map((product) => (
+                      <div key={product._id} className="col-sm-6 col-md-4 mb-4">
+                        <Product product={product} />
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             </div>

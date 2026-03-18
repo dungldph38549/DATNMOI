@@ -4,6 +4,13 @@ import { useDispatch } from "react-redux";
 import { addToCart } from "../../redux/cartSlice";
 
 
+const PLACEHOLDER_IMG = "https://via.placeholder.com/300x300/f0f0f0/999?text=No+Image"
+const getProductImageUrl = (p) => {
+  if (!p?.image || typeof p.image !== "string") return PLACEHOLDER_IMG
+  if (p.image.startsWith("http://") || p.image.startsWith("https://")) return p.image
+  return `http://localhost:3001/uploads/${p.image}`
+}
+
 const Product = ({ product }) => {
 
 const dispatch = useDispatch();
@@ -11,6 +18,8 @@ const dispatch = useDispatch();
 const sale = Math.floor(Math.random() * 30) + 10;
 const sold = Math.floor(Math.random() * 500);
 const oldPrice = Math.floor(product.price + (product.price * sale) / 100);
+const imageUrl = getProductImageUrl(product)
+const onImgError = (e) => { e.target.onerror = null; e.target.src = PLACEHOLDER_IMG }
 
 return (
 
@@ -27,9 +36,10 @@ return (
 <div className="h-72 bg-gray-100 flex items-center justify-center overflow-hidden relative">
 
 <img
-src={`http://localhost:3001/uploads/${product.image}`}
+src={imageUrl}
 alt={product.name}
 className="w-full h-[260px] object-cover rounded-lg"
+onError={onImgError}
 />
 
 {/* OVERLAY */}
