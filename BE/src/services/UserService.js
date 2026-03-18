@@ -91,7 +91,26 @@ const loginUser = async (userLogin) => {
     throw { status: 403, message: "Tài khoản của bạn đã bị khoá!" };
   }
 
-  const isMatch = bcrypt.compareSync(password, user.password);
+  // So sánh mật khẩu với bcrypt
+  let isMatch = false;
+  if (user.password) {
+    try {
+      isMatch = bcrypt.compareSync(password, user.password);
+    } catch {
+      isMatch = false;
+    }
+  }
+
+  // TRƯỜNG HỢP CŨ: mật khẩu lưu dạng plain-text
+  // Nếu so sánh bcrypt thất bại nhưng chuỗi trùng khớp,
+  // coi như đúng mật khẩu và tự động hash lại để nâng cấp.
+  if (!isMatch && password && user.password === password) {
+    const newHash = bcrypt.hashSync(password, 10);
+    user.password = newHash;
+    await user.save();
+    isMatch = true;
+  }
+
   if (!isMatch) {
     throw { status: 401, message: "Mật khẩu không chính xác" };
   }

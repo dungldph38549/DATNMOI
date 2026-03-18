@@ -7,6 +7,7 @@ import Brands from "./Brands";
 import Dashboard from "./Dashboard";
 import Users from "./Users";
 import Vouchers from "./Vouchers";
+import InventoryDashboard from "./Inventorydashboard";
 // import OrderReturn from "./OrderReturn";
 // import Comments from "./Comments";
 // import InventoryManagement from "./InventoryManagement";
@@ -224,7 +225,8 @@ const AdminPage = () => {
       case "inventory":
         return <InventoryDashboard />;
       case "staff":
-      //     return <StaffManagement />;
+        //     return <StaffManagement />;
+        break;
       default:
         return (
           <div
