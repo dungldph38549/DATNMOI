@@ -1,39 +1,26 @@
 const express = require("express");
 const router = express.Router();
 const UserController = require("../controllers/UserController");
+const { protect, restrictTo } = require("../middlewares/authMiddleware");
 
-// Import Middleware
-let authMiddleware, authAdminMiddleware, authStaffMiddleware;
-try {
-  const auth = require("../middlewares/authMiddleware");
-  authMiddleware = auth.authMiddleware;
-  authAdminMiddleware = auth.authAdminMiddleware;
-  authStaffMiddleware = auth.authStaffMiddleware || auth.authAdminMiddleware;
-} catch (e) {
-  console.warn("[UserRouter] Bypass auth middleware");
-  authMiddleware =
-    authAdminMiddleware =
-    authStaffMiddleware =
-      (req, res, next) => next();
-}
-
-// Hàm kiểm tra an toàn để tránh lỗi "argument handler must be a function"
+/**
+ * HÀM KIỂM TRA AN TOÀN
+ * Giúp server không bị crash nếu chẳng may bạn chưa định nghĩa hàm trong UserController
+ */
 const handle = (fn) => {
   if (typeof fn !== "function") {
     return (req, res) => {
-      res
-        .status(500)
-        .json({
-          message:
-            "Lỗi hệ thống: Hàm xử lý chưa được định nghĩa trong Controller",
-        });
+      res.status(500).json({
+        message:
+          "Lỗi hệ thống: Hàm xử lý (Controller) chưa được định nghĩa hoặc export.",
+      });
     };
   }
   return fn;
 };
 
 // ==========================================
-// 1. CÁC ROUTE CÔNG KHAI (AUTH)
+// 1. PUBLIC ROUTES (KHÔNG CẦN ĐĂNG NHẬP)
 // ==========================================
 router.post(
   "/register",
@@ -46,51 +33,66 @@ router.post(
 router.post("/login", handle(UserController.login || UserController.loginUser));
 router.post("/refresh-token", handle(UserController.refreshToken));
 router.post("/google-login", handle(UserController.googleCallback));
-router.post("/logout", authMiddleware, handle(UserController.logout));
 
 // ==========================================
-// 2. CÁC ROUTE DÀNH CHO USER
+// 2. USER ROUTES (CẦN ĐĂNG NHẬP)
 // ==========================================
-router.get(
-  "/get-details",
-  authMiddleware,
-  handle(UserController.getDetailsUser),
-);
+router.post("/logout", protect, handle(UserController.logout));
+router.get("/get-details", protect, handle(UserController.getDetailsUser));
 router.put(
   "/update",
-  authMiddleware,
+  protect,
   handle(UserController.updateCustomer || UserController.updateUser),
 );
 
 // ==========================================
-// 3. CÁC ROUTE QUẢN TRỊ (ADMIN / STAFF)
+// 3. ADMIN & STAFF ROUTES (QUẢN LÝ)
 // ==========================================
+
+// Lấy danh sách user có phân trang cho UI Admin
 router.get(
-  "/all",
-  authStaffMiddleware,
-  // Dùng listUser để trả về có phân trang (total/page/limit/pages) cho admin UI.
+  "/list",
+  protect,
+  restrictTo("admin", "staff"),
   handle(UserController.listUser),
 );
 
-// Lấy toàn bộ user không phân trang (dùng cho dropdown/export...) — dành cho staff/admin
-router.get("/admin/all", authStaffMiddleware, handle(UserController.getAllUser));
-router.post("/admin", authAdminMiddleware, handle(UserController.createUser));
+// Lấy toàn bộ user (thường dùng cho Export Excel hoặc báo cáo)
+router.get(
+  "/all",
+  protect,
+  restrictTo("admin", "staff"),
+  handle(UserController.getAllUser),
+);
+
+// Tạo user mới từ trang quản trị
+router.post(
+  "/admin",
+  protect,
+  restrictTo("admin"),
+  handle(UserController.createUser),
+);
+
+// Cập nhật user bất kỳ theo ID
 router.put(
   "/admin/:id",
-  authAdminMiddleware,
+  protect,
+  restrictTo("admin"),
   handle(UserController.updateUser),
 );
+
+// Xóa user
 router.delete(
   "/admin/:id",
-  authAdminMiddleware,
+  protect,
+  restrictTo("admin"),
   handle(UserController.deleteUser),
 );
 
-// Lấy theo ID cụ thể
-router.get(
-  "/:id",
-  authMiddleware,
-  handle(UserController.getUserById || UserController.getDetailsUser),
-);
+// ==========================================
+// 4. GET BY ID (ĐỂ CUỐI CÙNG)
+// ==========================================
+// Route có tham số biến :id phải để dưới cùng để không "ăn" mất các route tĩnh bên trên
+router.get("/:id", protect, handle(UserController.getUserById));
 
 module.exports = router;

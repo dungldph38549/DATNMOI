@@ -6,6 +6,15 @@ const OrderStatusHistory = require("../models/orderStatusHistory.js");
 const { successResponse, errorResponse } = require("../utils/response.js");
 const User = require("../models/UserModel.js");
 const inventoryService = require("../services/inventoryService");
+const { VNPay } = require("vnpay");
+
+const getVnpayClient = () =>
+  new VNPay({
+    tmnCode: process.env.VNP_TMN_CODE || "DEMOMERCHANT01",
+    secureSecret: process.env.VNP_HASH_SECRET || "SECRETKEY",
+    vnpayHost: process.env.VNP_URL || "https://sandbox.vnpayment.vn",
+    testMode: true,
+  });
 
 // ================================================================
 // Tạo đơn hàng
@@ -306,9 +315,9 @@ const statusLabels = {
   shipped: "Đang giao",
   delivered: "Đã giao",
   canceled: "Đã hủy",
-  // "return-request": "Yêu cầu hoàn hàng",       // tạm comment
-  // "accepted":       "Chấp nhận hoàn hàng",      // tạm comment
-  // "rejected":       "Không chấp nhận hoàn hàng", // tạm comment
+  "return-request": "Yêu cầu hoàn hàng",
+  accepted: "Chấp nhận hoàn hàng",
+  rejected: "Từ chối hoàn hàng",
 };
 
 exports.updateOrder = async (req, res) => {
@@ -324,20 +333,20 @@ exports.updateOrder = async (req, res) => {
       "shipped",
       "delivered",
       "canceled",
+      "return-request",
+      "accepted",
+      "rejected",
     ];
-    // Tạm comment các trạng thái hoàn hàng:
-    // "return-request", "accepted", "rejected"
 
     const TRANSITIONS = {
       pending: ["confirmed", "canceled"],
       confirmed: ["shipped", "canceled"],
       shipped: ["delivered"],
-      delivered: [],
-      // delivered: ["return-request"],   // bật lại khi cần hoàn hàng
+      delivered: ["return-request"],
       canceled: [],
-      // "return-request": ["accepted", "rejected"], // tạm comment
-      // "accepted": [],                              // tạm comment
-      // "rejected": [],                              // tạm comment
+      "return-request": ["accepted", "rejected"],
+      accepted: [],
+      rejected: [],
     };
 
     const order = await Order.findById(req.params.id).session(session);
@@ -364,8 +373,14 @@ exports.updateOrder = async (req, res) => {
       }
     }
 
-    const NON_EDITABLE_STATUSES = ["shipped", "delivered", "canceled"];
-    // Tạm comment: "return-request", "accepted", "rejected"
+    const NON_EDITABLE_STATUSES = [
+      "shipped",
+      "delivered",
+      "canceled",
+      "return-request",
+      "accepted",
+      "rejected",
+    ];
     const isLockedStatus = NON_EDITABLE_STATUSES.includes(order.status);
     const tryingToEditOtherFields = fullName || email || phone || address;
 
@@ -794,5 +809,122 @@ exports.paymentMethod = async (req, res) => {
       status: "error",
       message: err?.message || "Internal server error",
     });
+  }
+};
+
+// ================================================================
+// VNPay: Tạo URL thanh toán
+// POST /api/order/:id/create-vnpay-url
+// Body: { returnUrl, cancelUrl }
+// ================================================================
+exports.createVnpayUrl = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const { returnUrl, cancelUrl } = req.body || {};
+    const order = await Order.findById(orderId);
+    if (!order)
+      return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+    if (order.paymentMethod !== "vnpay")
+      return res.status(400).json({ message: "Đơn hàng không dùng VNPay" });
+    if (order.paymentStatus === "paid")
+      return res.status(400).json({ message: "Đơn hàng đã thanh toán" });
+
+    const baseUrl = process.env.FE_URL || "http://localhost:3000";
+    const vnp = getVnpayClient();
+    const url = vnp.buildPaymentUrl({
+      vnp_Amount: order.totalAmount,
+      vnp_TxnRef: orderId,
+      vnp_OrderInfo: `Thanh toan don hang ${orderId}`,
+      vnp_ReturnUrl: returnUrl || `${baseUrl}/payment/return`,
+      vnp_IpAddr: req.ip || "127.0.0.1",
+    });
+    res.status(200).json({ url });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ================================================================
+// VNPay: Return URL sau khi thanh toán (redirect từ VNPay)
+// GET /api/order/return-payment?vnp_ResponseCode=00&vnp_TxnRef=...
+// ================================================================
+exports.returnPayment = async (req, res) => {
+  try {
+    const vnp = getVnpayClient();
+    const result = vnp.verifyReturnUrl(req.query);
+    const orderId = result.vnp_TxnRef;
+    const feUrl = process.env.FE_URL || "http://localhost:3000";
+
+    if (result.isVerified && result.isSuccess) {
+      await Order.findByIdAndUpdate(orderId, { paymentStatus: "paid" });
+      return res.redirect(
+        `${feUrl}/payment/return?success=1&orderId=${orderId}`,
+      );
+    }
+    return res.redirect(`${feUrl}/payment/return?success=0&orderId=${orderId}`);
+  } catch (err) {
+    const feUrl = process.env.FE_URL || "http://localhost:3000";
+    return res.redirect(`${feUrl}/payment/return?success=0&error=1`);
+  }
+};
+
+// ================================================================
+// User: Tạo yêu cầu hoàn hàng
+// POST /api/order/:id/return-request
+// ================================================================
+exports.returnOrderRequest = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order)
+      return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+    if (order.status !== "delivered")
+      return res
+        .status(400)
+        .json({ message: "Chỉ đơn hàng đã giao mới được yêu cầu hoàn hàng" });
+    const updated = await Order.findByIdAndUpdate(
+      req.params.id,
+      { status: "return-request" },
+      { new: true },
+    ).populate("products.productId");
+    await OrderStatusHistory.create({
+      oldStatus: "delivered",
+      newStatus: "return-request",
+      orderId: order._id,
+      note: req.body?.reason || "",
+    });
+    res.status(200).json(updated);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ================================================================
+// Admin: Chấp nhận hoặc từ chối hoàn hàng
+// ================================================================
+exports.acceptOrRejectReturn = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const action = req.path.includes("accept") ? "accepted" : "rejected";
+    const order = await Order.findById(id);
+    if (!order)
+      return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+    if (order.status !== "return-request")
+      return res
+        .status(400)
+        .json({ message: "Đơn hàng không ở trạng thái yêu cầu hoàn hàng" });
+    const updated = await Order.findByIdAndUpdate(
+      id,
+      { status: action },
+      { new: true },
+    ).populate("products.productId");
+    await OrderStatusHistory.create({
+      oldStatus: "return-request",
+      newStatus: action,
+      orderId: order._id,
+      note: req.body?.note || "",
+    });
+    res.status(200).json(updated);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };

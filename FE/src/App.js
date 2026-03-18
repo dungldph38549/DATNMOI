@@ -20,7 +20,10 @@ import ContactPage from "./pages/ContactPage/ContactPage";
 import CheckOut from "./pages/CheckOut/CheckOut";
 import CategoryPage from "./pages/Category/CategoryPage";
 import SearchPage from "./pages/SearchPage/SearchPage";
-
+/* eslint-disable no-unused-vars -- used in Routes below */
+import OrderHistoryPage from "./pages/OrderHistoryPage/OrderHistoryPage";
+import OrderDetailPage from "./pages/OrderDetailPage/OrderDetailPage";
+import PaymentReturnPage from "./pages/PaymentReturnPage/PaymentReturnPage";
 
 //  IMPORT TRANG ADMIN USERS
 import User from "./pages/User";
@@ -49,6 +52,12 @@ function AppContent() {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/terms" element={<TermsConditionsPage />} />
           <Route path="/search" element={<SearchPage />} />
+          <Route path="/orders" element={<OrderHistoryPage />} />
+          <Route path="/orders/:id" element={<OrderDetailPage />} />
+          <Route
+            path="/payment/return"
+            element={<PaymentReturnPage />}
+          />
 
           {/* ADMIN ROUTE */}
           <Route path="/admin/users" element={<User />} />

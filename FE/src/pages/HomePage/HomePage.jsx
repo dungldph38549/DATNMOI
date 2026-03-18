@@ -1,8 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useSelector } from "react-redux";
+import {
+  getFeaturedProducts,
+  getBestSellers,
+  getNewArrivals,
+  fetchProducts,
+} from "../../api";
 
 const HomePage = () => {
+  const user = useSelector((state) => state.user);
+  const isLoggedIn = !!(user?.login && (user?.token || user?.name || user?.email));
   const [products, setProducts] = useState([]);
+  const [hotProducts, setHotProducts] = useState([]);
+  const [newProducts, setNewProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [sort, setSort] = useState("new");
@@ -24,17 +36,49 @@ const HomePage = () => {
     return () => clearInterval(interval);
   }, [banners.length]);
 
-  /* FETCH PRODUCTS */
+  /* FETCH PRODUCTS FROM BE */
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      const res = await fetch("http://localhost:3001/api/product");
-      const data = await res.json();
-
-      setProducts(data.data || []);
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [featuredRes, bestRes, newRes] = await Promise.all([
+          getFeaturedProducts(8),
+          getBestSellers(8),
+          getNewArrivals(8),
+        ]);
+        const featured = featuredRes?.data ?? [];
+        const best = bestRes?.data ?? [];
+        const newArr = newRes?.data ?? [];
+        setHotProducts(best.length > 0 ? best : featured.length > 0 ? featured : newArr);
+        setNewProducts(newArr.length > 0 ? newArr : featured.length > 0 ? featured : best);
+        if (featured.length > 0 || best.length > 0 || newArr.length > 0) {
+          setProducts([...new Set([...best, ...featured, ...newArr].map((p) => p._id))].map((id) => {
+            const p = [...best, ...featured, ...newArr].find((x) => x._id === id);
+            return p;
+          }).filter(Boolean));
+        } else {
+          const allRes = await fetchProducts({ limit: 24, page: 0 });
+          const list = allRes?.data ?? [];
+          setProducts(list);
+          setHotProducts(list.slice(0, 8));
+          setNewProducts(list.slice(8, 16));
+        }
+      } catch (err) {
+        console.error("Load products:", err);
+        try {
+          const allRes = await fetchProducts({ limit: 24, page: 0 });
+          const list = allRes?.data ?? [];
+          setProducts(list);
+          setHotProducts(list.slice(0, 8));
+          setNewProducts(list.slice(8, 16));
+        } catch (e) {
+          setProducts([]);
+        }
+      }
+      setLoading(false);
     };
-
-    fetchProducts();
+    load();
   }, []);
 
   /* FILTER */
@@ -42,12 +86,14 @@ const HomePage = () => {
   let filterProducts = [...products];
 
   if (selectedBrand) {
-    filterProducts = filterProducts.filter((p) => p.brand === selectedBrand);
+    filterProducts = filterProducts.filter(
+      (p) => (p.brandId?.name || p.brand) === selectedBrand,
+    );
   }
 
   if (selectedCategory) {
     filterProducts = filterProducts.filter(
-      (p) => p.category === selectedCategory,
+      (p) => (p.categoryId?.name || p.category) === selectedCategory,
     );
   }
 
@@ -62,11 +108,11 @@ const HomePage = () => {
   }
 
   if (sort === "sold") {
-    filterProducts.sort((a, b) => (b.sold || 0) - (a.sold || 0));
+    filterProducts.sort((a, b) => (b.soldCount || b.sold || 0) - (a.soldCount || a.sold || 0));
   }
 
-  const hotProducts = filterProducts.slice(0, 8);
-  const newProducts = filterProducts.slice(8, 16);
+  const hotDisplay = filterProducts.length > 0 ? filterProducts.slice(0, 8) : hotProducts;
+  const newDisplay = filterProducts.length > 0 ? filterProducts.slice(8, 16) : newProducts;
 
   const isFiltering = selectedBrand || selectedCategory;
 
@@ -101,6 +147,11 @@ const HomePage = () => {
 
         <div className="absolute inset-0 flex items-center justify-center text-white text-center">
           <div>
+            {isLoggedIn && (
+              <p className="text-xl font-semibold mb-2">
+                Chào, {user?.name || user?.email || "bạn"}!
+              </p>
+            )}
             <h1 className="text-5xl font-black mb-6">Sneaker Store</h1>
 
             <p className="text-lg mb-8">Phong cách bắt đầu từ đôi giày</p>
@@ -272,7 +323,7 @@ ${sort === "high" ? "bg-blue-500 text-white" : "bg-gray-200 hover:bg-gray-300"}
               </h2>
 
               <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-8 mb-20">
-                {hotProducts.map((p) => (
+                {(loading ? [] : hotDisplay).map((p) => (
                   <Link
                     to={`/product/${p._id}`}
                     key={p._id}
@@ -307,7 +358,7 @@ ${sort === "high" ? "bg-blue-500 text-white" : "bg-gray-200 hover:bg-gray-300"}
               </h2>
 
               <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-8">
-                {newProducts.map((p) => (
+                {(loading ? [] : newDisplay).map((p) => (
                   <Link
                     to={`/product/${p._id}`}
                     key={p._id}

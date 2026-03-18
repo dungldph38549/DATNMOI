@@ -209,6 +209,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
       const isHasVariants = !!productData.hasVariants;
       form.setFieldsValue({
         ...productData,
+        countInStock: productData.stock ?? productData.countInStock,
         attributes: productData.attributes || [],
         variants: productData.variants || [],
         ...(isHasVariants

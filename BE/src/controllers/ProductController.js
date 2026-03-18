@@ -75,13 +75,13 @@ exports.getProducts = async (req, res) => {
 exports.getAllProducts = async (req, res) => {
   try {
     const { limit, page, filter, isListProductRemoved } = req.query;
-    const products = await ProductService.getAllProducts(
+    const result = await ProductService.getAllProductsAdmin(
       Number(limit) || 10,
       Number(page) || 0,
       filter,
       isListProductRemoved,
     );
-    res.json(products);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -23,7 +23,8 @@ const extractToken = (req) => {
  * Nếu payload có id → truy vấn DB lấy thông tin mới nhất
  */
 const decodeToken = async (token) => {
-  const decoded = jwt.verify(token, process.env.ACCESS_TOKEN);
+  const secret = process.env.ACCESS_TOKEN || process.env.ACCESS_TOKEN_SECRET || "access_secret";
+  const decoded = jwt.verify(token, secret);
   const { payload } = decoded;
 
   if (payload?.id) {

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import Product from "../../components/Product/Product";
+import { fetchProducts } from "../../api";
 
 const PAGE_SIZE = 30;
 
@@ -15,21 +15,18 @@ const ProductPage = () => {
   const [page, setPage] = useState(1);
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const load = async () => {
       try {
         setLoading(true);
-
-        const res = await axios.get("http://localhost:3001/api/product");
-
-        setProducts(res.data.data || []);
+        const res = await fetchProducts({ limit: 200, page: 0 });
+        setProducts(res?.data ?? res ?? []);
       } catch (err) {
-        console.log(err);
+        console.error(err);
+        setProducts([]);
       }
-
       setLoading(false);
     };
-
-    fetchProducts();
+    load();
   }, []);
 
   const filteredProducts = useMemo(() => {

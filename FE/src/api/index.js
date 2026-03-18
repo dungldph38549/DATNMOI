@@ -363,3 +363,103 @@ export const getWarehouses = async (params = {}) => {
   const res = await axiosInstance.get("/warehouses", { params });
   return res?.data?.data ?? res?.data ?? [];
 };
+
+// ================== Order API ==================
+
+export const createOrder = async (payload) => {
+  const res = await axiosInstance.post("/order", payload);
+  return res.data;
+};
+
+export const getOrdersByUser = async (userId, page = 1, limit = 10) => {
+  const res = await axiosInstance.get(
+    `/order/user?userId=${userId}&page=${page}&limit=${limit}`,
+  );
+  return res.data;
+};
+
+export const getOrderById = async (id) => {
+  const res = await axiosInstance.get(`/order/${id}`);
+  return res.data;
+};
+
+export const updateOrderStatus = async (id, body) => {
+  const res = await axiosInstance.put(`/order/${id}`, body);
+  return res.data;
+};
+
+export const confirmDelivery = async (id) => {
+  const res = await axiosInstance.post(`/order/comfirmDelivery/${id}`);
+  return res.data;
+};
+
+export const createVnpayUrl = async (orderId, returnUrl, cancelUrl) => {
+  const res = await axiosInstance.post(`/order/${orderId}/create-vnpay-url`, {
+    returnUrl,
+    cancelUrl,
+  });
+  return res.data;
+};
+
+export const returnOrderRequest = async (id, reason) => {
+  const res = await axiosInstance.post(`/order/${id}/return-request`, {
+    reason,
+  });
+  return res.data;
+};
+
+export const acceptReturn = async (id, note) => {
+  const res = await axiosInstance.put(`/order/${id}/accept-return`, { note });
+  return res.data;
+};
+
+export const rejectReturn = async (id, note) => {
+  const res = await axiosInstance.put(`/order/${id}/reject-return`, { note });
+  return res.data;
+};
+
+// Admin: lấy tất cả đơn hàng
+export const getAllOrders = async (page = 0, limit = 10) => {
+  const res = await axiosInstance.get(`/order?page=${page}&limit=${limit}`);
+  return res.data;
+};
+
+// ================== Voucher API ==================
+
+export const getAllVouchers = async () => {
+  const res = await axiosInstance.get("/voucher");
+  return res.data;
+};
+
+export const getVoucherDetail = async (id) => {
+  const res = await axiosInstance.get(`/voucher/${id}`);
+  return res.data;
+};
+
+export const createVoucher = async (payload) => {
+  const res = await axiosInstance.post("/voucher/create", payload);
+  return res.data;
+};
+
+export const updateVoucher = async (id, payload) => {
+  const res = await axiosInstance.put(`/voucher/${id}`, payload);
+  return res.data;
+};
+
+export const deleteVoucher = async (id) => {
+  const res = await axiosInstance.delete(`/voucher/${id}`);
+  return res.data;
+};
+
+export const getVoucherByCode = async (code) => {
+  const list = await getAllVouchers();
+  const data = list?.data || list;
+  const arr = Array.isArray(data) ? data : data?.data || [];
+  return (
+    arr.find(
+      (v) =>
+        v.code &&
+        v.code.trim().toUpperCase() === String(code).trim().toUpperCase(),
+    ) || null
+  );
+};

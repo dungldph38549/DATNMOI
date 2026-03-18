@@ -40,16 +40,13 @@ axiosInstance.interceptors.response.use(
     const url = error?.config?.url || "";
 
     if (status === 401) {
-      // Chỉ logout nếu đây là API auth (login/profile)
-      // KHÔNG reload khi API dashboard/thống kê bị 401
-      const isAuthRoute = url.includes("/login") || url.includes("/profile");
-
-      if (isAuthRoute) {
+      // KHÔNG redirect khi 401 từ chính form đăng nhập/đăng ký — để trang Login/Register hiển thị lỗi
+      const isLoginOrRegister =
+        url.includes("/user/login") || url.includes("/user/register");
+      if (!isLoginOrRegister) {
         localStorage.removeItem("user");
-        window.location.href = "/login"; // dùng href thay reload để không loop
+        window.location.href = "/login";
       }
-
-      // Các API khác bị 401 → chỉ reject, để component tự xử lý
     }
 
     return Promise.reject(error);

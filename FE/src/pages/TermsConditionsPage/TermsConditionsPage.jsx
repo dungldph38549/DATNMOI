@@ -8,7 +8,7 @@ const TermsConditionsPage = () => {
           <div className="breadcrumb-inner">
             <ul className="list-inline list-unstyled">
               <li>
-                <a href="#">Trang chủ</a>
+                <a href="/">Trang chủ</a>
               </li>
               <li className="active">Điều khoản &amp; điều kiện</li>
             </ul>
@@ -109,7 +109,7 @@ const TermsConditionsPage = () => {
                   <p>
                     Nếu bạn có bất kỳ câu hỏi nào về thỏa thuận này, vui lòng
                     liên hệ với chúng tôi bằng cách điền vào{" "}
-                    <a href="#" className="contact-form">
+                    <a href="/" className="contact-form">
                       biểu mẫu liên hệ
                     </a>
                   </p>
@@ -125,7 +125,7 @@ const TermsConditionsPage = () => {
                 className="owl-carousel brand-slider custom-carousel owl-theme"
               >
                 <div className="item m-t-15">
-                  <a href="#" className="image">
+                  <a href="/" className="image">
                     <img
                       data-echo="assets/images/brands/brand1.png"
                       src="assets/images/blank.gif"
@@ -135,7 +135,7 @@ const TermsConditionsPage = () => {
                 </div>
 
                 <div className="item m-t-10">
-                  <a href="#" className="image">
+                  <a href="/" className="image">
                     <img
                       data-echo="assets/images/brands/brand2.png"
                       src="assets/images/blank.gif"
@@ -145,7 +145,7 @@ const TermsConditionsPage = () => {
                 </div>
 
                 <div className="item">
-                  <a href="#" className="image">
+                  <a href="/" className="image">
                     <img
                       data-echo="assets/images/brands/brand3.png"
                       src="assets/images/blank.gif"
@@ -155,7 +155,7 @@ const TermsConditionsPage = () => {
                 </div>
 
                 <div className="item">
-                  <a href="#" className="image">
+                  <a href="/" className="image">
                     <img
                       data-echo="assets/images/brands/brand4.png"
                       src="assets/images/blank.gif"
@@ -165,7 +165,7 @@ const TermsConditionsPage = () => {
                 </div>
 
                 <div className="item">
-                  <a href="#" className="image">
+                  <a href="/" className="image">
                     <img
                       data-echo="assets/images/brands/brand5.png"
                       src="assets/images/blank.gif"
@@ -175,7 +175,7 @@ const TermsConditionsPage = () => {
                 </div>
 
                 <div className="item">
-                  <a href="#" className="image">
+                  <a href="/" className="image">
                     <img
                       data-echo="assets/images/brands/brand6.png"
                       src="assets/images/blank.gif"
@@ -185,7 +185,7 @@ const TermsConditionsPage = () => {
                 </div>
 
                 <div className="item">
-                  <a href="#" className="image">
+                  <a href="/" className="image">
                     <img
                       data-echo="assets/images/brands/brand2.png"
                       src="assets/images/blank.gif"
@@ -195,7 +195,7 @@ const TermsConditionsPage = () => {
                 </div>
 
                 <div className="item">
-                  <a href="#" className="image">
+                  <a href="/" className="image">
                     <img
                       data-echo="assets/images/brands/brand4.png"
                       src="assets/images/blank.gif"
@@ -205,7 +205,7 @@ const TermsConditionsPage = () => {
                 </div>
 
                 <div className="item">
-                  <a href="#" className="image">
+                  <a href="/" className="image">
                     <img
                       data-echo="assets/images/brands/brand1.png"
                       src="assets/images/blank.gif"
@@ -215,7 +215,7 @@ const TermsConditionsPage = () => {
                 </div>
 
                 <div className="item">
-                  <a href="#" className="image">
+                  <a href="/" className="image">
                     <img
                       data-echo="assets/images/brands/brand5.png"
                       src="assets/images/blank.gif"

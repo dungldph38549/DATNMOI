@@ -7,9 +7,9 @@ import Brands from "./Brands";
 import Dashboard from "./Dashboard";
 import Users from "./Users";
 import Vouchers from "./Vouchers";
+import InventoryDashboard from "./Inventorydashboard";
 // import OrderReturn from "./OrderReturn";
 // import Comments from "./Comments";
-import InventoryDashboard from "./Inventorydashboard";
 // import StaffManagement from "./StaffManagement";
 import { Link, useNavigate } from "react-router-dom";
 import { clearUser } from "../redux/user";
@@ -199,8 +199,6 @@ const AdminPage = () => {
     if (isMobile) setSidebarCollapsed(true);
   };
 
-  const currentItem = MENU.find((m) => m.key === selectedMenu);
-
   const renderContent = () => {
     switch (selectedMenu) {
       case "dashboard":
@@ -224,7 +222,8 @@ const AdminPage = () => {
       case "inventory":
         return <InventoryDashboard />;
       case "staff":
-      //     return <StaffManagement />;
+        //     return <StaffManagement />;
+        break;
       default:
         return (
           <div

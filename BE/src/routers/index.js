@@ -7,6 +7,7 @@ const AdminReviewRouter = require("./adminReviewRoutes");
 const SizeRouter = require("./SizeRouter");
 const ColorRouter = require("./ColorRouter");
 const UserRouter = require("./UserRouter");
+const OrderRouter = require("./OrderRouter");
 const inventoryRouter = require("./inventoryRoutes");
 
 const routes = (app) => {
@@ -20,6 +21,7 @@ const routes = (app) => {
   app.use("/api/admin", AdminReviewRouter);
   app.use("/api/size", SizeRouter);
   app.use("/api/color", ColorRouter);
+  app.use("/api/order", OrderRouter);
 };
 
 module.exports = routes;

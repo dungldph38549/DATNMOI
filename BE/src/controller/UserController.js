@@ -1,5 +1,5 @@
 const User = require("../model/UserModel");
-const UserService = require("../service/UserService");
+const UserService = require("../services/UserService");
 
 
 // ================== GET ALL ==================
@@ -218,14 +218,21 @@ exports.register = async (req, res) => {
         message: "Vui lòng điền đầy đủ: Họ tên, Email, Mật khẩu, Số điện thoại",
       });
     }
+
     const result = await UserService.registerUser({ name, email, password, phone });
-    if (result.status === "ERR") {
-      return res.status(400).json({ status: result.status, message: result.message });
-    }
-    res.status(200).json({ status: result.status, message: result.message });
+    return res.status(201).json(result);
   } catch (error) {
     console.error("REGISTER ERROR:", error);
-    res.status(500).json({ message: error.message });
+    if (error && error.status) {
+      return res.status(error.status).json({
+        status: "ERR",
+        message: error.message || "Đăng ký thất bại",
+      });
+    }
+    return res.status(500).json({
+      status: "ERR",
+      message: error?.message || "Lỗi server khi đăng ký",
+    });
   }
 };
 
@@ -239,20 +246,22 @@ exports.login = async (req, res) => {
         message: "Vui lòng nhập email và mật khẩu",
       });
     }
+
     const result = await UserService.loginUser({ email, password });
-    if (result.status === "ERR") {
-      return res.status(400).json({ status: result.status, message: result.message });
-    }
-    res.status(200).json({
-      status: result.status,
-      message: result.message,
-      access_token: result.access_token,
-      refresh_token: result.refresh_token,
-      user: result.user,
-    });
+
+    return res.status(200).json(result);
   } catch (error) {
     console.error("LOGIN ERROR:", error);
-    res.status(500).json({ message: error.message });
+    if (error && error.status) {
+      return res.status(error.status).json({
+        status: "ERR",
+        message: error.message || "Đăng nhập thất bại",
+      });
+    }
+    return res.status(500).json({
+      status: "ERR",
+      message: error?.message || "Lỗi server khi đăng nhập",
+    });
   }
 };
 

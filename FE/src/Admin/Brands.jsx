@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Table, Spin, Modal, Button, Form, Input, message } from "antd";
+import { Table, Modal, Button, Form, Input, message } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getAllBrands,
@@ -28,7 +28,7 @@ export default function Brands() {
   const [form] = Form.useForm(); // Edit form
   const [createForm] = Form.useForm(); // Create form
 
-  const { data, isLoading, isError } = useQuery({
+  const { data } = useQuery({
     queryKey: ["admin-brands"],
     queryFn: () => getAllBrands("all"),
     keepPreviousData: true,

@@ -69,6 +69,15 @@ app.get("/", (req, res) => {
   res.send("--- HELLO! BACKEND SNEAKERHOUSE CHẠY THÀNH CÔNG ---");
 });
 
+// Health check cho FE / công cụ kiểm tra API
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    ok: true,
+    message: "API đang chạy",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.post("/api/upload", upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).json({ message: "Không có file" });
   res
@@ -116,6 +125,10 @@ scheduleLowStockScan();
 // 9. Kết nối MongoDB và Start Server
 const startServer = async () => {
   try {
+    if (!process.env.ACCESS_TOKEN) {
+      console.warn("⚠️ ACCESS_TOKEN chưa có trong .env — các route cần đăng nhập sẽ lỗi.");
+    }
+
     const mongoURI = process.env.MONGO_DB;
     if (!mongoURI) throw new Error("MONGO_DB is not defined in .env");
 

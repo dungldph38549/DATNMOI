@@ -93,13 +93,34 @@ exports.getUserById = async (req, res) => {
 };
 
 /**
+ * GET /user/get-details
+ * Lấy thông tin user hiện tại (từ token)
+ */
+exports.getDetailsUser = async (req, res) => {
+  try {
+    if (!req.user?.id && !req.user?._id) {
+      return errorResponse({
+        res,
+        message: "Không tìm thấy thông tin người dùng trong phiên đăng nhập",
+        statusCode: 401,
+      });
+    }
+    const id = req.user.id || req.user._id;
+    const user = await UserService.getUserById(id);
+    return successResponse({ res, data: user });
+  } catch (err) {
+    handleError(res, err);
+  }
+};
+
+/**
  * PUT /user/update
  * Body: { id, name?, email?, phone?, address?, password?, avatar? }
  * Dùng cho khách hàng tự cập nhật profile
  */
 exports.updateCustomer = async (req, res) => {
   try {
-    const { id, name, email, phone, address, password, avatar } = req.body;
+    const { id, name, email, phone, address, avatar } = req.body;
 
     if (!id)
       return errorResponse({
@@ -108,16 +129,14 @@ exports.updateCustomer = async (req, res) => {
         statusCode: 422,
       });
 
-    // Chỉ cập nhật field nào được gửi lên
-    const updateData = {};
-    if (name) updateData.name = name;
-    if (email) updateData.email = email;
-    if (phone) updateData.phone = phone;
-    if (address) updateData.address = address;
-    if (password) updateData.password = password;
-    if (avatar) updateData.avatar = avatar;
-
-    const user = await UserService.updateUser(id, updateData);
+    // Chỉ cập nhật field cơ bản, không cho phép đổi password tại đây
+    const user = await UserService.updateCustomer(id, {
+      name,
+      email,
+      phone,
+      address,
+      avatar,
+    });
     return successResponse({ res, data: user });
   } catch (err) {
     handleError(res, err);
@@ -194,4 +213,58 @@ exports.deleteUser = async (req, res) => {
   } catch (err) {
     handleError(res, err);
   }
+};
+
+
+exports.refreshToken = async (req, res) => {
+  try {
+    const token =
+      req.body?.refresh_token ||
+      req.body?.refreshToken ||
+      req.cookies?.refresh_token;
+
+    if (!token) {
+      return errorResponse({
+        res,
+        message: "Thiếu Refresh Token",
+        statusCode: 400,
+      });
+    }
+
+    const result = await UserService.refreshTokenService(token);
+    return successResponse({ res, data: result });
+  } catch (err) {
+    handleError(res, err);
+  }
+};
+
+exports.googleCallback = async (req, res) => {
+  try {
+    const { googleId, email, name, avatar } = req.body || {};
+    if (!googleId || !email) {
+      return errorResponse({
+        res,
+        message: "Thiếu thông tin Google user",
+        statusCode: 400,
+      });
+    }
+
+    const result = await UserService.googleLoginOrRegister({
+      googleId,
+      email,
+      name,
+      avatar,
+    });
+
+    return successResponse({ res, data: result });
+  } catch (err) {
+    handleError(res, err);
+  }
+};
+
+exports.logout = async (req, res) => {
+  return successResponse({
+    res,
+    message: "Logout thành công",
+  });
 };
