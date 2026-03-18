@@ -241,10 +241,11 @@ exports.getStock = async (req, res) => {
         } else {
           // Kiểm tra tồn kho tổng (sản phẩm không có variant)
           const product = await Product.findById(productId);
+          const available = product?.stock ?? product?.countInStock ?? 0;
           return {
             productId,
-            countInStock: product?.countInStock ?? 0,
-            available: (product?.countInStock ?? 0) > 0,
+            countInStock: available,
+            available: available > 0,
           };
         }
       }),

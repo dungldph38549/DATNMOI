@@ -73,7 +73,8 @@ const addItem = async (req, res, next) => {
         .json({ status: "ERR", message: "Sản phẩm không tồn tại" });
     }
 
-    if (product.countInStock < quantity) {
+    const availableStock = product.stock ?? product.countInStock ?? 0;
+    if (availableStock < quantity) {
       return res.status(400).json({
         status: "ERR",
         message: "Số lượng vượt quá tồn kho",
@@ -88,7 +89,7 @@ const addItem = async (req, res, next) => {
 
     if (existing) {
       const newQty = existing.qty + quantity;
-      if (newQty > product.countInStock) {
+      if (newQty > availableStock) {
         return res.status(400).json({
           status: "ERR",
           message: "Tổng số lượng trong giỏ vượt quá tồn kho",
@@ -167,7 +168,8 @@ const updateItemQty = async (req, res, next) => {
           .json({ status: "ERR", message: "Sản phẩm không tồn tại" });
       }
 
-      if (quantity > product.countInStock) {
+      const availableStock = product.stock ?? product.countInStock ?? 0;
+      if (quantity > availableStock) {
         return res.status(400).json({
           status: "ERR",
           message: "Số lượng vượt quá tồn kho",

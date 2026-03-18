@@ -41,13 +41,27 @@ const Login = () => {
   const { mutate, isPending } = useMutation({
     mutationFn: (data) => loginUser(data),
     onSuccess: (res) => {
-      if (res?.status === "OK") {
-        localStorage.setItem("access_token", res?.access_token);
+      const payload = res?.data ?? res; // backend: { status: true, data: { status: "OK", ... } }
+      const user = payload?.user;
+
+      const isLoginOk =
+        (res?.status === true || res?.status === "OK") &&
+        (payload?.status === "OK" || payload?.access_token);
+
+      if (isLoginOk && user) {
+        // axiosConfig đang đọc `localStorage.user.token`, nên map đúng key ở state
         dispatch(
-          updateUserInfo({ ...res?.data, access_token: res?.access_token }),
+          updateUserInfo({
+            ...user,
+            token: payload?.access_token,
+            refreshToken: payload?.refresh_token,
+            isAdmin: !!user?.isAdmin,
+            login: true,
+          }),
         );
         Swal.fire("Thành công", "Đăng nhập thành công!", "success");
-        navigate("/");
+        // Điều hướng sang trang admin nếu user là admin
+        navigate(user?.isAdmin ? "/admin" : "/");
       } else {
         Swal.fire("Lỗi", res?.message || "Đăng nhập thất bại", "error");
       }

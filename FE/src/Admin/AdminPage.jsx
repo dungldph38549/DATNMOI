@@ -9,7 +9,7 @@ import Users from "./Users";
 import Vouchers from "./Vouchers";
 // import OrderReturn from "./OrderReturn";
 // import Comments from "./Comments";
-// import InventoryManagement from "./InventoryManagement";
+import InventoryDashboard from "./Inventorydashboard";
 // import StaffManagement from "./StaffManagement";
 import { Link, useNavigate } from "react-router-dom";
 import { clearUser } from "../redux/user";
@@ -618,183 +618,35 @@ const AdminPage = () => {
             marginLeft: isMobile ? 0 : 0,
           }}
         >
-          {/* Top header */}
-          <header
-            style={{
-              background: T.bgCard,
-              borderBottom: `1px solid ${T.border}`,
-              padding: "0 28px",
-              height: 64,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              position: "sticky",
-              top: 0,
-              zIndex: 20,
-              flexShrink: 0,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              {/* Mobile hamburger */}
-              {isMobile && (
-                <button
-                  onClick={() => setSidebarCollapsed(false)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: T.textMid,
-                    padding: 4,
-                  }}
-                >
-                  <span
-                    className="material-symbols-outlined"
-                    style={{ fontSize: 24 }}
-                  >
-                    menu
-                  </span>
-                </button>
-              )}
-              {/* Breadcrumb */}
-              <div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 11,
-                      color: T.textMuted,
-                      fontWeight: 500,
-                    }}
-                  >
-                    Admin
-                  </span>
-                  <span style={{ fontSize: 11, color: T.textMuted }}>/</span>
-                  <span
-                    style={{ fontSize: 11, color: T.primary, fontWeight: 600 }}
-                  >
-                    {currentItem?.label}
-                  </span>
-                </div>
-                <h1
-                  style={{
-                    fontSize: 17,
-                    fontWeight: 800,
-                    color: T.text,
-                    letterSpacing: "-0.2px",
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {currentItem?.desc || currentItem?.label}
-                </h1>
-              </div>
-            </div>
-
-            {/* Right actions */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {/* Date */}
-              <div
-                style={{
-                  display: isMobile ? "none" : "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 12px",
-                  background: "#F8FAFC",
-                  borderRadius: 10,
-                  border: `1px solid ${T.border}`,
-                  fontSize: 12,
-                  color: T.textMuted,
-                  fontWeight: 500,
-                }}
-              >
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: 15 }}
-                >
-                  calendar_today
-                </span>
-                {new Date().toLocaleDateString("vi-VN", {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
-              </div>
-
-              {/* Notification bell */}
-              <button
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  border: `1px solid ${T.border}`,
-                  background: T.bgCard,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  position: "relative",
-                }}
-              >
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: 18, color: T.textMid }}
-                >
-                  notifications
-                </span>
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 6,
-                    right: 6,
-                    width: 7,
-                    height: 7,
-                    borderRadius: "50%",
-                    background: T.red,
-                    border: "1.5px solid #fff",
-                  }}
-                />
-              </button>
-
-              {/* New product shortcut */}
-              <button
-                onClick={() => handleMenuClick("products")}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "8px 16px",
-                  borderRadius: 10,
-                  background: T.primary,
-                  border: "none",
-                  color: "#fff",
-                  fontWeight: 700,
-                  fontSize: 12,
-                  cursor: "pointer",
-                  fontFamily: "'Lexend', sans-serif",
-                  boxShadow: "0 2px 10px rgba(244,157,37,0.30)",
-                  transition: "opacity 0.15s",
-                  whiteSpace: "nowrap",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.88")}
-                onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-              >
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: 16 }}
-                >
-                  add
-                </span>
-                Sản phẩm mới
-              </button>
-            </div>
-          </header>
-
           {/* Content */}
+          {/* Mobile: nút mở sidebar (thay cho Top header đã cắt) */}
+          {isMobile && sidebarCollapsed && (
+            <button
+              onClick={() => setSidebarCollapsed(false)}
+              style={{
+                position: "fixed",
+                top: 14,
+                left: 14,
+                zIndex: 60,
+                width: 42,
+                height: 42,
+                borderRadius: 12,
+                background: T.bgCard,
+                border: `1px solid ${T.border}`,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <span
+                className="material-symbols-outlined"
+                style={{ fontSize: 24, color: T.textMid }}
+              >
+                menu
+              </span>
+            </button>
+          )}
           <main
             key={selectedMenu}
             className="sh-content-anim"

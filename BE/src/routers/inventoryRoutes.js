@@ -14,6 +14,9 @@ router.get("/", ctrl.getByProduct); // GET  /api/inventory?productId=
 // ── Cần đăng nhập ─────────────────────────────────────────────
 router.use(authMiddleware);
 
+// Admin list phải đứng trước /:id để "admin" không bị coi là id
+router.get("/admin/list", authAdminMiddleware, ctrl.getList); // GET  /api/inventory/admin/list
+
 router.get("/:id", ctrl.getById); // GET  /api/inventory/:id
 router.get("/:id/logs", ctrl.getAuditLogs); // GET  /api/inventory/:id/logs
 

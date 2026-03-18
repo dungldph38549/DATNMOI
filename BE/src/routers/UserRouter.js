@@ -2,50 +2,95 @@ const express = require("express");
 const router = express.Router();
 const UserController = require("../controllers/UserController");
 
-// Import Middleware xác thực
+// Import Middleware
 let authMiddleware, authAdminMiddleware, authStaffMiddleware;
 try {
-    const auth = require("../middlewares/authMiddleware");
-    authMiddleware = auth.authMiddleware;
-    authAdminMiddleware = auth.authAdminMiddleware;
-    authStaffMiddleware = auth.authStaffMiddleware || auth.authAdminMiddleware;
+  const auth = require("../middlewares/authMiddleware");
+  authMiddleware = auth.authMiddleware;
+  authAdminMiddleware = auth.authAdminMiddleware;
+  authStaffMiddleware = auth.authStaffMiddleware || auth.authAdminMiddleware;
 } catch (e) {
-    console.warn("[UserRouter] Không tìm thấy auth middleware, đang dùng bypass để tránh crash");
-    authMiddleware = authAdminMiddleware = authStaffMiddleware = (req, res, next) => next();
+  console.warn("[UserRouter] Bypass auth middleware");
+  authMiddleware =
+    authAdminMiddleware =
+    authStaffMiddleware =
+      (req, res, next) => next();
 }
 
-// ==========================================
-// 1. CÁC ROUTE XÁC THỰC (AUTH) - CÔNG KHAI
-// ==========================================
-router.post("/register", UserController.register || UserController.createUser);
-router.post("/login", UserController.login || UserController.loginUser);
-router.post("/refresh-token", UserController.refreshToken);
-router.post("/google-login", UserController.googleCallback);
-
-// Cần đăng nhập mới có thể logout
-router.post("/logout", authMiddleware, UserController.logout);
-
-// ==========================================
-// 2. CÁC ROUTE DÀNH CHO USER (CUSTOMER)
-// ==========================================
-// Lấy thông tin chi tiết của chính mình
-router.get("/get-details", authMiddleware, UserController.getDetailsUser);
-
-// Cập nhật thông tin cá nhân
-router.put("/update", authMiddleware, UserController.updateCustomer || UserController.updateUser);
+// Hàm kiểm tra an toàn để tránh lỗi "argument handler must be a function"
+const handle = (fn) => {
+  if (typeof fn !== "function") {
+    return (req, res) => {
+      res
+        .status(500)
+        .json({
+          message:
+            "Lỗi hệ thống: Hàm xử lý chưa được định nghĩa trong Controller",
+        });
+    };
+  }
+  return fn;
+};
 
 // ==========================================
-// 3. CÁC ROUTE DÀNH CHO ADMIN / STAFF
+// 1. CÁC ROUTE CÔNG KHAI (AUTH)
 // ==========================================
-// Lấy danh sách tất cả user (Admin/Staff)
-router.get("/all", authStaffMiddleware, UserController.getAllUser || UserController.listUser);
+router.post(
+  "/register",
+  handle(
+    UserController.register ||
+      UserController.createUser ||
+      UserController.registerUser,
+  ),
+);
+router.post("/login", handle(UserController.login || UserController.loginUser));
+router.post("/refresh-token", handle(UserController.refreshToken));
+router.post("/google-login", handle(UserController.googleCallback));
+router.post("/logout", authMiddleware, handle(UserController.logout));
 
-// Quản lý user theo ID (Admin)
-router.post("/admin", authAdminMiddleware, UserController.createUser);
-router.put("/admin/:id", authAdminMiddleware, UserController.updateUser);
-router.delete("/admin/:id", authAdminMiddleware, UserController.deleteUser);
+// ==========================================
+// 2. CÁC ROUTE DÀNH CHO USER
+// ==========================================
+router.get(
+  "/get-details",
+  authMiddleware,
+  handle(UserController.getDetailsUser),
+);
+router.put(
+  "/update",
+  authMiddleware,
+  handle(UserController.updateCustomer || UserController.updateUser),
+);
 
-// Lấy thông tin 1 user cụ thể theo ID (Phải để dưới cùng để tránh trùng khớp route khác)
-router.get("/:id", authMiddleware, UserController.getUserById);
+// ==========================================
+// 3. CÁC ROUTE QUẢN TRỊ (ADMIN / STAFF)
+// ==========================================
+router.get(
+  "/all",
+  authStaffMiddleware,
+  // Dùng listUser để trả về có phân trang (total/page/limit/pages) cho admin UI.
+  handle(UserController.listUser),
+);
+
+// Lấy toàn bộ user không phân trang (dùng cho dropdown/export...) — dành cho staff/admin
+router.get("/admin/all", authStaffMiddleware, handle(UserController.getAllUser));
+router.post("/admin", authAdminMiddleware, handle(UserController.createUser));
+router.put(
+  "/admin/:id",
+  authAdminMiddleware,
+  handle(UserController.updateUser),
+);
+router.delete(
+  "/admin/:id",
+  authAdminMiddleware,
+  handle(UserController.deleteUser),
+);
+
+// Lấy theo ID cụ thể
+router.get(
+  "/:id",
+  authMiddleware,
+  handle(UserController.getUserById || UserController.getDetailsUser),
+);
 
 module.exports = router;

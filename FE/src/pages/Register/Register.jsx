@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-const API_REGISTER = "http://localhost:3001/api/user/register";
+const API_REGISTER =
+  (process.env.REACT_APP_API_URL_BACKEND || "http://localhost:3002/api") +
+  "/user/register";
 
 const Register = () => {
   const navigate = useNavigate();

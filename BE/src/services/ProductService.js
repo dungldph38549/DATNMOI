@@ -11,253 +11,167 @@ const removeVietnameseTones = (str) => {
     .toLowerCase();
 };
 
-const getAllProducts = async (search) => {
-  try {
+// GET /product/admin/get-all
+// Controller đang gọi theo signature: (limit, page, filter, isListProductRemoved)
+const getAllProducts = async (
+  limit = 10,
+  page = 0,
+  filter = {},
+  isListProductRemoved = 0,
+) => {
+  const includeRemoved =
+    isListProductRemoved === "1" ||
+    isListProductRemoved === 1 ||
+    isListProductRemoved === true;
 
-    const products = await Product.find();
+  const parsedFilter =
+    typeof filter === "string"
+      ? (() => {
+          try {
+            return JSON.parse(filter);
+          } catch {
+            return {};
+          }
+        })()
+      : filter || {};
 
-    if (!search) {
-      return {
-        status: "OK",
-        data: products
+  const query = includeRemoved
+    ? {}
+    : {
+        isDeleted: { $ne: true },
       };
-    }
 
-    const keyword = removeVietnameseTones(search);
-
-    const filtered = products.filter((p) =>
-      removeVietnameseTones(p.name).includes(keyword)
-    );
-
-    return {
-      status: "OK",
-      data: filtered
-    };
-
-  } catch (e) {
-    return {
-      status: "ERR",
-      message: e.message
-    };
+  if (parsedFilter?.name?.trim()) {
+    const keyword = parsedFilter.name.trim();
+    query.name = new RegExp(keyword, "i");
   }
+  if (parsedFilter?.categoryId) query.categoryId = parsedFilter.categoryId;
+  if (parsedFilter?.brandId) query.brandId = parsedFilter.brandId;
+
+  const priceFrom = parsedFilter?.priceFrom;
+  const priceTo = parsedFilter?.priceTo;
+  if (priceFrom !== undefined || priceTo !== undefined) {
+    const range = {};
+    const min = priceFrom !== undefined ? Number(priceFrom) : undefined;
+    const max = priceTo !== undefined ? Number(priceTo) : undefined;
+    if (min !== undefined && !Number.isNaN(min)) range.$gte = min;
+    if (max !== undefined && !Number.isNaN(max)) range.$lte = max;
+
+    // Lọc theo sản phẩm không variant hoặc theo giá variant (xấp xỉ)
+    if (Object.keys(range).length) {
+      query.$or = [
+        { hasVariants: false, price: range },
+        { hasVariants: true, variants: { $elemMatch: { price: range } } },
+      ];
+    }
+  }
+
+  const [total, items] = await Promise.all([
+    Product.countDocuments(query),
+    Product.find(query)
+      .populate("brandId", "name")
+      .populate("categoryId", "name")
+      .sort({ createdAt: -1 })
+      .skip(Number(page) * Number(limit))
+      .limit(Number(limit)),
+  ]);
+
+  return {
+    data: items,
+    total,
+    page: Number(page),
+    limit: Number(limit),
+  };
 };
 
-const getProductDetail = async (productId) => {
+// GET /product/:id
+// Trả về document để FE setFieldsValue đúng type (brandId/categoryId là ObjectId)
+const getProductById = async (productId) => {
   try {
     if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
-      return {
-        status: "ERR",
-        message: "Invalid product id",
-      };
+      return null;
     }
 
     const product = await Product.findById(productId);
 
-    if (!product) {
-      return {
-        status: "ERR",
-        message: "Product not found",
-      };
-    }
-
-    return {
-      status: "OK",
-      message: "SUCCESS",
-      data: product,
-    };
+    return product || null;
   } catch (e) {
     throw e;
   }
 };
 
 const createProduct = async (newProduct) => {
-  try {
-    if (!newProduct || typeof newProduct !== "object") {
-      return {
-        status: "ERR",
-        message: "Invalid product payload",
-      };
-    }
-
-    const {
-      name,
-      image,
-      type,
-      countInStock,
-      price,
-      rating,
-      description,
-      discount,
-    } = newProduct;
-
-    // Basic required-field validation
-    if (!name || !price || !type) {
-      return {
-        status: "ERR",
-        message: "Missing required fields: name, price or type",
-      };
-    }
-
-    const numericCountInStock =
-      countInStock !== undefined ? Number(countInStock) : 0;
-    const numericDiscount =
-      discount !== undefined && discount !== null ? Number(discount) : 0;
-
-    if (Number.isNaN(numericCountInStock) || numericCountInStock < 0) {
-      return {
-        status: "ERR",
-        message: "countInStock must be a non-negative number",
-      };
-    }
-
-    if (Number.isNaN(Number(price)) || Number(price) < 0) {
-      return {
-        status: "ERR",
-        message: "price must be a non-negative number",
-      };
-    }
-
-    if (Number.isNaN(numericDiscount) || numericDiscount < 0) {
-      return {
-        status: "ERR",
-        message: "discount must be a non-negative number",
-      };
-    }
-
-    // Check duplicate name
-    const existingProduct = await Product.findOne({ name });
-
-    if (existingProduct) {
-      return {
-        status: "ERR",
-        message: "Product name already exists",
-      };
-    }
-
-    const createdProduct = await Product.create({
-      name,
-      image,
-      type,
-      countInStock: numericCountInStock,
-      price: Number(price),
-      rating,
-      description,
-      discount: numericDiscount,
-    });
-
-    return {
-      status: "OK",
-      message: "SUCCESS",
-      data: createdProduct,
-    };
-  } catch (e) {
-    throw e;
+  if (!newProduct || typeof newProduct !== "object") {
+    throw new Error("Invalid product payload");
   }
+
+  // FE đang gửi `countInStock`, nhưng ProductModel mới dùng `stock`
+  const payload = { ...newProduct };
+  if (payload.countInStock !== undefined && payload.stock === undefined) {
+    payload.stock = Number(payload.countInStock);
+    delete payload.countInStock;
+  }
+
+  if (payload.price !== undefined) payload.price = Number(payload.price);
+  if (payload.stock !== undefined) payload.stock = Number(payload.stock);
+
+  // Chuẩn hoá variants (nếu có)
+  if (Array.isArray(payload.variants)) {
+    payload.variants = payload.variants.map((v) => ({
+      ...v,
+      price: v?.price !== undefined ? Number(v.price) : v.price,
+      stock: v?.stock !== undefined ? Number(v.stock) : v.stock,
+    }));
+  }
+
+  if (payload.name) {
+    const existingProduct = await Product.findOne({ name: payload.name });
+    if (existingProduct) throw new Error("Product name already exists");
+  }
+
+  // Dùng đúng schema `src/models/ProductModel.js`
+  const createdProduct = await Product.create(payload);
+  return createdProduct;
 };
 
 const updateProduct = async (productId, updateData) => {
-  try {
-    if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
-      return {
-        status: "ERR",
-        message: "Invalid product id",
-      };
-    }
-
-    if (!updateData || typeof updateData !== "object") {
-      return {
-        status: "ERR",
-        message: "Invalid update payload",
-      };
-    }
-
-    const product = await Product.findById(productId);
-    if (!product) {
-      return {
-        status: "ERR",
-        message: "Product not found",
-      };
-    }
-
-    const {
-      name,
-      image,
-      type,
-      countInStock,
-      price,
-      rating,
-      description,
-      discount,
-    } = updateData;
-
-    const payload = {};
-
-    if (name !== undefined) payload.name = name;
-    if (image !== undefined) payload.image = image;
-    if (type !== undefined) payload.type = type;
-    if (description !== undefined) payload.description = description;
-    if (rating !== undefined) payload.rating = rating;
-
-    if (countInStock !== undefined) {
-      const num = Number(countInStock);
-      if (Number.isNaN(num) || num < 0) {
-        return {
-          status: "ERR",
-          message: "countInStock must be a non-negative number",
-        };
-      }
-      payload.countInStock = num;
-    }
-
-    if (price !== undefined) {
-      const num = Number(price);
-      if (Number.isNaN(num) || num < 0) {
-        return {
-          status: "ERR",
-          message: "price must be a non-negative number",
-        };
-      }
-      payload.price = num;
-    }
-
-    if (discount !== undefined && discount !== null) {
-      const num = Number(discount);
-      if (Number.isNaN(num) || num < 0) {
-        return {
-          status: "ERR",
-          message: "discount must be a non-negative number",
-        };
-      }
-      payload.discount = num;
-    }
-
-    if (payload.name) {
-      const duplicate = await Product.findOne({
-        name: payload.name,
-        _id: { $ne: productId },
-      });
-      if (duplicate) {
-        return {
-          status: "ERR",
-          message: "Product name already exists",
-        };
-      }
-    }
-
-    const updated = await Product.findByIdAndUpdate(
-      productId,
-      { $set: payload },
-      { new: true, runValidators: true },
-    );
-
-    return {
-      status: "OK",
-      message: "SUCCESS",
-      data: updated,
-    };
-  } catch (e) {
-    throw e;
+  if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+    throw new Error("Invalid product id");
   }
+  if (!updateData || typeof updateData !== "object") {
+    throw new Error("Invalid update payload");
+  }
+
+  const product = await Product.findById(productId);
+  if (!product) throw new Error("Product not found");
+
+  const payload = { ...updateData };
+  if (payload.countInStock !== undefined && payload.stock === undefined) {
+    payload.stock = Number(payload.countInStock);
+    delete payload.countInStock;
+  }
+  if (payload.price !== undefined) payload.price = Number(payload.price);
+  if (payload.stock !== undefined) payload.stock = Number(payload.stock);
+
+  if (Array.isArray(payload.variants)) {
+    payload.variants = payload.variants.map((v) => ({
+      ...v,
+      price: v?.price !== undefined ? Number(v.price) : v.price,
+      stock: v?.stock !== undefined ? Number(v.stock) : v.stock,
+    }));
+  }
+
+  if (payload.name && payload.name !== product.name) {
+    const duplicate = await Product.findOne({ name: payload.name });
+    if (duplicate && duplicate._id.toString() !== productId.toString()) {
+      throw new Error("Product name already exists");
+    }
+  }
+
+  // Gán field trực tiếp vào document để trigger đủ validators/presave
+  Object.assign(product, payload);
+  await product.save();
+  return product;
 };
 
 const deleteProduct = async (productId) => {
@@ -288,7 +202,9 @@ const deleteProduct = async (productId) => {
 
 module.exports = {
   getAllProducts,
-  getProductDetail,
+  getProductById,
+  // giữ lại export cũ (nếu chỗ nào khác còn gọi)
+  getProductDetail: getProductById,
   createProduct,
   updateProduct,
   deleteProduct,

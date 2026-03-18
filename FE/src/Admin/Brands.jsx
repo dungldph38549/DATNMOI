@@ -8,6 +8,14 @@ import {
   uploadImage,
 } from "../api/index";
 
+// Backend đang chạy tại 3002. Ép base URL đúng port để ảnh luôn load được (tránh dính 3001 -> ERR_CONNECTION_REFUSED).
+const BACKEND_BASE_URL = (
+  process.env.REACT_APP_API_URL_BACKEND || "http://localhost:3002/api"
+)
+  .replace(/\/api\/?$/, "")
+  .replace(/localhost:\d+/, "localhost:3002")
+  .replace(/127\.0\.0\.1:\d+/, "127.0.0.1:3002");
+
 export default function Brands() {
   const queryClient = useQueryClient();
 
@@ -52,6 +60,9 @@ export default function Brands() {
 
   const transformFormValues = (values) => ({
     ...values,
+    // Backend BrandModel lưu ảnh ở field `logo`, còn FE form đang dùng `image`
+    logo: values.logo || values.image,
+    image: undefined,
     status:
       values.status === undefined
         ? "active"
@@ -89,10 +100,10 @@ export default function Brands() {
 
   const handleEdit = (record) => {
     setSelected(record);
-    setImagePreview(record.image);
+    setImagePreview(record.logo);
     form.setFieldsValue({
       name: record.name,
-      image: record.image,
+      image: record.logo,
       status: record.status === "active",
     });
     setIsEditModalVisible(true);
@@ -102,12 +113,12 @@ export default function Brands() {
     { title: "Tên", dataIndex: "name", key: "name" },
     {
       title: "Hình ảnh",
-      dataIndex: "image",
-      key: "image",
+      dataIndex: "logo",
+      key: "logo",
       render: (img) =>
         img && (
           <img
-            src={`${process.env.REACT_APP_API_URL_BACKEND}/image/${img}`}
+            src={`${BACKEND_BASE_URL}/uploads/${img}`}
             alt="Ảnh"
             className="w-12 h-12 object-cover rounded"
           />
@@ -183,7 +194,7 @@ export default function Brands() {
 
           {imagePreview && (
             <img
-              src={`${process.env.REACT_APP_API_URL_BACKEND}/image/${imagePreview}`}
+              src={`${BACKEND_BASE_URL}/uploads/${imagePreview}`}
               alt="Preview"
               className="w-20 h-20 object-cover rounded border border-gray-300 shadow"
             />
@@ -250,7 +261,7 @@ export default function Brands() {
 
           {createImagePreview && (
             <img
-              src={`${process.env.REACT_APP_API_URL_BACKEND}/image/${createImagePreview}`}
+              src={`${BACKEND_BASE_URL}/uploads/${createImagePreview}`}
               alt="Preview"
               className="w-20 h-20 object-cover rounded border border-gray-300 shadow"
             />
@@ -270,17 +281,7 @@ export default function Brands() {
     );
   };
 
-  if (isLoading) {
-    return (
-      <Spin tip="Đang tải danh sách ..." className="mt-10 block text-center" />
-    );
-  }
-
-  if (isError || !data) {
-    return (
-      <div className="text-center text-red-500">Lỗi khi tải danh sách.</div>
-    );
-  }
+  const brands = data?.data ?? [];
 
   return (
     <div className="bg-white p-4 rounded-xl shadow">
@@ -300,7 +301,7 @@ export default function Brands() {
 
       <Table
         columns={columns}
-        dataSource={data.data.map((v) => ({ ...v, key: v._id }))}
+        dataSource={brands.map((v) => ({ ...v, key: v._id }))}
         bordered
         pagination={false}
       />

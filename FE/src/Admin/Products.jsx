@@ -1046,7 +1046,9 @@ export default function Products() {
                                   Có biến thể
                                 </span>
                               ) : (
-                                <StockBar count={record.countInStock} />
+                                <StockBar
+                                  count={record.countInStock ?? record.stock}
+                                />
                               )}
                             </td>
                             {/* Status */}
@@ -1056,7 +1058,7 @@ export default function Products() {
                                 count={
                                   record.hasVariants
                                     ? undefined
-                                    : record.countInStock
+                                    : record.countInStock ?? record.stock
                                 }
                               />
                             </td>

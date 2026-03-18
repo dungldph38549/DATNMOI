@@ -1098,6 +1098,14 @@ import {
   uploadImage,
 } from "../api/index";
 
+// Backend đang chạy tại 3002. Ép base URL đúng port để ảnh luôn load được (tránh dính 3001 -> ERR_CONNECTION_REFUSED).
+const BACKEND_BASE_URL = (
+  process.env.REACT_APP_API_URL_BACKEND || "http://localhost:3002/api"
+)
+  .replace(/\/api\/?$/, "")
+  .replace(/localhost:\d+/, "localhost:3002")
+  .replace(/127\.0\.0\.1:\d+/, "127.0.0.1:3002");
+
 // ── Design tokens ──────────────────────────────────────────────
 const T = {
   primary: "#f49d25",
@@ -1439,7 +1447,7 @@ const CategoryFormBody = ({
           {imgPreview ? (
             <>
               <img
-                src={`${process.env.REACT_APP_API_URL_BACKEND}/image/${imgPreview}`}
+                src={`${BACKEND_BASE_URL}/uploads/${imgPreview}`}
                 alt="preview"
                 style={{
                   width: 72,
@@ -1967,7 +1975,7 @@ export default function Categories() {
                           >
                             {record.image ? (
                               <img
-                                src={`${process.env.REACT_APP_API_URL_BACKEND}/image/${record.image}`}
+                                src={`${BACKEND_BASE_URL}/uploads/${record.image}`}
                                 alt={record.name}
                                 style={{
                                   width: "100%",

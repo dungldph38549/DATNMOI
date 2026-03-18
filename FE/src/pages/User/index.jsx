@@ -1,7 +1,19 @@
 import React, { useEffect, useState } from "react";
 import "./User.css";
 
-const API = "http://localhost:3001/api/users";
+// Backend admin endpoints: /api/user/*
+const API_BASE = "http://localhost:3002/api/user";
+
+const getAuthToken = () => {
+  try {
+    const raw = localStorage.getItem("user");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.token || null;
+  } catch {
+    return null;
+  }
+};
 
 function UserPage() {
   const [users, setUsers] = useState([]);
@@ -18,10 +30,20 @@ function UserPage() {
   // lấy danh sách user
   const fetchUsers = async () => {
     try {
-      const res = await fetch(API);
+      const token = getAuthToken();
+      const res = await fetch(`${API_BASE}/all?page=0&limit=1000`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (!res.ok) throw new Error("Không thể tải danh sách người dùng");
-      const data = await res.json();
-      setUsers(data.data || data);
+      const payload = await res.json();
+      // listUser: data = { data: [...], total, page, limit, pages }
+      // getAllUser: data = [...]
+      const list = Array.isArray(payload?.data)
+        ? payload.data
+        : payload?.data?.data || [];
+      setUsers(list);
     } catch (error) {
       console.log("GET ERROR:", error);
     }
@@ -44,15 +66,19 @@ function UserPage() {
     e.preventDefault();
 
     try {
+      const token = getAuthToken();
       const options = {
         method: editingId ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(form),
       };
 
-      const url = editingId ? `${API}/${editingId}` : API;
+      const url = editingId
+        ? `${API_BASE}/admin/${editingId}`
+        : `${API_BASE}/admin`;
       const res = await fetch(url, options);
 
       if (!res.ok) {
@@ -79,7 +105,13 @@ function UserPage() {
   // xóa user
   const handleDelete = async (id) => {
     try {
-      const res = await fetch(`${API}/${id}`, { method: "DELETE" });
+      const token = getAuthToken();
+      const res = await fetch(`${API_BASE}/admin/${id}`, {
+        method: "DELETE",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (!res.ok) throw new Error("Không thể xóa người dùng");
       fetchUsers();
     } catch (error) {

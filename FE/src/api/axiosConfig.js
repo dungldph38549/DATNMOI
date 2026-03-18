@@ -1,6 +1,8 @@
 import axios from "axios";
 
-const API_URL = "http://localhost:3001/api";
+// Backend đang chạy ở PORT=3002
+// Tránh trường hợp `.env` không reload đúng khi dev server chạy lâu.
+const API_URL = "http://localhost:3002/api";
 
 console.log("🔥 API:", API_URL);
 

@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 
 import "./assets/css/bootstrap.min.css";
 import "./assets/css/main.css";
@@ -26,46 +26,56 @@ import SearchPage from "./pages/SearchPage/SearchPage";
 import User from "./pages/User";
 import AdminPage from "./Admin/AdminPage";
 
+function AppContent() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin");
+
+  return (
+    <div className="app">
+      {/* Ẩn header site khi vào toàn bộ admin (/admin/*) */}
+      {!isAdminRoute && <HeaderComponent />}
+
+      <div className="content">
+        <Routes>
+          {/* CLIENT ROUTES */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/product" element={<ProductPage />} />
+          <Route path="/product/:id" element={<ProductDetail />} />
+          <Route path="/category" element={<CategoryPage />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/cart" element={<ShoppingCartPage />} />
+          <Route path="/checkout" element={<CheckOut />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/terms" element={<TermsConditionsPage />} />
+          <Route path="/search" element={<SearchPage />} />
+
+          {/* ADMIN ROUTE */}
+          <Route path="/admin/users" element={<User />} />
+          <Route path="/admin" element={<AdminPage />} />
+
+          {/* 404 - Đã sửa thành <Route> */}
+          <Route
+            path="*"
+            element={
+              <div className="py-5 text-center">
+                <h1>404</h1>
+                <p>Trang không tồn tại.</p>
+              </div>
+            }
+          />
+        </Routes>
+      </div>
+
+      <FooterComponent />
+    </div>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
-      <div className="app">
-        <HeaderComponent />
-
-        <div className="content">
-          <Routes>
-            {/* CLIENT ROUTES */}
-            <Route path="/" element={<HomePage />} />
-            <Route path="/product" element={<ProductPage />} />
-            <Route path="/product/:id" element={<ProductDetail />} />
-            <Route path="/category" element={<CategoryPage />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/cart" element={<ShoppingCartPage />} />
-            <Route path="/checkout" element={<CheckOut />} />
-            <Route path="/contact" element={<ContactPage />} />
-            <Route path="/terms" element={<TermsConditionsPage />} />
-            <Route path="/search" element={<SearchPage />} />
-
-            {/* ADMIN ROUTE */}
-            <Route path="/admin/users" element={<User />} />
-            <Route path="/admin" element={<AdminPage />} />
-
-            {/* 404 - Đã sửa thành <Route> */}
-            <Route
-              path="*"
-              element={
-                <div className="py-5 text-center">
-                  <h1>404</h1>
-                  <p>Trang không tồn tại.</p>
-                </div>
-              }
-            />
-          </Routes>
-        </div>
-
-        <FooterComponent />
-      </div>
+      <AppContent />
     </BrowserRouter>
   );
 }
