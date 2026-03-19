@@ -125,16 +125,45 @@ scheduleLowStockScan();
 // 9. Kết nối MongoDB và Start Server
 const startServer = async () => {
   try {
-    if (!process.env.ACCESS_TOKEN) {
+    if (!process.env.ACCESS_TOKEN && !process.env.ACCESS_TOKEN_SECRET) {
       console.warn("⚠️ ACCESS_TOKEN chưa có trong .env — các route cần đăng nhập sẽ lỗi.");
     }
 
-    const mongoURI = process.env.MONGO_DB;
-    if (!mongoURI) throw new Error("MONGO_DB is not defined in .env");
+    const connectionCandidates = [
+      process.env.MONGO_DB,
+      process.env.MONGO_URL,
+      process.env.MONGO_LOCAL,
+      "mongodb://127.0.0.1:27017/DATN1",
+    ].filter(Boolean);
 
-    console.log("⏳ Connecting to MongoDB...");
-    await mongoose.connect(mongoURI);
-    console.log("✅ Connected to MongoDB successfully!");
+    if (connectionCandidates.length === 0) {
+      throw new Error(
+        "Mongo URI is not defined. Hãy thêm MONGO_DB hoặc MONGO_URL trong .env",
+      );
+    }
+
+    let connected = false;
+    let lastError = null;
+    for (const uri of connectionCandidates) {
+      try {
+        console.log("⏳ Connecting to MongoDB...");
+        await mongoose.connect(uri, {
+          serverSelectionTimeoutMS: 8000,
+          connectTimeoutMS: 8000,
+        });
+        connected = true;
+        console.log("✅ Connected to MongoDB successfully!");
+        break;
+      } catch (err) {
+        lastError = err;
+        console.warn(`⚠️ Kết nối DB thất bại với URI: ${uri}`);
+        console.warn(`   ↳ Lý do: ${err.message}`);
+      }
+    }
+
+    if (!connected) {
+      throw lastError || new Error("Không thể kết nối MongoDB");
+    }
 
     server.listen(PORT, () => {
       console.log(`🚀 Server running at http://localhost:${PORT}`);
