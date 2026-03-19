@@ -292,6 +292,19 @@ const ProductDetail = ({ productId = null, onClose }) => {
     }
   };
 
+  const onFinishFailed = ({ errorFields }) => {
+    if (!errorFields?.length) return;
+    const missing = errorFields
+      .map((f) => (Array.isArray(f.name) ? f.name.join(" > ") : `${f.name}`))
+      .slice(0, 6)
+      .join("\n- ");
+    Swal.fire(
+      "Thiếu thông tin",
+      `Bạn cần nhập/điền các trường bắt buộc:\n- ${missing}`,
+      "warning",
+    );
+  };
+
   const isEdit = productId !== "create";
 
   return (
@@ -416,6 +429,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
           form={form}
           layout="vertical"
           onFinish={onFinish}
+          onFinishFailed={onFinishFailed}
           initialValues={{ hasVariants: false, variants: [], attributes: [] }}
         >
           <div
@@ -521,17 +535,21 @@ const ProductDetail = ({ productId = null, onClose }) => {
                         gap: 16,
                       }}
                     >
-                      <Form.Item
-                        name="price"
-                        // Backend validate: price phải > 0 (không cho phép 0)
-                        rules={[{ required: true, type: "number", min: 1 }]}
-                      >
-                        <div>
-                          <FieldLabel>Giá (₫)</FieldLabel>
+                      <div>
+                        <FieldLabel>Giá (₫)</FieldLabel>
+                        <Form.Item
+                          name="price"
+                          // Backend validate: price phải > 0 (không cho phép 0)
+                          rules={[{ required: true, type: "number", min: 1 }]}
+                        >
                           <InputNumber
                             formatter={(v) =>
                               `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
                             }
+                            parser={(v) => {
+                              const n = Number(String(v || "").replace(/,/g, ""));
+                              return Number.isFinite(n) ? n : undefined;
+                            }}
                             placeholder="3,500,000"
                             style={{
                               width: "100%",
@@ -539,15 +557,19 @@ const ProductDetail = ({ productId = null, onClose }) => {
                               fontFamily: "'Lexend', sans-serif",
                             }}
                           />
-                        </div>
-                      </Form.Item>
-                      <Form.Item
-                        name="countInStock"
-                        rules={[{ required: true, type: "number", min: 0 }]}
-                      >
-                        <div>
-                          <FieldLabel>Số lượng tồn kho</FieldLabel>
+                        </Form.Item>
+                      </div>
+                      <div>
+                        <FieldLabel>Số lượng tồn kho</FieldLabel>
+                        <Form.Item
+                          name="countInStock"
+                          rules={[{ required: true, type: "number", min: 0 }]}
+                        >
                           <InputNumber
+                            parser={(v) => {
+                              const n = Number(String(v || "").replace(/,/g, ""));
+                              return Number.isFinite(n) ? n : undefined;
+                            }}
                             placeholder="0"
                             style={{
                               width: "100%",
@@ -555,8 +577,8 @@ const ProductDetail = ({ productId = null, onClose }) => {
                               fontFamily: "'Lexend', sans-serif",
                             }}
                           />
-                        </div>
-                      </Form.Item>
+                        </Form.Item>
+                      </div>
                     </div>
                   )}
                 </div>

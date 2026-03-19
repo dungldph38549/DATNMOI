@@ -43,7 +43,8 @@ axiosInstance.interceptors.response.use(
       // KHÔNG redirect khi 401 từ chính form đăng nhập/đăng ký — để trang Login/Register hiển thị lỗi
       const isLoginOrRegister =
         url.includes("/user/login") || url.includes("/user/register");
-      if (!isLoginOrRegister) {
+      const isAdminPage = window.location.pathname.startsWith("/admin");
+      if (!isLoginOrRegister && !isAdminPage) {
         localStorage.removeItem("user");
         window.location.href = "/login";
       }

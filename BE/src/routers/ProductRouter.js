@@ -8,6 +8,13 @@ const {
   authAdminMiddleware,
 } = require("../middlewares/authMiddleware");
 
+// Cho phép vào admin không cần đăng nhập khi đang dev/demo.
+// Bật bằng cách thêm ALLOW_GUEST_ADMIN=true trong BE/.env
+const adminGuard =
+  process.env.ALLOW_GUEST_ADMIN === "true"
+    ? (req, _res, next) => next()
+    : authAdminMiddleware;
+
 // ================================================================
 // PUBLIC — Khách hàng không cần đăng nhập
 // ================================================================
@@ -66,30 +73,30 @@ router.get("/:id", PC.getProductById);
 // ================================================================
 
 // Lấy toàn bộ SP (bao gồm đã ẩn)        GET /product/admin/get-all
-router.get("/admin/get-all", authAdminMiddleware, PC.getAllProducts);
+router.get("/admin/get-all", adminGuard, PC.getAllProducts);
 
 // Tạo sản phẩm mới                       POST /product/create
-router.post("/create", authAdminMiddleware, PC.createProduct);
+router.post("/create", adminGuard, PC.createProduct);
 
 // Upload ảnh chính                        POST /product/:id/upload-image
-router.post("/:id/upload-image", authAdminMiddleware, PC.uploadImage);
+router.post("/:id/upload-image", adminGuard, PC.uploadImage);
 
 // Cập nhật sản phẩm                      PUT /product/:id
-router.put("/:id", authAdminMiddleware, PC.updateProduct);
+router.put("/:id", adminGuard, PC.updateProduct);
 
 // Soft delete (ẩn sản phẩm)             DELETE /product/:id
-router.delete("/:id", authAdminMiddleware, PC.deleteProductById);
+router.delete("/:id", adminGuard, PC.deleteProductById);
 
 // Khôi phục sản phẩm đã ẩn              PATCH /product/:id/restore
-router.patch("/:id/restore", authAdminMiddleware, PC.restoreProductById);
+router.patch("/:id/restore", adminGuard, PC.restoreProductById);
 
 // Hard delete (xóa vĩnh viễn)           DELETE /product/:id/permanent
-router.delete("/:id/permanent", authAdminMiddleware, PC.deleteProduct);
+router.delete("/:id/permanent", adminGuard, PC.deleteProduct);
 
 // Bật / tắt nổi bật                      PATCH /product/:id/toggle-featured
-router.patch("/:id/toggle-featured", authAdminMiddleware, PC.toggleFeatured);
+router.patch("/:id/toggle-featured", adminGuard, PC.toggleFeatured);
 
 // Ẩn / hiện trên cửa hàng               PATCH /product/:id/toggle-visible
-router.patch("/:id/toggle-visible", authAdminMiddleware, PC.toggleVisible);
+router.patch("/:id/toggle-visible", adminGuard, PC.toggleVisible);
 
 module.exports = router;

@@ -6,6 +6,7 @@ import {
   getBestSellers,
   getNewArrivals,
   fetchProducts,
+  getAllCategories,
 } from "../../api";
 
 const HomePage = () => {
@@ -14,6 +15,7 @@ const HomePage = () => {
   const [products, setProducts] = useState([]);
   const [hotProducts, setHotProducts] = useState([]);
   const [newProducts, setNewProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -47,6 +49,8 @@ const HomePage = () => {
           getBestSellers(8),
           getNewArrivals(8),
         ]);
+        const categoryRes = await getAllCategories("all");
+        setCategories(Array.isArray(categoryRes?.data) ? categoryRes.data : []);
         const featured = featuredRes?.data ?? [];
         const best = bestRes?.data ?? [];
         const newArr = newRes?.data ?? [];
@@ -69,11 +73,14 @@ const HomePage = () => {
         try {
           const allRes = await fetchProducts({ limit: 24, page: 0 });
           const list = allRes?.data ?? [];
+          const categoryRes = await getAllCategories("all");
+          setCategories(Array.isArray(categoryRes?.data) ? categoryRes.data : []);
           setProducts(list);
           setHotProducts(list.slice(0, 8));
           setNewProducts(list.slice(8, 16));
         } catch (e) {
           setProducts([]);
+          setCategories([]);
         }
       }
       setLoading(false);
@@ -117,12 +124,25 @@ const HomePage = () => {
   const isFiltering = selectedBrand || selectedCategory;
 
   const PLACEHOLDER_IMG =
-    "https://via.placeholder.com/300x300/f0f0f0/999?text=No+Image";
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f3f4f6'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='28' font-family='Arial'>No Image</text></svg>";
   const getProductImageUrl = (p) => {
-    if (!p?.image || typeof p.image !== "string") return PLACEHOLDER_IMG;
-    if (p.image.startsWith("http://") || p.image.startsWith("https://"))
-      return p.image;
-    return `http://localhost:3001/uploads/${p.image}`;
+    const candidate =
+      (typeof p?.image === "string" && p.image.trim()) ||
+      (Array.isArray(p?.srcImages) && typeof p.srcImages[0] === "string"
+        ? p.srcImages[0].trim()
+        : "");
+
+    if (!candidate) return PLACEHOLDER_IMG;
+    if (candidate.startsWith("http://") || candidate.startsWith("https://")) {
+      return candidate;
+    }
+    if (candidate.startsWith("/uploads/")) {
+      return `http://localhost:3002${candidate}`;
+    }
+    if (candidate.startsWith("uploads/")) {
+      return `http://localhost:3002/${candidate}`;
+    }
+    return `http://localhost:3002/uploads/${candidate}`;
   };
   const onImgError = (e) => {
     e.target.onerror = null;
@@ -235,36 +255,23 @@ const HomePage = () => {
 
             <ul className="space-y-6 text-lg">
               <li
-                onClick={() => setSelectedCategory("Quần áo")}
+                onClick={() => setSelectedCategory("")}
                 className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p-2 rounded-lg transition"
               >
-                <span className="text-2xl grayscale">👕</span>
-                Quần áo
+                <span className="text-2xl grayscale">📦</span>
+                Tất cả danh mục
               </li>
 
-              <li
-                onClick={() => setSelectedCategory("Giày")}
-                className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p-2 rounded-lg transition"
-              >
-                <span className="text-2xl grayscale">👟</span>
-                Giày
-              </li>
-
-              <li
-                onClick={() => setSelectedCategory("Balo")}
-                className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p-2 rounded-lg transition"
-              >
-                <span className="text-2xl grayscale">🎒</span>
-                Balo
-              </li>
-
-              <li
-                onClick={() => setSelectedCategory("Phụ kiện")}
-                className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p-2 rounded-lg transition"
-              >
-                <span className="text-2xl grayscale">⚽</span>
-                Phụ kiện khác
-              </li>
+              {categories.map((c) => (
+                <li
+                  key={c._id}
+                  onClick={() => setSelectedCategory(c.name)}
+                  className="flex items-center gap-4 cursor-pointer text-black hover:bg-gray-100 p-2 rounded-lg transition"
+                >
+                  <span className="text-2xl grayscale">👟</span>
+                  {c.name}
+                </li>
+              ))}
             </ul>
           </div>
         </div>

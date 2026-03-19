@@ -216,7 +216,7 @@ productSchema.virtual("priceRange").get(function () {
 });
 
 // ── Pre-save: tạo slug từ tên ──────────────────────────────────
-productSchema.pre("save", function (next) {
+productSchema.pre("save", function () {
   if (this.isModified("name") || this.isNew) {
     const base = this.name
       .toLowerCase()
@@ -228,54 +228,55 @@ productSchema.pre("save", function (next) {
       .replace(/\s+/g, "-");
     this.slug = this.isNew ? `${base}-${Date.now()}` : base;
   }
-  next();
 });
 
 // ── Pre-validate: kiểm tra biến thể ───────────────────────────
-productSchema.pre("validate", function (next) {
+productSchema.pre("validate", function () {
   if (!this.hasVariants) {
-    if (!this.price || this.price <= 0)
-      return next(new Error("Sản phẩm không có biến thể phải có giá > 0."));
-    if (this.stock < 0)
-      return next(new Error("Số lượng tồn kho không được âm."));
-    return next();
+    if (!this.price || this.price <= 0) {
+      throw new Error("Sản phẩm không có biến thể phải có giá > 0.");
+    }
+    if (this.stock < 0) {
+      throw new Error("Số lượng tồn kho không được âm.");
+    }
+    return;
   }
 
-  if (!this.variants?.length)
-    return next(new Error("Sản phẩm có biến thể phải có ít nhất 1 biến thể."));
+  if (!this.variants?.length) {
+    throw new Error("Sản phẩm có biến thể phải có ít nhất 1 biến thể.");
+  }
 
   const expectedAttrs = this.attributes || [];
 
   for (const v of this.variants) {
     // Giá
-    if (!v.price || v.price <= 0)
-      return next(new Error("Tất cả biến thể phải có giá > 0."));
+    if (!v.price || v.price <= 0) {
+      throw new Error("Tất cả biến thể phải có giá > 0.");
+    }
 
     // Thuộc tính
     const keys = v.attributes ? Array.from(v.attributes.keys()) : [];
     if (
       keys.length !== expectedAttrs.length ||
       !expectedAttrs.every((k) => keys.includes(k))
-    )
-      return next(
-        new Error(
-          `Biến thể phải có đầy đủ thuộc tính: [${expectedAttrs.join(", ")}]`,
-        ),
+    ) {
+      throw new Error(
+        `Biến thể phải có đầy đủ thuộc tính: [${expectedAttrs.join(", ")}]`,
       );
+    }
 
     // Giá trị rỗng
-    if (Array.from(v.attributes.values()).some((val) => !val?.trim()))
-      return next(
-        new Error("Không được để giá trị thuộc tính biến thể trống."),
-      );
+    if (Array.from(v.attributes.values()).some((val) => !val?.trim())) {
+      throw new Error("Không được để giá trị thuộc tính biến thể trống.");
+    }
   }
 
   // SKU trùng trong cùng sản phẩm
   const skus = this.variants.map((v) => v.sku);
   const dup = skus.find((s, i) => skus.indexOf(s) !== i);
-  if (dup) return next(new Error(`SKU "${dup}" bị trùng trong cùng sản phẩm.`));
-
-  next();
+  if (dup) {
+    throw new Error(`SKU "${dup}" bị trùng trong cùng sản phẩm.`);
+  }
 });
 
 // ── Static helpers ─────────────────────────────────────────────

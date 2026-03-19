@@ -30,14 +30,16 @@ const Product = ({ product }) => {
   if (!product) return null;
 
   const PLACEHOLDER =
-    "https://via.placeholder.com/300x300/f0f0f0/999?text=No+Image";
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f3f4f6'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='28' font-family='Arial'>No Image</text></svg>";
   const getImageUrl = (img) => {
     if (!img || typeof img !== "string") return PLACEHOLDER;
     if (img.startsWith("http://") || img.startsWith("https://")) return img;
-    return `http://localhost:3001/uploads/${img}`;
+    if (img.startsWith("/uploads/")) return `http://localhost:3002${img}`;
+    if (img.startsWith("uploads/")) return `http://localhost:3002/${img}`;
+    return `http://localhost:3002/uploads/${img}`;
   };
-  const image1 = getImageUrl(product.image);
-  const image2 = getImageUrl(product.image2) || image1;
+  const image1 = getImageUrl(product.image || product?.srcImages?.[0]);
+  const image2 = getImageUrl(product.image2 || product?.srcImages?.[1]) || image1;
 
   const onImageError = (e) => {
     e.target.onerror = null;

@@ -4,12 +4,19 @@ import { useDispatch } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
 
 const PLACEHOLDER_IMG =
-  "https://via.placeholder.com/300x300/f0f0f0/999?text=No+Image";
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f3f4f6'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='28' font-family='Arial'>No Image</text></svg>";
 const getProductImageUrl = (p) => {
-  if (!p?.image || typeof p.image !== "string") return PLACEHOLDER_IMG;
-  if (p.image.startsWith("http://") || p.image.startsWith("https://"))
-    return p.image;
-  return `http://localhost:3001/uploads/${p.image}`;
+  const candidate =
+    (typeof p?.image === "string" && p.image.trim()) ||
+    (Array.isArray(p?.srcImages) && typeof p.srcImages[0] === "string"
+      ? p.srcImages[0].trim()
+      : "");
+  if (!candidate) return PLACEHOLDER_IMG;
+  if (candidate.startsWith("http://") || candidate.startsWith("https://"))
+    return candidate;
+  if (candidate.startsWith("/uploads/")) return `http://localhost:3002${candidate}`;
+  if (candidate.startsWith("uploads/")) return `http://localhost:3002/${candidate}`;
+  return `http://localhost:3002/uploads/${candidate}`;
 };
 
 const Product = ({ product }) => {
