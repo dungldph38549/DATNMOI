@@ -24,6 +24,7 @@ const variantSchema = new mongoose.Schema({
     type: Number,
     default: 0,
     min: 0,
+    set: (v) => (Number.isFinite(v) ? v : 0),
   },
   attributes: {
     // { Size: "42", Color: "Đen" }
