@@ -105,6 +105,11 @@ app.use((err, req, res, next) => {
   const status = err.status || 500;
   const message = err.message || "Lỗi máy chủ nội bộ";
 
+  // Log stack để truy lỗi "next is not a function" chính xác.
+  // (Chỉ log ra console, không ảnh hưởng API client)
+  console.error("[GlobalError]", message);
+  if (err?.stack) console.error(err.stack);
+
   if (err instanceof multer.MulterError) {
     return res
       .status(400)
@@ -114,6 +119,8 @@ app.use((err, req, res, next) => {
   res.status(status).json({
     success: false,
     message,
+    // Debug nhanh cho lỗi hay gặp (không cần bật NODE_ENV=development)
+    ...(err?.message?.includes("next is not a function") && { stack: err.stack }),
     ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
   });
 });
@@ -173,5 +180,6 @@ const startServer = async () => {
     process.exit(1);
   }
 };
+
 
 startServer();

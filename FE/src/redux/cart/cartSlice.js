@@ -35,10 +35,18 @@ const cartSlice = createSlice({
       const name = payload.name || "Unnamed product";
       const image = payload.image || "";
       const price = Number(payload.price || 0);
+      const sku = payload.sku ?? null;
+      const size = payload.size ?? null;
 
       const existing = state.items.find((i) => i.productId === productId);
       if (existing) {
         existing.qty += qty;
+        // Nếu user thêm lại cùng sản phẩm nhưng khác biến thể (size/sku) → cập nhật thông tin để checkout đúng SKU.
+        if (sku !== null && existing.sku !== sku) {
+          existing.sku = sku;
+          existing.size = size;
+        }
+        if (price) existing.price = price;
       } else {
         state.items.push({
           productId,
@@ -46,6 +54,8 @@ const cartSlice = createSlice({
           image,
           price,
           qty,
+          sku,
+          size,
         });
       }
 

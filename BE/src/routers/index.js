@@ -9,6 +9,7 @@ const ColorRouter = require("./ColorRouter");
 const UserRouter = require("./UserRouter");
 const OrderRouter = require("./OrderRouter");
 const inventoryRouter = require("./inventoryRoutes");
+const CartRouter = require("./CartRouter");
 
 const routes = (app) => {
   app.use("/api/product", ProductRouter);
@@ -22,6 +23,7 @@ const routes = (app) => {
   app.use("/api/size", SizeRouter);
   app.use("/api/color", ColorRouter);
   app.use("/api/order", OrderRouter);
+  app.use("/api/cart", CartRouter);
 };
 
 module.exports = routes;

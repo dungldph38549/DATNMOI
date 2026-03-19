@@ -17,14 +17,16 @@ const Login = () => {
   const validate = () => {
     const e = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const email = String(formData.email || "").trim();
+    const password = String(formData.password || "").trim();
 
-    if (!formData.email.trim()) {
+    if (!email) {
       e.email = "Vui lòng nhập email";
-    } else if (!emailRegex.test(formData.email)) {
+    } else if (!emailRegex.test(email)) {
       e.email = "Email không đúng định dạng (VD: example@gmail.com)";
     }
 
-    if (!formData.password) {
+    if (!password) {
       e.password = "Vui lòng nhập mật khẩu";
     }
 
@@ -91,7 +93,10 @@ const Login = () => {
     e.preventDefault();
     if (isLoading) return;
     if (!validate()) return;
-    mutate(formData);
+    mutate({
+      email: String(formData.email || "").trim(),
+      password: String(formData.password || "").trim(),
+    });
   };
 
   const inputBase =

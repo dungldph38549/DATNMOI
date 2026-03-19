@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./User.css";
 
 // Backend admin endpoints: /api/user/*
@@ -9,14 +10,16 @@ const getAuthToken = () => {
     const raw = localStorage.getItem("user");
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed?.token || null;
+    return parsed?.token || parsed?.access_token || parsed?.accessToken || null;
   } catch {
     return null;
   }
 };
 
 function UserPage() {
+  const navigate = useNavigate();
   const [users, setUsers] = useState([]);
+  const [errorMsg, setErrorMsg] = useState("");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -29,15 +32,31 @@ function UserPage() {
 
   // lấy danh sách user
   const fetchUsers = async () => {
+    setErrorMsg("");
+    const token = getAuthToken();
+    if (!token) {
+      setErrorMsg("Bạn cần đăng nhập để truy cập trang quản lý người dùng.");
+      navigate("/login");
+      return;
+    }
     try {
-      const token = getAuthToken();
       const res = await fetch(`${API_BASE}/all?page=0&limit=1000`, {
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
-      if (!res.ok) throw new Error("Không thể tải danh sách người dùng");
-      const payload = await res.json();
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        const msg =
+          payload?.message || payload?.error || "Không thể tải danh sách người dùng";
+        if (res.status === 401 || res.status === 403) {
+          localStorage.removeItem("user");
+          setErrorMsg("Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.");
+          navigate("/login");
+          return;
+        }
+        throw new Error(msg);
+      }
       // listUser: data = { data: [...], total, page, limit, pages }
       // getAllUser: data = [...]
       const list = Array.isArray(payload?.data)
@@ -45,7 +64,7 @@ function UserPage() {
         : payload?.data?.data || [];
       setUsers(list);
     } catch (error) {
-      console.log("GET ERROR:", error);
+      setErrorMsg(error?.message || "Lỗi khi tải danh sách người dùng");
     }
   };
 
@@ -67,6 +86,11 @@ function UserPage() {
 
     try {
       const token = getAuthToken();
+      if (!token) {
+        setErrorMsg("Bạn cần đăng nhập để thực hiện thao tác này.");
+        navigate("/login");
+        return;
+      }
       const options = {
         method: editingId ? "PUT" : "POST",
         headers: {
@@ -82,7 +106,15 @@ function UserPage() {
       const res = await fetch(url, options);
 
       if (!res.ok) {
-        throw new Error("Không thể lưu thông tin người dùng");
+        const raw = await res.json().catch(() => null);
+        const msg = raw?.message || "Không thể lưu thông tin người dùng";
+        if (res.status === 401 || res.status === 403) {
+          localStorage.removeItem("user");
+          setErrorMsg("Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.");
+          navigate("/login");
+          return;
+        }
+        throw new Error(msg);
       }
 
       setEditingId(null);
@@ -98,7 +130,7 @@ function UserPage() {
 
       fetchUsers();
     } catch (error) {
-      console.log("SUBMIT ERROR:", error);
+      setErrorMsg(error?.message || "Lỗi khi lưu thông tin người dùng");
     }
   };
 
@@ -106,16 +138,31 @@ function UserPage() {
   const handleDelete = async (id) => {
     try {
       const token = getAuthToken();
+      if (!token) {
+        setErrorMsg("Bạn cần đăng nhập để thực hiện thao tác này.");
+        navigate("/login");
+        return;
+      }
       const res = await fetch(`${API_BASE}/admin/${id}`, {
         method: "DELETE",
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
-      if (!res.ok) throw new Error("Không thể xóa người dùng");
+      if (!res.ok) {
+        const raw = await res.json().catch(() => null);
+        const msg = raw?.message || "Không thể xóa người dùng";
+        if (res.status === 401 || res.status === 403) {
+          localStorage.removeItem("user");
+          setErrorMsg("Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.");
+          navigate("/login");
+          return;
+        }
+        throw new Error(msg);
+      }
       fetchUsers();
     } catch (error) {
-      console.log("DELETE ERROR:", error);
+      setErrorMsg(error?.message || "Lỗi khi xóa người dùng");
     }
   };
 
@@ -135,6 +182,11 @@ function UserPage() {
   return (
     <div className="admin-users">
       <h2>Quản lý người dùng</h2>
+      {errorMsg && (
+        <p className="role-user" style={{ color: "#dc2626", fontWeight: 600 }}>
+          {errorMsg}
+        </p>
+      )}
 
       <form onSubmit={handleSubmit} className="user-form">
         <input

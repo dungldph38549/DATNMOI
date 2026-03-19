@@ -5,6 +5,7 @@ import { clearCart, selectCartSubtotal } from "../../redux/cart/cartSlice";
 import {
   createOrder,
   createVnpayUrl,
+  updateCustomerById,
 } from "../../api";
 
 const CheckOut = () => {
@@ -15,6 +16,22 @@ const CheckOut = () => {
   const subtotal = useSelector(selectCartSubtotal);
   const user = useSelector((state) => state.user);
 
+  const LAST_CHECKOUT_KEY = "last_checkout_v1";
+
+  const safeJsonParse = (raw) => {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  };
+
+  const isProbablyObjectId = (v) => /^[0-9a-fA-F]{24}$/.test(String(v || ""));
+
+  const lastCheckout = safeJsonParse(
+    localStorage.getItem(LAST_CHECKOUT_KEY),
+  );
+
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [shippingMethod, setShippingMethod] = useState("standard");
   const [loading, setLoading] = useState(false);
@@ -22,11 +39,11 @@ const CheckOut = () => {
   const [discount] = useState(0);
 
   const [form, setForm] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    address: "",
-    note: "",
+    fullName: lastCheckout?.fullName ?? "",
+    email: lastCheckout?.email ?? "",
+    phone: lastCheckout?.phone ?? "",
+    address: lastCheckout?.address ?? "",
+    note: lastCheckout?.note ?? "",
   });
 
   useEffect(() => {
@@ -45,10 +62,18 @@ const CheckOut = () => {
   const onPlaceOrder = async (e) => {
     e.preventDefault();
 
-    const userId = user?.id || user?._id;
-    if (!userId) {
-      alert("Bạn cần đăng nhập trước khi đặt hàng");
-      navigate("/login");
+    const userIdCandidate = user?._id || user?.id;
+    const isLoggedIn = !!user?.login;
+
+    const userId = isLoggedIn && isProbablyObjectId(userIdCandidate)
+      ? userIdCandidate
+      : null;
+
+    const guestId = !isLoggedIn ? String(user?.id || "") : null;
+
+    // BE yêu cầu phải có userId hoặc guestId
+    if (!userId && (!guestId || guestId.length < 6)) {
+      alert("Không xác định được tài khoản để đặt hàng. Vui lòng đăng nhập lại.");
       return;
     }
 
@@ -72,7 +97,8 @@ const CheckOut = () => {
       }));
 
       const orderPayload = {
-        userId,
+        ...(userId ? { userId } : {}),
+        ...(guestId ? { guestId } : {}),
         fullName: form.fullName,
         email: form.email,
         phone: form.phone,
@@ -88,10 +114,51 @@ const CheckOut = () => {
 
       const order = await createOrder(orderPayload);
 
+      // Persist thông tin giao hàng lần gần nhất (dùng cho lần sau)
+      const persistCheckoutInfo = () => {
+        try {
+          localStorage.setItem(
+            LAST_CHECKOUT_KEY,
+            JSON.stringify({
+              fullName: form.fullName,
+              email: form.email,
+              phone: form.phone,
+              address: form.address,
+              note: form.note,
+              shippingMethod,
+              paymentMethod,
+              voucherCode: voucherCode.trim() || null,
+            }),
+          );
+        } catch {
+          // ignore
+        }
+      };
+
+      const updateProfileIfLoggedIn = async () => {
+        if (!isLoggedIn) return;
+        if (!user?.id) return;
+
+        try {
+          await updateCustomerById({
+            id: user.id,
+            name: form.fullName,
+            email: form.email,
+            phone: form.phone,
+            address: form.address,
+          });
+        } catch (err) {
+          // Không chặn đặt hàng nếu update profile thất bại
+          console.error("Update customer profile failed:", err);
+        }
+      };
+
       if (order?.paymentMethod === "vnpay" && order?._id) {
         const baseUrl = window.location.origin;
         const { url } = await createVnpayUrl(order._id, `${baseUrl}/payment/return`, `${baseUrl}/checkout`);
         if (url) {
+          persistCheckoutInfo();
+          await updateProfileIfLoggedIn();
           dispatch(clearCart());
           window.location.href = url;
           return;
@@ -99,12 +166,20 @@ const CheckOut = () => {
       }
 
       dispatch(clearCart());
+      persistCheckoutInfo();
+      await updateProfileIfLoggedIn();
+
       alert("Đặt hàng thành công!");
       navigate("/orders");
     } catch (error) {
       console.error("ORDER ERROR:", error);
-      const msg = error?.response?.data?.message || "Có lỗi xảy ra khi đặt hàng";
-      alert(msg);
+      const data = error?.response?.data;
+      const msg = data?.message || "Có lỗi xảy ra khi đặt hàng";
+      if (data?.stack && String(msg).includes("next")) {
+        alert(`${msg}\n\n${data.stack}`);
+      } else {
+        alert(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -128,6 +203,11 @@ const CheckOut = () => {
           <div className="col-md-8">
             <div className="checkout-box">
               <h2>Thông tin giao hàng</h2>
+              {lastCheckout && (
+                <p className="text-gray-500 mb-4">
+                  Thông tin đã được lưu từ lần đặt hàng gần nhất.
+                </p>
+              )}
 
               <form onSubmit={onPlaceOrder}>
                 <div className="form-group">

@@ -7,6 +7,16 @@ const cartItemSchema = new mongoose.Schema(
       ref: "Product",
       required: true,
     },
+    // SKU của biến thể (nếu product có variants). Dùng để reserve tồn kho theo SKU.
+    sku: {
+      type: String,
+      default: null,
+    },
+    // Size hiển thị (tuỳ chọn, để UI/đơn hàng dễ hiểu hơn)
+    size: {
+      type: String,
+      default: null,
+    },
     name: {
       type: String,
       required: true,

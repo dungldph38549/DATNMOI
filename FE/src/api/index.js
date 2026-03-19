@@ -15,6 +15,25 @@ import axiosInstance from "./axiosConfig";
 //   return res.data;
 // };
 
+export const addToCartAPI = async (payload) => {
+  // Back-end: POST /api/cart/:userId/items
+  // payload: { userId, productId, qty, sku?, size? }
+  const { userId, productId, qty, sku, size } = payload || {};
+  if (!userId || !productId) throw new Error("Missing userId or productId");
+  const res = await axiosInstance.post(`/cart/${userId}/items`, {
+    productId,
+    qty,
+    sku: sku ?? null,
+    size: size ?? null,
+  });
+  return res.data;
+};
+
+export const getCart = async (userId) => {
+  const res = await axiosInstance.get(`/cart/${userId}`);
+  return res.data;
+};
+
 // ================== User ==================
 
 export const loginUser = async (payload) => {
@@ -462,4 +481,30 @@ export const getVoucherByCode = async (code) => {
         v.code.trim().toUpperCase() === String(code).trim().toUpperCase(),
     ) || null
   );
+};
+
+// ================== Review API (Customer) ==================
+/**
+ * GET /api/reviews
+ * Query params: productId, page, limit, rating, verified, sort
+ */
+export const getProductReviews = async ({
+  productId,
+  page = 1,
+  limit = 10,
+  rating,
+  verified,
+  sort = "newest",
+} = {}) => {
+  const res = await axiosInstance.get("/reviews", {
+    params: {
+      productId,
+      page,
+      limit,
+      rating,
+      verified,
+      sort,
+    },
+  });
+  return res.data;
 };

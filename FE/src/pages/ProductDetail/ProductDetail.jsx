@@ -1,78 +1,592 @@
-import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { useDispatch } from "react-redux";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
-import { getProductById } from "../../api";
+import {
+  addToCartAPI,
+  getProductById,
+  getProductReviews,
+  getStocks,
+  relationProduct,
+} from "../../api";
 
 const ProductDetail = () => {
   const { id } = useParams();
   const dispatch = useDispatch();
+  const user = useSelector((state) => state.user);
 
   const [product, setProduct] = useState(null);
+  const [quantity, setQuantity] = useState(1);
+  const [selectedSize, setSelectedSize] = useState(null);
+  const [activeTab, setActiveTab] = useState("desc");
+  const [mainImage, setMainImage] = useState("");
+
+  const [relatedProducts, setRelatedProducts] = useState([]);
+  const [relatedLoading, setRelatedLoading] = useState(false);
+
+  const [reviews, setReviews] = useState([]);
+  const [reviewStats, setReviewStats] = useState(null);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+
+  const [checkingStock, setCheckingStock] = useState(false);
+  const [stockInfo, setStockInfo] = useState(null); // { countInStock, available, sku, size, color }
+
+  const PLACEHOLDER_IMG =
+    "https://via.placeholder.com/400x400/f0f0f0/999?text=No+Image";
+
+  const getImage = (img) => {
+    if (!img) return PLACEHOLDER_IMG;
+    if (typeof img !== "string") return PLACEHOLDER_IMG;
+    if (img.startsWith("http://") || img.startsWith("https://")) return img;
+    if (img.startsWith("/uploads/")) return `http://localhost:3002${img}`;
+    if (img.startsWith("uploads/")) return `http://localhost:3002/${img}`;
+    return `http://localhost:3002/uploads/${img}`;
+  };
+
+  // Lấy value thuộc tính variant (variant.attributes có thể là Map hoặc object khi lean/serialize khác nhau)
+  const getVariantAttr = (attrs, key) => {
+    if (!attrs) return null;
+    if (typeof attrs.get === "function") return attrs.get(key);
+    if (typeof attrs === "object") return attrs[key] ?? null;
+    return null;
+  };
+
+  const getVariantSizeValue = (variant) => {
+    const attrs = variant?.attributes;
+    if (!attrs) return null;
+
+    // Map
+    if (typeof attrs.get === "function") {
+      return (
+        attrs.get("Size") ??
+        attrs.get("size") ??
+        attrs.get("SIZE") ??
+        null
+      );
+    }
+
+    // Plain object: tìm theo key case-insensitive
+    if (typeof attrs === "object") {
+      if (attrs.Size != null) return attrs.Size;
+      if (attrs.size != null) return attrs.size;
+      if (attrs.SIZE != null) return attrs.SIZE;
+
+      const foundKey = Object.keys(attrs).find((k) => String(k).toLowerCase() === "size");
+      if (foundKey) return attrs[foundKey];
+    }
+
+    return null;
+  };
+
+  const getVariantSizeLabel = (variant) => {
+    const val = getVariantSizeValue(variant);
+    return val != null ? String(val) : variant?.sku ?? "";
+  };
+
+  // Chỉ coi là "có biến thể" khi thật sự có danh sách variants và length > 0.
+  // Tránh trường hợp backend set `hasVariants` không khớp dữ liệu variants.
+  const hasVariants = Array.isArray(product?.variants) && product.variants.length > 0;
 
   useEffect(() => {
     if (!id) return;
+
     const fetchProduct = async () => {
       try {
         const data = await getProductById(id);
-        setProduct(data?.data ?? data);
+        const p = data?.data ?? data;
+        setProduct(p);
+        const firstImg = p?.image || p?.srcImages?.[0] || "";
+        setMainImage(firstImg);
       } catch (err) {
         console.error(err);
         setProduct(null);
       }
     };
+
     fetchProduct();
   }, [id]);
 
-  if (!product) return <p className="text-center mt-10">Loading...</p>;
+  const availableSizes = useMemo(() => {
+    if (!product) return [];
+    if (!hasVariants) return [];
 
-  const PLACEHOLDER_IMG =
-    "https://via.placeholder.com/400x400/f0f0f0/999?text=No+Image";
-  const imageUrl =
-    (product.image &&
-      (product.image.startsWith("http")
-        ? product.image
-        : `http://localhost:3002/uploads/${product.image}`)) ||
-    PLACEHOLDER_IMG;
-  const onImgError = (e) => {
-    e.target.onerror = null;
-    e.target.src = PLACEHOLDER_IMG;
+    const labels = product.variants
+      .map((v) => getVariantSizeLabel(v))
+      .filter((s) => s != null && String(s).trim() !== "");
+
+    // Dedupe label để render nút
+    return Array.from(new Set(labels.map((s) => String(s))));
+  }, [product]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectedVariant = useMemo(() => {
+    if (!hasVariants || !selectedSize || !Array.isArray(product?.variants))
+      return null;
+
+    return (
+      product.variants.find((v) => {
+        const label = getVariantSizeLabel(v);
+        return label != null && String(label) === String(selectedSize);
+      }) ?? null
+    );
+  }, [product, selectedSize]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectedSku = selectedVariant?.sku ?? null;
+  const selectedSizeValue = getVariantSizeValue(selectedVariant) ?? null;
+
+  const displayPrice = useMemo(() => {
+    if (!product) return 0;
+    if (hasVariants) {
+      return selectedVariant?.price ?? product?.variants?.[0]?.price ?? 0;
+    }
+    return product.price ?? 0;
+  }, [product, selectedVariant]);
+
+  const ratingAverage = reviewStats?.average ?? product?.rating ?? 4.5;
+  const ratingTotal = reviewStats?.total ?? product?.reviewCount ?? 120;
+
+  const thumbnails = useMemo(() => {
+    if (!product) return [];
+    const imgs = [
+      product.image,
+      ...(Array.isArray(product.srcImages) ? product.srcImages : []),
+    ].filter(Boolean);
+    return Array.from(new Set(imgs));
+  }, [product]);
+
+  // Nếu có variants, tự chọn size còn hàng (tránh UX trống)
+  useEffect(() => {
+    if (!hasVariants || !availableSizes.length) return;
+    if (selectedSize) return;
+
+    const firstInStock = product?.variants?.find((v) => {
+      return (getVariantSizeLabel(v) ?? "").trim() !== "" && v?.stock > 0;
+    });
+
+    const fallback = availableSizes[0];
+    const nextSize = firstInStock
+      ? String(getVariantSizeLabel(firstInStock))
+      : fallback;
+    setSelectedSize(nextSize);
+  }, [product, availableSizes, selectedSize]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Check tồn kho theo size (SKU variant)
+  useEffect(() => {
+    const run = async () => {
+      if (!product) return;
+
+      if (!hasVariants) {
+        const countInStock =
+          product.stock ?? product.countInStock ?? product?.totalStock ?? 0;
+        setStockInfo({
+          countInStock,
+          available: countInStock > 0,
+        });
+        return;
+      }
+
+      if (!selectedSku) {
+        setStockInfo(null);
+        return;
+      }
+
+      setCheckingStock(true);
+      try {
+        const res = await getStocks([{ productId: product._id, sku: selectedSku }]);
+        const first = Array.isArray(res) ? res[0] : res;
+        setStockInfo(first ?? { countInStock: 0, available: false });
+      } catch (err) {
+        console.error("Check stock error:", err);
+        setStockInfo({ countInStock: 0, available: false });
+      } finally {
+        setCheckingStock(false);
+      }
+    };
+
+    run();
+  }, [product, selectedSku]);
+
+  // Clamp quantity theo tồn kho khi đã check xong
+  useEffect(() => {
+    if (!stockInfo || stockInfo.available === false) return;
+    const max = Number(stockInfo?.countInStock ?? 0);
+    if (!Number.isFinite(max) || max <= 0) return;
+    setQuantity((q) => Math.min(q, max));
+  }, [stockInfo]);
+
+  // Related products + Reviews
+  useEffect(() => {
+    const run = async () => {
+      if (!product) return;
+
+      // Related
+      setRelatedLoading(true);
+      try {
+        const brandId = product.brandId?._id ?? product.brandId;
+        const categoryId = product.categoryId?._id ?? product.categoryId;
+        const rel = await relationProduct(brandId, categoryId, product._id);
+        setRelatedProducts(Array.isArray(rel) ? rel : rel?.data ?? []);
+      } catch (err) {
+        console.error("Load related products error:", err);
+        setRelatedProducts([]);
+      } finally {
+        setRelatedLoading(false);
+      }
+
+      // Reviews
+      setReviewsLoading(true);
+      try {
+        const res = await getProductReviews({
+          productId: product._id,
+          page: 1,
+          limit: 10,
+          sort: "newest",
+        });
+        setReviews(res?.reviews ?? []);
+        setReviewStats(res?.stats ?? null);
+      } catch (err) {
+        console.error("Load reviews error:", err);
+        setReviews([]);
+        setReviewStats(null);
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+
+    run();
+  }, [product]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleAddToCart = async () => {
+    if (!product) return;
+
+    const isVariant = hasVariants;
+    // sizeToSave: cố lấy "value" thật (không fallback bằng sku)
+    const sizeToSave = isVariant ? selectedSizeValue : null;
+    const skuToSave = isVariant ? selectedSku : null;
+
+    if (isVariant && !skuToSave) {
+      alert("Vui lòng chọn size!");
+      return;
+    }
+
+    if (stockInfo?.available === false) {
+      alert("Sản phẩm hiện đã hết hàng theo size đã chọn.");
+      return;
+    }
+
+    const qtySafe = (() => {
+      if (!stockInfo?.available) return quantity;
+      const max = Number(stockInfo?.countInStock ?? 0);
+      if (!Number.isFinite(max) || max <= 0) return quantity;
+      return Math.min(quantity, max);
+    })();
+
+    // 1) Lưu cart local để checkout hoạt động ngay
+    dispatch(
+      addToCart({
+        productId: product._id,
+        name: product.name,
+        image: product.image,
+        price: displayPrice,
+        qty: qtySafe,
+        sku: skuToSave,
+        size: sizeToSave,
+      }),
+    );
+
+    // 2) Lưu cart vào DB (chỉ khi user đã login)
+    try {
+      if (user?.login && user?.id) {
+        await addToCartAPI({
+          userId: user.id,
+          productId: product._id,
+          qty: qtySafe,
+          sku: skuToSave ?? null,
+          size: sizeToSave ?? null,
+        });
+      }
+    } catch (err) {
+      // Không chặn flow checkout nếu BE cart đang lỗi
+      console.error("Save cart to DB error:", err);
+    }
   };
 
+  const renderStarsText = (rating) => {
+    const r = Number(rating ?? 0);
+    const full = Math.max(0, Math.min(5, Math.round(r)));
+    return `${"★".repeat(full)}${"☆".repeat(5 - full)}`;
+  };
+
+  if (!product) return <p className="text-center mt-10">Loading...</p>;
+
+  const isVariant = hasVariants;
+  const stockCountDisplay =
+    stockInfo?.countInStock ?? product?.countInStock ?? product?.stock ?? 0;
+
   return (
-    <div className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-2 gap-10">
-      <div className="bg-gray-100 p-10 rounded">
-        <img
-          src={imageUrl}
-          alt={product.name}
-          className="w-full object-contain"
-          onError={onImgError}
-        />
+    <div className="max-w-7xl mx-auto px-6 py-10">
+      {/* ===== TOP ===== */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+        {/* IMAGE */}
+        <div>
+          <div className="bg-gray-100 p-6 rounded-2xl shadow">
+            <img
+              src={getImage(mainImage)}
+              onError={(e) => {
+                e.target.src = PLACEHOLDER_IMG;
+              }}
+              className="w-full h-[400px] object-contain"
+              alt={product.name}
+            />
+          </div>
+
+          {/* THUMBNAIL */}
+          <div className="flex gap-3 mt-4">
+            {thumbnails.map((img, i) => (
+              <img
+                key={i}
+                src={getImage(img)}
+                onClick={() => setMainImage(img)}
+                className={`w-20 h-20 object-cover rounded cursor-pointer border ${
+                  mainImage === img ? "border-black" : ""
+                }`}
+                alt=""
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* INFO */}
+        <div>
+          <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
+
+          <p className="text-yellow-500 mb-2">
+            {renderStarsText(ratingAverage)} ({Number(ratingAverage).toFixed(1)} / 5)
+          </p>
+
+          <p className="text-3xl text-red-500 font-bold mb-4">
+            {Number(displayPrice).toLocaleString()}₫
+          </p>
+
+          {/* SIZE */}
+          {isVariant ? (
+            <div className="mb-6">
+              <p className="font-medium mb-2">Chọn size:</p>
+              <div className="flex gap-3 flex-wrap">
+                {availableSizes.map((size) => {
+                  const v = product.variants?.find(
+                    (vv) => String(getVariantSizeLabel(vv)) === String(size),
+                  );
+                  const sizeStock = v?.stock ?? 0;
+                  const isSelected = String(selectedSize) === String(size);
+                  const isDisabled = sizeStock <= 0;
+
+                  return (
+                    <button
+                      key={size}
+                      onClick={() => !isDisabled && setSelectedSize(String(size))}
+                      disabled={isDisabled}
+                      className={`px-4 py-2 border rounded-lg ${
+                        isSelected
+                          ? "bg-black text-white"
+                          : isDisabled
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            : "hover:bg-gray-100"
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {/* QUANTITY */}
+          <div className="mb-6">
+            <p className="font-medium mb-2">Số lượng:</p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                className="px-3 py-1 border"
+              >
+                -
+              </button>
+              <span>{quantity}</span>
+              <button
+                onClick={() => setQuantity(quantity + 1)}
+                className="px-3 py-1 border"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          {/* STOCK */}
+          <p className="text-green-600 mb-4">
+            {checkingStock ? (
+              "Đang kiểm tra tồn kho..."
+            ) : isVariant ? (
+              `Còn ${stockCountDisplay} sản phẩm (size ${selectedSize ?? "-"})`
+            ) : (
+              `Còn ${stockCountDisplay} sản phẩm`
+            )}
+          </p>
+
+          <button
+            onClick={handleAddToCart}
+            disabled={checkingStock || (isVariant && stockInfo?.available === false)}
+            className="w-full bg-black text-white py-4 rounded-xl hover:bg-red-500 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            🛒 Thêm vào giỏ hàng
+          </button>
+
+          <div className="mt-5 text-sm text-gray-500">
+            🚚 Giao hàng toàn quốc <br />
+            🔄 Đổi trả 7 ngày <br />
+            💳 COD
+          </div>
+        </div>
       </div>
 
-      <div>
-        <h1 className="text-3xl font-bold mb-4">{product.name}</h1>
+      {/* ===== TABS ===== */}
+      <div className="mt-16">
+        <div className="flex gap-6 border-b">
+          {[
+            { key: "desc", label: "Mô tả" },
+            { key: "review", label: "Đánh giá" },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`pb-3 ${
+                activeTab === tab.key
+                  ? "border-b-2 border-black font-bold"
+                  : "text-gray-500"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-        <p className="text-red-500 text-2xl font-bold mb-4">${product.price}</p>
+        <div className="mt-6">
+          {activeTab === "desc" && (
+            <p className="text-gray-600 leading-relaxed">
+              {product.description || "Chưa có mô tả sản phẩm."}
+            </p>
+          )}
 
-        <p className="text-gray-600 mb-6">{product.description}</p>
+          {activeTab === "review" && (
+            <div>
+              <div className="mb-6">
+                <p className="font-medium">
+                  {renderStarsText(ratingAverage)}{" "}
+                  {Number(ratingAverage).toFixed(1)}/5
+                </p>
+                <p className="text-gray-500">
+                  {Number(ratingTotal)} đánh giá
+                </p>
+              </div>
 
-        <button
-          onClick={() =>
-            dispatch(
-              addToCart({
-                productId: product._id,
-                name: product.name,
-                image: product.image,
-                price: product.price,
-                qty: 1,
-              }),
-            )
-          }
-          className="bg-black text-white px-10 py-3 rounded hover:bg-red-500"
-        >
-          Thêm vào giỏ hàng
-        </button>
+              {reviewsLoading ? (
+                <p>Đang tải đánh giá...</p>
+              ) : reviews.length === 0 ? (
+                <p className="text-gray-500">Chưa có đánh giá nào.</p>
+              ) : (
+                <div className="space-y-4">
+                  {reviews.map((r) => (
+                    <div
+                      key={r._id}
+                      className="border rounded-xl p-4 bg-white"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-medium">
+                            {r.title || "Đánh giá"}
+                          </p>
+                          <p className="text-yellow-500 mt-1">
+                            {renderStarsText(r.rating)} ({r.rating}/5)
+                          </p>
+                          {r.verifiedPurchase && (
+                            <p className="text-green-600 text-sm mt-1">
+                              Đã mua hàng
+                            </p>
+                          )}
+                        </div>
+                        <p className="text-gray-500 text-sm">
+                          {r.createdAt
+                            ? new Date(r.createdAt).toLocaleDateString()
+                            : ""}
+                        </p>
+                      </div>
+
+                      {r.content && (
+                        <p className="text-gray-700 mt-3 leading-relaxed">
+                          {r.content}
+                        </p>
+                      )}
+
+                      {Array.isArray(r.images) && r.images.length > 0 && (
+                        <div className="flex gap-3 mt-3 flex-wrap">
+                          {r.images.slice(0, 5).map((img, idx) => (
+                            <img
+                              key={idx}
+                              src={getImage(img?.url ?? img)}
+                              alt=""
+                              className="w-16 h-16 object-cover rounded border"
+                              onError={(e) => {
+                                e.target.src = PLACEHOLDER_IMG;
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      <p className="text-gray-500 text-sm mt-3">
+                        — {r.userId?.name || "Người dùng"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ===== RELATED ===== */}
+      <div className="mt-16">
+        <h2 className="text-2xl font-bold mb-6">Sản phẩm liên quan</h2>
+
+        {relatedLoading ? (
+          <p>Đang tải...</p>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {relatedProducts?.slice(0, 8)?.map((p) => {
+              const img = p?.image || p?.srcImages?.[0] || "";
+              const price = p?.price ?? p?.variants?.[0]?.price ?? 0;
+
+              return (
+                <div key={p._id} className="border rounded-xl p-3 hover:shadow">
+                  <Link to={`/product/${p._id}`} className="block">
+                    <img
+                      src={getImage(img)}
+                      alt={p.name}
+                      className="h-40 w-full object-contain mb-3 bg-gray-50"
+                      onError={(e) => {
+                        e.target.src = PLACEHOLDER_IMG;
+                      }}
+                    />
+                    <p className="font-medium line-clamp-2">{p.name}</p>
+                    <p className="text-red-500 font-bold mt-2">
+                      {Number(price).toLocaleString()}₫
+                    </p>
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

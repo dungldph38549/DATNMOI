@@ -39,7 +39,10 @@ exports.createOrder = async (req, res) => {
       voucherCode,
     } = req.body;
 
-    const user = await User.findById(userId);
+    let user = null;
+    if (userId) {
+      user = await User.findById(userId);
+    }
     if (user?.isAdmin) {
       await session.abortTransaction();
       session.endSession();
@@ -134,12 +137,36 @@ exports.createOrder = async (req, res) => {
     // Sau khi đã đảm bảo dữ liệu hợp lệ, tiến hành reserve tồn kho cho các SKU có Inventory
     for (const item of mappedProducts) {
       if (!item.sku) continue;
-      await inventoryService.reserveBySku(
-        item.sku,
-        item.quantity,
-        null,
-        userId || guestId || null,
-      );
+      try {
+        await inventoryService.reserveBySku(
+          item.sku,
+          item.quantity,
+          null,
+          userId || guestId || null,
+        );
+      } catch (err) {
+        // Fallback demo: nếu hệ thống Inventory chưa tạo record cho SKU này
+        // thì trừ trực tiếp stock trên Product biến thể để vẫn cho đặt hàng.
+        const msg = err?.message || "";
+        const isSkuNotFound =
+          err?.status === 404 || msg.includes(`SKU "${item.sku}"`) || msg.includes("SKU không tồn tại");
+
+        if (!isSkuNotFound) throw err;
+
+        const productForStock = await Product.findById(item.productId).session(session);
+        if (!productForStock) {
+          throw err;
+        }
+
+        const variant = productForStock.variants?.find((v) => v.sku === item.sku);
+        const available = variant?.stock ?? 0;
+        if (!variant || available < item.quantity) {
+          throw new Error(`Không đủ hàng cho SKU ${item.sku} (khả dụng: ${available})`);
+        }
+
+        variant.stock = available - item.quantity;
+        await productForStock.save({ session });
+      }
     }
 
     const newOrder = new Order({

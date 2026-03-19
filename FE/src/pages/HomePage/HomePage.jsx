@@ -194,7 +194,7 @@ const HomePage = () => {
         <div className="col-span-3 space-y-8">
           {/* BRAND */}
 
-          <div className="bg-white rounded-xl shadow p-6">
+          {/* <div className="bg-white rounded-xl shadow p-6">
             <h3 className="text-2xl font-bold mb-6 text-black">Thương hiệu</h3>
 
             <ul className="space-y-6 text-lg">
@@ -246,7 +246,7 @@ const HomePage = () => {
                 Nike
               </li>
             </ul>
-          </div>
+          </div> */}
 
           {/* CATEGORY */}
 
