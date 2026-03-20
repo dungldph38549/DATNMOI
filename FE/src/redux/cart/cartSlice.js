@@ -8,7 +8,15 @@ const loadCart = () => {
     if (!raw) return { items: [] };
     const parsed = JSON.parse(raw);
     if (!parsed || !Array.isArray(parsed.items)) return { items: [] };
-    return { items: parsed.items };
+    const normalized = parsed.items.map((i) => ({
+      ...i,
+      qty: i.qty ?? i.quantity ?? 1,
+      price: Number(i.price ?? 0),
+      sku:
+        i.sku == null ? null : String(i.sku).trim().toUpperCase(),
+      size: i.size ?? null,
+    }));
+    return { items: normalized };
   } catch {
     return { items: [] };
   }
@@ -35,7 +43,9 @@ const cartSlice = createSlice({
       const name = payload.name || "Unnamed product";
       const image = payload.image || "";
       const price = Number(payload.price || 0);
-      const sku = payload.sku ?? null;
+      const skuRaw = payload.sku ?? null;
+      const sku =
+        skuRaw == null ? null : String(skuRaw).trim().toUpperCase();
       const size = payload.size ?? null;
 
       const existing = state.items.find((i) => i.productId === productId);

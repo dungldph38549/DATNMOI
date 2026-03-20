@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import Swal from "sweetalert2";
 import { useDispatch } from "react-redux";
-import { updateUserInfo } from "../../redux/user/index";
+import { clearUser, updateUserInfo } from "../../redux/user/index";
 import { loginUser } from "../../api";
 
 const Login = () => {
@@ -57,19 +57,44 @@ const Login = () => {
         (payload?.status === "OK" || payload?.access_token || access_token);
 
       if (isLoginOk && user) {
-        const userInfo = {
+        const isAdmin = !!user?.isAdmin;
+        const authInfo = {
           ...user,
           token: access_token,
           refreshToken: refresh_token,
-          isAdmin: !!user?.isAdmin,
+          isAdmin,
           login: true,
         };
 
-        dispatch(updateUserInfo(userInfo));
-        localStorage.setItem("user", JSON.stringify(userInfo));
+        // Tách session admin vs user để tránh "đăng nhập lẫn" giữa 2 khu vực
+        if (isAdmin) {
+          // Xóa session user cũ để trang khách không bị "dính" admin
+          dispatch(clearUser());
+          localStorage.removeItem("user");
+          localStorage.removeItem("user_v1");
 
-        Swal.fire("Thành công", "Đăng nhập thành công!", "success");
-        navigate(user?.isAdmin ? "/admin" : "/", { replace: true });
+          // Lưu session admin vào key riêng
+          localStorage.setItem("admin_v1", JSON.stringify(authInfo));
+          localStorage.removeItem("admin");
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refresh_token");
+          localStorage.removeItem("refreshToken");
+          localStorage.removeItem("token");
+
+          Swal.fire("Thành công", "Đăng nhập admin thành công!", "success");
+          navigate("/admin", { replace: true });
+        } else {
+          // Nếu trước đó là admin thì xóa admin session
+          localStorage.removeItem("admin_v1");
+          localStorage.removeItem("admin");
+
+          dispatch(updateUserInfo(authInfo));
+          localStorage.setItem("user", JSON.stringify(authInfo));
+
+          Swal.fire("Thành công", "Đăng nhập thành công!", "success");
+          navigate("/", { replace: true });
+        }
       } else {
         Swal.fire("Lỗi", resData?.message || "Đăng nhập thất bại", "error");
       }
@@ -81,11 +106,7 @@ const Login = () => {
         err?.response?.data?.errors?.[0]?.msg ||
         err?.message ||
         "Có lỗi xảy ra!";
-
-      const raw = err?.response?.data;
-      const detail = raw ? `\n\nChi tiết:\n${JSON.stringify(raw, null, 2)}` : "";
-
-      Swal.fire("Lỗi", msg + detail, "error");
+      Swal.fire("Lỗi", msg, "error");
     },
   });
 

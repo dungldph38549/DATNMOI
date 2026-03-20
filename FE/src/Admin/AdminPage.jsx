@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import Order from "./Order";
 import Products from "./Products";
 import Categories from "./Categories";
@@ -8,11 +8,22 @@ import Dashboard from "./Dashboard";
 import Users from "./Users";
 import Vouchers from "./Vouchers";
 import InventoryDashboard from "./Inventorydashboard";
+import Reviews from "./Reviews";
 // import OrderReturn from "./OrderReturn";
 // import Comments from "./Comments";
 // import StaffManagement from "./StaffManagement";
 import { Link, useNavigate } from "react-router-dom";
 import { clearUser } from "../redux/user";
+
+const getAdminSession = () => {
+  try {
+    const raw = localStorage.getItem("admin_v1") || localStorage.getItem("admin");
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
 
 // ================================================================
 // Design tokens — SneakerHouse
@@ -169,7 +180,7 @@ const SideItem = ({ item, active, onClick }) => (
 const AdminPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const user = useSelector((state) => state.user);
+  const [adminSession, setAdminSession] = useState(() => getAdminSession());
   const [selectedMenu, setSelectedMenu] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -186,15 +197,27 @@ const AdminPage = () => {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // ── auth guard ──
-  // useEffect(() => {
-  //   if (!user || !user.login || !user.isAdmin) {
-  //     navigate("/login");
-  //   }
-  // }, [user, navigate]);
+  // ── auth guard (admin only) ──
+  useEffect(() => {
+    const freshAdmin = getAdminSession();
+    setAdminSession(freshAdmin);
+
+    const isLoggedIn = !!freshAdmin?.login;
+    const isAdmin = !!freshAdmin?.isAdmin;
+
+    // Nếu chưa đăng nhập -> chuyển về trang login
+    if (!isLoggedIn) {
+      navigate("/login");
+      return;
+    }
+
+    // Nếu đã đăng nhập nhưng không phải admin -> chặn truy cập admin
+    if (!isAdmin) {
+      navigate("/login", { replace: true });
+    }
+  }, [navigate]);
 
   const handleMenuClick = (key) => {
-    // Tạm thời bỏ điều kiện if (user?.isAdmin) để test UI dễ dàng hơn
     setSelectedMenu(key);
     if (isMobile) setSidebarCollapsed(true);
   };
@@ -206,7 +229,7 @@ const AdminPage = () => {
       case "products":
         return <Products />;
       case "orders":
-        return <Order />;
+        return <Order mode="all" />;
       case "users":
         return <Users />;
       case "vouchers":
@@ -215,15 +238,14 @@ const AdminPage = () => {
         return <Brands />;
       case "categories":
         return <Categories />;
-      //   case "order-returns":
-      //     return <OrderReturn />;
-      //   case "comments":
-      //     return <Comments />;
+      case "order-returns":
+        return <Order mode="returns" />;
+      case "comments":
+        return <Reviews />;
       case "inventory":
         return <InventoryDashboard />;
       case "staff":
-        //     return <StaffManagement />;
-        break;
+        return <Users />;
       default:
         return (
           <div
@@ -252,7 +274,7 @@ const AdminPage = () => {
   };
 
   // ── loading state ──
-  if (!user) {
+  if (!adminSession) {
     return (
       <div
         style={{
@@ -285,7 +307,7 @@ const AdminPage = () => {
     );
   }
 
-  const initials = (user.name || user.email || "A")
+  const initials = (adminSession.name || adminSession.email || "A")
     .split(" ")
     .map((w) => w[0])
     .slice(0, 2)
@@ -476,7 +498,7 @@ const AdminPage = () => {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {user.name || "Admin"}
+                  {adminSession.name || "Admin"}
                 </div>
                 <div
                   style={{
@@ -487,7 +509,7 @@ const AdminPage = () => {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {user.email}
+                  {adminSession.email}
                 </div>
               </div>
               <div
@@ -567,6 +589,10 @@ const AdminPage = () => {
             </Link>
             <button
               onClick={() => {
+                localStorage.removeItem("admin_v1");
+                localStorage.removeItem("admin");
+                localStorage.removeItem("admin_access_token");
+                localStorage.removeItem("admin_token");
                 dispatch(clearUser());
                 navigate("/login");
               }}

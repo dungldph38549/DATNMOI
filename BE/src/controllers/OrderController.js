@@ -13,8 +13,16 @@ const getVnpayClient = () =>
     tmnCode: process.env.VNP_TMN_CODE || "DEMOMERCHANT01",
     secureSecret: process.env.VNP_HASH_SECRET || "SECRETKEY",
     vnpayHost: process.env.VNP_URL || "https://sandbox.vnpayment.vn",
-    testMode: true,
+    testMode: String(process.env.VNP_TEST_MODE || "true") !== "false",
   });
+
+const getBackendPublicBaseUrl = (req) => {
+  if (process.env.BE_URL) return process.env.BE_URL;
+  if (process.env.API_URL) return process.env.API_URL.replace(/\/api\/?$/, "");
+  const proto = req.headers["x-forwarded-proto"] || req.protocol || "http";
+  const host = req.headers["x-forwarded-host"] || req.get("host");
+  return `${proto}://${host}`;
+};
 
 // ================================================================
 // Tạo đơn hàng
@@ -34,8 +42,6 @@ exports.createOrder = async (req, res) => {
       phone,
       email,
       products,
-      discount = 0,
-      totalAmount,
       voucherCode,
     } = req.body;
 
@@ -64,7 +70,6 @@ exports.createOrder = async (req, res) => {
       shippingMethod,
       phone,
       email,
-      totalAmount,
     };
     for (let key in requiredFields) {
       if (!requiredFields[key]) {
@@ -107,12 +112,22 @@ exports.createOrder = async (req, res) => {
       }
 
       if (product.hasVariants) {
-        const variant = product.variants.find((v) => v.sku === item.sku);
+        const normalizedSku =
+          item.sku == null ? null : String(item.sku).trim().toUpperCase();
+        const variant = product.variants.find(
+          (v) => String(v.sku).trim().toUpperCase() === normalizedSku,
+        );
         if (!variant) {
           await session.abortTransaction();
           session.endSession();
+          const availableSkus = Array.isArray(product.variants)
+            ? product.variants.map((v) => v.sku).filter(Boolean)
+            : [];
           return res.status(400).json({
             message: `Không tìm thấy biến thể SKU ${item.sku} cho sản phẩm ${product.name}`,
+            availableSkus,
+            productId: item.productId,
+            invalidSku: normalizedSku,
           });
         }
 
@@ -135,6 +150,65 @@ exports.createOrder = async (req, res) => {
     }
 
     // Sau khi đã đảm bảo dữ liệu hợp lệ, tiến hành reserve tồn kho cho các SKU có Inventory
+    const subtotal = mappedProducts.reduce(
+      (sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
+      0,
+    );
+
+    let normalizedVoucherCode = null;
+    let discountAmount = 0;
+    let voucherDoc = null;
+
+    if (voucherCode) {
+      normalizedVoucherCode = String(voucherCode).trim().toUpperCase();
+      voucherDoc = await Voucher.findOne({ code: normalizedVoucherCode }).session(session);
+
+      if (!voucherDoc) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(422).json({ message: "Voucher không tồn tại" });
+      }
+
+      if (voucherDoc.status !== "active") {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(422).json({ message: "Voucher không hoạt động" });
+      }
+
+      const now = new Date();
+      const start = voucherDoc.startDate ? new Date(voucherDoc.startDate) : null;
+      const end = voucherDoc.endDate ? new Date(voucherDoc.endDate) : null;
+      if ((start && now < start) || (end && now > end)) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(422).json({ message: "Voucher đã hết hạn" });
+      }
+
+      const minOrderValue = Number(voucherDoc.minOrderValue ?? 0);
+      if (subtotal < minOrderValue) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(422).json({
+          message: `Đơn hàng tối thiểu để dùng voucher là ${minOrderValue.toLocaleString()} đ`,
+        });
+      }
+
+      const usageLimit = Number(voucherDoc.usageLimit ?? 0); // 0 = unlimited
+      const usedCount = Number(voucherDoc.usedCount ?? 0);
+      if (usageLimit !== 0 && usedCount >= usageLimit) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(422).json({ message: "Voucher đã hết lượt sử dụng" });
+      }
+
+      const discountValue = Number(voucherDoc.discountValue ?? 0);
+      const rawDiscount =
+        voucherDoc.discountType === "fixed"
+          ? discountValue
+          : (subtotal * discountValue) / 100;
+      discountAmount = Math.max(0, Math.min(subtotal, rawDiscount));
+    }
+
     for (const item of mappedProducts) {
       if (!item.sku) continue;
       try {
@@ -179,17 +253,17 @@ exports.createOrder = async (req, res) => {
       phone,
       email,
       products: mappedProducts,
-      discount,
-      voucherCode,
+      discount: discountAmount,
+      voucherCode: normalizedVoucherCode,
       shippingFee,
-      totalAmount,
+      totalAmount: Math.max(0, subtotal - discountAmount + shippingFee),
     });
 
     const savedOrder = await newOrder.save({ session });
 
-    if (voucherCode) {
+    if (voucherDoc) {
       await Voucher.findOneAndUpdate(
-        { code: voucherCode },
+        { _id: voucherDoc._id },
         { $inc: { usedCount: 1 } },
         { session },
       );
@@ -222,7 +296,11 @@ exports.createOrder = async (req, res) => {
     }
     await session.abortTransaction();
     session.endSession();
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({
+      message: err.message,
+      name: err?.name,
+      ...(process.env.NODE_ENV !== "production" ? { stack: err?.stack } : {}),
+    });
   }
 };
 
@@ -268,7 +346,10 @@ exports.getOrdersByUserOrGuest = async (req, res) => {
       totalPage: Math.ceil(total / limitPage),
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    const statusCode = err?.status || err?.statusCode || 500;
+    res.status(statusCode).json({
+      message: err?.message || err?.error || "Internal server error",
+    });
   }
 };
 
@@ -299,7 +380,10 @@ exports.getAllOrders = async (req, res) => {
       totalPage: Math.ceil(total / limit),
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    const statusCode = err?.status || err?.statusCode || 500;
+    res.status(statusCode).json({
+      message: err?.message || err?.error || "Internal server error",
+    });
   }
 };
 
@@ -310,7 +394,10 @@ exports.getOrders = async (req, res) => {
       .populate("products.productId");
     res.status(200).json(orders);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    const statusCode = err?.status || err?.statusCode || 500;
+    res.status(statusCode).json({
+      message: err?.message || err?.error || "Internal server error",
+    });
   }
 };
 
@@ -329,7 +416,10 @@ exports.getOrderById = async (req, res) => {
     });
     res.status(200).json({ order, history });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    const statusCode = err?.status || err?.statusCode || 500;
+    res.status(statusCode).json({
+      message: err?.message || err?.error || "Internal server error",
+    });
   }
 };
 
@@ -352,7 +442,7 @@ exports.updateOrder = async (req, res) => {
   try {
     session.startTransaction();
 
-    const { status, fullName, email, phone, address, note } = req.body;
+    const { status, fullName, email, phone, address, note, lookup } = req.body;
 
     const VALID_STATUSES = [
       "pending",
@@ -376,7 +466,46 @@ exports.updateOrder = async (req, res) => {
       rejected: [],
     };
 
-    const order = await Order.findById(req.params.id).session(session);
+    const rawId = String(req.params.id || "")
+      .trim()
+      .replace(/^#/, "")
+      .replace(/[^a-fA-F0-9]/g, "");
+
+    let order = null;
+    if (/^[a-fA-F0-9]{24}$/.test(rawId)) {
+      order = await Order.findById(rawId).session(session);
+    }
+
+    // Fallback: FE có thể gửi mã rút gọn (8 ký tự cuối) hoặc đoạn id ngắn.
+    if (!order && /^[a-fA-F0-9]{6,24}$/.test(rawId)) {
+      const upper = rawId.toUpperCase();
+      order = await Order.findOne({
+        $expr: {
+          $regexMatch: {
+            input: { $toUpper: { $toString: "$_id" } },
+            regex: `${upper}$`,
+          },
+        },
+      }).session(session);
+    }
+    // Fallback cuối: dò theo thông tin hàng trong bảng admin.
+    if (!order && lookup?.createdAt) {
+      const createdAt = new Date(lookup.createdAt);
+      if (!Number.isNaN(createdAt.getTime())) {
+        const from = new Date(createdAt.getTime() - 1500);
+        const to = new Date(createdAt.getTime() + 1500);
+        const query = {
+          createdAt: { $gte: from, $lte: to },
+        };
+        if (lookup.totalAmount != null) {
+          query.totalAmount = Number(lookup.totalAmount);
+        }
+        if (lookup.fullName) {
+          query.fullName = String(lookup.fullName).trim();
+        }
+        order = await Order.findOne(query).session(session);
+      }
+    }
     if (!order) {
       await session.abortTransaction();
       session.endSession();
@@ -441,7 +570,7 @@ exports.updateOrder = async (req, res) => {
     }
 
     const updatedOrder = await Order.findByIdAndUpdate(
-      req.params.id,
+      order._id,
       updateFields,
       { new: true, session },
     ).populate("products.productId");
@@ -505,7 +634,10 @@ exports.updateOrder = async (req, res) => {
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
-    res.status(500).json({ message: err.message });
+    const statusCode = err?.status || err?.statusCode || 500;
+    res.status(statusCode).json({
+      message: err?.message || err?.error || "Internal server error",
+    });
   }
 };
 
@@ -533,7 +665,10 @@ exports.updateOrderById = async (req, res) => {
     const updated = await order.save();
     res.status(200).json(updated);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    const statusCode = err?.status || err?.statusCode || 500;
+    res.status(statusCode).json({
+      message: err?.message || err?.error || "Internal server error",
+    });
   }
 };
 
@@ -564,7 +699,10 @@ exports.comfirmDelivery = async (req, res) => {
 
     res.status(200).json(updatedOrder);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    const statusCode = err?.status || err?.statusCode || 500;
+    res.status(statusCode).json({
+      message: err?.message || err?.error || "Internal server error",
+    });
   }
 };
 
@@ -578,7 +716,10 @@ exports.deleteOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     res.status(200).json({ message: "Order deleted" });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    const statusCode = err?.status || err?.statusCode || 500;
+    res.status(statusCode).json({
+      message: err?.message || err?.error || "Internal server error",
+    });
   }
 };
 
@@ -734,7 +875,12 @@ exports.topSelling = async (req, res) => {
           status: { $ne: "canceled" },
         },
       },
-      { $unwind: "$products" },
+      {
+        // Một số đơn có thể thiếu `products` (null/undefined) => tránh lỗi $unwind
+        $unwind: { path: "$products", preserveNullAndEmptyArrays: true },
+      },
+      // Lọc bỏ các bản ghi không có productId (tránh group _id = null)
+      { $match: { "products.productId": { $ne: null } } },
       {
         $group: {
           _id: {
@@ -857,17 +1003,27 @@ exports.createVnpayUrl = async (req, res) => {
       return res.status(400).json({ message: "Đơn hàng đã thanh toán" });
 
     const baseUrl = process.env.FE_URL || "http://localhost:3000";
+    const backendBaseUrl = getBackendPublicBaseUrl(req);
+    const redirectSuccess = encodeURIComponent(
+      returnUrl || `${baseUrl}/payment/return`,
+    );
+    const redirectCancel = encodeURIComponent(cancelUrl || `${baseUrl}/checkout`);
+
     const vnp = getVnpayClient();
     const url = vnp.buildPaymentUrl({
       vnp_Amount: order.totalAmount,
       vnp_TxnRef: orderId,
       vnp_OrderInfo: `Thanh toan don hang ${orderId}`,
-      vnp_ReturnUrl: returnUrl || `${baseUrl}/payment/return`,
+      // VNPay phải redirect về backend trước để verify chữ ký và cập nhật paymentStatus.
+      vnp_ReturnUrl: `${backendBaseUrl}/api/order/return-payment?redirect=${redirectSuccess}&cancelRedirect=${redirectCancel}`,
       vnp_IpAddr: req.ip || "127.0.0.1",
     });
     res.status(200).json({ url });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    const statusCode = err?.status || err?.statusCode || 500;
+    res.status(statusCode).json({
+      message: err?.message || err?.error || "Internal server error",
+    });
   }
 };
 
@@ -877,18 +1033,37 @@ exports.createVnpayUrl = async (req, res) => {
 // ================================================================
 exports.returnPayment = async (req, res) => {
   try {
+    const feUrl = process.env.FE_URL || "http://localhost:3000";
+    const resolveSafeUrl = (raw, fallback) => {
+      if (!raw) return fallback;
+      try {
+        const decoded = decodeURIComponent(String(raw));
+        return decoded.startsWith("http://") || decoded.startsWith("https://")
+          ? decoded
+          : fallback;
+      } catch {
+        return fallback;
+      }
+    };
+
     const vnp = getVnpayClient();
     const result = vnp.verifyReturnUrl(req.query);
     const orderId = result.vnp_TxnRef;
-    const feUrl = process.env.FE_URL || "http://localhost:3000";
+    const successUrl = resolveSafeUrl(
+      req.query?.redirect,
+      `${feUrl}/payment/return`,
+    );
+    const cancelUrl = resolveSafeUrl(
+      req.query?.cancelRedirect,
+      `${feUrl}/checkout`,
+    );
 
     if (result.isVerified && result.isSuccess) {
       await Order.findByIdAndUpdate(orderId, { paymentStatus: "paid" });
-      return res.redirect(
-        `${feUrl}/payment/return?success=1&orderId=${orderId}`,
-      );
+      return res.redirect(`${successUrl}?success=1&orderId=${orderId}`);
     }
-    return res.redirect(`${feUrl}/payment/return?success=0&orderId=${orderId}`);
+
+    return res.redirect(`${cancelUrl}?success=0&orderId=${orderId}`);
   } catch (err) {
     const feUrl = process.env.FE_URL || "http://localhost:3000";
     return res.redirect(`${feUrl}/payment/return?success=0&error=1`);
@@ -921,7 +1096,10 @@ exports.returnOrderRequest = async (req, res) => {
     });
     res.status(200).json(updated);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    const statusCode = err?.status || err?.statusCode || 500;
+    res.status(statusCode).json({
+      message: err?.message || err?.error || "Internal server error",
+    });
   }
 };
 
@@ -929,29 +1107,86 @@ exports.returnOrderRequest = async (req, res) => {
 // Admin: Chấp nhận hoặc từ chối hoàn hàng
 // ================================================================
 exports.acceptOrRejectReturn = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
+    session.startTransaction();
     const { id } = req.params;
     const action = req.path.includes("accept") ? "accepted" : "rejected";
-    const order = await Order.findById(id);
-    if (!order)
+    const order = await Order.findById(id)
+      .populate("products.productId")
+      .session(session);
+    if (!order) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
-    if (order.status !== "return-request")
+    }
+    if (order.status !== "return-request") {
+      await session.abortTransaction();
+      session.endSession();
       return res
         .status(400)
         .json({ message: "Đơn hàng không ở trạng thái yêu cầu hoàn hàng" });
+    }
+
     const updated = await Order.findByIdAndUpdate(
       id,
       { status: action },
-      { new: true },
+      { new: true, session },
     ).populate("products.productId");
+
+    // Nếu chấp nhận hoàn hàng: nhập hàng lại kho.
+    if (action === "accepted") {
+      for (const item of order.products || []) {
+        const qty = Number(item?.quantity || 0);
+        if (qty <= 0) continue;
+
+        if (item.sku) {
+          try {
+            await inventoryService.importStock(
+              (await inventoryService.getBySku(item.sku))._id,
+              {
+                qty,
+                warehouseId: null,
+                note: `Nhập lại do hoàn hàng đơn #${order._id}`,
+              },
+              null,
+            );
+            continue;
+          } catch (err) {
+            // fallback ở dưới
+          }
+        }
+
+        const productDoc = item.productId;
+        if (!productDoc) continue;
+        if (item.sku && productDoc.hasVariants) {
+          const variant = productDoc.variants?.find((v) => v.sku === item.sku);
+          if (variant) {
+            variant.stock = Number(variant.stock || 0) + qty;
+            await productDoc.save({ session });
+          }
+        } else if (!productDoc.hasVariants) {
+          productDoc.stock = Number(productDoc.stock || 0) + qty;
+          await productDoc.save({ session });
+        }
+      }
+    }
+
     await OrderStatusHistory.create({
       oldStatus: "return-request",
       newStatus: action,
       orderId: order._id,
       note: req.body?.note || "",
     });
+    await session.commitTransaction();
+    session.endSession();
     res.status(200).json(updated);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    await session.abortTransaction();
+    session.endSession();
+    const statusCode = err?.status || err?.statusCode || 500;
+    res.status(statusCode).json({
+      message: err?.message || err?.error || "Internal server error",
+    });
   }
 };

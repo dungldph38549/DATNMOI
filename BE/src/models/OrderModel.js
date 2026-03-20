@@ -100,12 +100,12 @@ const orderSchema = new mongoose.Schema(
 );
 
 // Đảm bảo ít nhất 1 trong 2: userId hoặc guestId
-orderSchema.pre("validate", function (next) {
+orderSchema.pre("validate", function () {
+  // Use sync middleware style to avoid `next is not a function` runtime errors.
   if (!this.userId && !this.guestId) {
     this.invalidate("userId", "Either userId or guestId is required.");
     this.invalidate("guestId", "Either guestId or userId is required.");
   }
-  next();
 });
 
 module.exports = mongoose.model("Order", orderSchema);

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   FaStar,
   FaShoppingCart,
@@ -12,6 +12,7 @@ import { addToCart } from "../../redux/cart/cartSlice";
 
 const Product = ({ product }) => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const [wishlist, setWishlist] = useState(false);
   const [showQuickView, setShowQuickView] = useState(false);
@@ -25,6 +26,37 @@ const Product = ({ product }) => {
     if (saved.includes(product._id)) {
       setWishlist(true);
     }
+  }, [product]);
+
+  // Back-end đôi khi không set `hasVariants` đúng như `variants` thực có.
+  // Vì vậy suy ra biến thể dựa trên `variants.length`.
+  const hasVariants = Array.isArray(product?.variants) && product.variants.length > 0;
+
+  const { minPrice, maxPrice } = useMemo(() => {
+    const pr = product?.priceRange;
+    if (pr && (pr.min != null || pr.max != null)) {
+      return {
+        minPrice: Number(pr.min ?? product?.price ?? 0) || 0,
+        maxPrice: Number(pr.max ?? product?.price ?? 0) || 0,
+      };
+    }
+
+    const prices = Array.isArray(product?.variants)
+      ? product.variants
+          .filter((v) => v && v.price != null)
+          .map((v) => Number(v.price))
+          .filter((n) => Number.isFinite(n))
+      : [];
+
+    if (prices.length > 0) {
+      return { minPrice: Math.min(...prices), maxPrice: Math.max(...prices) };
+    }
+
+    const single = Number(product?.price ?? 0);
+    return {
+      minPrice: Number.isFinite(single) ? single : 0,
+      maxPrice: Number.isFinite(single) ? single : 0,
+    };
   }, [product]);
 
   if (!product) return null;
@@ -63,11 +95,18 @@ const Product = ({ product }) => {
 
   // ADD CART
   const handleAddCart = () => {
+    if (hasVariants) {
+      // Có biến thể (size/SKU) thì bắt buộc chọn ở trang chi tiết.
+      navigate(`/product/${product._id}`);
+      return;
+    }
+
+    const safePrice = Number(product?.price ?? minPrice ?? 0) || 0;
     dispatch(
       addToCart({
         productId: product._id,
         name: product.name,
-        price: product.price,
+        price: safePrice,
         image: product.image,
         qty: 1,
       }),
@@ -148,7 +187,11 @@ const Product = ({ product }) => {
           {/* PRICE */}
           <div className="mt-2">
             <span className="text-red-500 font-bold text-lg">
-              {product.price?.toLocaleString()}đ
+              {hasVariants
+                ? minPrice === maxPrice
+                  ? `${minPrice.toLocaleString()}đ`
+                  : `Giá ${minPrice.toLocaleString()}đ - ${maxPrice.toLocaleString()}đ`
+                : `${(product.price ?? minPrice ?? 0).toLocaleString()}đ`}
             </span>
           </div>
         </div>
@@ -162,7 +205,7 @@ const Product = ({ product }) => {
             }`}
           >
             <FaShoppingCart />
-            {added ? "Đã thêm" : "Thêm vào giỏ hàng"}
+            {hasVariants ? "Chọn size" : added ? "Đã thêm" : "Thêm vào giỏ hàng"}
           </button>
         </div>
       </div>
@@ -188,14 +231,18 @@ const Product = ({ product }) => {
             <h3 className="font-bold text-lg mt-3">{product.name}</h3>
 
             <p className="text-red-500 text-xl font-bold mt-1">
-              {product.price?.toLocaleString()}đ
+              {hasVariants
+                ? minPrice === maxPrice
+                  ? `${minPrice.toLocaleString()}đ`
+                  : `Giá ${minPrice.toLocaleString()}đ - ${maxPrice.toLocaleString()}đ`
+                : `${(product.price ?? minPrice ?? 0).toLocaleString()}đ`}
             </p>
 
             <button
               onClick={handleAddCart}
               className="mt-4 w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg"
             >
-              Thêm vào giỏ
+              {hasVariants ? "Chọn size" : "Thêm vào giỏ"}
             </button>
           </div>
         </div>

@@ -56,6 +56,7 @@ router.put("/:id/reject-return", authAdminMiddleware, orderController.acceptOrRe
 
 // Cập nhật đơn hàng từ admin
 router.put("/:id", authAdminMiddleware, orderController.updateOrder);
+router.put("/admin/:id", authAdminMiddleware, orderController.updateOrder);
 
 // Cập nhật đơn hàng từ user
 router.patch("/:id", authMiddleware, orderController.updateOrderById);

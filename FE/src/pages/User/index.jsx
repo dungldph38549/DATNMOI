@@ -5,12 +5,30 @@ import "./User.css";
 // Backend admin endpoints: /api/user/*
 const API_BASE = "http://localhost:3002/api/user";
 
-const getAuthToken = () => {
+const getAdminToken = () => {
   try {
-    const raw = localStorage.getItem("user");
+    const raw =
+      localStorage.getItem("admin_v1") || localStorage.getItem("admin");
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed?.token || parsed?.access_token || parsed?.accessToken || null;
+    return (
+      parsed?.token ||
+      parsed?.access_token ||
+      parsed?.accessToken ||
+      parsed?.user?.token ||
+      null
+    );
+  } catch {
+    return null;
+  }
+};
+
+const getStoredAdmin = () => {
+  try {
+    const raw =
+      localStorage.getItem("admin_v1") || localStorage.getItem("admin");
+    if (!raw) return null;
+    return JSON.parse(raw);
   } catch {
     return null;
   }
@@ -33,7 +51,17 @@ function UserPage() {
   // lấy danh sách user
   const fetchUsers = async () => {
     setErrorMsg("");
-    const token = getAuthToken();
+
+    const storedAdmin = getStoredAdmin();
+    const isAdmin = !!storedAdmin?.isAdmin;
+    const token = getAdminToken();
+
+    // trang /admin/users chỉ dành cho admin
+    if (!storedAdmin?.login || !isAdmin) {
+      setErrorMsg("Bạn không có quyền truy cập trang quản lý người dùng.");
+      navigate("/", { replace: true });
+      return;
+    }
     if (!token) {
       setErrorMsg("Bạn cần đăng nhập để truy cập trang quản lý người dùng.");
       navigate("/login");
@@ -50,7 +78,8 @@ function UserPage() {
         const msg =
           payload?.message || payload?.error || "Không thể tải danh sách người dùng";
         if (res.status === 401 || res.status === 403) {
-          localStorage.removeItem("user");
+          localStorage.removeItem("admin_v1");
+          localStorage.removeItem("admin");
           setErrorMsg("Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.");
           navigate("/login");
           return;
@@ -85,7 +114,7 @@ function UserPage() {
     e.preventDefault();
 
     try {
-      const token = getAuthToken();
+      const token = getAdminToken();
       if (!token) {
         setErrorMsg("Bạn cần đăng nhập để thực hiện thao tác này.");
         navigate("/login");
@@ -109,7 +138,8 @@ function UserPage() {
         const raw = await res.json().catch(() => null);
         const msg = raw?.message || "Không thể lưu thông tin người dùng";
         if (res.status === 401 || res.status === 403) {
-          localStorage.removeItem("user");
+          localStorage.removeItem("admin_v1");
+          localStorage.removeItem("admin");
           setErrorMsg("Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.");
           navigate("/login");
           return;
@@ -137,7 +167,7 @@ function UserPage() {
   // xóa user
   const handleDelete = async (id) => {
     try {
-      const token = getAuthToken();
+      const token = getAdminToken();
       if (!token) {
         setErrorMsg("Bạn cần đăng nhập để thực hiện thao tác này.");
         navigate("/login");
@@ -153,7 +183,8 @@ function UserPage() {
         const raw = await res.json().catch(() => null);
         const msg = raw?.message || "Không thể xóa người dùng";
         if (res.status === 401 || res.status === 403) {
-          localStorage.removeItem("user");
+          localStorage.removeItem("admin_v1");
+          localStorage.removeItem("admin");
           setErrorMsg("Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.");
           navigate("/login");
           return;

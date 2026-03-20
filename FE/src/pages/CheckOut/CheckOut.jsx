@@ -1,10 +1,17 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { clearCart, selectCartSubtotal } from "../../redux/cart/cartSlice";
+import {
+  addToCart,
+  clearCart,
+  removeFromCart,
+  selectCartSubtotal,
+} from "../../redux/cart/cartSlice";
 import {
   createOrder,
   createVnpayUrl,
+  getVoucherByCode,
+  getProductById,
   updateCustomerById,
 } from "../../api";
 
@@ -36,7 +43,9 @@ const CheckOut = () => {
   const [shippingMethod, setShippingMethod] = useState("standard");
   const [loading, setLoading] = useState(false);
   const [voucherCode, setVoucherCode] = useState("");
-  const [discount] = useState(0);
+  const [discount, setDiscount] = useState(0);
+  const [voucherChecking, setVoucherChecking] = useState(false);
+  const [voucherError, setVoucherError] = useState("");
 
   const [form, setForm] = useState({
     fullName: lastCheckout?.fullName ?? "",
@@ -52,6 +61,90 @@ const CheckOut = () => {
     if (user?.phone) setForm((f) => ({ ...f, phone: user.phone || "" }));
     if (user?.address) setForm((f) => ({ ...f, address: Array.isArray(user.address) ? user.address[0] : user.address || "" }));
   }, [user]);
+
+  // Preview voucher discount on the client (BE is still source of truth).
+  useEffect(() => {
+    const code = voucherCode.trim();
+    if (!code) {
+      setDiscount(0);
+      setVoucherError("");
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        setVoucherChecking(true);
+        const voucher = await getVoucherByCode(code);
+        if (cancelled) return;
+
+        if (!voucher) {
+          setDiscount(0);
+          setVoucherError("Mã giảm giá không hợp lệ");
+          return;
+        }
+
+        const now = new Date();
+        const start = voucher.startDate ? new Date(voucher.startDate) : null;
+        const end = voucher.endDate ? new Date(voucher.endDate) : null;
+
+        const statusOk = voucher.status === "active";
+        const timeOk =
+          (!start || now >= start) && (!end || now <= end);
+        const minOk = subtotal >= (voucher.minOrderValue ?? 0);
+        const usageLimit = voucher.usageLimit ?? 0; // 0 = unlimited
+        const usedCount = voucher.usedCount ?? 0;
+        const usageOk = usageLimit === 0 || usedCount < usageLimit;
+
+        if (!statusOk) {
+          setDiscount(0);
+          setVoucherError("Mã giảm giá không hoạt động");
+          return;
+        }
+        if (!timeOk) {
+          setDiscount(0);
+          setVoucherError("Mã giảm giá đã hết hạn");
+          return;
+        }
+        if (!minOk) {
+          setDiscount(0);
+          setVoucherError(
+            `Đơn hàng tối thiểu ${Number(voucher.minOrderValue ?? 0).toLocaleString()} đ`,
+          );
+          return;
+        }
+        if (!usageOk) {
+          setDiscount(0);
+          setVoucherError("Mã giảm giá đã hết lượt");
+          return;
+        }
+
+        const rawDiscount =
+          voucher.discountType === "fixed"
+            ? Number(voucher.discountValue ?? 0)
+            : (subtotal * Number(voucher.discountValue ?? 0)) / 100;
+
+        const discountAmount = Math.max(
+          0,
+          Math.min(subtotal, rawDiscount),
+        );
+
+        setDiscount(discountAmount);
+        setVoucherError("");
+      } catch (e) {
+        if (cancelled) return;
+        setDiscount(0);
+        setVoucherError("Không thể kiểm tra mã giảm giá");
+      } finally {
+        if (!cancelled) setVoucherChecking(false);
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [voucherCode, subtotal]);
 
   const shipping = useMemo(
     () => (shippingMethod === "fast" ? 30000 : subtotal > 0 ? 0 : 0),
@@ -93,7 +186,7 @@ const CheckOut = () => {
       const products = items.map((item) => ({
         productId: item.productId || item._id,
         quantity: item.qty || 1,
-        sku: item.sku || null,
+        sku: item.sku == null ? null : String(item.sku).trim().toUpperCase(),
       }));
 
       const orderPayload = {
@@ -174,7 +267,120 @@ const CheckOut = () => {
     } catch (error) {
       console.error("ORDER ERROR:", error);
       const data = error?.response?.data;
+      console.error("ORDER ERROR DATA:", data);
       const msg = data?.message || "Có lỗi xảy ra khi đặt hàng";
+      if (
+        Array.isArray(data?.availableSkus) &&
+        data?.availableSkus.length > 0
+      ) {
+        const productId = data?.productId;
+        const availableSkus = data?.availableSkus || [];
+
+        const normalizeSku = (s) =>
+          s == null ? null : String(s).trim().toUpperCase();
+
+        const cartItem = productId
+          ? items.find(
+              (i) =>
+                String(i?.productId || i?._id || "") === String(productId),
+            )
+          : null;
+
+        const wantedSize = cartItem?.size ?? null;
+        const skuSet = new Set(availableSkus.map(normalizeSku).filter(Boolean));
+
+        // Nếu cartItem có `size` thì ưu tiên map theo size,
+        // còn không thì fallback chọn một SKU hợp lệ bất kỳ để checkout không bị kẹt.
+        const attemptAutoFix = async () => {
+          if (!productId || !cartItem) return false;
+
+          const sizeKey = wantedSize
+            ? String(wantedSize).trim().toUpperCase()
+            : null;
+          try {
+            const res = await getProductById(productId);
+            const p = res?.data ?? res;
+            const variants = Array.isArray(p?.variants) ? p.variants : [];
+
+            const getVariantSizeValue = (variant) => {
+              const attrs = variant?.attributes;
+              if (!attrs) return null;
+              if (typeof attrs.get === "function") {
+                return attrs.get("Size") ?? attrs.get("size") ?? null;
+              }
+              if (typeof attrs === "object") {
+                const foundKey = Object.keys(attrs).find(
+                  (k) => String(k).toLowerCase() === "size",
+                );
+                return foundKey ? attrs[foundKey] : null;
+              }
+              return null;
+            };
+
+            let target = null;
+
+            if (sizeKey) {
+              target =
+                variants.find(
+                  (v) =>
+                    skuSet.has(normalizeSku(v?.sku)) &&
+                    String(getVariantSizeValue(v) ?? "")
+                      .trim()
+                      .toUpperCase() === sizeKey,
+                ) ?? null;
+            }
+
+            if (!target) {
+              target = variants.find((v) =>
+                skuSet.has(normalizeSku(v?.sku)),
+              );
+            }
+
+            if (!target) return false;
+
+            const finalSize = cartItem?.size
+              ? cartItem.size
+              : getVariantSizeValue(target);
+
+            dispatch(removeFromCart(productId));
+            dispatch(
+              addToCart({
+                productId: productId,
+                name: cartItem.name,
+                image: cartItem.image,
+                price: target.price,
+                qty: cartItem.qty || 1,
+                sku: target.sku,
+                size: finalSize ?? null,
+              }),
+            );
+            return true;
+          } catch {
+            return false;
+          }
+        };
+
+        try {
+          const fixed = await attemptAutoFix();
+          if (fixed) {
+            alert(
+              `${msg}\nMình đã tự cập nhật SKU theo size (${cartItem?.size}). Bấm OK để thử checkout lại.`,
+            );
+            return;
+          }
+        } catch {
+          // ignore auto-fix errors
+        }
+
+        alert(
+          `${msg}\n${
+            data?.invalidSku ? `SKU đang gửi: ${data.invalidSku}\n` : ""
+          }Các SKU hợp lệ: ${availableSkus.join(", ")}`,
+        );
+        // Nếu không tự fix được, xóa item sai khỏi cart.
+        if (productId) dispatch(removeFromCart(productId));
+        return;
+      }
       if (data?.stack && String(msg).includes("next")) {
         alert(`${msg}\n\n${data.stack}`);
       } else {
@@ -327,6 +533,12 @@ const CheckOut = () => {
                     value={voucherCode}
                     onChange={(e) => setVoucherCode(e.target.value)}
                   />
+                  {voucherChecking && (
+                    <div className="text-muted mt-1">Đang kiểm tra...</div>
+                  )}
+                  {voucherError && (
+                    <div className="text-danger mt-1">{voucherError}</div>
+                  )}
                 </div>
 
                 <button

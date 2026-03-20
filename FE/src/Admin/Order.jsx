@@ -30,7 +30,7 @@ const TRANSITIONS = {
   rejected: [],
 };
 
-export default function Order() {
+export default function Order({ mode = "all" }) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [limit] = useState(10);
@@ -38,6 +38,8 @@ export default function Order() {
   const { data, isLoading } = useQuery({
     queryKey: ["admin-orders", page, limit],
     queryFn: () => getAllOrders(page, limit),
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
   });
 
   const updateMutation = useMutation({
@@ -47,7 +49,9 @@ export default function Order() {
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
     },
     onError: (err) => {
-      message.error(err?.response?.data?.message || "Lỗi cập nhật");
+      const status = err?.response?.status;
+      const msg = err?.response?.data?.message || err?.message || "Lỗi cập nhật";
+      message.error(status ? `(${status}) ${msg}` : msg);
     },
   });
 
@@ -73,7 +77,13 @@ export default function Order() {
     },
   });
 
-  const orders = data?.data || [];
+  const rawOrders = data?.data || [];
+  const orders =
+    mode === "returns"
+      ? rawOrders.filter((o) =>
+          ["return-request", "accepted", "rejected"].includes(o.status),
+        )
+      : rawOrders;
   const total = data?.total || 0;
 
   const allowedNext = (current) => TRANSITIONS[current] || [];
@@ -140,9 +150,24 @@ export default function Order() {
               })),
             ]}
             onChange={(newStatus) => {
+              if (newStatus === status) return;
+              const orderId = String(
+                record?._id?.$oid || record?._id || record?.id || "",
+              ).trim();
+              if (!orderId) {
+                message.error("Đơn hàng không hợp lệ (thiếu ID).");
+                return;
+              }
               updateMutation.mutate({
-                id: record._id,
-                body: { status: newStatus },
+                id: orderId,
+                body: {
+                  status: newStatus,
+                  lookup: {
+                    createdAt: record?.createdAt || null,
+                    totalAmount: record?.totalAmount ?? null,
+                    fullName: record?.fullName || record?.userId?.name || "",
+                  },
+                },
               });
             }}
           />
@@ -189,6 +214,11 @@ export default function Order() {
   return (
     <div style={{ padding: 24 }}>
       <h2 style={{ marginBottom: 16 }}>Quản lý đơn hàng</h2>
+      {mode === "returns" && (
+        <p style={{ marginBottom: 16, color: "#666" }}>
+          Đang hiển thị các đơn liên quan hoàn hàng.
+        </p>
+      )}
       <Table
         rowKey="_id"
         loading={isLoading}

@@ -4,6 +4,7 @@
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs"); // Dùng bcryptjs đồng bộ với bản 69d302
+const bcryptNative = require("bcrypt");
 const User = require("../models/UserModel");
 
 // ── Helper: Validate ObjectId ──────────────────────────────────
@@ -35,6 +36,10 @@ const sanitize = (user) => {
     return obj;
 };
 
+const normalizeEmail = (email = "") => String(email).trim().toLowerCase();
+const escapeRegex = (str = "") =>
+  String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 // ================================================================
 // AUTH (ĐĂNG KÝ, ĐĂNG NHẬP, GOOGLE, REFRESH)
 // ================================================================
@@ -44,17 +49,18 @@ const sanitize = (user) => {
  */
 const registerUser = async (newUserData) => {
   const { name, email, password, phone } = newUserData;
-  const existingUser = await User.findOne({ email });
+  const normalizedEmail = normalizeEmail(email);
+  const existingUser = await User.findOne({ email: normalizedEmail });
 
   if (existingUser) {
     throw { status: 409, message: "Email này đã được sử dụng!" };
   }
 
-  const hashedPassword = bcrypt.hashSync(password, 10);
   const createdUser = await User.create({
     name,
-    email,
-    password: hashedPassword,
+    email: normalizedEmail,
+    // UserModel pre-save sẽ hash mật khẩu, không hash ở service để tránh double-hash.
+    password,
     phone,
   });
 
@@ -73,7 +79,14 @@ const createUser = registerUser;
  */
 const loginUser = async (userLogin) => {
   const { email, password } = userLogin;
-  const user = await User.findOne({ email, deletedAt: null });
+  const normalizedEmail = normalizeEmail(email);
+  let user = await User.findOne({ email: normalizedEmail, deletedAt: null });
+  if (!user) {
+    user = await User.findOne({
+      email: { $regex: `^${escapeRegex(normalizedEmail)}$`, $options: "i" },
+      deletedAt: null,
+    });
+  }
 
   if (!user) {
     throw { status: 404, message: "Người dùng không tồn tại" };
@@ -99,14 +112,23 @@ const loginUser = async (userLogin) => {
     } catch {
       isMatch = false;
     }
+
+    // Fallback cho dữ liệu cũ hash bằng lib khác.
+    if (!isMatch) {
+      try {
+        isMatch = bcryptNative.compareSync(password, user.password);
+      } catch {
+        // ignore
+      }
+    }
   }
 
   // TRƯỜNG HỢP CŨ: mật khẩu lưu dạng plain-text
   // Nếu so sánh bcrypt thất bại nhưng chuỗi trùng khớp,
   // coi như đúng mật khẩu và tự động hash lại để nâng cấp.
   if (!isMatch && password && user.password === password) {
-    const newHash = bcrypt.hashSync(password, 10);
-    user.password = newHash;
+    // Ghi plain password để pre-save hash đúng 1 lần.
+    user.password = password;
     await user.save();
     isMatch = true;
   }

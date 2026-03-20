@@ -32,20 +32,38 @@ const ProductPage = () => {
   const filteredProducts = useMemo(() => {
     let data = [...products];
 
-    if (price === "low") data = data.filter((p) => p.price < 500000);
+    const getMinPrice = (p) => {
+      const pr = p?.priceRange;
+      if (pr && (pr.min != null || pr.max != null)) return Number(pr.min ?? 0) || 0;
+      if (typeof p?.price === "number") return p.price;
+      if (Array.isArray(p?.variants) && p.variants.length > 0) {
+        const prices = p.variants
+          .map((v) => Number(v?.price))
+          .filter((n) => Number.isFinite(n));
+        if (prices.length) return Math.min(...prices);
+      }
+      return 0;
+    };
+
+    if (price === "low") data = data.filter((p) => getMinPrice(p) < 500000);
 
     if (price === "mid")
-      data = data.filter((p) => p.price >= 500000 && p.price <= 1000000);
+      data = data.filter(
+        (p) => getMinPrice(p) >= 500000 && getMinPrice(p) <= 1000000,
+      );
 
-    if (price === "high") data = data.filter((p) => p.price > 1000000);
+    if (price === "high")
+      data = data.filter((p) => getMinPrice(p) > 1000000);
 
     if (rating === "4") data = data.filter((p) => p.rating >= 4);
 
     if (rating === "3") data = data.filter((p) => p.rating >= 3);
 
-    if (sort === "priceAsc") data.sort((a, b) => a.price - b.price);
+    if (sort === "priceAsc")
+      data.sort((a, b) => getMinPrice(a) - getMinPrice(b));
 
-    if (sort === "priceDesc") data.sort((a, b) => b.price - a.price);
+    if (sort === "priceDesc")
+      data.sort((a, b) => getMinPrice(b) - getMinPrice(a));
 
     if (sort === "rating") data.sort((a, b) => b.rating - a.rating);
 

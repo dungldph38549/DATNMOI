@@ -63,8 +63,8 @@ export const updateCustomerById = async (payload) => {
 };
 
 export const getAllUser = async (page, limit) => {
-  // Backend staff list (có phân trang): GET /api/user/all?page=&limit=
-  const res = await axiosInstance.get(`/user/all?page=${page}&limit=${limit}`);
+  // Backend staff list (có phân trang): GET /api/user/list?page=&limit=
+  const res = await axiosInstance.get(`/user/list?page=${page}&limit=${limit}`);
   return res.data;
 };
 // ================== Product API ==================
@@ -397,14 +397,38 @@ export const getOrdersByUser = async (userId, page = 1, limit = 10) => {
   return res.data;
 };
 
+export const getOrdersByUserOrGuest = async ({
+  userId,
+  guestId,
+  page = 1,
+  limit = 10,
+} = {}) => {
+  const params = { page, limit };
+  if (userId) params.userId = userId;
+  if (guestId) params.guestId = guestId;
+  const res = await axiosInstance.get(`/order/user`, { params });
+  return res.data;
+};
+
 export const getOrderById = async (id) => {
   const res = await axiosInstance.get(`/order/${id}`);
   return res.data;
 };
 
 export const updateOrderStatus = async (id, body) => {
-  const res = await axiosInstance.put(`/order/${id}`, body);
-  return res.data;
+  const endpoints = [`/order/${id}`, `/order/admin/${id}`];
+  let lastError = null;
+  for (const endpoint of endpoints) {
+    try {
+      const res = await axiosInstance.put(endpoint, body);
+      return res.data;
+    } catch (err) {
+      lastError = err;
+      // Nếu 404 thì thử endpoint tiếp theo, các lỗi khác ném luôn.
+      if (err?.response?.status !== 404) break;
+    }
+  }
+  throw lastError;
 };
 
 export const confirmDelivery = async (id) => {
@@ -506,5 +530,32 @@ export const getProductReviews = async ({
       sort,
     },
   });
+  return res.data;
+};
+
+/**
+ * POST /api/reviews
+ * Body: { productId, rating, title, content, images, orderId? }
+ */
+export const createReview = async (payload) => {
+  const res = await axiosInstance.post("/reviews", payload);
+  return res.data;
+};
+
+// ================== Review API (Admin) ==================
+export const getAdminReviews = async ({ status = "pending", productId } = {}) => {
+  const res = await axiosInstance.get("/admin/reviews", {
+    params: { status, productId },
+  });
+  return res.data;
+};
+
+export const approveAdminReview = async (id) => {
+  const res = await axiosInstance.patch(`/admin/reviews/${id}/approve`);
+  return res.data;
+};
+
+export const rejectAdminReview = async (id, reason = "") => {
+  const res = await axiosInstance.patch(`/admin/reviews/${id}/reject`, { reason });
   return res.data;
 };

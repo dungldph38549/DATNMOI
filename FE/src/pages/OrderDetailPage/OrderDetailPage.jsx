@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getOrderById, confirmDelivery, returnOrderRequest } from "../../api";
+import { useSelector } from "react-redux";
+import {
+  getOrderById,
+  confirmDelivery,
+  returnOrderRequest,
+  createVnpayUrl,
+} from "../../api";
 
 const STATUS_LABELS = {
   pending: "Chờ xử lý",
@@ -13,11 +19,21 @@ const STATUS_LABELS = {
   rejected: "Từ chối hoàn hàng",
 };
 
+const TRACKING_STEPS = ["pending", "confirmed", "shipped", "delivered"];
+const getTrackingProgress = (status) => {
+  if (status === "canceled") return -1;
+  if (status === "return-request") return 3;
+  if (status === "accepted" || status === "rejected") return 3;
+  return TRACKING_STEPS.indexOf(status);
+};
+
 const OrderDetailPage = () => {
   const { id } = useParams();
   const [order, setOrder] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const user = useSelector((state) => state.user);
+  const isLoggedIn = !!user?.login;
 
   useEffect(() => {
     if (!id) return;
@@ -57,6 +73,24 @@ const OrderDetailPage = () => {
     }
   };
 
+  const handleRepayVnpay = async () => {
+    try {
+      const baseUrl = window.location.origin;
+      const res = await createVnpayUrl(
+        id,
+        `${baseUrl}/payment/return`,
+        `${baseUrl}/orders/${id}`,
+      );
+      if (res?.url) {
+        window.location.href = res.url;
+      } else {
+        alert("Không tạo được link thanh toán VNPay.");
+      }
+    } catch (err) {
+      alert(err?.response?.data?.message || "Không thể tạo thanh toán VNPay.");
+    }
+  };
+
   if (loading) return <div className="max-w-2xl mx-auto p-6">Đang tải...</div>;
   if (!order) return <div className="max-w-2xl mx-auto p-6">Không tìm thấy đơn hàng.</div>;
 
@@ -85,6 +119,29 @@ const OrderDetailPage = () => {
             {STATUS_LABELS[order.status] || order.status}
           </span>
         </div>
+
+        <div>
+          <span className="text-gray-500 block mb-2">Theo dõi đơn hàng</span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {TRACKING_STEPS.map((step, idx) => {
+              const progress = getTrackingProgress(order.status);
+              const active = progress >= idx;
+              return (
+                <div
+                  key={step}
+                  className={`text-xs rounded px-2 py-1 text-center ${
+                    active
+                      ? "bg-primary/20 text-primary font-semibold"
+                      : "bg-gray-100 text-gray-500"
+                  }`}
+                >
+                  {STATUS_LABELS[step]}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="flex justify-between">
           <span className="text-gray-500">Ngày đặt</span>
           <span>{new Date(order.createdAt).toLocaleString("vi-VN")}</span>
@@ -96,6 +153,17 @@ const OrderDetailPage = () => {
             {order.paymentStatus === "paid" ? "Đã thanh toán" : "Chưa thanh toán"}
           </span>
         </div>
+        {order.paymentMethod === "vnpay" &&
+          order.paymentStatus !== "paid" &&
+          order.status !== "canceled" && (
+            <button
+              type="button"
+              className="w-full py-2 bg-blue-600 text-white rounded"
+              onClick={handleRepayVnpay}
+            >
+              Thanh toán lại bằng VNPay
+            </button>
+          )}
         <div>
           <span className="text-gray-500 block">Địa chỉ giao hàng</span>
           <p>
@@ -123,22 +191,40 @@ const OrderDetailPage = () => {
         </div>
 
         {order.status === "shipped" && (
-          <button
-            type="button"
-            className="w-full py-2 bg-green-600 text-white rounded"
-            onClick={handleConfirmDelivery}
-          >
-            Xác nhận đã nhận hàng
-          </button>
+          isLoggedIn ? (
+            <button
+              type="button"
+              className="w-full py-2 bg-green-600 text-white rounded"
+              onClick={handleConfirmDelivery}
+            >
+              Xác nhận đã nhận hàng
+            </button>
+          ) : (
+            <Link
+              to="/login"
+              className="w-full block text-center py-2 rounded bg-gray-200 text-gray-700"
+            >
+              Đăng nhập để xác nhận
+            </Link>
+          )
         )}
         {order.status === "delivered" && (
-          <button
-            type="button"
-            className="w-full py-2 bg-amber-600 text-white rounded"
-            onClick={handleReturnRequest}
-          >
-            Yêu cầu hoàn hàng
-          </button>
+          isLoggedIn ? (
+            <button
+              type="button"
+              className="w-full py-2 bg-amber-600 text-white rounded"
+              onClick={handleReturnRequest}
+            >
+              Yêu cầu hoàn hàng
+            </button>
+          ) : (
+            <Link
+              to="/login"
+              className="w-full block text-center py-2 rounded bg-gray-200 text-gray-700"
+            >
+              Đăng nhập để hoàn hàng
+            </Link>
+          )
         )}
       </div>
 

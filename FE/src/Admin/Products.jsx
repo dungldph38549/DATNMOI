@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Form, Select, InputNumber } from "antd";
 import Swal from "sweetalert2";
@@ -882,9 +882,8 @@ export default function Products() {
                     products.map((record) => {
                       const isExpanded = expandedRow === record._id;
                       return (
-                        <>
+                        <React.Fragment key={record._id}>
                           <tr
-                            key={record._id}
                             className="sh-prod-row"
                             style={{
                               borderBottom: `1px solid #F1F5F9`,
@@ -1189,7 +1188,6 @@ export default function Products() {
                           {/* Expanded variant row */}
                           {isExpanded && (
                             <tr
-                              key={`${record._id}-variants`}
                               style={{ background: "#FFFBF5" }}
                             >
                               <td
@@ -1203,7 +1201,7 @@ export default function Products() {
                               </td>
                             </tr>
                           )}
-                        </>
+                        </React.Fragment>
                       );
                     })
                   )}

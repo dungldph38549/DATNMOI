@@ -4,10 +4,13 @@ import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
 import {
   addToCartAPI,
+  createReview,
+  getOrdersByUser,
   getProductById,
   getProductReviews,
   getStocks,
   relationProduct,
+  uploadImages,
 } from "../../api";
 
 const ProductDetail = () => {
@@ -27,12 +30,31 @@ const ProductDetail = () => {
   const [reviews, setReviews] = useState([]);
   const [reviewStats, setReviewStats] = useState(null);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsReload, setReviewsReload] = useState(0);
+
+  // Customer review form
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewTitle, setReviewTitle] = useState("");
+  const [reviewContent, setReviewContent] = useState("");
+  const [reviewFiles, setReviewFiles] = useState([]);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewSubmitError, setReviewSubmitError] = useState("");
 
   const [checkingStock, setCheckingStock] = useState(false);
   const [stockInfo, setStockInfo] = useState(null); // { countInStock, available, sku, size, color }
 
   const PLACEHOLDER_IMG =
     "https://via.placeholder.com/400x400/f0f0f0/999?text=No+Image";
+
+  const reviewFilePreviews = useMemo(
+    () => reviewFiles.map((f) => URL.createObjectURL(f)),
+    [reviewFiles],
+  );
+  useEffect(() => {
+    return () => {
+      reviewFilePreviews.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [reviewFilePreviews]);
 
   const getImage = (img) => {
     if (!img) return PLACEHOLDER_IMG;
@@ -253,7 +275,7 @@ const ProductDetail = () => {
     };
 
     run();
-  }, [product]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [product, reviewsReload]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAddToCart = async () => {
     if (!product) return;
@@ -314,6 +336,88 @@ const ProductDetail = () => {
     const r = Number(rating ?? 0);
     const full = Math.max(0, Math.min(5, Math.round(r)));
     return `${"★".repeat(full)}${"☆".repeat(5 - full)}`;
+  };
+
+  const handleSelectReviewFiles = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const remaining = Math.max(0, 5 - reviewFiles.length);
+    if (remaining <= 0) return;
+
+    const next = files.slice(0, remaining);
+    setReviewFiles((prev) => [...prev, ...next]);
+    e.target.value = null; // allow re-select same file
+  };
+
+  const handleSubmitReview = async () => {
+    if (!product) return;
+    if (!user?.login || !user?.id) {
+      setReviewSubmitError("Vui lòng đăng nhập để viết đánh giá.");
+      return;
+    }
+    if (!reviewRating || reviewRating < 1 || reviewRating > 5) {
+      setReviewSubmitError("Vui lòng chọn số sao (1 đến 5).");
+      return;
+    }
+
+    setReviewSubmitting(true);
+    setReviewSubmitError("");
+    try {
+      let orderId = null;
+
+      // verifiedPurchase => set orderId from delivered order containing this product
+      const ordersResp = await getOrdersByUser(user.id, 1, 20);
+      const orders = ordersResp?.data ?? ordersResp;
+      const targetProductId = String(product._id);
+      const deliveredOrder = Array.isArray(orders)
+        ? orders.find(
+            (o) =>
+              o?.status === "delivered" &&
+              Array.isArray(o?.products) &&
+              o.products.some(
+                (p) =>
+                  String(p?.productId?._id ?? p?.productId) ===
+                  targetProductId,
+              ),
+          )
+        : null;
+
+      orderId = deliveredOrder?._id ?? null;
+
+      let images = [];
+      if (reviewFiles.length > 0) {
+        const formData = new FormData();
+        reviewFiles.forEach((f) => formData.append("files", f));
+        const uploadRes = await uploadImages(formData);
+        const paths =
+          uploadRes?.paths ?? uploadRes?.data?.paths ?? uploadRes?.data ?? [];
+        if (Array.isArray(paths)) {
+          images = paths.map((p) => ({ url: p }));
+        }
+      }
+
+      await createReview({
+        productId: product._id,
+        rating: reviewRating,
+        title: reviewTitle.trim() || null,
+        content: reviewContent.trim() || null,
+        images,
+        orderId,
+      });
+
+      setReviewRating(0);
+      setReviewTitle("");
+      setReviewContent("");
+      setReviewFiles([]);
+      setReviewsReload((x) => x + 1);
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message || err?.message || "Không thể gửi review";
+      setReviewSubmitError(msg);
+    } finally {
+      setReviewSubmitting(false);
+    }
   };
 
   if (!product) return <p className="text-center mt-10">Loading...</p>;
@@ -478,6 +582,122 @@ const ProductDetail = () => {
 
           {activeTab === "review" && (
             <div>
+              <div className="border rounded-xl p-4 mb-6 bg-white">
+                <div className="flex items-center justify-between gap-4 mb-3">
+                  <h3 className="font-semibold">Viết đánh giá</h3>
+                  {reviewFiles.length > 0 && (
+                    <span className="text-sm text-gray-500">
+                      {reviewFiles.length}/5 ảnh
+                    </span>
+                  )}
+                </div>
+
+                {!user?.login ? (
+                  <p className="text-gray-500 text-sm">
+                    Vui lòng đăng nhập để viết đánh giá.
+                  </p>
+                ) : (
+                  <>
+                    {reviewSubmitError && (
+                      <p className="text-red-500 text-sm mb-3">
+                        {reviewSubmitError}
+                      </p>
+                    )}
+
+                    <div className="mb-3">
+                      <p className="text-sm font-medium mb-1">Số sao</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {[1, 2, 3, 4, 5].map((n) => {
+                          const active = reviewRating === n;
+                          return (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setReviewRating(n)}
+                              className={`px-3 py-1 border rounded ${
+                                active
+                                  ? "bg-black text-white border-black"
+                                  : "bg-white hover:bg-gray-50"
+                              }`}
+                            >
+                              {n}★
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="mb-3">
+                      <input
+                        className="w-full border rounded-lg px-3 py-2"
+                        value={reviewTitle}
+                        onChange={(e) => setReviewTitle(e.target.value)}
+                        placeholder="Tiêu đề (tuỳ chọn)"
+                        maxLength={150}
+                      />
+                    </div>
+
+                    <div className="mb-3">
+                      <textarea
+                        className="w-full border rounded-lg px-3 py-2"
+                        rows={4}
+                        value={reviewContent}
+                        onChange={(e) => setReviewContent(e.target.value)}
+                        placeholder="Nội dung (tuỳ chọn)"
+                        maxLength={500}
+                      />
+                    </div>
+
+                    <div className="mb-4">
+                      <p className="text-sm font-medium mb-1">
+                        Ảnh (tối đa 5)
+                      </p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        disabled={reviewSubmitting}
+                        onChange={handleSelectReviewFiles}
+                      />
+
+                      {reviewFilePreviews.length > 0 && (
+                        <div className="flex gap-3 mt-3 flex-wrap">
+                          {reviewFilePreviews.slice(0, 5).map((url, i) => (
+                            <div key={i} className="relative">
+                              <img
+                                src={url}
+                                alt="review"
+                                className="w-16 h-16 object-cover rounded border bg-gray-50"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setReviewFiles((prev) =>
+                                    prev.filter((_, idx) => idx !== i),
+                                  )
+                                }
+                                className="absolute -top-2 -right-2 bg-white border rounded-full w-6 h-6 text-sm"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleSubmitReview}
+                      disabled={reviewSubmitting}
+                      className="w-full bg-black text-white py-3 rounded-xl hover:bg-red-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {reviewSubmitting ? "Đang gửi..." : "Gửi đánh giá"}
+                    </button>
+                  </>
+                )}
+              </div>
+
               <div className="mb-6">
                 <p className="font-medium">
                   {renderStarsText(ratingAverage)}{" "}

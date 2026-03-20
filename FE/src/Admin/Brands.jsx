@@ -311,7 +311,7 @@ export default function Brands() {
         open={isEditModalVisible}
         onCancel={() => setIsEditModalVisible(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         {selected && renderEditForm()}
       </Modal>
@@ -321,7 +321,7 @@ export default function Brands() {
         open={isCreateModalVisible}
         onCancel={() => setIsCreateModalVisible(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         {renderCreateForm()}
       </Modal>

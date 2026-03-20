@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
   getOrdersByUser,
+  getOrdersByUserOrGuest,
   confirmDelivery,
   returnOrderRequest,
 } from "../../api";
@@ -18,6 +19,14 @@ const STATUS_LABELS = {
   rejected: "Từ chối hoàn hàng",
 };
 
+const TRACKING_STEPS = ["pending", "confirmed", "shipped", "delivered"];
+const getTrackingProgress = (status) => {
+  if (status === "canceled") return -1;
+  if (status === "return-request") return 3;
+  if (status === "accepted" || status === "rejected") return 3;
+  return TRACKING_STEPS.indexOf(status);
+};
+
 const OrderHistoryPage = () => {
   const navigate = useNavigate();
   const user = useSelector((state) => state.user);
@@ -26,17 +35,23 @@ const OrderHistoryPage = () => {
   const [page, setPage] = useState(1);
   const [totalPage, setTotalPage] = useState(1);
 
-  const userId = user?.id || user?._id;
+  const isLoggedIn = !!user?.login;
+  const userId = isLoggedIn ? user?.id || user?._id : null;
+  const guestId = !isLoggedIn ? String(user?.id || user?._id || "") : null;
 
   useEffect(() => {
-    if (!userId) {
-      navigate("/login");
-      return;
-    }
+    if (!userId && !guestId) return;
+
     const load = async () => {
       setLoading(true);
       try {
-        const res = await getOrdersByUser(userId, page, 10);
+        const res = userId
+          ? await getOrdersByUser(userId, page, 10)
+          : await getOrdersByUserOrGuest({
+              guestId,
+              page,
+              limit: 10,
+            });
         setOrders(res?.data || []);
         setTotalPage(res?.totalPage || 1);
       } catch (err) {
@@ -46,7 +61,7 @@ const OrderHistoryPage = () => {
       setLoading(false);
     };
     load();
-  }, [userId, page, navigate]);
+  }, [userId, guestId, page, navigate]);
 
   const handleConfirmDelivery = async (orderId) => {
     try {
@@ -79,7 +94,7 @@ const OrderHistoryPage = () => {
     }
   };
 
-  if (!userId) return null;
+  if (!userId && !guestId) return null;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
@@ -142,23 +157,65 @@ const OrderHistoryPage = () => {
                     Chi tiết
                   </Link>
                   {order.status === "shipped" && (
-                    <button
-                      type="button"
-                      className="text-sm bg-green-600 text-white px-2 py-1 rounded"
-                      onClick={() => handleConfirmDelivery(order._id)}
-                    >
-                      Đã nhận hàng
-                    </button>
+                    isLoggedIn ? (
+                      <button
+                        type="button"
+                        className="text-sm bg-green-600 text-white px-2 py-1 rounded"
+                        onClick={() => handleConfirmDelivery(order._id)}
+                      >
+                        Đã nhận hàng
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="text-sm bg-gray-200 text-gray-700 px-2 py-1 rounded"
+                        onClick={() => navigate("/login", { replace: true })}
+                      >
+                        Đăng nhập để xác nhận
+                      </button>
+                    )
                   )}
                   {order.status === "delivered" && (
-                    <button
-                      type="button"
-                      className="text-sm bg-amber-600 text-white px-2 py-1 rounded"
-                      onClick={() => handleReturnRequest(order._id)}
-                    >
-                      Yêu cầu hoàn hàng
-                    </button>
+                    isLoggedIn ? (
+                      <button
+                        type="button"
+                        className="text-sm bg-amber-600 text-white px-2 py-1 rounded"
+                        onClick={() => handleReturnRequest(order._id)}
+                      >
+                        Yêu cầu hoàn hàng
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="text-sm bg-gray-200 text-gray-700 px-2 py-1 rounded"
+                        onClick={() => navigate("/login", { replace: true })}
+                      >
+                        Đăng nhập để hoàn hàng
+                      </button>
+                    )
                   )}
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <p className="text-xs text-gray-500 mb-1">Theo dõi đơn hàng</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {TRACKING_STEPS.map((step, idx) => {
+                    const progress = getTrackingProgress(order.status);
+                    const active = progress >= idx;
+                    return (
+                      <div
+                        key={step}
+                        className={`text-xs rounded px-2 py-1 text-center ${
+                          active
+                            ? "bg-primary/20 text-primary font-semibold"
+                            : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {STATUS_LABELS[step]}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
