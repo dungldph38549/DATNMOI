@@ -1523,7 +1523,6 @@ export default function Categories() {
   const [selected, setSelected] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState(null);
   const [editPreview, setEditPreview] = useState("");
   const [createPreview, setCreatePreview] = useState("");
   const [search, setSearch] = useState("");
@@ -1569,17 +1568,6 @@ export default function Categories() {
     },
     onError: (err) =>
       showToast(err?.response?.data?.message || "Lỗi khi tạo mới", "error"),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: ({ id }) => updateCategory({ id, status: "inactive" }),
-    onSuccess: () => {
-      showToast("Đã xoá danh mục");
-      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
-      setDeleteTarget(null);
-    },
-    onError: (err) =>
-      showToast(err?.response?.data?.message || "Lỗi khi xoá", "error"),
   });
 
   // ── Upload image ───────────────────────────────────────────
@@ -2073,40 +2061,6 @@ export default function Categories() {
                               edit
                             </span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteTarget(record)}
-                            style={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: "50%",
-                              border: `1.5px solid ${T.border}`,
-                              background: "#fff",
-                              color: T.textMuted,
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              transition: "all 0.15s",
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.borderColor = T.red;
-                              e.currentTarget.style.color = T.red;
-                              e.currentTarget.style.background = T.redBg;
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.borderColor = T.border;
-                              e.currentTarget.style.color = T.textMuted;
-                              e.currentTarget.style.background = "#fff";
-                            }}
-                          >
-                            <span
-                              className="material-symbols-outlined"
-                              style={{ fontSize: 17 }}
-                            >
-                              delete
-                            </span>
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -2182,14 +2136,6 @@ export default function Categories() {
         </Form>
       </SHModal>
 
-      {/* Confirm delete */}
-      <ConfirmModal
-        open={!!deleteTarget}
-        name={deleteTarget?.name}
-        loading={deleteMutation.isPending}
-        onConfirm={() => deleteMutation.mutate({ id: deleteTarget._id })}
-        onCancel={() => setDeleteTarget(null)}
-      />
     </>
   );
 }

@@ -139,6 +139,19 @@ exports.createOrder = async (req, res) => {
           attributes: Object.fromEntries(variant.attributes),
         });
       } else {
+        const availableStock = Number(product.stock ?? 0);
+        if (availableStock < item.quantity) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({
+            message: `Không đủ hàng cho sản phẩm ${product.name} (khả dụng: ${availableStock})`,
+          });
+        }
+
+        // Sản phẩm không biến thể: trừ tồn trực tiếp ngay khi tạo đơn.
+        product.stock = availableStock - Number(item.quantity || 0);
+        await product.save({ session });
+
         mappedProducts.push({
           productId: item.productId,
           sku: null,
@@ -580,13 +593,22 @@ exports.updateOrder = async (req, res) => {
       // Nếu đơn bị hủy từ trạng thái có thể đang giữ hàng, release reserve
       if (status === "canceled") {
         for (const item of order.products) {
-          if (!item.sku || !item.quantity) continue;
-          await inventoryService.releaseBySku(
-            item.sku,
-            item.quantity,
-            order._id,
-            null,
-          );
+          if (!item?.quantity) continue;
+          if (item.sku) {
+            await inventoryService.releaseBySku(
+              item.sku,
+              item.quantity,
+              order._id,
+              null,
+            );
+            continue;
+          }
+
+          const productDoc = await Product.findById(item.productId).session(session);
+          if (productDoc && !productDoc.hasVariants) {
+            productDoc.stock = Number(productDoc.stock || 0) + Number(item.quantity || 0);
+            await productDoc.save({ session });
+          }
         }
       }
 
@@ -651,16 +673,58 @@ exports.updateOrderById = async (req, res) => {
     const order = await Order.findById(id);
     if (!order)
       return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
-    if (order.status !== "pending")
+
+    const editableStatuses = ["pending", "confirmed"];
+    if (!editableStatuses.includes(order.status)) {
       return res
         .status(400)
-        .json({ message: "Đơn hàng đã xử lý, không thể chỉnh sửa" });
+        .json({ message: "Đơn hàng đã chuyển sang trạng thái giao, không thể chỉnh sửa/hủy" });
+    }
 
     if (fullName) order.fullName = fullName;
     if (email) order.email = email;
     if (phone) order.phone = phone;
     if (address) order.address = address;
-    if (status === "canceled") order.status = "canceled";
+
+    if (status === "canceled" && order.status !== "canceled") {
+      const oldStatus = order.status;
+      order.status = "canceled";
+
+      for (const item of order.products || []) {
+        if (!item?.quantity) continue;
+
+        if (item.sku) {
+          try {
+            await inventoryService.releaseBySku(
+              item.sku,
+              item.quantity,
+              order._id,
+              order.userId || order.guestId || null,
+            );
+          } catch (_) {
+            // ignore inventory release errors in user-cancel flow
+          }
+          continue;
+        }
+
+        try {
+          const productDoc = await Product.findById(item.productId);
+          if (productDoc && !productDoc.hasVariants) {
+            productDoc.stock = Number(productDoc.stock || 0) + Number(item.quantity || 0);
+            await productDoc.save();
+          }
+        } catch (_) {
+          // ignore non-variant stock restore errors in user-cancel flow
+        }
+      }
+
+      await OrderStatusHistory.create({
+        oldStatus,
+        newStatus: "canceled",
+        orderId: order._id,
+        note: "Khách hàng hủy đơn hàng",
+      });
+    }
 
     const updated = await order.save();
     res.status(200).json(updated);
@@ -1027,6 +1091,58 @@ exports.createVnpayUrl = async (req, res) => {
   }
 };
 
+const cancelUnpaidVnpayOrder = async (orderId) => {
+  if (!orderId) return;
+  const order = await Order.findById(orderId);
+  if (!order) return;
+  if (order.paymentMethod !== "vnpay") return;
+  if (order.paymentStatus === "paid") return;
+  if (order.status === "canceled") return;
+
+  // Trả lại tồn đã reserve khi thanh toán VNPay thất bại/hủy.
+  for (const item of order.products || []) {
+    if (!item?.quantity) continue;
+
+    if (item.sku) {
+      try {
+        await inventoryService.releaseBySku(
+          item.sku,
+          item.quantity,
+          order._id,
+          order.userId || order.guestId || null,
+        );
+      } catch (_) {
+        // Bỏ qua lỗi release để không block luồng cập nhật trạng thái đơn.
+      }
+      continue;
+    }
+
+    try {
+      const productDoc = await Product.findById(item.productId);
+      if (productDoc && !productDoc.hasVariants) {
+        productDoc.stock = Number(productDoc.stock || 0) + Number(item.quantity || 0);
+        await productDoc.save();
+      }
+    } catch (_) {
+      // ignore non-variant stock restore errors
+    }
+  }
+
+  const update = { status: "canceled" };
+
+  // Hoàn lại lượt voucher nếu đã bị trừ khi tạo đơn.
+  if (order.voucherCode) {
+    await Voucher.findOneAndUpdate(
+      { code: String(order.voucherCode).trim().toUpperCase() },
+      { $inc: { usedCount: -1 } },
+    );
+    update.voucherCode = null;
+    update.discount = 0;
+  }
+
+  await Order.findByIdAndUpdate(order._id, update);
+};
+
 // ================================================================
 // VNPay: Return URL sau khi thanh toán (redirect từ VNPay)
 // GET /api/order/return-payment?vnp_ResponseCode=00&vnp_TxnRef=...
@@ -1063,8 +1179,15 @@ exports.returnPayment = async (req, res) => {
       return res.redirect(`${successUrl}?success=1&orderId=${orderId}`);
     }
 
+    await cancelUnpaidVnpayOrder(orderId);
     return res.redirect(`${cancelUrl}?success=0&orderId=${orderId}`);
   } catch (err) {
+    try {
+      const fallbackOrderId = req.query?.vnp_TxnRef;
+      await cancelUnpaidVnpayOrder(fallbackOrderId);
+    } catch (_) {
+      // Ignore cleanup errors.
+    }
     const feUrl = process.env.FE_URL || "http://localhost:3000";
     return res.redirect(`${feUrl}/payment/return?success=0&error=1`);
   }

@@ -150,15 +150,15 @@ const SearchPage = () => {
 
         {/* FILTER */}
 
-        <div className="w-[230px] bg-white p-5 rounded-lg shadow-sm h-fit">
+        <div className="w-[260px] bg-white p-5 rounded-2xl shadow-md border border-slate-100 h-fit">
 
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold">Bộ lọc</h3>
+          <div className="flex justify-between items-center mb-5">
+            <h3 className="text-3xl font-black tracking-tight">Bộ lọc</h3>
 
             {(price || rating || sort) && (
               <button
                 onClick={clearAllFilter}
-                className="text-sm text-red-500 hover:underline"
+                className="text-xs font-semibold text-red-500 hover:underline"
               >
                 Bỏ chọn tất cả
               </button>
@@ -170,7 +170,7 @@ const SearchPage = () => {
 
           <div className="flex justify-between items-center mb-2">
 
-            <p className="text-sm font-medium">Khoảng giá</p>
+            <p className="text-base font-bold">Khoảng giá</p>
 
             {price && (
               <button
@@ -183,33 +183,36 @@ const SearchPage = () => {
 
           </div>
 
-          <div className="space-y-2 text-sm mb-5">
+          <div className="space-y-2 text-sm mb-6">
 
-            <label className="flex gap-2 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer rounded-xl px-3 py-2 hover:bg-slate-50 transition">
               <input
                 type="radio"
                 checked={price === "low"}
                 onChange={() => setPrice("low")}
+                className="w-4 h-4"
               />
-              Dưới 500k
+              <span className="font-medium">Dưới 500k</span>
             </label>
 
-            <label className="flex gap-2 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer rounded-xl px-3 py-2 hover:bg-slate-50 transition">
               <input
                 type="radio"
                 checked={price === "mid"}
                 onChange={() => setPrice("mid")}
+                className="w-4 h-4"
               />
-              500k - 1 triệu
+              <span className="font-medium">500k - 1 triệu</span>
             </label>
 
-            <label className="flex gap-2 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer rounded-xl px-3 py-2 hover:bg-slate-50 transition">
               <input
                 type="radio"
                 checked={price === "high"}
                 onChange={() => setPrice("high")}
+                className="w-4 h-4"
               />
-              Trên 1 triệu
+              <span className="font-medium">Trên 1 triệu</span>
             </label>
 
           </div>
@@ -217,9 +220,9 @@ const SearchPage = () => {
 
           {/* RATING */}
 
-          <div className="flex justify-between items-center mb-2">
+          <div className="flex justify-between items-center mb-2 pt-2 border-t border-slate-100">
 
-            <p className="text-sm font-medium">Đánh giá</p>
+            <p className="text-base font-bold">Đánh giá</p>
 
             {rating && (
               <button
@@ -234,22 +237,24 @@ const SearchPage = () => {
 
           <div className="space-y-2 text-sm">
 
-            <label className="flex gap-2 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer rounded-xl px-3 py-2 hover:bg-slate-50 transition">
               <input
                 type="radio"
                 checked={rating === "4"}
                 onChange={() => setRating("4")}
+                className="w-4 h-4"
               />
-              ⭐ 4 sao trở lên
+              <span className="font-medium">⭐ 4 sao trở lên</span>
             </label>
 
-            <label className="flex gap-2 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer rounded-xl px-3 py-2 hover:bg-slate-50 transition">
               <input
                 type="radio"
                 checked={rating === "3"}
                 onChange={() => setRating("3")}
+                className="w-4 h-4"
               />
-              ⭐ 3 sao trở lên
+              <span className="font-medium">⭐ 3 sao trở lên</span>
             </label>
 
           </div>

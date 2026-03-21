@@ -23,8 +23,22 @@ const Header = () => {
   /* ================= NAVIGATION ================= */
 
   const goHome = () => navigate("/");
-  const goCart = () => navigate("/cart");
-  const goOrders = () => navigate("/orders");
+  const goCart = () => {
+    if (!isLoggedIn) {
+      alert("Vui lòng đăng nhập để xem giỏ hàng.");
+      navigate("/login", { state: { from: "/cart" } });
+      return;
+    }
+    navigate("/cart");
+  };
+  const goOrders = () => {
+    if (!isLoggedIn) {
+      alert("Vui lòng đăng nhập để xem đơn hàng.");
+      navigate("/login", { state: { from: "/orders" } });
+      return;
+    }
+    navigate("/orders");
+  };
   const goLogin = () => navigate("/login");
   const handleLogout = () => {
     dispatch(clearUser());

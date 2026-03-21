@@ -427,32 +427,36 @@ const ProductDetail = () => {
     stockInfo?.countInStock ?? product?.countInStock ?? product?.stock ?? 0;
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-10">
+    <div className="container py-5">
       {/* ===== TOP ===== */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+      <div className="row g-5">
         {/* IMAGE */}
-        <div>
-          <div className="bg-gray-100 p-6 rounded-2xl shadow">
+        <div className="col-12 col-lg-6">
+          <div className="card border-0 shadow-sm rounded-4 bg-light">
+            <div className="p-4 p-md-5">
             <img
               src={getImage(mainImage)}
               onError={(e) => {
                 e.target.src = PLACEHOLDER_IMG;
               }}
-              className="w-full h-[400px] object-contain"
+                className="w-100"
+                style={{ height: 420, objectFit: "contain" }}
               alt={product.name}
             />
+            </div>
           </div>
 
           {/* THUMBNAIL */}
-          <div className="flex gap-3 mt-4">
+          <div className="d-flex gap-2 gap-md-3 mt-3 flex-wrap">
             {thumbnails.map((img, i) => (
               <img
                 key={i}
                 src={getImage(img)}
                 onClick={() => setMainImage(img)}
-                className={`w-20 h-20 object-cover rounded cursor-pointer border ${
-                  mainImage === img ? "border-black" : ""
+                className={`rounded border ${
+                  mainImage === img ? "border-dark border-2" : "border-secondary-subtle"
                 }`}
+                style={{ width: 76, height: 76, objectFit: "cover", cursor: "pointer" }}
                 alt=""
               />
             ))}
@@ -460,22 +464,26 @@ const ProductDetail = () => {
         </div>
 
         {/* INFO */}
-        <div>
-          <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
+        <div className="col-12 col-lg-6">
+          <h1 className="fw-bold mb-2" style={{ fontSize: "2.4rem", lineHeight: 1.2 }}>
+            {product.name}
+          </h1>
 
-          <p className="text-yellow-500 mb-2">
+          <p className="mb-2" style={{ color: "#f59e0b", fontSize: "1.05rem" }}>
             {renderStarsText(ratingAverage)} ({Number(ratingAverage).toFixed(1)} / 5)
           </p>
 
-          <p className="text-3xl text-red-500 font-bold mb-4">
+          <p className="fw-bold mb-4" style={{ color: "#ef4444", fontSize: "2.2rem" }}>
             {Number(displayPrice).toLocaleString()}₫
           </p>
 
           {/* SIZE */}
           {isVariant ? (
-            <div className="mb-6">
-              <p className="font-medium mb-2">Chọn size:</p>
-              <div className="flex gap-3 flex-wrap">
+            <div className="mb-4 mb-md-5">
+              <p className="fw-semibold mb-2" style={{ fontSize: "1.15rem" }}>
+                Chọn size:
+              </p>
+              <div className="d-flex gap-2 gap-md-3 flex-wrap">
                 {availableSizes.map((size) => {
                   const v = product.variants?.find(
                     (vv) => String(getVariantSizeLabel(vv)) === String(size),
@@ -489,12 +497,12 @@ const ProductDetail = () => {
                       key={size}
                       onClick={() => !isDisabled && setSelectedSize(String(size))}
                       disabled={isDisabled}
-                      className={`px-4 py-2 border rounded-lg ${
+                      className={`btn rounded-pill px-4 py-2 fw-semibold ${
                         isSelected
-                          ? "bg-black text-white"
+                          ? "btn-dark"
                           : isDisabled
-                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                            : "hover:bg-gray-100"
+                            ? "btn-light text-secondary border"
+                            : "btn-outline-secondary"
                       }`}
                     >
                       {size}
@@ -506,19 +514,25 @@ const ProductDetail = () => {
           ) : null}
 
           {/* QUANTITY */}
-          <div className="mb-6">
-            <p className="font-medium mb-2">Số lượng:</p>
-            <div className="flex items-center gap-3">
+          <div className="mb-4 mb-md-5">
+            <p className="fw-semibold mb-2" style={{ fontSize: "1.15rem" }}>
+              Số lượng:
+            </p>
+            <div className="d-flex align-items-center gap-3">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="px-3 py-1 border"
+                className="btn btn-outline-secondary px-3 py-1"
+                style={{ fontSize: "1.1rem", lineHeight: 1 }}
               >
                 -
               </button>
-              <span>{quantity}</span>
+              <span className="fw-bold" style={{ minWidth: 24, fontSize: "1.2rem" }}>
+                {quantity}
+              </span>
               <button
                 onClick={() => setQuantity(quantity + 1)}
-                className="px-3 py-1 border"
+                className="btn btn-outline-secondary px-3 py-1"
+                style={{ fontSize: "1.1rem", lineHeight: 1 }}
               >
                 +
               </button>
@@ -526,7 +540,7 @@ const ProductDetail = () => {
           </div>
 
           {/* STOCK */}
-          <p className="text-green-600 mb-4">
+          <p className="text-success fw-semibold mb-4" style={{ fontSize: "1.1rem" }}>
             {checkingStock ? (
               "Đang kiểm tra tồn kho..."
             ) : isVariant ? (
@@ -539,12 +553,13 @@ const ProductDetail = () => {
           <button
             onClick={handleAddToCart}
             disabled={checkingStock || (isVariant && stockInfo?.available === false)}
-            className="w-full bg-black text-white py-4 rounded-xl hover:bg-red-500 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="btn btn-dark w-100 py-3 rounded-pill fw-semibold"
+            style={{ fontSize: "1.2rem" }}
           >
             🛒 Thêm vào giỏ hàng
           </button>
 
-          <div className="mt-5 text-sm text-gray-500">
+          <div className="mt-4 text-secondary" style={{ fontSize: "1rem" }}>
             🚚 Giao hàng toàn quốc <br />
             🔄 Đổi trả 7 ngày <br />
             💳 COD

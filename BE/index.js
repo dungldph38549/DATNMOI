@@ -12,6 +12,7 @@ const { Server } = require("socket.io");
 const routes = require("./src/routers");
 const { initSocket } = require("./src/socket/inventorySocket");
 const { scheduleLowStockScan } = require("./src/jobs/alertJob");
+const { cleanupUnpaidVnpayOrders } = require("./src/services/vnpayCleanupService");
 
 const app = express();
 const server = http.createServer(app);
@@ -128,6 +129,18 @@ app.use((err, req, res, next) => {
 // 8. Khởi chạy Socket & Jobs
 initSocket(io);
 scheduleLowStockScan();
+setInterval(async () => {
+  try {
+    const result = await cleanupUnpaidVnpayOrders();
+    if (result?.canceled > 0) {
+      console.log(
+        `[VNPayCleanup] Auto-canceled ${result.canceled}/${result.scanned} unpaid orders`,
+      );
+    }
+  } catch (err) {
+    console.error("[VNPayCleanup] Job error:", err?.message);
+  }
+}, Number(process.env.VNPAY_CLEANUP_INTERVAL_MS || 60 * 1000));
 
 // 9. Kết nối MongoDB và Start Server
 const startServer = async () => {
@@ -151,13 +164,20 @@ const startServer = async () => {
 
     let connected = false;
     let lastError = null;
+    const mongoConnectOptions = {
+      serverSelectionTimeoutMS: Number(
+        process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 30000,
+      ),
+      connectTimeoutMS: Number(process.env.MONGO_CONNECT_TIMEOUT_MS || 30000),
+      socketTimeoutMS: Number(process.env.MONGO_SOCKET_TIMEOUT_MS || 45000),
+      maxPoolSize: Number(process.env.MONGO_MAX_POOL_SIZE || 10),
+      family: 4,
+    };
+
     for (const uri of connectionCandidates) {
       try {
         console.log("⏳ Connecting to MongoDB...");
-        await mongoose.connect(uri, {
-          serverSelectionTimeoutMS: 8000,
-          connectTimeoutMS: 8000,
-        });
+        await mongoose.connect(uri, mongoConnectOptions);
         connected = true;
         console.log("✅ Connected to MongoDB successfully!");
         break;

@@ -1,11 +1,10 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   addToCart,
-  clearCart,
+  removeManyFromCart,
   removeFromCart,
-  selectCartSubtotal,
 } from "../../redux/cart/cartSlice";
 import {
   createOrder,
@@ -17,11 +16,30 @@ import {
 
 const CheckOut = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
 
   const items = useSelector((state) => state.cart.items);
-  const subtotal = useSelector(selectCartSubtotal);
   const user = useSelector((state) => state.user);
+  const selectedItemIds = Array.isArray(location?.state?.selectedItemIds)
+    ? location.state.selectedItemIds
+    : [];
+  const selectedIdSet = useMemo(
+    () => new Set(selectedItemIds.map((id) => String(id))),
+    [selectedItemIds],
+  );
+  const checkoutItems = useMemo(() => {
+    if (selectedIdSet.size === 0) return items;
+    return items.filter((item) => selectedIdSet.has(String(item.productId)));
+  }, [items, selectedIdSet]);
+  const subtotal = useMemo(
+    () =>
+      checkoutItems.reduce(
+        (sum, i) => sum + Number(i.qty || 0) * Number(i.price || 0),
+        0,
+      ),
+    [checkoutItems],
+  );
 
   const LAST_CHECKOUT_KEY = "last_checkout_v1";
 
@@ -170,7 +188,7 @@ const CheckOut = () => {
       return;
     }
 
-    if (items.length === 0) {
+    if (checkoutItems.length === 0) {
       alert("Giỏ hàng trống");
       return;
     }
@@ -183,7 +201,7 @@ const CheckOut = () => {
     try {
       setLoading(true);
 
-      const products = items.map((item) => ({
+      const products = checkoutItems.map((item) => ({
         productId: item.productId || item._id,
         quantity: item.qty || 1,
         sku: item.sku == null ? null : String(item.sku).trim().toUpperCase(),
@@ -252,13 +270,13 @@ const CheckOut = () => {
         if (url) {
           persistCheckoutInfo();
           await updateProfileIfLoggedIn();
-          dispatch(clearCart());
+          dispatch(removeManyFromCart(checkoutItems.map((i) => i.productId)));
           window.location.href = url;
           return;
         }
       }
 
-      dispatch(clearCart());
+      dispatch(removeManyFromCart(checkoutItems.map((i) => i.productId)));
       persistCheckoutInfo();
       await updateProfileIfLoggedIn();
 
@@ -280,7 +298,7 @@ const CheckOut = () => {
           s == null ? null : String(s).trim().toUpperCase();
 
         const cartItem = productId
-          ? items.find(
+          ? checkoutItems.find(
               (i) =>
                 String(i?.productId || i?._id || "") === String(productId),
             )
@@ -408,18 +426,18 @@ const CheckOut = () => {
         <div className="row">
           <div className="col-md-8">
             <div className="checkout-box">
-              <h2>Thông tin giao hàng</h2>
+              <h2 className="text-3xl font-bold mb-3">Thông tin giao hàng</h2>
               {lastCheckout && (
-                <p className="text-gray-500 mb-4">
+                <p className="text-gray-500 text-base mb-5">
                   Thông tin đã được lưu từ lần đặt hàng gần nhất.
                 </p>
               )}
 
               <form onSubmit={onPlaceOrder}>
                 <div className="form-group">
-                  <label>Họ và tên</label>
+                  <label className="text-base font-semibold mb-2">Họ và tên</label>
                   <input
-                    className="form-control"
+                    className="form-control text-base py-2 h-[44px]"
                     value={form.fullName}
                     onChange={(e) =>
                       setForm({ ...form, fullName: e.target.value })
@@ -429,10 +447,10 @@ const CheckOut = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Email</label>
+                  <label className="text-base font-semibold mb-2">Email</label>
                   <input
                     type="email"
-                    className="form-control"
+                    className="form-control text-base py-2 h-[44px]"
                     value={form.email}
                     onChange={(e) =>
                       setForm({ ...form, email: e.target.value })
@@ -442,9 +460,9 @@ const CheckOut = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Số điện thoại</label>
+                  <label className="text-base font-semibold mb-2">Số điện thoại</label>
                   <input
-                    className="form-control"
+                    className="form-control text-base py-2 h-[44px]"
                     value={form.phone}
                     onChange={(e) =>
                       setForm({ ...form, phone: e.target.value })
@@ -454,9 +472,9 @@ const CheckOut = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Địa chỉ</label>
+                  <label className="text-base font-semibold mb-2">Địa chỉ</label>
                   <input
-                    className="form-control"
+                    className="form-control text-base py-2 h-[44px]"
                     value={form.address}
                     onChange={(e) =>
                       setForm({ ...form, address: e.target.value })
@@ -466,9 +484,9 @@ const CheckOut = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Ghi chú</label>
+                  <label className="text-base font-semibold mb-2">Ghi chú</label>
                   <textarea
-                    className="form-control"
+                    className="form-control text-base py-2"
                     rows={4}
                     value={form.note}
                     onChange={(e) => setForm({ ...form, note: e.target.value })}
@@ -476,9 +494,9 @@ const CheckOut = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Phương thức giao hàng</label>
+                  <label className="text-lg font-bold mb-2">Phương thức giao hàng</label>
                   <div>
-                    <label>
+                    <label className="text-base font-medium">
                       <input
                         type="radio"
                         checked={shippingMethod === "standard"}
@@ -488,7 +506,7 @@ const CheckOut = () => {
                     </label>
                   </div>
                   <div>
-                    <label>
+                    <label className="text-base font-medium">
                       <input
                         type="radio"
                         checked={shippingMethod === "fast"}
@@ -500,9 +518,9 @@ const CheckOut = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Phương thức thanh toán</label>
+                  <label className="text-lg font-bold mb-2">Phương thức thanh toán</label>
                   <div>
-                    <label>
+                    <label className="text-base font-medium">
                       <input
                         type="radio"
                         value="cod"
@@ -513,7 +531,7 @@ const CheckOut = () => {
                     </label>
                   </div>
                   <div>
-                    <label>
+                    <label className="text-base font-medium">
                       <input
                         type="radio"
                         value="VNPay"
@@ -526,9 +544,9 @@ const CheckOut = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Mã giảm giá</label>
+                  <label className="text-base font-semibold mb-2">Mã giảm giá</label>
                   <input
-                    className="form-control"
+                    className="form-control text-base py-2 h-[44px]"
                     placeholder="Nhập mã (nếu có)"
                     value={voucherCode}
                     onChange={(e) => setVoucherCode(e.target.value)}
@@ -543,13 +561,13 @@ const CheckOut = () => {
 
                 <button
                   type="submit"
-                  className="btn btn-primary"
-                  disabled={items.length === 0 || loading}
+                  className="btn btn-primary text-base px-5 py-2.5"
+                  disabled={checkoutItems.length === 0 || loading}
                 >
                   {loading ? "Đang xử lý..." : "Đặt hàng"}
                 </button>
 
-                <Link className="btn btn-default" to="/cart">
+                <Link className="btn btn-default text-base px-5 py-2.5" to="/cart">
                   Quay lại giỏ hàng
                 </Link>
               </form>
@@ -558,50 +576,50 @@ const CheckOut = () => {
 
           <div className="col-md-4">
             <div className="checkout-summary">
-              <h2>Đơn hàng</h2>
+              <h2 className="text-5xl font-black mb-7">Đơn hàng</h2>
 
-              <table className="table">
+              <table className="table text-2xl">
                 <tbody>
-                  {items.map((item, index) => (
-                    <tr key={item.productId || index}>
+                  {checkoutItems.map((item, index) => (
+                    <tr key={item.productId || index} className="h-[74px]">
                       <td>
                         {item.name} x{item.qty}
                       </td>
-                      <td className="text-right">
+                      <td className="text-right font-bold">
                         {((item.price || 0) * (item.qty || 0)).toLocaleString()} đ
                       </td>
                     </tr>
                   ))}
 
-                  <tr>
-                    <td>Tạm tính</td>
-                    <td className="text-right">
+                  <tr className="h-[74px]">
+                    <td className="font-semibold">Tạm tính</td>
+                    <td className="text-right font-bold">
                       {subtotal.toLocaleString()} đ
                     </td>
                   </tr>
 
-                  <tr>
-                    <td>Phí ship</td>
-                    <td className="text-right">
+                  <tr className="h-[74px]">
+                    <td className="font-semibold">Phí ship</td>
+                    <td className="text-right font-bold">
                       {shipping.toLocaleString()} đ
                     </td>
                   </tr>
 
                   {discount > 0 && (
-                    <tr>
-                      <td>Giảm giá</td>
-                      <td className="text-right">
+                    <tr className="h-[74px]">
+                      <td className="font-semibold">Giảm giá</td>
+                      <td className="text-right font-bold">
                         -{discount.toLocaleString()} đ
                       </td>
                     </tr>
                   )}
 
-                  <tr>
+                  <tr className="h-[86px]">
                     <td>
-                      <strong>Tổng</strong>
+                      <strong className="text-4xl">Tổng</strong>
                     </td>
                     <td className="text-right">
-                      <strong>{total.toLocaleString()} đ</strong>
+                      <strong className="text-4xl text-red-600">{total.toLocaleString()} đ</strong>
                     </td>
                   </tr>
                 </tbody>

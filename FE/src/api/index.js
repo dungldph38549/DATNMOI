@@ -436,6 +436,11 @@ export const confirmDelivery = async (id) => {
   return res.data;
 };
 
+export const cancelOrderByUser = async (id) => {
+  const res = await axiosInstance.patch(`/order/${id}`, { status: "canceled" });
+  return res.data;
+};
+
 export const createVnpayUrl = async (orderId, returnUrl, cancelUrl) => {
   const res = await axiosInstance.post(`/order/${orderId}/create-vnpay-url`, {
     returnUrl,

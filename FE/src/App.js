@@ -1,5 +1,12 @@
 import React from "react";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  useLocation,
+  Navigate,
+} from "react-router-dom";
+import { useSelector } from "react-redux";
 
 import "./assets/css/bootstrap.min.css";
 import "./assets/css/main.css";
@@ -29,16 +36,28 @@ import PaymentReturnPage from "./pages/PaymentReturnPage/PaymentReturnPage";
 import User from "./pages/User";
 import AdminPage from "./Admin/AdminPage";
 
+function RequireAuth({ children }) {
+  const user = useSelector((state) => state.user);
+  const isLoggedIn = !!(user?.login && user?.token);
+  const location = useLocation();
+
+  if (!isLoggedIn) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  return children;
+}
+
 function AppContent() {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith("/admin");
 
   return (
-    <div className="app">
+    <div className="app min-h-screen flex flex-col bg-gray-50">
       {/* Ẩn header site khi vào toàn bộ admin (/admin/*) */}
       {!isAdminRoute && <HeaderComponent />}
 
-      <div className="content">
+      <div className="content flex-1">
         <Routes>
           {/* CLIENT ROUTES */}
           <Route path="/" element={<HomePage />} />
@@ -47,13 +66,41 @@ function AppContent() {
           <Route path="/category" element={<CategoryPage />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/cart" element={<ShoppingCartPage />} />
-          <Route path="/checkout" element={<CheckOut />} />
+          <Route
+            path="/cart"
+            element={(
+              <RequireAuth>
+                <ShoppingCartPage />
+              </RequireAuth>
+            )}
+          />
+          <Route
+            path="/checkout"
+            element={(
+              <RequireAuth>
+                <CheckOut />
+              </RequireAuth>
+            )}
+          />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/terms" element={<TermsConditionsPage />} />
           <Route path="/search" element={<SearchPage />} />
-          <Route path="/orders" element={<OrderHistoryPage />} />
-          <Route path="/orders/:id" element={<OrderDetailPage />} />
+          <Route
+            path="/orders"
+            element={(
+              <RequireAuth>
+                <OrderHistoryPage />
+              </RequireAuth>
+            )}
+          />
+          <Route
+            path="/orders/:id"
+            element={(
+              <RequireAuth>
+                <OrderDetailPage />
+              </RequireAuth>
+            )}
+          />
           <Route
             path="/payment/return"
             element={<PaymentReturnPage />}

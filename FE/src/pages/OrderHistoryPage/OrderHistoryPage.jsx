@@ -2,10 +2,10 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
-  getOrdersByUser,
   getOrdersByUserOrGuest,
   confirmDelivery,
   returnOrderRequest,
+  cancelOrderByUser,
 } from "../../api";
 
 const STATUS_LABELS = {
@@ -20,6 +20,7 @@ const STATUS_LABELS = {
 };
 
 const TRACKING_STEPS = ["pending", "confirmed", "shipped", "delivered"];
+const PAGE_SIZE = 10;
 const getTrackingProgress = (status) => {
   if (status === "canceled") return -1;
   if (status === "return-request") return 3;
@@ -33,35 +34,76 @@ const OrderHistoryPage = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPage, setTotalPage] = useState(1);
 
   const isLoggedIn = !!user?.login;
   const userId = isLoggedIn ? user?.id || user?._id : null;
   const guestId = !isLoggedIn ? String(user?.id || user?._id || "") : null;
 
   useEffect(() => {
-    if (!userId && !guestId) return;
+    if (!userId && !guestId) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
 
-    const load = async () => {
-      setLoading(true);
+    let mounted = true;
+    const load = async (showLoading = true) => {
+      if (showLoading) setLoading(true);
       try {
-        const res = userId
-          ? await getOrdersByUser(userId, page, 10)
-          : await getOrdersByUserOrGuest({
+        const requests = [];
+        if (userId) {
+          requests.push(
+            getOrdersByUserOrGuest({
+              userId,
+              page: 1,
+              limit: 100,
+            }),
+          );
+        }
+        if (guestId && guestId !== userId) {
+          requests.push(
+            getOrdersByUserOrGuest({
               guestId,
-              page,
-              limit: 10,
-            });
-        setOrders(res?.data || []);
-        setTotalPage(res?.totalPage || 1);
+              page: 1,
+              limit: 100,
+            }),
+          );
+        }
+
+        const responses = await Promise.all(requests);
+        const mergedOrders = responses
+          .flatMap((res) => (Array.isArray(res?.data) ? res.data : []))
+          .reduce((acc, order) => {
+            if (!acc.some((x) => String(x._id) === String(order._id))) {
+              acc.push(order);
+            }
+            return acc;
+          }, [])
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        if (mounted) setOrders(mergedOrders);
       } catch (err) {
         console.error(err);
-        setOrders([]);
+        if (mounted) setOrders([]);
+      } finally {
+        if (mounted) setLoading(false);
       }
-      setLoading(false);
     };
-    load();
-  }, [userId, guestId, page, navigate]);
+
+    load(true);
+    const intervalId = setInterval(() => load(false), 12000);
+    return () => {
+      mounted = false;
+      clearInterval(intervalId);
+    };
+  }, [userId, guestId]);
+
+  const totalPage = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
+  const currentOrders = orders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  useEffect(() => {
+    if (page > totalPage) setPage(totalPage);
+  }, [page, totalPage]);
 
   const handleConfirmDelivery = async (orderId) => {
     try {
@@ -94,65 +136,86 @@ const OrderHistoryPage = () => {
     }
   };
 
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm("Bạn có chắc muốn hủy đơn hàng này?")) return;
+    try {
+      await cancelOrderByUser(orderId);
+      setOrders((prev) =>
+        prev.map((o) => (o._id === orderId ? { ...o, status: "canceled" } : o)),
+      );
+      alert("Đã hủy đơn hàng.");
+    } catch (err) {
+      alert(err?.response?.data?.message || "Không thể hủy đơn hàng.");
+    }
+  };
+
   if (!userId && !guestId) return null;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-10">
-      <h1 className="text-2xl font-bold mb-6">Lịch sử đơn hàng</h1>
+    <div className="container py-5">
+      <h1 className="display-5 fw-bold mb-4">Lịch sử đơn hàng</h1>
 
       {loading ? (
         <p>Đang tải...</p>
       ) : orders.length === 0 ? (
         <p className="text-gray-500">Bạn chưa có đơn hàng nào.</p>
       ) : (
-        <div className="space-y-4">
-          {orders.map((order) => (
+        <div className="d-flex flex-column gap-4">
+          {currentOrders.map((order) => (
             <div
               key={order._id}
-              className="border rounded-lg p-4 bg-white shadow-sm"
+              className="card border-0 shadow-sm"
             >
-              <div className="flex justify-between items-start flex-wrap gap-2">
+              <div className="card-body p-4 p-md-5">
+              <div className="d-flex justify-content-between align-items-start flex-wrap gap-3 pb-3 border-bottom">
                 <div>
-                  <span className="text-gray-500 text-sm">
+                  <span className="fs-5 fw-bold text-dark">
                     #{order._id?.slice(-8).toUpperCase()}
                   </span>
-                  <span className="ml-2 text-sm text-gray-600">
+                  <span className="ms-3 text-secondary">
                     {new Date(order.createdAt).toLocaleDateString("vi-VN")}
                   </span>
                 </div>
                 <span
-                  className={`px-2 py-1 rounded text-sm font-medium ${
+                  className={`badge fs-6 px-3 py-2 rounded-pill ${
                     order.status === "delivered"
-                      ? "bg-green-100 text-green-800"
+                      ? "text-bg-success"
                       : order.status === "canceled"
-                        ? "bg-red-100 text-red-800"
+                        ? "text-bg-danger"
                         : order.status === "return-request"
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-blue-100 text-blue-800"
+                          ? "text-bg-warning"
+                          : "text-bg-primary"
                   }`}
                 >
                   {STATUS_LABELS[order.status] || order.status}
                 </span>
               </div>
 
-              <div className="mt-2 text-sm text-gray-600">
+              <div className="mt-4 d-flex flex-column gap-2">
                 {order.products?.length > 0 &&
                   order.products.map((p, i) => (
-                    <div key={i}>
-                      {(p.productId?.name || p.name || "Sản phẩm")} x{p.quantity}{" "}
-                      - {(p.price * p.quantity).toLocaleString()}đ
+                    <div
+                      key={i}
+                      className="d-flex align-items-center justify-content-between gap-3 bg-light rounded-3 px-3 py-2"
+                    >
+                      <span className="fw-medium text-dark">
+                        {(p.productId?.name || p.name || "Sản phẩm")} x{p.quantity}
+                      </span>
+                      <span className="fw-semibold text-nowrap">
+                        {(p.price * p.quantity).toLocaleString()}đ
+                      </span>
                     </div>
                   ))}
               </div>
 
-              <div className="mt-2 flex justify-between items-center flex-wrap gap-2">
-                <span className="font-bold">
+              <div className="mt-4 pt-3 border-top d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <span className="fs-3 fw-bold text-dark">
                   Tổng: {Number(order.totalAmount).toLocaleString()}đ
                 </span>
-                <div className="flex gap-2">
+                <div className="d-flex gap-2 flex-wrap">
                   <Link
                     to={`/orders/${order._id}`}
-                    className="text-sm text-blue-600 hover:underline"
+                    className="btn btn-outline-primary"
                   >
                     Chi tiết
                   </Link>
@@ -160,7 +223,7 @@ const OrderHistoryPage = () => {
                     isLoggedIn ? (
                       <button
                         type="button"
-                        className="text-sm bg-green-600 text-white px-2 py-1 rounded"
+                        className="btn btn-success"
                         onClick={() => handleConfirmDelivery(order._id)}
                       >
                         Đã nhận hàng
@@ -168,7 +231,7 @@ const OrderHistoryPage = () => {
                     ) : (
                       <button
                         type="button"
-                        className="text-sm bg-gray-200 text-gray-700 px-2 py-1 rounded"
+                        className="btn btn-secondary"
                         onClick={() => navigate("/login", { replace: true })}
                       >
                         Đăng nhập để xác nhận
@@ -179,7 +242,7 @@ const OrderHistoryPage = () => {
                     isLoggedIn ? (
                       <button
                         type="button"
-                        className="text-sm bg-amber-600 text-white px-2 py-1 rounded"
+                        className="btn btn-warning"
                         onClick={() => handleReturnRequest(order._id)}
                       >
                         Yêu cầu hoàn hàng
@@ -187,36 +250,50 @@ const OrderHistoryPage = () => {
                     ) : (
                       <button
                         type="button"
-                        className="text-sm bg-gray-200 text-gray-700 px-2 py-1 rounded"
+                        className="btn btn-secondary"
                         onClick={() => navigate("/login", { replace: true })}
                       >
                         Đăng nhập để hoàn hàng
                       </button>
                     )
                   )}
+                  {(order.status === "pending" || order.status === "confirmed") && (
+                    <button
+                      type="button"
+                      className="btn btn-outline-danger"
+                      onClick={() => handleCancelOrder(order._id)}
+                    >
+                      Hủy đơn
+                    </button>
+                  )}
                 </div>
               </div>
 
-              <div className="mt-3">
-                <p className="text-xs text-gray-500 mb-1">Theo dõi đơn hàng</p>
-                <div className="grid grid-cols-4 gap-2">
+              <div className="mt-4">
+                <p className="small text-secondary mb-2 fw-semibold">Theo dõi đơn hàng</p>
+                <div className="row g-2">
                   {TRACKING_STEPS.map((step, idx) => {
                     const progress = getTrackingProgress(order.status);
                     const active = progress >= idx;
                     return (
                       <div
                         key={step}
-                        className={`text-xs rounded px-2 py-1 text-center ${
-                          active
-                            ? "bg-primary/20 text-primary font-semibold"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
+                        className="col-12 col-sm-6 col-lg-3"
                       >
-                        {STATUS_LABELS[step]}
+                        <div
+                          className={`rounded-3 px-2 py-2 text-center border ${
+                            active
+                              ? "bg-warning-subtle border-warning text-warning-emphasis fw-semibold"
+                              : "bg-light border-light-subtle text-secondary"
+                          }`}
+                        >
+                          {STATUS_LABELS[step]}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
+              </div>
               </div>
             </div>
           ))}
@@ -224,23 +301,23 @@ const OrderHistoryPage = () => {
       )}
 
       {totalPage > 1 && (
-        <div className="flex justify-center gap-2 mt-6">
+        <div className="d-flex justify-content-center align-items-center gap-2 mt-4">
           <button
             type="button"
             disabled={page <= 1}
             onClick={() => setPage((p) => p - 1)}
-            className="px-3 py-1 border rounded disabled:opacity-50"
+            className="btn btn-outline-secondary"
           >
             Trước
           </button>
-          <span className="px-3 py-1">
+          <span className="fw-semibold px-2">
             {page} / {totalPage}
           </span>
           <button
             type="button"
             disabled={page >= totalPage}
             onClick={() => setPage((p) => p + 1)}
-            className="px-3 py-1 border rounded disabled:opacity-50"
+            className="btn btn-outline-secondary"
           >
             Sau
           </button>

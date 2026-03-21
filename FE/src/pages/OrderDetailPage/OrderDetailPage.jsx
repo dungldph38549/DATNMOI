@@ -6,6 +6,7 @@ import {
   confirmDelivery,
   returnOrderRequest,
   createVnpayUrl,
+  cancelOrderByUser,
 } from "../../api";
 
 const STATUS_LABELS = {
@@ -91,155 +92,198 @@ const OrderDetailPage = () => {
     }
   };
 
-  if (loading) return <div className="max-w-2xl mx-auto p-6">Đang tải...</div>;
-  if (!order) return <div className="max-w-2xl mx-auto p-6">Không tìm thấy đơn hàng.</div>;
+  const handleCancelOrder = async () => {
+    if (!window.confirm("Bạn có chắc muốn hủy đơn hàng này?")) return;
+    try {
+      await cancelOrderByUser(id);
+      setOrder((o) => (o ? { ...o, status: "canceled" } : o));
+      alert("Đã hủy đơn hàng.");
+    } catch (err) {
+      alert(err?.response?.data?.message || "Không thể hủy đơn hàng.");
+    }
+  };
+
+  if (loading) return <div className="container py-5">Đang tải...</div>;
+  if (!order) return <div className="container py-5">Không tìm thấy đơn hàng.</div>;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-10">
-      <Link to="/orders" className="text-blue-600 hover:underline mb-4 inline-block">
+    <div className="container py-5">
+      <Link to="/orders" className="link-primary text-decoration-none mb-3 d-inline-block">
         ← Lịch sử đơn hàng
       </Link>
 
-      <h1 className="text-2xl font-bold mb-4">
+      <h1 className="h2 fw-bold mb-4">
         Đơn hàng #{order._id?.slice(-8).toUpperCase()}
       </h1>
 
-      <div className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
-        <div className="flex justify-between">
-          <span className="text-gray-500">Trạng thái</span>
-          <span
-            className={`px-2 py-1 rounded text-sm font-medium ${
-              order.status === "delivered"
-                ? "bg-green-100 text-green-800"
-                : order.status === "canceled"
-                  ? "bg-red-100 text-red-800"
-                  : "bg-blue-100 text-blue-800"
-            }`}
-          >
-            {STATUS_LABELS[order.status] || order.status}
-          </span>
-        </div>
-
-        <div>
-          <span className="text-gray-500 block mb-2">Theo dõi đơn hàng</span>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {TRACKING_STEPS.map((step, idx) => {
-              const progress = getTrackingProgress(order.status);
-              const active = progress >= idx;
-              return (
-                <div
-                  key={step}
-                  className={`text-xs rounded px-2 py-1 text-center ${
-                    active
-                      ? "bg-primary/20 text-primary font-semibold"
-                      : "bg-gray-100 text-gray-500"
+      <div className="card border-0 shadow-sm mb-4">
+        <div className="card-body p-4 p-md-5">
+          <div className="row g-4">
+            <div className="col-12 col-lg-8">
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 pb-3 border-bottom mb-3">
+                <span className="text-secondary">Trạng thái</span>
+                <span
+                  className={`badge fs-6 px-3 py-2 rounded-pill ${
+                    order.status === "delivered"
+                      ? "text-bg-success"
+                      : order.status === "canceled"
+                        ? "text-bg-danger"
+                        : "text-bg-primary"
                   }`}
                 >
-                  {STATUS_LABELS[step]}
+                  {STATUS_LABELS[order.status] || order.status}
+                </span>
+              </div>
+
+              <div className="mb-4">
+                <span className="text-secondary d-block mb-2">Theo dõi đơn hàng</span>
+                <div className="row g-2">
+                  {TRACKING_STEPS.map((step, idx) => {
+                    const progress = getTrackingProgress(order.status);
+                    const active = progress >= idx;
+                    return (
+                      <div
+                        key={step}
+                        className="col-6 col-md-3"
+                      >
+                        <div
+                          className={`rounded-3 px-2 py-2 text-center border small ${
+                            active
+                              ? "bg-warning-subtle border-warning text-warning-emphasis fw-semibold"
+                              : "bg-light border-light-subtle text-secondary"
+                          }`}
+                        >
+                          {STATUS_LABELS[step]}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+
+              <div className="d-flex justify-content-between flex-wrap gap-2 mb-2">
+                <span className="text-secondary">Ngày đặt</span>
+                <span>{new Date(order.createdAt).toLocaleString("vi-VN")}</span>
+              </div>
+              <div className="d-flex justify-content-between flex-wrap gap-2 mb-3">
+                <span className="text-secondary">Thanh toán</span>
+                <span>
+                  {order.paymentMethod === "vnpay" ? "VNPay" : "COD"} -{" "}
+                  {order.paymentStatus === "paid" ? "Đã thanh toán" : "Chưa thanh toán"}
+                </span>
+              </div>
+
+              <div className="mb-3">
+                <span className="text-secondary d-block">Địa chỉ giao hàng</span>
+                <p className="mb-0 fw-medium">
+                  {order.fullName}, {order.phone}, {order.address}
+                </p>
+              </div>
+
+              <hr className="my-4" />
+
+              <div className="mb-3">
+                <h3 className="h4 fw-bold mb-3">Sản phẩm</h3>
+                <ul className="list-group list-group-flush">
+                  {order.products?.map((p, i) => (
+                    <li key={i} className="list-group-item px-0 d-flex justify-content-between">
+                      <span>{(p.productId?.name || p.name || "SP")} x{p.quantity}</span>
+                      <span className="fw-semibold">{(p.price * p.quantity).toLocaleString()}đ</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="d-flex justify-content-between fw-bold fs-4 pt-3 border-top">
+                <span>Tổng cộng</span>
+                <span>{Number(order.totalAmount).toLocaleString()}đ</span>
+              </div>
+            </div>
+
+            <div className="col-12 col-lg-4">
+              <div className="border rounded-3 p-3 bg-light sticky-lg-top" style={{ top: "90px" }}>
+                <h4 className="h5 fw-bold mb-3">Thao tác</h4>
+                <div className="d-grid gap-2">
+                  {order.paymentMethod === "vnpay" &&
+                    order.paymentStatus !== "paid" &&
+                    order.status !== "canceled" && (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={handleRepayVnpay}
+                      >
+                        Thanh toán lại bằng VNPay
+                      </button>
+                    )}
+
+                  {(order.status === "pending" || order.status === "confirmed") && (
+                    <button
+                      type="button"
+                      className="btn btn-outline-danger"
+                      onClick={handleCancelOrder}
+                    >
+                      Hủy đơn hàng
+                    </button>
+                  )}
+
+                  {order.status === "shipped" && (
+                    isLoggedIn ? (
+                      <button
+                        type="button"
+                        className="btn btn-success"
+                        onClick={handleConfirmDelivery}
+                      >
+                        Xác nhận đã nhận hàng
+                      </button>
+                    ) : (
+                      <Link
+                        to="/login"
+                        className="btn btn-secondary"
+                      >
+                        Đăng nhập để xác nhận
+                      </Link>
+                    )
+                  )}
+
+                  {order.status === "delivered" && (
+                    isLoggedIn ? (
+                      <button
+                        type="button"
+                        className="btn btn-warning"
+                        onClick={handleReturnRequest}
+                      >
+                        Yêu cầu hoàn hàng
+                      </button>
+                    ) : (
+                      <Link
+                        to="/login"
+                        className="btn btn-secondary"
+                      >
+                        Đăng nhập để hoàn hàng
+                      </Link>
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-
-        <div className="flex justify-between">
-          <span className="text-gray-500">Ngày đặt</span>
-          <span>{new Date(order.createdAt).toLocaleString("vi-VN")}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">Thanh toán</span>
-          <span>
-            {order.paymentMethod === "vnpay" ? "VNPay" : "COD"} -{" "}
-            {order.paymentStatus === "paid" ? "Đã thanh toán" : "Chưa thanh toán"}
-          </span>
-        </div>
-        {order.paymentMethod === "vnpay" &&
-          order.paymentStatus !== "paid" &&
-          order.status !== "canceled" && (
-            <button
-              type="button"
-              className="w-full py-2 bg-blue-600 text-white rounded"
-              onClick={handleRepayVnpay}
-            >
-              Thanh toán lại bằng VNPay
-            </button>
-          )}
-        <div>
-          <span className="text-gray-500 block">Địa chỉ giao hàng</span>
-          <p>
-            {order.fullName}, {order.phone}, {order.address}
-          </p>
-        </div>
-
-        <hr />
-
-        <div>
-          <h3 className="font-semibold mb-2">Sản phẩm</h3>
-          <ul className="space-y-1">
-            {order.products?.map((p, i) => (
-              <li key={i}>
-                {(p.productId?.name || p.name || "SP")} x{p.quantity} -{" "}
-                {(p.price * p.quantity).toLocaleString()}đ
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="flex justify-between font-bold">
-          <span>Tổng cộng</span>
-          <span>{Number(order.totalAmount).toLocaleString()}đ</span>
-        </div>
-
-        {order.status === "shipped" && (
-          isLoggedIn ? (
-            <button
-              type="button"
-              className="w-full py-2 bg-green-600 text-white rounded"
-              onClick={handleConfirmDelivery}
-            >
-              Xác nhận đã nhận hàng
-            </button>
-          ) : (
-            <Link
-              to="/login"
-              className="w-full block text-center py-2 rounded bg-gray-200 text-gray-700"
-            >
-              Đăng nhập để xác nhận
-            </Link>
-          )
-        )}
-        {order.status === "delivered" && (
-          isLoggedIn ? (
-            <button
-              type="button"
-              className="w-full py-2 bg-amber-600 text-white rounded"
-              onClick={handleReturnRequest}
-            >
-              Yêu cầu hoàn hàng
-            </button>
-          ) : (
-            <Link
-              to="/login"
-              className="w-full block text-center py-2 rounded bg-gray-200 text-gray-700"
-            >
-              Đăng nhập để hoàn hàng
-            </Link>
-          )
-        )}
       </div>
 
       {history?.length > 0 && (
-        <div className="mt-6 border rounded-lg p-4">
-          <h3 className="font-semibold mb-2">Lịch sử trạng thái</h3>
-          <ul className="space-y-1 text-sm text-gray-600">
+        <div className="card border-0 shadow-sm">
+          <div className="card-body p-4">
+          <h3 className="h3 fw-bold mb-3">Lịch sử trạng thái</h3>
+          <ul className="list-unstyled mb-0 text-secondary">
             {history.map((h, i) => (
-              <li key={i}>
+              <li key={i} className="mb-2">
                 {h.oldStatus && `${STATUS_LABELS[h.oldStatus] || h.oldStatus} → `}
                 {STATUS_LABELS[h.newStatus] || h.newStatus}
                 {h.createdAt && ` (${new Date(h.createdAt).toLocaleString("vi-VN")})`}
               </li>
             ))}
           </ul>
+          </div>
         </div>
       )}
     </div>

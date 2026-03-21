@@ -7,12 +7,14 @@ import {
   FaRegHeart,
   FaEye,
 } from "react-icons/fa";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
 
 const Product = ({ product }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const user = useSelector((state) => state.user);
+  const isLoggedIn = !!(user?.login && user?.token);
 
   const [wishlist, setWishlist] = useState(false);
   const [showQuickView, setShowQuickView] = useState(false);
@@ -95,6 +97,12 @@ const Product = ({ product }) => {
 
   // ADD CART
   const handleAddCart = () => {
+    if (!isLoggedIn) {
+      alert("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.");
+      navigate("/login", { state: { from: `/product/${product?._id || ""}` } });
+      return;
+    }
+
     if (hasVariants) {
       // Có biến thể (size/SKU) thì bắt buộc chọn ở trang chi tiết.
       navigate(`/product/${product._id}`);

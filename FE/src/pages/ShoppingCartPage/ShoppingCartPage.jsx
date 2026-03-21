@@ -1,5 +1,5 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   removeFromCart,
@@ -11,6 +11,48 @@ const ShoppingCartPage = () => {
   const cartItems = useSelector((state) => state.cart.items);
   const subtotal = useSelector(selectCartSubtotal);
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const [selectedItemIds, setSelectedItemIds] = useState([]);
+
+  useEffect(() => {
+    const ids = cartItems.map((i) => i.productId);
+    setSelectedItemIds(ids);
+  }, [cartItems]);
+
+  const selectedSubtotal = useMemo(() => {
+    const selected = new Set(selectedItemIds.map((id) => String(id)));
+    return cartItems.reduce((sum, item) => {
+      if (!selected.has(String(item.productId))) return sum;
+      return sum + Number(item.price || 0) * Number(item.qty || 0);
+    }, 0);
+  }, [cartItems, selectedItemIds]);
+
+  const allSelected =
+    cartItems.length > 0 && selectedItemIds.length === cartItems.length;
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedItemIds([]);
+      return;
+    }
+    setSelectedItemIds(cartItems.map((i) => i.productId));
+  };
+
+  const toggleSelectItem = (productId) => {
+    setSelectedItemIds((prev) => {
+      const exists = prev.some((id) => String(id) === String(productId));
+      if (exists) return prev.filter((id) => String(id) !== String(productId));
+      return [...prev, productId];
+    });
+  };
+
+  const goCheckoutWithSelected = () => {
+    if (selectedItemIds.length === 0) {
+      alert("Vui lòng chọn ít nhất 1 sản phẩm để thanh toán.");
+      return;
+    }
+    navigate("/checkout", { state: { selectedItemIds } });
+  };
 
   const formatMoney = (v) => `${Number(v || 0).toLocaleString()}đ`;
 
@@ -48,12 +90,13 @@ const ShoppingCartPage = () => {
             Tiếp tục mua sắm
           </Link>
           {cartItems.length > 0 && (
-            <Link
-              to="/checkout"
+            <button
+              type="button"
+              onClick={goCheckoutWithSelected}
               className="px-4 py-2 bg-black text-white rounded-lg hover:bg-red-600 transition font-semibold"
             >
-              Thanh toán
-            </Link>
+              Thanh toán ({selectedItemIds.length})
+            </button>
           )}
         </div>
       </div>
@@ -71,6 +114,19 @@ const ShoppingCartPage = () => {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleSelectAll}
+                />
+                Chọn tất cả
+              </label>
+              <span className="text-sm text-gray-500">
+                Đã chọn {selectedItemIds.length}/{cartItems.length} sản phẩm
+              </span>
+            </div>
             {cartItems.map((item) => {
               const unit = Number(item.price || 0);
               const qty = Number(item.qty || 1);
@@ -82,6 +138,15 @@ const ShoppingCartPage = () => {
                   className="border rounded-2xl bg-white p-4"
                 >
                   <div className="flex gap-4">
+                    <div className="pt-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedItemIds.some(
+                          (id) => String(id) === String(item.productId),
+                        )}
+                        onChange={() => toggleSelectItem(item.productId)}
+                      />
+                    </div>
                     <img
                       src={getImageUrl(item.image)}
                       alt={item.name}
@@ -178,7 +243,7 @@ const ShoppingCartPage = () => {
 
               <div className="flex items-center justify-between mb-3">
                 <span className="text-gray-600">Tạm tính</span>
-                <span className="font-bold">{formatMoney(subtotal)}</span>
+                <span className="font-bold">{formatMoney(selectedSubtotal)}</span>
               </div>
 
               <div className="flex items-center justify-between mb-3">
@@ -189,16 +254,18 @@ const ShoppingCartPage = () => {
               <div className="flex items-center justify-between mb-5 pt-4 border-t">
                 <span className="text-gray-600">Tổng</span>
                 <span className="text-lg font-bold">
-                  {formatMoney(subtotal)}
+                  {formatMoney(selectedSubtotal)}
                 </span>
               </div>
 
-              <Link
-                to="/checkout"
+              <button
+                type="button"
+                onClick={goCheckoutWithSelected}
+                disabled={selectedItemIds.length === 0}
                 className="block text-center px-4 py-3 bg-black text-white rounded-xl hover:bg-red-600 transition font-semibold"
               >
-                Đi tới thanh toán
-              </Link>
+                Đi tới thanh toán ({selectedItemIds.length})
+              </button>
 
               <p className="text-xs text-gray-500 mt-3">
                 Lưu ý: tồn kho theo size được kiểm tra tại trang chi tiết sản

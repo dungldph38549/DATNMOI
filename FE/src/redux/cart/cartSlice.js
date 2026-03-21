@@ -94,10 +94,17 @@ const cartSlice = createSlice({
       state.items = [];
       saveCart(state);
     },
+    removeManyFromCart: (state, action) => {
+      const ids = Array.isArray(action.payload) ? action.payload : [];
+      if (ids.length === 0) return;
+      const idSet = new Set(ids.map((id) => String(id)));
+      state.items = state.items.filter((i) => !idSet.has(String(i.productId)));
+      saveCart(state);
+    },
   },
 });
 
-export const { addToCart, removeFromCart, setQty, clearCart } =
+export const { addToCart, removeFromCart, setQty, clearCart, removeManyFromCart } =
   cartSlice.actions;
 
 export const selectCartCount = (state) =>
