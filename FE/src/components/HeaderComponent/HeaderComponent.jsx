@@ -43,52 +43,52 @@ const Header = () => {
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-50">
-      <div className="max-w-[1400px] mx-auto flex items-center justify-between px-10 py-6">
+      <div className="max-w-[1450px] mx-auto flex items-center justify-between px-12 py-7">
         {/* LOGO */}
 
         <div
           onClick={goHome}
           className="flex items-center gap-4 cursor-pointer"
         >
-          <div className="bg-black text-white px-4 py-2 rounded-xl text-xl font-bold">
+          <div className="bg-black text-white px-4 py-2 rounded-xl text-2xl font-bold leading-none">
             EO
           </div>
 
-          <span className="font-bold text-2xl">SNEAKERHOUSE</span>
+          <span className="font-bold text-3xl tracking-wide">SNEAKERHOUSE</span>
         </div>
 
         {/* SEARCH */}
 
         <form
           onSubmit={handleSearch}
-          className="flex items-center bg-gray-100 rounded-full px-6 py-3 w-[550px]"
+          className="flex items-center bg-gray-100 rounded-full px-7 py-4 w-[640px]"
         >
-          <FaSearch className="text-gray-400 mr-3" />
+          <FaSearch className="text-gray-400 mr-3 text-lg" />
 
           <input
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             placeholder="Tìm kiếm sản phẩm..."
-            className="bg-transparent outline-none w-full"
+            className="bg-transparent outline-none w-full text-base placeholder:text-gray-500"
           />
         </form>
 
         {/* RIGHT MENU */}
 
-        <div className="flex items-center gap-10 text-lg">
+        <div className="flex items-center gap-10 text-xl">
           {/* CART */}
 
           <div
             onClick={goCart}
-            className="flex items-center gap-2 cursor-pointer hover:text-blue-600"
+            className="flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors"
           >
-            <FaShoppingCart className="text-2xl" />
+            <FaShoppingCart className="text-3xl" />
 
             <span>Giỏ hàng</span>
 
             {cart.length > 0 && (
               <>
-                <span className="bg-red-500 text-white text-xs px-2 rounded-full">
+                <span className="bg-red-500 text-white text-sm px-2 rounded-full">
                   {cart.length}
                 </span>
                 <span className="text-sm text-slate-600">
@@ -102,9 +102,9 @@ const Header = () => {
 
           <div
             onClick={goOrders}
-            className="flex items-center gap-2 cursor-pointer hover:text-blue-600"
+            className="flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors"
           >
-            <FaClipboardList />
+            <FaClipboardList className="text-2xl" />
 
             <span>Đơn hàng</span>
           </div>
@@ -117,13 +117,13 @@ const Header = () => {
                 className="flex items-center gap-2"
                 title={user?.email}
               >
-                <FaUser />
+                <FaUser className="text-2xl" />
                 <span>{user?.name || user?.email || "Tài khoản"}</span>
               </div>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="text-sm px-3 py-1 rounded-full border border-slate-300 hover:bg-slate-100"
+                className="text-base px-4 py-2 rounded-full border border-slate-300 hover:bg-slate-100"
               >
                 Đăng xuất
               </button>
@@ -131,9 +131,9 @@ const Header = () => {
           ) : (
             <div
               onClick={goLogin}
-              className="flex items-center gap-2 cursor-pointer hover:text-blue-600"
+              className="flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors"
             >
-              <FaUser />
+              <FaUser className="text-2xl" />
               <span>Đăng nhập</span>
             </div>
           )}
