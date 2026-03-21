@@ -21,16 +21,24 @@ const CheckOut = () => {
 
   const items = useSelector((state) => state.cart.items);
   const user = useSelector((state) => state.user);
-  const selectedItemIds = Array.isArray(location?.state?.selectedItemIds)
-    ? location.state.selectedItemIds
-    : [];
+  const selectedItemKeys = useMemo(() => {
+    const selectedKeys = location?.state?.selectedItemKeys;
+    if (Array.isArray(selectedKeys)) return selectedKeys;
+    const selectedIds = location?.state?.selectedItemIds;
+    return Array.isArray(selectedIds)
+      ? selectedIds
+      : [];
+  }, [location?.state?.selectedItemKeys, location?.state?.selectedItemIds]);
   const selectedIdSet = useMemo(
-    () => new Set(selectedItemIds.map((id) => String(id))),
-    [selectedItemIds],
+    () => new Set(selectedItemKeys.map((id) => String(id))),
+    [selectedItemKeys],
   );
   const checkoutItems = useMemo(() => {
     if (selectedIdSet.size === 0) return items;
-    return items.filter((item) => selectedIdSet.has(String(item.productId)));
+    return items.filter((item) => {
+      const lineKey = item.cartKey || item.productId;
+      return selectedIdSet.has(String(lineKey));
+    });
   }, [items, selectedIdSet]);
   const subtotal = useMemo(
     () =>
@@ -270,13 +278,13 @@ const CheckOut = () => {
         if (url) {
           persistCheckoutInfo();
           await updateProfileIfLoggedIn();
-          dispatch(removeManyFromCart(checkoutItems.map((i) => i.productId)));
+          dispatch(removeManyFromCart(checkoutItems.map((i) => i.cartKey || i.productId)));
           window.location.href = url;
           return;
         }
       }
 
-      dispatch(removeManyFromCart(checkoutItems.map((i) => i.productId)));
+      dispatch(removeManyFromCart(checkoutItems.map((i) => i.cartKey || i.productId)));
       persistCheckoutInfo();
       await updateProfileIfLoggedIn();
 

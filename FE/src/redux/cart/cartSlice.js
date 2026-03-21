@@ -2,6 +2,16 @@ import { createSlice } from "@reduxjs/toolkit";
 
 const STORAGE_KEY = "cart_v1";
 
+const buildCartKey = ({ productId, sku, size }) => {
+  const variantKey =
+    sku != null && String(sku).trim() !== ""
+      ? String(sku).trim().toUpperCase()
+      : size != null && String(size).trim() !== ""
+        ? `SIZE:${String(size).trim()}`
+        : "default";
+  return `${String(productId)}::${variantKey}`;
+};
+
 const loadCart = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -15,6 +25,13 @@ const loadCart = () => {
       sku:
         i.sku == null ? null : String(i.sku).trim().toUpperCase(),
       size: i.size ?? null,
+      cartKey:
+        i.cartKey ??
+        buildCartKey({
+          productId: i.productId || i._id || i.id,
+          sku: i.sku,
+          size: i.size,
+        }),
     }));
     return { items: normalized };
   } catch {
@@ -47,18 +64,15 @@ const cartSlice = createSlice({
       const sku =
         skuRaw == null ? null : String(skuRaw).trim().toUpperCase();
       const size = payload.size ?? null;
+      const cartKey = buildCartKey({ productId, sku, size });
 
-      const existing = state.items.find((i) => i.productId === productId);
+      const existing = state.items.find((i) => i.cartKey === cartKey);
       if (existing) {
         existing.qty += qty;
-        // Nếu user thêm lại cùng sản phẩm nhưng khác biến thể (size/sku) → cập nhật thông tin để checkout đúng SKU.
-        if (sku !== null && existing.sku !== sku) {
-          existing.sku = sku;
-          existing.size = size;
-        }
         if (price) existing.price = price;
       } else {
         state.items.push({
+          cartKey,
           productId,
           name,
           image,
@@ -72,20 +86,72 @@ const cartSlice = createSlice({
       saveCart(state);
     },
     removeFromCart: (state, action) => {
-      const id = action.payload;
-      state.items = state.items.filter((i) => i.productId !== id);
+      const payload = action.payload;
+      if (payload && typeof payload === "object") {
+        const { cartKey, productId } = payload;
+        state.items = state.items.filter((i) => {
+          if (cartKey) return i.cartKey !== cartKey;
+          if (productId) return i.productId !== productId;
+          return true;
+        });
+      } else {
+        const id = payload;
+        state.items = state.items.filter(
+          (i) => i.productId !== id && i.cartKey !== id,
+        );
+      }
       saveCart(state);
     },
     setQty: (state, action) => {
-      const { productId, qty } = action.payload || {};
-      const item = state.items.find((i) => i.productId === productId);
+      const { cartKey, productId, qty } = action.payload || {};
+      const item = cartKey
+        ? state.items.find((i) => i.cartKey === cartKey)
+        : state.items.find((i) => i.productId === productId);
       if (!item) return;
 
       const nextQty = Number(qty);
       if (Number.isNaN(nextQty) || nextQty <= 0) {
-        state.items = state.items.filter((i) => i.productId !== productId);
+        state.items = state.items.filter((i) =>
+          cartKey ? i.cartKey !== cartKey : i.productId !== productId,
+        );
       } else {
         item.qty = Math.floor(nextQty);
+      }
+
+      saveCart(state);
+    },
+    updateCartVariant: (state, action) => {
+      const { cartKey, sku, size } = action.payload || {};
+      if (!cartKey) return;
+      const item = state.items.find((i) => i.cartKey === cartKey);
+      if (!item) return;
+
+      const normalizedSku =
+        sku == null || String(sku).trim() === ""
+          ? null
+          : String(sku).trim().toUpperCase();
+      const normalizedSize =
+        size == null || String(size).trim() === ""
+          ? null
+          : String(size).trim();
+
+      const nextCartKey = buildCartKey({
+        productId: item.productId,
+        sku: normalizedSku,
+        size: normalizedSize,
+      });
+
+      item.sku = normalizedSku;
+      item.size = normalizedSize;
+      item.cartKey = nextCartKey;
+
+      // Nếu đổi biến thể trùng item đã có sẵn thì gộp qty vào dòng đó.
+      const duplicate = state.items.find(
+        (i) => i !== item && i.cartKey === nextCartKey,
+      );
+      if (duplicate) {
+        duplicate.qty += item.qty;
+        state.items = state.items.filter((i) => i !== item);
       }
 
       saveCart(state);
@@ -98,13 +164,24 @@ const cartSlice = createSlice({
       const ids = Array.isArray(action.payload) ? action.payload : [];
       if (ids.length === 0) return;
       const idSet = new Set(ids.map((id) => String(id)));
-      state.items = state.items.filter((i) => !idSet.has(String(i.productId)));
+      state.items = state.items.filter(
+        (i) =>
+          !idSet.has(String(i.productId)) &&
+          !idSet.has(String(i.cartKey || "")),
+      );
       saveCart(state);
     },
   },
 });
 
-export const { addToCart, removeFromCart, setQty, clearCart, removeManyFromCart } =
+export const {
+  addToCart,
+  removeFromCart,
+  setQty,
+  clearCart,
+  removeManyFromCart,
+  updateCartVariant,
+} =
   cartSlice.actions;
 
 export const selectCartCount = (state) =>

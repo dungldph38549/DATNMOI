@@ -65,14 +65,6 @@ const ProductDetail = () => {
     return `http://localhost:3002/uploads/${img}`;
   };
 
-  // Lấy value thuộc tính variant (variant.attributes có thể là Map hoặc object khi lean/serialize khác nhau)
-  const getVariantAttr = (attrs, key) => {
-    if (!attrs) return null;
-    if (typeof attrs.get === "function") return attrs.get(key);
-    if (typeof attrs === "object") return attrs[key] ?? null;
-    return null;
-  };
-
   const getVariantSizeValue = (variant) => {
     const attrs = variant?.attributes;
     if (!attrs) return null;
@@ -161,7 +153,7 @@ const ProductDetail = () => {
       return selectedVariant?.price ?? product?.variants?.[0]?.price ?? 0;
     }
     return product.price ?? 0;
-  }, [product, selectedVariant]);
+  }, [product, selectedVariant, hasVariants]);
 
   const ratingAverage = reviewStats?.average ?? product?.rating ?? 4.5;
   const ratingTotal = reviewStats?.total ?? product?.reviewCount ?? 120;
@@ -225,7 +217,7 @@ const ProductDetail = () => {
     };
 
     run();
-  }, [product, selectedSku]);
+  }, [product, selectedSku, hasVariants]);
 
   // Clamp quantity theo tồn kho khi đã check xong
   useEffect(() => {
