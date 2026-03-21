@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { getProductById } from "../../api";
+import { getProductById, getStocks } from "../../api";
 import {
   removeFromCart,
   removeManyFromCart,
@@ -15,6 +15,8 @@ const ShoppingCartPage = () => {
   const navigate = useNavigate();
   const [selectedItemKeys, setSelectedItemKeys] = useState([]);
   const [variantOptionsByProduct, setVariantOptionsByProduct] = useState({});
+  const [stockByItemKey, setStockByItemKey] = useState({});
+  const [stockNoticeKey, setStockNoticeKey] = useState("");
   const [variantModal, setVariantModal] = useState({
     open: false,
     itemKey: null,
@@ -30,6 +32,56 @@ const ShoppingCartPage = () => {
       prev.filter((k) => keys.some((key) => String(key) === String(k))),
     );
   }, [cartItems]);
+
+  useEffect(() => {
+    const run = async () => {
+      const variantItems = cartItems.filter((i) => i?.sku);
+      if (variantItems.length === 0) {
+        setStockByItemKey({});
+        return;
+      }
+
+      try {
+        const payload = variantItems.map((i) => ({
+          productId: i.productId,
+          sku: i.sku,
+        }));
+        const res = await getStocks(payload);
+        const rows = Array.isArray(res) ? res : [];
+        const next = {};
+        rows.forEach((row, idx) => {
+          const item = variantItems[idx];
+          if (!item) return;
+          const key = getItemKey(item);
+          const max = Number(row?.countInStock ?? row?.stock ?? 0);
+          next[key] = Number.isFinite(max) ? Math.max(0, max) : 0;
+        });
+        setStockByItemKey(next);
+      } catch {
+        setStockByItemKey({});
+      }
+    };
+
+    run();
+  }, [cartItems]);
+
+  useEffect(() => {
+    cartItems.forEach((item) => {
+      const key = getItemKey(item);
+      const max = stockByItemKey[key];
+      if (!Number.isFinite(max)) return;
+      if (max <= 0) return;
+      const qty = Number(item.qty || 1);
+      if (qty > max) {
+        dispatch(
+          setQty({
+            cartKey: key,
+            qty: max,
+          }),
+        );
+      }
+    });
+  }, [cartItems, stockByItemKey, dispatch]);
 
   const selectedSubtotal = useMemo(() => {
     const selected = new Set(selectedItemKeys.map((id) => String(id)));
@@ -167,6 +219,11 @@ const ShoppingCartPage = () => {
     e.target.src = PLACEHOLDER_IMG;
   };
 
+  const showStockNotice = (itemKey) => {
+    setStockNoticeKey(String(itemKey));
+    setTimeout(() => setStockNoticeKey(""), 1800);
+  };
+
   return (
     <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-8 bg-[#f5f5f5] min-h-screen">
       <div className="flex items-center justify-between mb-4">
@@ -215,6 +272,10 @@ const ShoppingCartPage = () => {
               const unit = Number(item.price || 0);
               const qty = Number(item.qty || 1);
               const lineTotal = unit * qty;
+              const maxStock = Number(stockByItemKey[itemKey]);
+              const hasStockData = Number.isFinite(maxStock);
+              const safeMaxStock = hasStockData ? Math.max(0, maxStock) : null;
+              const canIncrease = hasStockData ? qty < safeMaxStock : true;
               const isSelected = selectedItemKeys.some(
                 (id) => String(id) === String(itemKey),
               );
@@ -262,7 +323,7 @@ const ShoppingCartPage = () => {
                   </div>
 
                   <div className="md:col-span-2 md:justify-self-center">
-                    <div className="inline-flex items-center border">
+                    <div className="relative inline-flex items-center border">
                       <button
                         type="button"
                         onClick={() =>
@@ -285,18 +346,32 @@ const ShoppingCartPage = () => {
                       <button
                         type="button"
                         onClick={() =>
-                          dispatch(
-                            setQty({
-                              cartKey: itemKey,
-                              qty: qty + 1,
-                            }),
-                          )
+                          canIncrease
+                            ? dispatch(
+                                setQty({
+                                  cartKey: itemKey,
+                                  qty: qty + 1,
+                                }),
+                              )
+                            : showStockNotice(itemKey)
                         }
-                        className="w-9 h-9 border-l text-base"
+                        className={`w-9 h-9 border-l text-base ${
+                          !canIncrease ? "opacity-40" : ""
+                        }`}
                         aria-label="Tăng số lượng"
                       >
                         +
                       </button>
+                      {stockNoticeKey === String(itemKey) && (
+                        <div className="absolute left-full top-1/2 z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-gray-300 bg-white px-2 py-1 text-[12px] text-gray-800 shadow">
+                          <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded bg-yellow-500 font-bold text-white">
+                            !
+                          </span>
+                          {safeMaxStock === 0
+                            ? "Sản phẩm đã hết hàng"
+                            : "Số lượng bạn chọn đã đạt mức tối đa của sản phẩm này"}
+                        </div>
+                      )}
                     </div>
                   </div>
 

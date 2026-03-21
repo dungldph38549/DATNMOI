@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
 import {
@@ -15,6 +15,7 @@ import {
 
 const ProductDetail = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const user = useSelector((state) => state.user);
 
@@ -42,6 +43,7 @@ const ProductDetail = () => {
 
   const [checkingStock, setCheckingStock] = useState(false);
   const [stockInfo, setStockInfo] = useState(null); // { countInStock, available, sku, size, color }
+  const [qtyNotice, setQtyNotice] = useState("");
 
   const PLACEHOLDER_IMG =
     "https://via.placeholder.com/400x400/f0f0f0/999?text=No+Image";
@@ -270,7 +272,7 @@ const ProductDetail = () => {
   }, [product, reviewsReload]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAddToCart = async () => {
-    if (!product) return;
+    if (!product) return false;
 
     const isVariant = hasVariants;
     // sizeToSave: cố lấy "value" thật (không fallback bằng sku)
@@ -279,12 +281,12 @@ const ProductDetail = () => {
 
     if (isVariant && !skuToSave) {
       alert("Vui lòng chọn size!");
-      return;
+      return false;
     }
 
     if (stockInfo?.available === false) {
       alert("Sản phẩm hiện đã hết hàng theo size đã chọn.");
-      return;
+      return false;
     }
 
     const qtySafe = (() => {
@@ -322,6 +324,13 @@ const ProductDetail = () => {
       // Không chặn flow checkout nếu BE cart đang lỗi
       console.error("Save cart to DB error:", err);
     }
+    return true;
+  };
+
+  const handleBuyNow = async () => {
+    const added = await handleAddToCart();
+    if (!added) return;
+    navigate("/checkout");
   };
 
   const renderStarsText = (rating) => {
@@ -412,11 +421,21 @@ const ProductDetail = () => {
     }
   };
 
+  const stockCountDisplay =
+    stockInfo?.countInStock ?? product?.countInStock ?? product?.stock ?? 0;
+  const maxSelectableQty = Math.max(0, Number(stockCountDisplay || 0));
+  const canIncreaseQty = maxSelectableQty <= 0 ? false : quantity < maxSelectableQty;
+  const isOutOfStock = maxSelectableQty <= 0 || stockInfo?.available === false;
+
+  useEffect(() => {
+    if (isOutOfStock || quantity < maxSelectableQty) {
+      setQtyNotice("");
+    }
+  }, [quantity, maxSelectableQty, isOutOfStock]);
+
   if (!product) return <p className="text-center mt-10">Loading...</p>;
 
   const isVariant = hasVariants;
-  const stockCountDisplay =
-    stockInfo?.countInStock ?? product?.countInStock ?? product?.stock ?? 0;
 
   return (
     <div className="container py-5">
@@ -457,22 +476,68 @@ const ProductDetail = () => {
 
         {/* INFO */}
         <div className="col-12 col-lg-6">
-          <h1 className="fw-bold mb-2" style={{ fontSize: "2.4rem", lineHeight: 1.2 }}>
-            {product.name}
-          </h1>
+          <div className="d-flex align-items-center gap-2 mb-2">
+            <span
+              className="badge"
+              style={{ background: "#ee4d2d", color: "#fff", fontSize: 12 }}
+            >
+              Yêu thích
+            </span>
+            <h1 className="fw-bold m-0" style={{ fontSize: "2rem", lineHeight: 1.2 }}>
+              {product.name}
+            </h1>
+          </div>
 
-          <p className="mb-2" style={{ color: "#f59e0b", fontSize: "1.05rem" }}>
-            {renderStarsText(ratingAverage)} ({Number(ratingAverage).toFixed(1)} / 5)
-          </p>
+          <div
+            className="d-flex align-items-center flex-wrap gap-3 mb-3 pb-2"
+            style={{ borderBottom: "1px solid #f1f5f9" }}
+          >
+            <span style={{ color: "#f59e0b", fontSize: "1.12rem" }}>
+              {Number(ratingAverage).toFixed(1)} {renderStarsText(ratingAverage)}
+            </span>
+            <span style={{ color: "#64748b" }}>|</span>
+            <span style={{ fontSize: "1.12rem" }}>{Number(ratingTotal)} Đánh Giá</span>
+            <span style={{ color: "#64748b" }}>|</span>
+            <span style={{ fontSize: "1.12rem" }}>Đã Bán {Number(ratingTotal)}</span>
+            <span className="ms-auto text-secondary" style={{ fontSize: "1.08rem" }}>
+              Tố cáo
+            </span>
+          </div>
 
-          <p className="fw-bold mb-4" style={{ color: "#ef4444", fontSize: "2.2rem" }}>
-            {Number(displayPrice).toLocaleString()}₫
-          </p>
+          <div
+            className="mb-4 px-3 py-3"
+            style={{ background: "#fafafa", borderRadius: 6 }}
+          >
+            <p className="fw-bold m-0" style={{ color: "#ef4444", fontSize: "2.2rem" }}>
+              {Number(displayPrice).toLocaleString()}₫
+            </p>
+          </div>
+
+          <div className="mb-3 d-flex gap-4">
+            <div style={{ minWidth: 130, color: "#64748b", fontSize: "1.2rem" }}>
+              Vận Chuyển
+            </div>
+            <div>
+              <div className="fw-medium" style={{ fontSize: "1.2rem" }}>
+                Nhận trong 23 Th03
+              </div>
+              <div style={{ color: "#059669", fontSize: "1.2rem" }}>Phí ship 0₫</div>
+            </div>
+          </div>
+
+          <div className="mb-4 d-flex gap-4">
+            <div style={{ minWidth: 130, color: "#64748b", fontSize: "1.2rem" }}>
+              An Tâm Mua Sắm
+            </div>
+            <div className="fw-medium" style={{ fontSize: "1.2rem" }}>
+              Trả hàng miễn phí 15 ngày
+            </div>
+          </div>
 
           {/* SIZE */}
           {isVariant ? (
             <div className="mb-4 mb-md-5">
-              <p className="fw-semibold mb-2" style={{ fontSize: "1.15rem" }}>
+              <p className="fw-semibold mb-2" style={{ fontSize: "1.3rem" }}>
                 Chọn size:
               </p>
               <div className="d-flex gap-2 gap-md-3 flex-wrap">
@@ -489,13 +554,18 @@ const ProductDetail = () => {
                       key={size}
                       onClick={() => !isDisabled && setSelectedSize(String(size))}
                       disabled={isDisabled}
-                      className={`btn rounded-pill px-4 py-2 fw-semibold ${
-                        isSelected
-                          ? "btn-dark"
-                          : isDisabled
-                            ? "btn-light text-secondary border"
-                            : "btn-outline-secondary"
-                      }`}
+                      className="btn rounded-pill fw-semibold"
+                      style={{
+                        padding: "10px 22px",
+                        borderWidth: 1.5,
+                        borderStyle: "solid",
+                        borderColor: isSelected ? "#ee4d2d" : "#6b7280",
+                        background: isSelected ? "#fff1ee" : "#fff",
+                        color: isSelected ? "#ee4d2d" : "#334155",
+                        opacity: isDisabled ? 0.45 : 1,
+                        cursor: isDisabled ? "not-allowed" : "pointer",
+                        fontSize: "1.15rem",
+                      }}
                     >
                       {size}
                     </button>
@@ -507,51 +577,78 @@ const ProductDetail = () => {
 
           {/* QUANTITY */}
           <div className="mb-4 mb-md-5">
-            <p className="fw-semibold mb-2" style={{ fontSize: "1.15rem" }}>
+            <p className="fw-semibold mb-2" style={{ fontSize: "1.35rem" }}>
               Số lượng:
             </p>
-            <div className="d-flex align-items-center gap-3">
-              <button
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="btn btn-outline-secondary px-3 py-1"
-                style={{ fontSize: "1.1rem", lineHeight: 1 }}
-              >
-                -
-              </button>
-              <span className="fw-bold" style={{ minWidth: 24, fontSize: "1.2rem" }}>
-                {quantity}
+            <div className="d-flex align-items-center gap-3 flex-wrap">
+              <div className="d-inline-flex align-items-center border rounded overflow-hidden bg-white">
+                <button
+                  type="button"
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  disabled={quantity <= 1}
+                  className="btn btn-outline-secondary border-0 border-end rounded-0 px-3 py-1"
+                  style={{ fontSize: "1.3rem", lineHeight: 1, minWidth: 54, minHeight: 46 }}
+                >
+                  -
+                </button>
+                <span
+                  className="fw-bold text-center"
+                  style={{ minWidth: 62, fontSize: "1.45rem" }}
+                >
+                  {quantity}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!canIncreaseQty) {
+                      setQtyNotice(
+                        isOutOfStock
+                          ? "Sản phẩm này hiện đã hết hàng"
+                          : "Số lượng bạn chọn đã đạt mức tối đa của sản phẩm này",
+                      );
+                      return;
+                    }
+                    setQuantity((q) =>
+                      Math.min(Math.max(1, maxSelectableQty || 1), q + 1),
+                    );
+                  }}
+                  className="btn btn-outline-secondary border-0 border-start rounded-0 px-3 py-1"
+                  style={{ fontSize: "1.3rem", lineHeight: 1, minWidth: 54, minHeight: 46 }}
+                >
+                  +
+                </button>
+              </div>
+              <span className="text-secondary fw-medium" style={{ fontSize: "1.2rem" }}>
+                {`${Math.max(0, maxSelectableQty)} sản phẩm có sẵn`}
               </span>
-              <button
-                onClick={() => setQuantity(quantity + 1)}
-                className="btn btn-outline-secondary px-3 py-1"
-                style={{ fontSize: "1.1rem", lineHeight: 1 }}
-              >
-                +
-              </button>
             </div>
+            {qtyNotice && (
+              <p className="text-danger mt-2 mb-0 fw-medium" style={{ fontSize: "1.25rem" }}>
+                {qtyNotice}
+              </p>
+            )}
           </div>
 
-          {/* STOCK */}
-          <p className="text-success fw-semibold mb-4" style={{ fontSize: "1.1rem" }}>
-            {checkingStock ? (
-              "Đang kiểm tra tồn kho..."
-            ) : isVariant ? (
-              `Còn ${stockCountDisplay} sản phẩm (size ${selectedSize ?? "-"})`
-            ) : (
-              `Còn ${stockCountDisplay} sản phẩm`
-            )}
-          </p>
+            <div className="d-flex gap-3 flex-wrap">
+              <button
+                onClick={handleAddToCart}
+                disabled={checkingStock || isOutOfStock}
+                className="btn btn-outline-danger px-4 py-3 fw-semibold"
+                style={{ fontSize: "1.25rem", minWidth: 260, borderColor: "#ee4d2d", color: "#ee4d2d" }}
+              >
+                🛒 Thêm vào giỏ hàng
+              </button>
+              <button
+                onClick={handleBuyNow}
+                disabled={checkingStock || isOutOfStock}
+                className="btn btn-danger px-4 py-3 fw-semibold"
+                style={{ fontSize: "1.25rem", minWidth: 230 }}
+              >
+                Mua ngay
+              </button>
+            </div>
 
-          <button
-            onClick={handleAddToCart}
-            disabled={checkingStock || (isVariant && stockInfo?.available === false)}
-            className="btn btn-dark w-100 py-3 rounded-pill fw-semibold"
-            style={{ fontSize: "1.2rem" }}
-          >
-            🛒 Thêm vào giỏ hàng
-          </button>
-
-          <div className="mt-4 text-secondary" style={{ fontSize: "1rem" }}>
+            <div className="mt-4 text-secondary" style={{ fontSize: "1.2rem" }}>
             🚚 Giao hàng toàn quốc <br />
             🔄 Đổi trả 7 ngày <br />
             💳 COD
