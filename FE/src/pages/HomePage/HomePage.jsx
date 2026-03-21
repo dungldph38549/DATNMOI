@@ -17,7 +17,7 @@ const HomePage = () => {
   const [newProducts, setNewProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedBrand, setSelectedBrand] = useState("");
+  const [selectedBrand] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [sort, setSort] = useState("new");
   const [slide, setSlide] = useState(0);
@@ -148,6 +148,42 @@ const HomePage = () => {
     e.target.onerror = null;
     e.target.src = PLACEHOLDER_IMG;
   };
+  const getDisplayPrice = (p) => {
+    const range = p?.priceRange;
+    const minFromRange = Number(range?.min);
+    const maxFromRange = Number(range?.max);
+
+    if (Number.isFinite(minFromRange) && Number.isFinite(maxFromRange)) {
+      return minFromRange === maxFromRange
+        ? `${minFromRange.toLocaleString("vi-VN")}đ`
+        : `${minFromRange.toLocaleString("vi-VN")}đ - ${maxFromRange.toLocaleString("vi-VN")}đ`;
+    }
+
+    if (Number.isFinite(minFromRange)) {
+      return `${minFromRange.toLocaleString("vi-VN")}đ`;
+    }
+
+    if (Array.isArray(p?.variants) && p.variants.length > 0) {
+      const prices = p.variants
+        .map((v) => Number(v?.price))
+        .filter((n) => Number.isFinite(n));
+
+      if (prices.length > 0) {
+        const min = Math.min(...prices);
+        const max = Math.max(...prices);
+        return min === max
+          ? `${min.toLocaleString("vi-VN")}đ`
+          : `${min.toLocaleString("vi-VN")}đ - ${max.toLocaleString("vi-VN")}đ`;
+      }
+    }
+
+    const singlePrice = Number(p?.price);
+    if (Number.isFinite(singlePrice)) {
+      return `${singlePrice.toLocaleString("vi-VN")}đ`;
+    }
+
+    return "Liên hệ";
+  };
 
   return (
     <main className="bg-gray-50 min-h-screen">
@@ -274,6 +310,35 @@ const HomePage = () => {
               ))}
             </ul>
           </div>
+
+          {/* PROMO */}
+          <div className="bg-gradient-to-br from-black to-slate-800 text-white rounded-xl shadow p-6">
+            <p className="text-sm uppercase tracking-wider text-yellow-300 mb-2">
+              Khuyến mãi hôm nay
+            </p>
+            <h4 className="text-2xl font-black leading-tight">
+              Giảm đến 30%
+            </h4>
+            <p className="text-sm text-slate-200 mt-3">
+              Áp dụng cho một số mẫu sneaker mới.
+            </p>
+            <Link
+              to="/product"
+              className="inline-block mt-5 bg-yellow-400 text-black font-bold px-5 py-2 rounded-full hover:scale-105 transition"
+            >
+              Xem ngay
+            </Link>
+          </div>
+
+          {/* SERVICE INFO */}
+          <div className="bg-white rounded-xl shadow p-6">
+            <h4 className="text-lg font-bold text-black mb-4">Cam kết</h4>
+            <ul className="space-y-3 text-sm text-slate-700">
+              <li className="flex items-center gap-2">🚚 Giao nhanh toàn quốc</li>
+              <li className="flex items-center gap-2">🔁 Đổi trả trong 7 ngày</li>
+              <li className="flex items-center gap-2">✅ Hàng chính hãng 100%</li>
+            </ul>
+          </div>
         </div>
 
         {/* PRODUCT AREA */}
@@ -334,12 +399,12 @@ ${sort === "high" ? "bg-blue-500 text-white" : "bg-gray-200 hover:bg-gray-300"}
                   <Link
                     to={`/product/${p._id}`}
                     key={p._id}
-                    className="bg-white rounded-2xl shadow hover:shadow-2xl transition p-6 block"
+                    className="group bg-white rounded-2xl shadow hover:shadow-2xl transition p-6 block"
                   >
                     <img
                       src={getProductImageUrl(p)}
                       alt={p.name}
-                      className="h-80 mx-auto object-contain"
+                      className="h-80 mx-auto object-contain transition duration-300 ease-out group-hover:-translate-y-1 group-hover:scale-105 active:scale-95"
                       onError={onImgError}
                     />
 
@@ -348,7 +413,7 @@ ${sort === "high" ? "bg-blue-500 text-white" : "bg-gray-200 hover:bg-gray-300"}
                     </h3>
 
                     <p className="text-red-500 font-bold text-xl mt-2">
-                      {Number(p.price).toLocaleString()}đ
+                      {getDisplayPrice(p)}
                     </p>
                   </Link>
                 ))}
@@ -369,12 +434,12 @@ ${sort === "high" ? "bg-blue-500 text-white" : "bg-gray-200 hover:bg-gray-300"}
                   <Link
                     to={`/product/${p._id}`}
                     key={p._id}
-                    className="bg-white rounded-2xl shadow hover:shadow-2xl transition p-6 block"
+                    className="group bg-white rounded-2xl shadow hover:shadow-2xl transition p-6 block"
                   >
                     <img
                       src={getProductImageUrl(p)}
                       alt={p.name}
-                      className="h-80 mx-auto object-contain"
+                      className="h-80 mx-auto object-contain transition duration-300 ease-out group-hover:-translate-y-1 group-hover:scale-105 active:scale-95"
                       onError={onImgError}
                     />
 
@@ -383,7 +448,7 @@ ${sort === "high" ? "bg-blue-500 text-white" : "bg-gray-200 hover:bg-gray-300"}
                     </h3>
 
                     <p className="text-red-500 font-bold text-xl mt-2">
-                      {Number(p.price).toLocaleString()}đ
+                      {getDisplayPrice(p)}
                     </p>
                   </Link>
                 ))}
@@ -404,12 +469,12 @@ ${sort === "high" ? "bg-blue-500 text-white" : "bg-gray-200 hover:bg-gray-300"}
                   <Link
                     to={`/product/${p._id}`}
                     key={p._id}
-                    className="bg-white rounded-2xl shadow hover:shadow-2xl transition p-6 block"
+                    className="group bg-white rounded-2xl shadow hover:shadow-2xl transition p-6 block"
                   >
                     <img
                       src={getProductImageUrl(p)}
                       alt={p.name}
-                      className="h-80 mx-auto object-contain"
+                      className="h-80 mx-auto object-contain transition duration-300 ease-out group-hover:-translate-y-1 group-hover:scale-105 active:scale-95"
                       onError={onImgError}
                     />
 
@@ -418,7 +483,7 @@ ${sort === "high" ? "bg-blue-500 text-white" : "bg-gray-200 hover:bg-gray-300"}
                     </h3>
 
                     <p className="text-red-500 font-bold text-xl mt-2">
-                      {Number(p.price).toLocaleString()}đ
+                      {getDisplayPrice(p)}
                     </p>
                   </Link>
                 ))}

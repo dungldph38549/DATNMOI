@@ -125,14 +125,14 @@ const Product = ({ product }) => {
             <img
               src={image1}
               alt={product.name}
-              className="absolute w-full h-full object-cover transition duration-300 group-hover:opacity-0"
+              className="absolute w-full h-full object-cover transition duration-300 ease-out group-hover:opacity-0 group-hover:-translate-y-1 group-hover:scale-105 active:scale-95"
               onError={onImageError}
             />
 
             <img
               src={image2}
               alt={product.name}
-              className="w-full h-full object-cover opacity-0 group-hover:opacity-100 transition duration-300"
+              className="w-full h-full object-cover opacity-0 transition duration-300 ease-out group-hover:opacity-100 group-hover:-translate-y-1 group-hover:scale-105 active:scale-95"
               onError={onImageError}
             />
 
