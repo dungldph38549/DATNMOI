@@ -5,6 +5,8 @@ import {
   getInventoryLogs,
   importInventoryStock,
   adjustInventoryStock,
+  createInventory,
+  getAllProducts,
 } from "../api";
 
 // ── Components ────────────────────────────────────────────────
@@ -359,6 +361,132 @@ const AdjustModal = ({ inv, onClose, onDone }) => {
           Huỷ
         </Btn>
       </div>
+    </Modal>
+  );
+};
+
+// ── Create SKU Modal ───────────────────────────────────────────
+const CreateInventoryModal = ({ onClose, onDone }) => {
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  const [form, setForm] = useState({
+    productId: "",
+    sku: "",
+    lowStockThreshold: 10,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadProducts = async () => {
+      setLoadingProducts(true);
+      try {
+        const res = await getAllProducts({
+          page: 0,
+          limit: 50,
+          isListProductRemoved: false,
+          filter: {},
+        });
+        const list = Array.isArray(res?.data) ? res.data : [];
+        if (!cancelled) setProducts(list);
+      } catch {
+        if (!cancelled) setProducts([]);
+      } finally {
+        if (!cancelled) setLoadingProducts(false);
+      }
+    };
+    loadProducts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const submit = async () => {
+    if (!form.productId || !form.sku.trim()) return;
+    setLoading(true);
+    try {
+      await createInventory({
+        productId: form.productId,
+        sku: form.sku.trim().toUpperCase(),
+        lowStockThreshold: Number(form.lowStockThreshold) || 10,
+      });
+      onDone("Tạo tồn kho/SKU thành công!", "success");
+      onClose();
+    } catch (e) {
+      onDone(
+        e?.response?.data?.message ||
+          e?.response?.data?.error ||
+          e?.message ||
+          "Lỗi tạo tồn kho",
+        "error",
+      );
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal title="➕ Tạo tồn kho (SKU)" onClose={onClose}>
+      {loadingProducts ? (
+        <div style={{ textAlign: "center", color: "#9CA3AF", padding: 40 }}>
+          Đang tải sản phẩm...
+        </div>
+      ) : (
+        <>
+          <Select
+            label="Sản phẩm *"
+            value={form.productId}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, productId: e.target.value }))
+            }
+          >
+            <option value="" disabled>
+              Chọn sản phẩm
+            </option>
+            {products.map((p) => (
+              <option key={p._id} value={p._id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+
+          <Input
+            label="SKU *"
+            type="text"
+            value={form.sku}
+            onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
+            placeholder="VD: NIKE-RED-42"
+          />
+
+          <Input
+            label="Cảnh báo sắp hết (lowStockThreshold)"
+            type="number"
+            min="0"
+            value={form.lowStockThreshold}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                lowStockThreshold: e.target.value,
+              }))
+            }
+          />
+
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <Btn
+              variant="primary"
+              loading={loading}
+              onClick={submit}
+              style={{ flex: 1 }}
+            >
+              Tạo tồn kho
+            </Btn>
+            <Btn variant="secondary" onClick={onClose} disabled={loading}>
+              Huỷ
+            </Btn>
+          </div>
+        </>
+      )}
     </Modal>
   );
 };
@@ -787,7 +915,16 @@ export default function InventoryDashboard() {
                       color: "#9CA3AF",
                     }}
                   >
-                    Không tìm thấy dữ liệu
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
+                      <div>Không tìm thấy dữ liệu</div>
+                      <Btn
+                        variant="primary"
+                        onClick={() => setModal({ type: "create-inventory" })}
+                        style={{ padding: "9px 18px", borderRadius: 10 }}
+                      >
+                        Tạo tồn kho (SKU)
+                      </Btn>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -939,6 +1076,13 @@ export default function InventoryDashboard() {
       )}
       {modal?.type === "logs" && (
         <LogsModal inv={modal.inv} onClose={closeModal} />
+      )}
+
+      {modal?.type === "create-inventory" && (
+        <CreateInventoryModal
+          onClose={closeModal}
+          onDone={(msg, type) => notify(msg, type)}
+        />
       )}
 
       {toast && <Toast msg={toast.msg} type={toast.type} />}

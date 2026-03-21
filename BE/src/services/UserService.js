@@ -100,7 +100,8 @@ const loginUser = async (userLogin) => {
     };
   }
 
-  if (user.isBanned) {
+  // UserModel dùng isActive (soft ban) thay vì isBanned
+  if (user.isActive === false || user.isBanned) {
     throw { status: 403, message: "Tài khoản của bạn đã bị khoá!" };
   }
 
@@ -269,8 +270,37 @@ const updateCustomer = async (id, payload) => {
 // Admin cập nhật user bất kỳ (trừ mật khẩu)
 const updateUser = async (id, payload) => {
   if (!isValidId(id)) throw { status: 400, message: "ID không hợp lệ" };
-  const { password, ...updateData } = payload;
 
+  // Frontend đang gửi { isAdmin, isStaff, isBanned }.
+  // Trong UserModel, quyền được lưu ở field `role`, còn trạng thái bị khoá dùng `isActive`.
+  const {
+    password,
+    isAdmin,
+    isStaff,
+    isBanned,
+    // cho phép gửi thẳng role nếu frontend có (dự phòng)
+    role: requestedRole,
+    ...rest
+  } = payload;
+
+  const updateData = { ...rest };
+
+  // Map quyền từ boolean sang role
+  if (typeof isAdmin === "boolean" || typeof isStaff === "boolean") {
+    // Ưu tiên admin > staff > customer
+    if (isAdmin === true) updateData.role = "admin";
+    else if (isStaff === true) updateData.role = "staff";
+    else updateData.role = "customer";
+  } else if (typeof requestedRole === "string") {
+    updateData.role = requestedRole;
+  }
+
+  // Map isBanned -> isActive
+  if (typeof isBanned === "boolean") {
+    updateData.isActive = !isBanned;
+  }
+
+  // password của admin hiện chưa được hỗ trợ cập nhật tại đây
   const updatedUser = await User.findByIdAndUpdate(id, updateData, { new: true });
   if (!updatedUser) throw { status: 404, message: "Không tìm thấy người dùng" };
   return sanitize(updatedUser);
