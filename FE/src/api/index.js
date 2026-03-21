@@ -64,7 +64,11 @@ export const updateCustomerById = async (payload) => {
 
 export const getAllUser = async (page, limit) => {
   // Backend staff list (có phân trang): GET /api/user/list?page=&limit=
+
+  // Admin: danh sách user có phân trang
+  // Backend: GET /api/user/list?page=&limit=
   const res = await axiosInstance.get(`/user/list?page=${page}&limit=${limit}`);
+
   return res.data;
 };
 // ================== Product API ==================
@@ -363,6 +367,14 @@ export const importInventoryStock = async (id, body) => {
   return inventoryData(res);
 };
 
+/** POST /api/inventory — create inventory by SKU
+ * Body: { productId, variantId?, sku, lowStockThreshold? }
+ */
+export const createInventory = async (payload) => {
+  const res = await axiosInstance.post("/inventory", payload);
+  return inventoryData(res);
+};
+
 /** PATCH /api/inventory/:id/adjust — body: { newQty, warehouseId?, note } */
 export const adjustInventoryStock = async (id, body) => {
   const res = await axiosInstance.patch(`/inventory/${id}/adjust`, body);
@@ -543,7 +555,10 @@ export const createReview = async (payload) => {
 };
 
 // ================== Review API (Admin) ==================
-export const getAdminReviews = async ({ status = "pending", productId } = {}) => {
+export const getAdminReviews = async ({
+  status = "pending",
+  productId,
+} = {}) => {
   const res = await axiosInstance.get("/admin/reviews", {
     params: { status, productId },
   });
@@ -556,6 +571,8 @@ export const approveAdminReview = async (id) => {
 };
 
 export const rejectAdminReview = async (id, reason = "") => {
-  const res = await axiosInstance.patch(`/admin/reviews/${id}/reject`, { reason });
+  const res = await axiosInstance.patch(`/admin/reviews/${id}/reject`, {
+    reason,
+  });
   return res.data;
 };

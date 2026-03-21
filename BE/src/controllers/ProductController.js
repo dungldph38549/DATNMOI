@@ -11,7 +11,11 @@ const { successResponse, errorResponse } = require("../utils/response.js");
 // ================================================================
 exports.createProduct = async (req, res) => {
   try {
-    const newProduct = await ProductService.createProduct(req.body.payload);
+    // Hỗ trợ cả 2 kiểu payload:
+    // 1) { payload: {...} } (FE hiện tại)
+    // 2) {...}            (test bằng Postman / script)
+    const input = req.body?.payload ?? req.body;
+    const newProduct = await ProductService.createProduct(input);
     successResponse({ res, data: newProduct, statusCode: 201 });
   } catch (err) {
     res.status(400).json({ message: err.message });
