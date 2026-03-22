@@ -30,6 +30,14 @@ const TRANSITIONS = {
   rejected: [],
 };
 
+/** Nhãn bước tiếp theo trong Select (giữ nguyên value gửi API). */
+const labelForNextStatus = (fromNormalized, toValue) => {
+  if (fromNormalized === "delivered" && toValue === "return-request") {
+    return "Người dùng đã nhận";
+  }
+  return STATUS_OPTIONS.find((o) => o.value === toValue)?.label || toValue;
+};
+
 export default function Order({ mode = "all" }) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
@@ -122,7 +130,9 @@ export default function Order({ mode = "all" }) {
       key: "status",
       width: 180,
       render: (status, record) => {
-        const next = allowedNext(status);
+        const normalized =
+          typeof status === "string" ? status.trim().toLowerCase() : status;
+        const next = allowedNext(normalized);
         if (next.length === 0) {
           return (
             <span
@@ -133,24 +143,31 @@ export default function Order({ mode = "all" }) {
                 background: "#f0f0f0",
               }}
             >
-              {STATUS_OPTIONS.find((o) => o.value === status)?.label || status}
+              {STATUS_OPTIONS.find((o) => o.value === normalized)?.label ||
+                status}
             </span>
           );
         }
         return (
           <Select
             size="small"
-            value={status}
+            value={normalized}
             style={{ width: 160 }}
+            getPopupContainer={() => document.body}
             options={[
-              { value: status, label: STATUS_OPTIONS.find((o) => o.value === status)?.label || status },
+              {
+                value: normalized,
+                label:
+                  STATUS_OPTIONS.find((o) => o.value === normalized)?.label ||
+                  status,
+              },
               ...next.map((v) => ({
                 value: v,
-                label: STATUS_OPTIONS.find((o) => o.value === v)?.label || v,
+                label: labelForNextStatus(normalized, v),
               })),
             ]}
             onChange={(newStatus) => {
-              if (newStatus === status) return;
+              if (newStatus === normalized) return;
               const orderId = String(
                 record?._id?.$oid || record?._id || record?.id || "",
               ).trim();

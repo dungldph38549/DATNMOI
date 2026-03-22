@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { getOrderById, confirmDelivery, returnOrderRequest, createVnpayUrl, cancelOrderByUser } from "../../api";
-import { FaBoxOpen, FaCheckCircle, FaTruck, FaMapMarkerAlt, FaTimesCircle, FaChevronLeft, FaUndoAlt, FaCreditCard, FaMoneyBillWave, FaShieldAlt } from "react-icons/fa";
+import { FaBoxOpen, FaCheckCircle, FaTruck, FaMapMarkerAlt, FaTimesCircle, FaChevronLeft, FaUndoAlt, FaCreditCard, FaMoneyBillWave, FaShieldAlt, FaTimes } from "react-icons/fa";
 
 const STATUS_LABELS = {
   pending: "Chờ xử lý", confirmed: "Đã xác nhận", shipped: "Đang giao", delivered: "Đã giao",
@@ -30,12 +30,34 @@ const getTrackingProgress = (status) => {
 
 const formatMoney = (v) => `${Number(v || 0).toLocaleString("vi-VN")}đ`;
 
+const normHistoryStatus = (s) =>
+  typeof s === "string" ? s.trim().toLowerCase() : s;
+
+/** Lịch sử sắp cũ → mới; tô đậm mục trùng `order.status` (lần xuất hiện cuối), không thì mục mới nhất. */
+const historyChronological = (items) =>
+  [...(items || [])].sort(
+    (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+  );
+
+const getHistoryHighlightIndex = (chron, orderStatus) => {
+  if (!chron.length) return -1;
+  const st = normHistoryStatus(orderStatus);
+  let idx = -1;
+  chron.forEach((h, i) => {
+    if (normHistoryStatus(h.newStatus) === st) idx = i;
+  });
+  return idx >= 0 ? idx : chron.length - 1;
+};
+
 const OrderDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [returnReason, setReturnReason] = useState("");
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
   const user = useSelector((state) => state.user);
   const isLoggedIn = !!user?.login;
 
@@ -54,20 +76,51 @@ const OrderDetailPage = () => {
   }, [id]);
 
   const handleConfirmDelivery = async () => {
+    const wasPaid = order?.paymentStatus === "paid";
     try {
       await confirmDelivery(id);
-      setOrder((o) => (o ? { ...o, status: "delivered", paymentStatus: "paid" } : o));
-      alert("Đã xác nhận nhận hàng.");
-    } catch (err) { alert(err?.response?.data?.message || "Có lỗi."); }
+      setOrder((o) =>
+        o ? { ...o, status: "delivered", paymentStatus: "paid" } : o,
+      );
+      alert(
+        wasPaid
+          ? "Cảm ơn bạn đã xác nhận đã nhận hàng."
+          : "Đã xác nhận nhận hàng.",
+      );
+    } catch (err) {
+      alert(err?.response?.data?.message || "Có lỗi.");
+    }
   };
 
-  const handleReturnRequest = async () => {
-    if (!window.confirm("Bạn có chắc muốn yêu cầu hoàn hàng đơn này?")) return;
+  const openReturnModal = () => {
+    setReturnReason("");
+    setReturnModalOpen(true);
+  };
+
+  const closeReturnModal = () => {
+    if (returnSubmitting) return;
+    setReturnModalOpen(false);
+    setReturnReason("");
+  };
+
+  const submitReturnRequest = async () => {
+    const reason = returnReason.trim();
+    if (reason.length < 5) {
+      alert("Vui lòng nhập lý do hoàn hàng (tối thiểu 5 ký tự).");
+      return;
+    }
+    setReturnSubmitting(true);
     try {
-      await returnOrderRequest(id, "");
+      await returnOrderRequest(id, reason);
       setOrder((o) => (o ? { ...o, status: "return-request" } : o));
+      setReturnModalOpen(false);
+      setReturnReason("");
       alert("Đã gửi yêu cầu hoàn hàng.");
-    } catch (err) { alert(err?.response?.data?.message || "Có lỗi."); }
+    } catch (err) {
+      alert(err?.response?.data?.message || "Có lỗi.");
+    } finally {
+      setReturnSubmitting(false);
+    }
   };
 
   const handleRepayVnpay = async () => {
@@ -107,6 +160,11 @@ const OrderDetailPage = () => {
     </div>
   );
 
+  const st =
+    typeof order.status === "string"
+      ? order.status.trim().toLowerCase()
+      : order.status;
+
   return (
     <div className="bg-background-light min-h-screen font-body pb-20 pt-24">
       <div className="container mx-auto px-4 max-w-5xl">
@@ -124,8 +182,8 @@ const OrderDetailPage = () => {
             <p className="text-slate-400 font-medium">Mã Đơn: <span className="text-white font-bold ml-1 uppercase">#{order._id?.slice(-8)}</span></p>
           </div>
           <div className="relative z-10">
-            <span className={`px-4 py-2.5 rounded-xl text-sm font-bold border-2 flex items-center gap-2 shadow-sm ${STATUS_COLORS[order.status] || "bg-slate-800 text-white border-slate-700"}`}>
-              {STATUS_ICONS[order.status] || <FaBoxOpen />} {STATUS_LABELS[order.status] || order.status}
+            <span className={`px-4 py-2.5 rounded-xl text-sm font-bold border-2 flex items-center gap-2 shadow-sm ${STATUS_COLORS[st] || "bg-slate-800 text-white border-slate-700"}`}>
+              {STATUS_ICONS[st] || <FaBoxOpen />} {STATUS_LABELS[st] || order.status}
             </span>
           </div>
         </div>
@@ -138,14 +196,14 @@ const OrderDetailPage = () => {
             {/* TIMELINE */}
             <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100">
               <h3 className="text-xl font-display font-black text-slate-800 mb-8 border-b border-slate-100 pb-4">Trạng Thái Giao Hàng</h3>
-              {(order.status !== "canceled" && order.status !== "return-request" && order.status !== "rejected") ? (
+              {(st !== "canceled" && st !== "return-request" && st !== "rejected") ? (
                 <div className="relative mb-8 pt-4 pb-2 px-4 md:px-8">
-                  <div className="absolute top-8 left-4 md:left-8 right-4 md:right-8 h-1.5 bg-slate-100 rounded-full"></div>
-                  <div className="absolute top-8 left-4 md:left-8 h-1.5 bg-primary rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(238,77,45,0.5)]" style={{ width: `calc(${Math.max(0, getTrackingProgress(order.status) / 3 * 100)}% - 2rem)` }}></div>
+                  <div className="absolute top-8 left-4 md:left-8 right-4 md:right-8 h-1.5 bg-slate-100 rounded-full pointer-events-none" aria-hidden />
+                  <div className="absolute top-8 left-4 md:left-8 h-1.5 bg-primary rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(238,77,45,0.5)] pointer-events-none" style={{ width: `calc(${Math.max(0, getTrackingProgress(st) / 3 * 100)}% - 2rem)` }} aria-hidden />
 
                   <div className="relative flex justify-between text-xs font-bold text-slate-400">
                     {TRACKING_STEPS.map((step, idx) => {
-                      const active = getTrackingProgress(order.status) >= idx;
+                      const active = getTrackingProgress(st) >= idx;
                       return (
                         <div key={step} className={`flex flex-col items-center gap-3 ${active ? 'text-primary' : ''} w-1/4`}>
                           <div className={`w-10 h-10 rounded-full border-[3px] flex items-center justify-center bg-white z-10 transition-colors ${active ? 'border-primary text-primary shadow-lg shadow-primary/20' : 'border-slate-200 text-slate-300'}`}>
@@ -160,9 +218,9 @@ const OrderDetailPage = () => {
               ) : (
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-4 text-slate-600 font-bold">
                   <span className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm">
-                    {STATUS_ICONS[order.status]}
+                    {STATUS_ICONS[st]}
                   </span>
-                  {STATUS_LABELS[order.status]}
+                  {STATUS_LABELS[st]}
                 </div>
               )}
 
@@ -171,15 +229,48 @@ const OrderDetailPage = () => {
                 <div className="mt-8 pt-6 border-t border-slate-100">
                   <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Chi Tiết Lịch Sử</h4>
                   <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
-                    {history.slice().reverse().map((h, i) => (
-                      <div key={i} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                        <div className="flex items-center justify-center w-5 h-5 rounded-full border-2 border-white bg-slate-300 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10 group-first:bg-primary group-first:scale-125 transition-all"></div>
-                        <div className="w-[calc(100%-2rem)] md:w-[calc(50%-1.5rem)] p-3 rounded-xl border border-slate-100 bg-slate-50 shadow-sm transition-all group-first:border-primary/20 group-first:bg-primary/5">
-                          <p className="font-bold text-slate-700 text-sm">{STATUS_LABELS[h.newStatus] || h.newStatus}</p>
-                          <p className="text-xs font-semibold text-slate-400 mt-0.5">{new Date(h.createdAt).toLocaleString("vi-VN")}</p>
-                        </div>
-                      </div>
-                    ))}
+                    {(() => {
+                      const chron = historyChronological(history);
+                      const hi = getHistoryHighlightIndex(chron, st);
+                      return chron.map((h, i) => {
+                        const current = i === hi;
+                        const rowKey = h._id
+                          ? String(h._id)
+                          : `hist-${i}-${h.createdAt}-${h.newStatus}`;
+                        return (
+                          <div
+                            key={rowKey}
+                            className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group"
+                          >
+                            <div
+                              className={`flex items-center justify-center w-5 h-5 rounded-full border-2 border-white shadow-sm z-10 transition-all md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 ${
+                                current
+                                  ? "bg-primary scale-125 shadow-md shadow-primary/25"
+                                  : "bg-slate-300"
+                              }`}
+                            />
+                            <div
+                              className={`w-[calc(100%-2rem)] md:w-[calc(50%-1.5rem)] p-3 rounded-xl border-2 shadow-sm transition-all ${
+                                current
+                                  ? "border-primary/30 bg-primary/5 ring-1 ring-primary/10"
+                                  : "border-slate-100 bg-slate-50"
+                              }`}
+                            >
+                              <p
+                                className={`font-bold text-sm ${
+                                  current ? "text-primary" : "text-slate-700"
+                                }`}
+                              >
+                                {STATUS_LABELS[h.newStatus] || h.newStatus}
+                              </p>
+                              <p className="text-xs font-semibold text-slate-400 mt-0.5">
+                                {new Date(h.createdAt).toLocaleString("vi-VN")}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
               )}
@@ -259,20 +350,55 @@ const OrderDetailPage = () => {
 
                 {/* ACTIONS */}
                 <div className="space-y-3">
-                  {order.paymentMethod === "vnpay" && order.paymentStatus !== "paid" && order.status !== "canceled" && (
-                    <button onClick={handleRepayVnpay} className="w-full flex justify-center items-center gap-2 py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-primary transition-colors shadow-lg"><FaShieldAlt /> Thanh Toán VNPay Lại</button>
+                  {order.paymentMethod === "vnpay" && order.paymentStatus !== "paid" && st !== "canceled" && (
+                    <button type="button" onClick={handleRepayVnpay} className="w-full flex justify-center items-center gap-2 py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-primary transition-colors shadow-lg"><FaShieldAlt /> Thanh Toán VNPay Lại</button>
                   )}
 
-                  {(order.status === "pending" || order.status === "confirmed") && (
-                    <button onClick={handleCancelOrder} className="w-full py-3.5 border-2 border-red-100 text-red-500 font-bold rounded-xl hover:bg-red-50 hover:border-red-200 transition-colors">Hủy Đơn Hàng</button>
+                  {(st === "pending" || st === "confirmed") && (
+                    <button type="button" onClick={handleCancelOrder} className="w-full py-3.5 border-2 border-red-100 text-red-500 font-bold rounded-xl hover:bg-red-50 hover:border-red-200 transition-colors">Hủy Đơn Hàng</button>
                   )}
 
-                  {order.status === "shipped" && (
-                    isLoggedIn ? (<button onClick={handleConfirmDelivery} className="w-full py-3.5 bg-green-500 text-white font-bold rounded-xl hover:bg-green-600 transition-colors shadow-lg shadow-green-500/20">Xác Nhận Đã Nhận Hàng</button>) : (<button onClick={() => navigate("/login")} className="w-full py-3.5 bg-slate-200 text-slate-700 font-bold rounded-xl">Đăng nhập để xác nhận</button>)
-                  )}
-
-                  {order.status === "delivered" && (
-                    isLoggedIn ? (<button onClick={handleReturnRequest} className="w-full py-3.5 bg-orange-100 text-orange-600 font-bold rounded-xl hover:bg-orange-200 transition-colors">Yêu Cầu Hoàn Hàng</button>) : (<button onClick={() => navigate("/login")} className="w-full py-3.5 bg-slate-200 text-slate-700 font-bold rounded-xl">Đăng nhập để hoàn hàng</button>)
+                  {st === "delivered" && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="min-w-0">
+                        {isLoggedIn ? (
+                          <button
+                            type="button"
+                            onClick={handleConfirmDelivery}
+                            className="w-full py-3.5 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition-colors shadow-md shadow-green-600/15"
+                          >
+                            Đã nhận hàng
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => navigate("/login")}
+                            className="w-full py-3.5 bg-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-300 transition-colors"
+                          >
+                            Đăng nhập
+                          </button>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        {isLoggedIn ? (
+                          <button
+                            type="button"
+                            onClick={openReturnModal}
+                            className="w-full py-3.5 bg-orange-100 text-orange-600 text-sm font-bold rounded-xl hover:bg-orange-200 transition-colors"
+                          >
+                            Yêu cầu hoàn hàng
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => navigate("/login")}
+                            className="w-full py-3.5 bg-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-300 transition-colors"
+                          >
+                            Đăng nhập
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -282,6 +408,72 @@ const OrderDetailPage = () => {
 
         </div>
       </div>
+
+      {returnModalOpen && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="return-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !returnSubmitting) closeReturnModal();
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-6 md:p-8 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start gap-4 mb-5">
+              <h3 id="return-modal-title" className="text-xl font-display font-black text-slate-800 leading-tight">
+                Yêu cầu hoàn hàng
+              </h3>
+              <button
+                type="button"
+                onClick={closeReturnModal}
+                disabled={returnSubmitting}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
+                aria-label="Đóng"
+              >
+                <FaTimes size={18} />
+              </button>
+            </div>
+            <p className="text-sm text-slate-500 mb-4">
+              Vui lòng mô tả lý do bạn muốn hoàn hàng. Shop sẽ xem xét và phản hồi sớm nhất.
+            </p>
+            <label htmlFor="return-reason-detail" className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+              Lý do hoàn hàng <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              id="return-reason-detail"
+              value={returnReason}
+              onChange={(e) => setReturnReason(e.target.value.slice(0, 2000))}
+              rows={5}
+              maxLength={2000}
+              placeholder="Ví dụ: Sản phẩm không đúng size, lỗi sản xuất, không còn nhu cầu..."
+              className="w-full border-2 border-slate-100 rounded-xl px-4 py-3 text-slate-800 font-medium placeholder:text-slate-400 focus:border-primary focus:ring-0 focus:outline-none resize-y min-h-[120px]"
+            />
+            <p className="text-xs text-slate-400 mt-2 text-right">{returnReason.length}/2000</p>
+            <div className="flex flex-col-reverse sm:flex-row gap-3 mt-6">
+              <button
+                type="button"
+                onClick={closeReturnModal}
+                disabled={returnSubmitting}
+                className="flex-1 py-3.5 border-2 border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={submitReturnRequest}
+                disabled={returnSubmitting}
+                className="flex-1 py-3.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20 disabled:opacity-60"
+              >
+                {returnSubmitting ? "Đang gửi..." : "Gửi yêu cầu"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

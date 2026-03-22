@@ -24,6 +24,28 @@ const getBackendPublicBaseUrl = (req) => {
   return `${proto}://${host}`;
 };
 
+/** Đặt hàng có thể trừ stock trên Product.variant mà không có bản ghi Inventory (createOrder fallback). */
+const isInventorySkuMissingError = (err) => {
+  const code = err?.status ?? err?.statusCode;
+  if (code !== 404) return false;
+  const msg = String(err?.message || "");
+  return msg.includes("SKU") && msg.includes("không tồn tại");
+};
+
+const restoreVariantStockBySku = async (item, qty, session = null) => {
+  const pid = item.productId?._id || item.productId;
+  if (!pid) return;
+  let q = Product.findById(pid);
+  if (session) q = q.session(session);
+  const productDoc = await q;
+  if (!productDoc?.hasVariants) return;
+  const variant = productDoc.variants?.find((v) => v.sku === item.sku);
+  if (!variant) return;
+  variant.stock = Number(variant.stock || 0) + Number(qty || 0);
+  if (session) await productDoc.save({ session });
+  else await productDoc.save();
+};
+
 // ================================================================
 // Tạo đơn hàng
 // ================================================================
@@ -595,12 +617,17 @@ exports.updateOrder = async (req, res) => {
         for (const item of order.products) {
           if (!item?.quantity) continue;
           if (item.sku) {
-            await inventoryService.releaseBySku(
-              item.sku,
-              item.quantity,
-              order._id,
-              null,
-            );
+            try {
+              await inventoryService.releaseBySku(
+                item.sku,
+                item.quantity,
+                order._id,
+                null,
+              );
+            } catch (err) {
+              if (!isInventorySkuMissingError(err)) throw err;
+              await restoreVariantStockBySku(item, item.quantity, session);
+            }
             continue;
           }
 
@@ -616,20 +643,28 @@ exports.updateOrder = async (req, res) => {
       if (status === "shipped") {
         for (const item of order.products) {
           if (!item.sku || !item.quantity) continue;
-          await inventoryService.releaseBySku(
-            item.sku,
-            item.quantity,
-            order._id,
-            null,
-          );
-          await inventoryService.exportBySku(
-            item.sku,
-            item.quantity,
-            order._id,
-            null,
-            null,
-            `Xuất kho theo đơn hàng #${order._id}`,
-          );
+          try {
+            await inventoryService.releaseBySku(
+              item.sku,
+              item.quantity,
+              order._id,
+              null,
+            );
+          } catch (err) {
+            if (!isInventorySkuMissingError(err)) throw err;
+          }
+          try {
+            await inventoryService.exportBySku(
+              item.sku,
+              item.quantity,
+              order._id,
+              null,
+              null,
+              `Xuất kho theo đơn hàng #${order._id}`,
+            );
+          } catch (err) {
+            if (!isInventorySkuMissingError(err)) throw err;
+          }
         }
       }
 
@@ -701,8 +736,9 @@ exports.updateOrderById = async (req, res) => {
               order._id,
               order.userId || order.guestId || null,
             );
-          } catch (_) {
-            // ignore inventory release errors in user-cancel flow
+          } catch (err) {
+            if (isInventorySkuMissingError(err))
+              await restoreVariantStockBySku(item, item.quantity, null);
           }
           continue;
         }
@@ -745,23 +781,58 @@ exports.comfirmDelivery = async (req, res) => {
     const order = await Order.findById(id);
     if (!order)
       return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
-    if (order.status !== "shipped")
-      return res.status(400).json({ message: "Đơn hàng chưa chuyển hàng" });
 
-    const updatedOrder = await Order.findByIdAndUpdate(
-      id,
-      { status: "delivered", paymentStatus: "paid" },
-      { new: true },
-    ).populate("products.productId");
+    // Luồng củ: đang giao → đã giao + đã thanh toán (giữ cho tương thích / gọi API trực tiếp)
+    if (order.status === "shipped") {
+      const updatedOrder = await Order.findByIdAndUpdate(
+        id,
+        { status: "delivered", paymentStatus: "paid" },
+        { new: true },
+      ).populate("products.productId");
 
-    await OrderStatusHistory.create({
-      oldStatus: "shipped",
-      newStatus: "delivered",
-      orderId: order._id,
-      paymentStatus: updatedOrder.paymentStatus === "paid" ? null : "paid",
+      await OrderStatusHistory.create({
+        oldStatus: "shipped",
+        newStatus: "delivered",
+        orderId: order._id,
+        paymentStatus: updatedOrder.paymentStatus === "paid" ? null : "paid",
+      });
+
+      return res.status(200).json(updatedOrder);
+    }
+
+    // Luồng hiển thị trên web: chỉ bấm xác nhận khi đơn đã ở trạng thái "đã giao" (COD chưa thanh toán)
+    if (order.status === "delivered") {
+      if (order.paymentStatus === "paid") {
+        const fresh = await Order.findById(id).populate("products.productId");
+        return res.status(200).json(fresh);
+      }
+      if (order.paymentMethod !== "cod") {
+        return res.status(400).json({
+          message:
+            "Đơn chưa thanh toán VNPay — vui lòng thanh toán online, không xác nhận COD tại đây.",
+        });
+      }
+      const updatedOrder = await Order.findByIdAndUpdate(
+        id,
+        { paymentStatus: "paid" },
+        { new: true },
+      ).populate("products.productId");
+
+      await OrderStatusHistory.create({
+        oldStatus: "delivered",
+        newStatus: "delivered",
+        orderId: order._id,
+        paymentStatus: "paid",
+        note: "Khách xác nhận đã nhận hàng (thanh toán COD)",
+      });
+
+      return res.status(200).json(updatedOrder);
+    }
+
+    return res.status(400).json({
+      message:
+        "Chỉ có thể xác nhận khi đơn đã giao (đã giao) hoặc đang trên luồng đang giao (API nội bộ).",
     });
-
-    res.status(200).json(updatedOrder);
   } catch (err) {
     const statusCode = err?.status || err?.statusCode || 500;
     res.status(statusCode).json({
