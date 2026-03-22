@@ -2,13 +2,13 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { FaArrowRight } from "react-icons/fa";
 
-const PLACEHOLDER_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='28' font-family='Arial'>No Image</text></svg>";
+const PLACEHOLDER_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='28' font-family='Plus Jakarta Sans'>No Image</text></svg>";
 
 const getProductImageUrl = (p) => {
   const candidate = (typeof p?.image === "string" && p.image.trim()) || (Array.isArray(p?.srcImages) && typeof p.srcImages[0] === "string" ? p.srcImages[0].trim() : "");
   if (!candidate) return PLACEHOLDER_IMG;
   if (candidate.startsWith("http")) return candidate;
-  return `http://localhost:3002/${candidate.startsWith("/") ? candidate.slice(1) : candidate}`;
+  return `http://localhost:3002/uploads/${candidate.startsWith("/") ? candidate.slice(1) : candidate}`;
 };
 
 const getDisplayPrice = (p) => {
@@ -28,7 +28,7 @@ const Product = ({ product }) => {
           src={getProductImageUrl(p)}
           alt={p.name}
           onError={(e) => { e.target.onerror = null; e.target.src = PLACEHOLDER_IMG; }}
-          className="w-full h-full object-cover mix-blend-multiply group-hover:scale-110 transition-transform duration-700 ease-out"
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
         />
         <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
           {isHot && <span className="bg-secondary text-white text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider backdrop-blur-md shadow-lg shadow-secondary/30">Hot Drop</span>}

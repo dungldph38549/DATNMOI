@@ -278,7 +278,7 @@ const Pagination = ({ page, total, limit, onChange }) => {
     fontWeight: active ? 700 : 500,
     fontSize: 13,
     cursor: "pointer",
-    fontFamily: "'Lexend', sans-serif",
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
     padding: "0 10px",
   });
   return (
@@ -479,7 +479,6 @@ export default function Products() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
         .material-symbols-outlined { font-family:'Material Symbols Outlined'; font-style:normal; line-height:1; text-transform:none; display:inline-block; white-space:nowrap; font-size:24px; }
         @keyframes fadeIn  { from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)} }
@@ -488,7 +487,7 @@ export default function Products() {
         .sh-filter .ant-input, .sh-filter .ant-input-number,
         .sh-filter .ant-select-selector {
           border-radius: 10px !important;
-          font-family: 'Lexend', sans-serif !important;
+          font-family: 'Plus Jakarta Sans', sans-serif !important;
           font-size: 13px !important;
           border: 1.5px solid #E2E8F0 !important;
         }
@@ -503,7 +502,7 @@ export default function Products() {
       <div
         style={{
           padding: 28,
-          fontFamily: "'Lexend', sans-serif",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
           minHeight: "100vh",
           background: T.bg,
         }}
@@ -550,7 +549,7 @@ export default function Products() {
                 fontWeight: 600,
                 fontSize: 12,
                 cursor: "pointer",
-                fontFamily: "'Lexend', sans-serif",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
                 borderColor: isListProductRemoved ? T.primary : T.border,
               }}
             >
@@ -576,7 +575,7 @@ export default function Products() {
                 fontWeight: 700,
                 fontSize: 13,
                 cursor: "pointer",
-                fontFamily: "'Lexend', sans-serif",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
                 boxShadow: "0 4px 14px rgba(244,157,37,0.30)",
               }}
             >
@@ -629,7 +628,7 @@ export default function Products() {
                   outline: "none",
                   fontSize: 13,
                   color: T.text,
-                  fontFamily: "'Lexend', sans-serif",
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
                   background: "#F8FAFC",
                   boxSizing: "border-box",
                 }}
@@ -651,7 +650,7 @@ export default function Products() {
                 fontSize: 12,
                 fontWeight: 600,
                 cursor: "pointer",
-                fontFamily: "'Lexend', sans-serif",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
                 whiteSpace: "nowrap",
               }}
             >
@@ -698,7 +697,7 @@ export default function Products() {
                         borderRadius: 10,
                         border: `1.5px solid ${T.border}`,
                         fontSize: 13,
-                        fontFamily: "'Lexend', sans-serif",
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
                         outline: "none",
                       }}
                       onFocus={(e) => (e.target.style.borderColor = T.primary)}
@@ -758,7 +757,7 @@ export default function Products() {
                         fontWeight: 600,
                         fontSize: 12,
                         cursor: "pointer",
-                        fontFamily: "'Lexend', sans-serif",
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
                       }}
                     >
                       Lọc
@@ -775,7 +774,7 @@ export default function Products() {
                         fontWeight: 600,
                         fontSize: 12,
                         cursor: "pointer",
-                        fontFamily: "'Lexend', sans-serif",
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
                       }}
                     >
                       Reset
@@ -1116,7 +1115,7 @@ export default function Products() {
                                         fontSize: 12,
                                         fontWeight: 600,
                                         cursor: "pointer",
-                                        fontFamily: "'Lexend', sans-serif",
+                                        fontFamily: "'Plus Jakarta Sans', sans-serif",
                                         display: "flex",
                                         alignItems: "center",
                                         gap: 4,
@@ -1154,7 +1153,7 @@ export default function Products() {
                                       fontSize: 12,
                                       fontWeight: 600,
                                       cursor: "pointer",
-                                      fontFamily: "'Lexend', sans-serif",
+                                      fontFamily: "'Plus Jakarta Sans', sans-serif",
                                       display: "flex",
                                       alignItems: "center",
                                       gap: 4,

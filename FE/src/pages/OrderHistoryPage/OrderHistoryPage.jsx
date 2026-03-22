@@ -194,7 +194,18 @@ const OrderHistoryPage = () => {
                     {order.products?.slice(0, 2).map((p, i) => (
                       <div key={i} className="flex gap-4 items-center">
                         <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-xl overflow-hidden shrink-0">
-                          <img src={p.image ? (p.image.startsWith("http") ? p.image : `http://localhost:3002/${p.image.startsWith("/") ? p.image.slice(1) : p.image}`) : "https://via.placeholder.com/80/f0f0f0/999?text=SP"} alt={p.name} className="w-full h-full object-cover mix-blend-multiply p-1" />
+                          <img 
+                            src={
+                              (() => {
+                                const imgName = p.image || p.productId?.image;
+                                if (!imgName) return "https://via.placeholder.com/80/f0f0f0/999?text=SP";
+                                if (imgName.startsWith("http")) return imgName;
+                                return `http://localhost:3002/uploads/${imgName.startsWith("/") ? imgName.slice(1) : imgName}`;
+                              })()
+                            } 
+                            alt={p.productId?.name || p.name || "Sản phẩm"} 
+                            className="w-full h-full object-cover p-1" 
+                          />
                         </div>
                         <div className="flex-1 flex justify-between items-center">
                           <div>

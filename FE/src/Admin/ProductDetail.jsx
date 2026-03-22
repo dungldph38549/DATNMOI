@@ -127,7 +127,7 @@ const inputStyle = {
   border: "1.5px solid #E2E8F0",
   outline: "none",
   fontSize: 14,
-  fontFamily: "'Lexend', sans-serif",
+  fontFamily: "'Plus Jakarta Sans', sans-serif",
   background: "transparent",
   transition: "border-color 0.15s",
   boxSizing: "border-box",
@@ -310,7 +310,6 @@ const ProductDetail = ({ productId = null, onClose }) => {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
         .material-symbols-outlined { font-family:'Material Symbols Outlined'; font-style:normal; line-height:1; text-transform:none; display:inline-block; white-space:nowrap; }
         .sneaker-input:focus { border-color:#f49d25 !important; box-shadow:0 0 0 3px rgba(244,157,37,0.12); }
@@ -323,7 +322,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
 
       <div
         style={{
-          fontFamily: "'Lexend', sans-serif",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
           background: "#F8F7F5",
           padding: 28,
         }}
@@ -370,7 +369,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                 fontWeight: 600,
                 fontSize: 13,
                 cursor: "pointer",
-                fontFamily: "'Lexend', sans-serif",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
               }}
             >
               Hủy bỏ
@@ -387,7 +386,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                 fontWeight: 700,
                 fontSize: 13,
                 cursor: "pointer",
-                fontFamily: "'Lexend', sans-serif",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
                 boxShadow: "0 4px 14px rgba(244,157,37,0.30)",
                 opacity: mutation.isLoading ? 0.7 : 1,
                 display: "flex",
@@ -554,7 +553,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                             style={{
                               width: "100%",
                               borderRadius: 12,
-                              fontFamily: "'Lexend', sans-serif",
+                              fontFamily: "'Plus Jakarta Sans', sans-serif",
                             }}
                           />
                         </Form.Item>
@@ -574,7 +573,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                             style={{
                               width: "100%",
                               borderRadius: 12,
-                              fontFamily: "'Lexend', sans-serif",
+                              fontFamily: "'Plus Jakarta Sans', sans-serif",
                             }}
                           />
                         </Form.Item>
@@ -830,7 +829,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                     fontWeight: 700,
                                     fontSize: 13,
                                     cursor: "pointer",
-                                    fontFamily: "'Lexend', sans-serif",
+                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",

@@ -64,7 +64,7 @@ const Product = ({ product }) => {
   if (!product) return null;
 
   const PLACEHOLDER =
-    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f3f4f6'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='28' font-family='Arial'>No Image</text></svg>";
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f3f4f6'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='28' font-family='Plus Jakarta Sans'>No Image</text></svg>";
   const getImageUrl = (img) => {
     if (!img || typeof img !== "string") return PLACEHOLDER;
     if (img.startsWith("http://") || img.startsWith("https://")) return img;
@@ -143,8 +143,8 @@ const Product = ({ product }) => {
             onError={onImageError}
           />
 
-          {/* OVERLAY ON HOVER */}
-          <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          {/* OPTIONAL LIGHT OVERLAY ON HOVER */}
+          <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
 
           {product?.sold > 50 && (
             <div className="absolute top-3 left-3 z-10">

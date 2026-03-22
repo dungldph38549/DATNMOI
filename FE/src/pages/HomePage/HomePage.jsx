@@ -82,13 +82,13 @@ const HomePage = () => {
   const newDisplay = filterProducts.length > 0 ? filterProducts.slice(8, 16) : newProducts;
   const isFiltering = !!selectedCategory;
 
-  const PLACEHOLDER_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='28' font-family='Arial'>No Image</text></svg>";
+  const PLACEHOLDER_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='28' font-family='Plus Jakarta Sans'>No Image</text></svg>";
 
   const getProductImageUrl = (p) => {
     const candidate = (typeof p?.image === "string" && p.image.trim()) || (Array.isArray(p?.srcImages) && typeof p.srcImages[0] === "string" ? p.srcImages[0].trim() : "");
     if (!candidate) return PLACEHOLDER_IMG;
     if (candidate.startsWith("http")) return candidate;
-    return `http://localhost:3002/${candidate.startsWith("/") ? candidate.slice(1) : candidate}`;
+    return `http://localhost:3002/uploads/${candidate.startsWith("/") ? candidate.slice(1) : candidate}`;
   };
 
   const getDisplayPrice = (p) => {
@@ -99,12 +99,12 @@ const HomePage = () => {
   const renderProductCard = (p) => (
     <Link to={`/product/${p._id}`} key={p._id} className="group relative rounded-2xl bg-white overflow-hidden hover:shadow-2xl transition-all duration-500 border border-slate-100 flex flex-col h-full">
       <div className="relative aspect-square overflow-hidden bg-slate-50 flex items-center justify-center">
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10"></div>
+        <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10"></div>
         <img
           src={getProductImageUrl(p)}
           alt={p.name}
           onError={(e) => { e.target.onerror = null; e.target.src = PLACEHOLDER_IMG; }}
-          className="w-full h-full object-cover mix-blend-multiply group-hover:scale-110 transition-transform duration-700 ease-out"
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
         />
         <div className="absolute top-3 left-3 z-20 flex flex-col gap-2">
           {p.soldCount > 50 && <span className="bg-orange-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-lg shadow-orange-500/30">Hot</span>}

@@ -6,7 +6,7 @@ import {
   addToCartAPI, createReview, getOrdersByUser, getProductById,
   getProductReviews, getStocks, relationProduct, uploadImages
 } from "../../api";
-import { FaStar, FaShoppingCart, FaCheckCircle, FaShippingFast, FaShieldAlt } from "react-icons/fa";
+import { FaStar, FaShoppingCart, FaCheckCircle, FaShippingFast, FaShieldAlt, FaTimes } from "react-icons/fa";
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -28,7 +28,6 @@ const ProductDetail = () => {
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsReload, setReviewsReload] = useState(0);
 
-  // Customer review form
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewTitle, setReviewTitle] = useState("");
   const [reviewContent, setReviewContent] = useState("");
@@ -40,7 +39,7 @@ const ProductDetail = () => {
   const [stockInfo, setStockInfo] = useState(null);
   const [qtyNotice, setQtyNotice] = useState("");
 
-  const PLACEHOLDER_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='28' font-family='Arial'>No Image</text></svg>";
+  const PLACEHOLDER_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='28' font-family='Plus Jakarta Sans'>No Image</text></svg>";
 
   const reviewFilePreviews = useMemo(() => reviewFiles.map((f) => URL.createObjectURL(f)), [reviewFiles]);
   useEffect(() => {
@@ -51,7 +50,7 @@ const ProductDetail = () => {
     if (!img) return PLACEHOLDER_IMG;
     if (typeof img !== "string") return PLACEHOLDER_IMG;
     if (img.startsWith("http")) return img;
-    return `http://localhost:3002/${img.startsWith("/") ? img.slice(1) : img}`;
+    return `http://localhost:3002/uploads/${img.startsWith("/") ? img.slice(1) : img}`;
   };
 
   const getVariantSizeValue = (variant) => {
@@ -270,7 +269,6 @@ const ProductDetail = () => {
   return (
     <div className="bg-background-light min-h-screen font-body pb-20 pt-24">
       <div className="container mx-auto px-4 max-w-7xl">
-        {/* MAIN PRODUCT SECTION */}
         <div className="flex flex-col lg:flex-row gap-12 mb-20 bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-slate-100">
 
           {/* LEFT: IMAGES */}
@@ -279,7 +277,7 @@ const ProductDetail = () => {
               <img
                 src={getImage(mainImage)}
                 onError={(e) => { e.target.src = PLACEHOLDER_IMG; }}
-                className="w-full h-full object-cover mix-blend-multiply group-hover:scale-105 transition-transform duration-700 ease-out"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                 alt={product.name}
               />
               {product.isNew && (
@@ -294,7 +292,7 @@ const ProductDetail = () => {
                   onClick={() => setMainImage(img)}
                   className={`relative flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden border-2 transition-all ${mainImage === img ? "border-primary shadow-md" : "border-transparent opacity-70 hover:opacity-100 bg-slate-50"}`}
                 >
-                  <img src={getImage(img)} className="w-full h-full object-cover mix-blend-multiply p-1" alt="" />
+                  <img src={getImage(img)} className="w-full h-full object-cover p-1" alt="" />
                 </button>
               ))}
             </div>
@@ -335,11 +333,12 @@ const ProductDetail = () => {
               </div>
             </div>
 
+            {/* REVERTED SIZE SELECTION */}
             {hasVariants && (
               <div className="mb-8">
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-slate-800 font-bold text-lg">Kích Cỡ</span>
-                  <button className="text-slate-400 text-sm font-medium hover:text-primary transition-colors underline underline-offset-4">Hướng dẫn chọn size</button>
+                  <span className="text-slate-800 font-bold text-lg uppercase tracking-wider">Kích Cỡ</span>
+                  <button className="text-slate-400 text-sm font-medium hover:text-primary transition-colors underline underline-offset-4 decoration-2">Hướng dẫn chọn size</button>
                 </div>
                 <div className="flex flex-wrap gap-3">
                   {availableSizes.map((size) => {
@@ -352,9 +351,9 @@ const ProductDetail = () => {
                         key={size}
                         onClick={() => !isDisabled && setSelectedSize(String(size))}
                         disabled={isDisabled}
-                        className={`min-w-[4rem] h-12 px-4 rounded-xl font-bold transition-all ${isSelected ? "bg-slate-900 border border-slate-900 text-white shadow-md" :
-                            isDisabled ? "bg-slate-50 border border-slate-100 text-slate-300 cursor-not-allowed" :
-                              "bg-white border border-slate-200 text-slate-600 hover:border-slate-900 hover:text-slate-900"
+                        className={`min-w-[4.5rem] h-12 px-4 rounded-xl font-black transition-all border-2 ${isSelected ? "bg-slate-900 border-slate-900 text-white shadow-xl scale-95" :
+                          isDisabled ? "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed" :
+                            "bg-white border-slate-100 text-slate-600 hover:border-slate-900 hover:text-slate-900"
                           }`}
                       >
                         {size}
@@ -449,9 +448,7 @@ const ProductDetail = () => {
                     </div>
                     <p className="text-slate-500 font-medium">{ratingTotal} Đánh giá</p>
                   </div>
-
                   <div className="w-px h-24 bg-slate-200 hidden md:block"></div>
-
                   <div className="flex-1 w-full">
                     {!user?.login ? (
                       <div className="text-center">
@@ -461,29 +458,16 @@ const ProductDetail = () => {
                     ) : (
                       <div>
                         {reviewSubmitError && <p className="text-red-500 bg-red-50 p-3 rounded-lg font-medium mb-4">{reviewSubmitError}</p>}
-
                         <div className="flex items-center gap-4 mb-4">
                           <span className="font-bold text-slate-700">Đánh giá của bạn:</span>
                           <div className="flex gap-2">
                             {[1, 2, 3, 4, 5].map((n) => (
-                              <button
-                                key={n}
-                                onClick={() => setReviewRating(n)}
-                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${reviewRating >= n ? "bg-secondary text-white" : "bg-white text-slate-300 border border-slate-200 hover:border-secondary hover:text-secondary"}`}
-                              ><FaStar /></button>
+                              <button key={n} onClick={() => setReviewRating(n)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${reviewRating >= n ? "bg-secondary text-white" : "bg-white text-slate-300 border border-slate-200 hover:border-secondary hover:text-secondary"}`}><FaStar /></button>
                             ))}
                           </div>
                         </div>
-
-                        <input
-                          className="w-full bg-white border border-slate-200 rounded-xl px-5 py-3 mb-4 font-medium outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                          value={reviewTitle} onChange={(e) => setReviewTitle(e.target.value)} placeholder="Tiêu đề (Tùy chọn)"
-                        />
-                        <textarea
-                          className="w-full bg-white border border-slate-200 rounded-xl px-5 py-4 mb-4 font-medium outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all custom-scrollbar shrink-0"
-                          rows={3} value={reviewContent} onChange={(e) => setReviewContent(e.target.value)} placeholder="Chia sẻ cảm nhận của bạn về sản phẩm..."
-                        />
-
+                        <input className="w-full bg-white border border-slate-200 rounded-xl px-5 py-3 mb-4 font-medium outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" value={reviewTitle} onChange={(e) => setReviewTitle(e.target.value)} placeholder="Tiêu đề (Tùy chọn)" />
+                        <textarea className="w-full bg-white border border-slate-200 rounded-xl px-5 py-4 mb-4 font-medium outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all custom-scrollbar shrink-0" rows={3} value={reviewContent} onChange={(e) => setReviewContent(e.target.value)} placeholder="Chia sẻ cảm nhận của bạn về sản phẩm..." />
                         <div className="flex items-center justify-between">
                           <div className="flex gap-4 items-center">
                             <label className="cursor-pointer bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-6 py-3 rounded-xl transition-colors">
@@ -492,18 +476,12 @@ const ProductDetail = () => {
                             </label>
                             {reviewFilePreviews.length > 0 && <span className="font-medium text-slate-500">{reviewFiles.length}/5 ảnh</span>}
                           </div>
-                          <button
-                            onClick={handleSubmitReview} disabled={reviewSubmitting || !reviewRating}
-                            className="bg-primary text-white px-8 py-3 rounded-xl font-bold hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-lg shadow-primary/30"
-                          >
-                            {reviewSubmitting ? "Đang gửi..." : "Gửi Đánh Giá"}
-                          </button>
+                          <button onClick={handleSubmitReview} disabled={reviewSubmitting || !reviewRating} className="bg-primary text-white px-8 py-3 rounded-xl font-bold hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-lg shadow-primary/30">{reviewSubmitting ? "Đang gửi..." : "Gửi Đánh Giá"}</button>
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
-
                 <div className="space-y-6">
                   {reviewsLoading ? (
                     <div className="text-center py-10 font-medium text-slate-500">Đang tải đánh giá...</div>
@@ -517,9 +495,7 @@ const ProductDetail = () => {
                       <div key={r._id} className="border-b border-slate-100 pb-6 last:border-0">
                         <div className="flex justify-between items-start mb-3">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold capitalize">
-                              {(r.userId?.name || "U")[0]}
-                            </div>
+                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold capitalize">{(r.userId?.name || "U")[0]}</div>
                             <div>
                               <p className="font-bold text-slate-800">{r.userId?.name || "Khách hàng"}</p>
                               <div className="flex items-center gap-2">
@@ -532,10 +508,8 @@ const ProductDetail = () => {
                           </div>
                           <span className="text-sm font-medium text-slate-400">{r.createdAt ? new Date(r.createdAt).toLocaleDateString("vi-VN") : ""}</span>
                         </div>
-
                         {r.title && <p className="font-bold text-slate-800 mb-2">{r.title}</p>}
                         {r.content && <p className="text-slate-600 leading-relaxed mb-4">{r.content}</p>}
-
                         {Array.isArray(r.images) && r.images.length > 0 && (
                           <div className="flex gap-2 mt-2">
                             {r.images.map((img, idx) => (
@@ -574,8 +548,8 @@ const ProductDetail = () => {
                 return (
                   <Link key={p._id} to={`/product/${p._id}`} className="group bg-white rounded-3xl border border-slate-100 p-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
                     <div className="aspect-square bg-slate-50 rounded-2xl mb-4 overflow-hidden flex items-center justify-center p-2 relative">
-                      <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity z-10"></div>
-                      <img src={getImage(img)} alt={p.name} className="w-full h-full object-cover mix-blend-multiply group-hover:scale-105 transition-transform duration-500" />
+                      <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity z-10"></div>
+                      <img src={getImage(img)} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-800 line-clamp-1 group-hover:text-primary transition-colors mb-2">{p.name}</h3>

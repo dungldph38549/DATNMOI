@@ -410,8 +410,8 @@ const CheckOut = () => {
                 {checkoutItems.map((item, index) => (
                   <div key={item.productId || index} className="flex gap-4 p-3 rounded-2xl border border-slate-100 bg-slate-50 relative group">
                     <div className="w-20 h-20 bg-white rounded-xl overflow-hidden border border-slate-200 shrink-0">
-                      <img src={item.image ? (item.image.startsWith("http") ? item.image : `http://localhost:3002/${item.image.startsWith("/") ? item.image.slice(1) : item.image}`) : "https://via.placeholder.com/80/f0f0f0/999?text=No+Image"}
-                        alt={item.name} className="w-full h-full object-cover mix-blend-multiply p-1" />
+                      <img src={item.image ? (item.image.startsWith("http") ? item.image : `http://localhost:3002/uploads/${item.image.startsWith("/") ? item.image.slice(1) : item.image}`) : "https://via.placeholder.com/80/f0f0f0/999?text=No+Image"}
+                        alt={item.name} className="w-full h-full object-cover p-1" />
                     </div>
                     <div className="flex-1 flex flex-col justify-between py-1">
                       <div>

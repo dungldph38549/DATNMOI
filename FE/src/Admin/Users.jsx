@@ -177,7 +177,7 @@ const Pagination = ({ page, total, limit, onChange }) => {
     fontWeight: active ? 700 : 500,
     fontSize: 13,
     cursor: "pointer",
-    fontFamily: "'Lexend', sans-serif",
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
     transition: "all 0.15s",
   });
 
@@ -305,7 +305,7 @@ const RolePicker = ({ value, onChange }) => (
             alignItems: "center",
             gap: 5,
             transition: "all 0.15s",
-            fontFamily: "'Lexend', sans-serif",
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
           }}
         >
           <span
@@ -412,7 +412,7 @@ const Users = () => {
           alignItems: "center",
           justifyContent: "center",
           height: 320,
-          fontFamily: "'Lexend', sans-serif",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
         }}
       >
         <div style={{ textAlign: "center" }}>
@@ -444,7 +444,7 @@ const Users = () => {
           justifyContent: "center",
           height: 280,
           gap: 10,
-          fontFamily: "'Lexend', sans-serif",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
           color: T.textMuted,
         }}
       >
@@ -466,7 +466,6 @@ const Users = () => {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
         .material-symbols-outlined {
           font-family: 'Material Symbols Outlined'; font-style: normal;
@@ -479,7 +478,7 @@ const Users = () => {
         .sh-row:hover td { background: #FFFBF5 !important; }
         .sh-form .ant-form-item { margin-bottom: 0; }
         .sh-form .ant-input, .sh-form .ant-input-password {
-          border-radius: 10px !important; font-family: 'Lexend', sans-serif !important;
+          border-radius: 10px !important; font-family: 'Plus Jakarta Sans', sans-serif !important;
           font-size: 13px !important; border: 1.5px solid #E2E8F0 !important;
         }
         .sh-form .ant-input:focus, .sh-form .ant-input-affix-wrapper:focus,
@@ -493,7 +492,7 @@ const Users = () => {
       <div
         style={{
           padding: 28,
-          fontFamily: "'Lexend', sans-serif",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
           minHeight: "100vh",
           background: T.bg,
         }}
@@ -568,7 +567,7 @@ const Users = () => {
               fontWeight: 700,
               fontSize: 13,
               cursor: "pointer",
-              fontFamily: "'Lexend', sans-serif",
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
               boxShadow: "0 4px 14px rgba(244,157,37,0.30)",
             }}
           >
@@ -622,7 +621,7 @@ const Users = () => {
                 outline: "none",
                 fontSize: 13,
                 color: T.text,
-                fontFamily: "'Lexend', sans-serif",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
                 background: "#F8FAFC",
                 boxSizing: "border-box",
                 transition: "border-color 0.15s",
@@ -644,7 +643,7 @@ const Users = () => {
               fontSize: 13,
               fontWeight: 600,
               cursor: "pointer",
-              fontFamily: "'Lexend', sans-serif",
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
             }}
           >
             <span
@@ -819,7 +818,7 @@ const Users = () => {
                             fontSize: 12,
                             fontWeight: 600,
                             cursor: "pointer",
-                            fontFamily: "'Lexend', sans-serif",
+                            fontFamily: "'Plus Jakarta Sans', sans-serif",
                             transition: "all 0.15s",
                           }}
                           onMouseEnter={(e) => {
@@ -888,7 +887,7 @@ const Users = () => {
               maxWidth: 440,
               padding: 28,
               animation: "slideUp 0.2s ease",
-              fontFamily: "'Lexend', sans-serif",
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
             }}
           >
             {/* Modal header */}
@@ -982,7 +981,7 @@ const Users = () => {
                         placeholder="Nhập mật khẩu mới..."
                         style={{
                           borderRadius: 10,
-                          fontFamily: "'Lexend', sans-serif",
+                          fontFamily: "'Plus Jakarta Sans', sans-serif",
                           fontSize: 13,
                         }}
                       />
@@ -1044,7 +1043,7 @@ const Users = () => {
                       fontWeight: 600,
                       fontSize: 13,
                       cursor: "pointer",
-                      fontFamily: "'Lexend', sans-serif",
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
                     }}
                   >
                     Hủy bỏ
@@ -1062,7 +1061,7 @@ const Users = () => {
                       fontWeight: 700,
                       fontSize: 13,
                       cursor: "pointer",
-                      fontFamily: "'Lexend', sans-serif",
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
                       boxShadow: "0 4px 14px rgba(244,157,37,0.30)",
                       opacity: isPending ? 0.7 : 1,
                       display: "flex",
