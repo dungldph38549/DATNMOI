@@ -24,6 +24,7 @@ import ContactPage from "./pages/ContactPage/ContactPage";
 import CheckOut from "./pages/CheckOut/CheckOut";
 import CategoryPage from "./pages/Category/CategoryPage";
 import SearchPage from "./pages/SearchPage/SearchPage";
+import ProfilePage from "./pages/Profile/ProfilePage";
 /* eslint-disable no-unused-vars -- used in Routes below */
 import OrderHistoryPage from "./pages/OrderHistoryPage/OrderHistoryPage";
 import OrderDetailPage from "./pages/OrderDetailPage/OrderDetailPage";
@@ -63,6 +64,14 @@ function AppContent() {
           <Route path="/category" element={<CategoryPage />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
+          <Route
+            path="/profile"
+            element={(
+              <RequireAuth>
+                <ProfilePage />
+              </RequireAuth>
+            )}
+          />
           <Route
             path="/cart"
             element={(

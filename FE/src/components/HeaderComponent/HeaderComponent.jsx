@@ -131,7 +131,9 @@ const Header = () => {
                 {/* DROPDOWN */}
                 <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all transform origin-top translate-y-2 group-hover:translate-y-0">
                   <div className="p-2 space-y-1">
-                    <div onClick={goOrders} className="block w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:text-primary hover:bg-primary/5 rounded-xl transition-colors">Lịch sử đơn hàng</div>
+                    <Link to="/profile" className="block w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:text-primary hover:bg-primary/5 rounded-xl transition-colors">Tài khoản của tôi</Link>
+                    <Link to="/profile?tab=wallet" className="block w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:text-primary hover:bg-primary/5 rounded-xl transition-colors">Ví SNEAKERHOUSE</Link>
+                    <div onClick={goOrders} className="block w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:text-primary hover:bg-primary/5 rounded-xl transition-colors cursor-pointer">Lịch sử đơn hàng</div>
                     {user?.isAdmin && (
                       <Link to="/admin" className="block w-full text-left px-4 py-2.5 text-sm font-bold text-primary hover:bg-primary/5 rounded-xl transition-colors">Quản trị viên (Admin)</Link>
                     )}
