@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { FaFire, FaGem, FaArrowRight, FaFilter, FaStar } from "react-icons/fa";
+import { FaFire, FaGem, FaArrowRight, FaFilter } from "react-icons/fa";
+import Product from "../../components/Product/Product";
 import {
   getFeaturedProducts,
   getBestSellers,
@@ -82,52 +83,6 @@ const HomePage = () => {
   const newDisplay = filterProducts.length > 0 ? filterProducts.slice(8, 16) : newProducts;
   const isFiltering = !!selectedCategory;
 
-  const PLACEHOLDER_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='28' font-family='Plus Jakarta Sans'>No Image</text></svg>";
-
-  const getProductImageUrl = (p) => {
-    const candidate = (typeof p?.image === "string" && p.image.trim()) || (Array.isArray(p?.srcImages) && typeof p.srcImages[0] === "string" ? p.srcImages[0].trim() : "");
-    if (!candidate) return PLACEHOLDER_IMG;
-    if (candidate.startsWith("http")) return candidate;
-    return `http://localhost:3002/uploads/${candidate.startsWith("/") ? candidate.slice(1) : candidate}`;
-  };
-
-  const getDisplayPrice = (p) => {
-    const singlePrice = Number(p?.price);
-    return Number.isFinite(singlePrice) ? `${singlePrice.toLocaleString("vi-VN")}đ` : "Liên hệ";
-  };
-
-  const renderProductCard = (p) => (
-    <Link to={`/product/${p._id}`} key={p._id} className="group relative rounded-2xl bg-white overflow-hidden hover:shadow-2xl transition-all duration-500 border border-slate-100 flex flex-col h-full">
-      <div className="relative aspect-square overflow-hidden bg-slate-50 flex items-center justify-center">
-        <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10"></div>
-        <img
-          src={getProductImageUrl(p)}
-          alt={p.name}
-          onError={(e) => { e.target.onerror = null; e.target.src = PLACEHOLDER_IMG; }}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
-        />
-        <div className="absolute top-3 left-3 z-20 flex flex-col gap-2">
-          {p.soldCount > 50 && <span className="bg-orange-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-lg shadow-orange-500/30">Hot</span>}
-          {p.isNew && <span className="bg-primary text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-lg shadow-primary/30">New</span>}
-        </div>
-      </div>
-
-      <div className="p-5 flex flex-col flex-1">
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">{p.brandId?.name || "Premium"}</p>
-        <h3 className="font-display font-bold text-base text-slate-800 leading-tight line-clamp-2 mb-3 group-hover:text-primary transition-colors min-h-[40px]">{p.name}</h3>
-
-        <div className="mt-auto flex items-center justify-between gap-4">
-          <div className="flex flex-col">
-            <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest leading-none mb-1">Giá từ</span>
-            <p className="text-secondary font-black text-lg leading-none">{getDisplayPrice(p)}</p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white group-hover:bg-primary transition-all duration-300 shadow-lg shadow-slate-900/10 group-hover:shadow-primary/20">
-            <FaArrowRight size={14} className="-rotate-45 group-hover:rotate-0 transition-transform duration-300" />
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
 
   return (
     <main className="bg-background-light min-h-screen font-body pb-24">
@@ -237,7 +192,9 @@ const HomePage = () => {
               </Link>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-              {newDisplay.map(renderProductCard)}
+              {newDisplay.map((p) => (
+                <Product key={p._id} product={p} />
+              ))}
             </div>
           </div>
         )}
@@ -275,7 +232,9 @@ const HomePage = () => {
               </Link>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-              {(isFiltering ? filterProducts : hotDisplay).map(renderProductCard)}
+              {(isFiltering ? filterProducts : hotDisplay).map((p) => (
+                <Product key={p._id} product={p} />
+              ))}
             </div>
           </div>
         )}

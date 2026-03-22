@@ -6,13 +6,16 @@ import {
   addToCartAPI, createReview, getOrdersByUser, getProductById,
   getProductReviews, getStocks, relationProduct, uploadImages
 } from "../../api";
-import { FaStar, FaShoppingCart, FaCheckCircle, FaShippingFast, FaShieldAlt, FaTimes } from "react-icons/fa";
+import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
+import { FaStar, FaShoppingCart, FaCheckCircle, FaShippingFast, FaShieldAlt, FaTimes, FaHeart, FaRegHeart } from "react-icons/fa";
 
 const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const user = useSelector((state) => state.user);
+  const wishlistItems = useSelector((state) => state.wishlist.items || []);
+  const isFavorited = wishlistItems.some((item) => item._id === id);
 
   const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
@@ -202,6 +205,11 @@ const ProductDetail = () => {
       }
     } catch (err) { }
     return true;
+  };
+
+  const handleToggleWishlist = () => {
+    if (!product) return;
+    dispatch(toggleWishlist(product));
   };
 
   const handleBuyNow = async () => {
@@ -404,6 +412,12 @@ const ProductDetail = () => {
                 className="flex-[1.5] h-14 bg-primary text-white rounded-2xl font-bold text-lg hover:bg-primary/90 transition-colors shadow-lg shadow-primary/30 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Mua Ngay
+              </button>
+              <button
+                onClick={handleToggleWishlist}
+                className={`w-14 h-14 flex items-center justify-center rounded-2xl border-2 transition-all ${isFavorited ? "border-red-500 text-red-500 bg-red-50" : "border-slate-200 text-slate-400 hover:border-red-400 hover:text-red-400"}`}
+              >
+                {isFavorited ? <FaHeart size={24} /> : <FaRegHeart size={24} />}
               </button>
             </div>
           </div>

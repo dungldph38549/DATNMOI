@@ -9,26 +9,22 @@ import {
 } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
+import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 
 const Product = ({ product }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const user = useSelector((state) => state.user);
+  const wishlistItems = useSelector((state) => state.wishlist.items || []);
   const isLoggedIn = !!(user?.login && user?.token);
 
-  const [wishlist, setWishlist] = useState(false);
+  const isFavorited = useMemo(() => {
+    return wishlistItems.some((item) => item._id === product?._id);
+  }, [wishlistItems, product?._id]);
+
   const [showQuickView, setShowQuickView] = useState(false);
   const [added, setAdded] = useState(false);
 
-  // LOAD WISHLIST
-  useEffect(() => {
-    if (!product) return;
-
-    const saved = JSON.parse(localStorage.getItem("wishlist")) || [];
-    if (saved.includes(product._id)) {
-      setWishlist(true);
-    }
-  }, [product]);
 
   // Back-end đôi khi không set `hasVariants` đúng như `variants` thực có.
   // Vì vậy suy ra biến thể dựa trên `variants.length`.
@@ -81,18 +77,10 @@ const Product = ({ product }) => {
   };
 
   // WISHLIST
-  const toggleWishlist = () => {
-    const saved = JSON.parse(localStorage.getItem("wishlist")) || [];
-    let updated;
-
-    if (wishlist) {
-      updated = saved.filter((id) => id !== product._id);
-    } else {
-      updated = [...saved, product._id];
-    }
-
-    localStorage.setItem("wishlist", JSON.stringify(updated));
-    setWishlist(!wishlist);
+  const handleToggleWishlist = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dispatch(toggleWishlist(product));
   };
 
   // ADD CART
@@ -167,10 +155,10 @@ const Product = ({ product }) => {
 
         {/* WISHLIST (Floating) */}
         <button
-          onClick={toggleWishlist}
+          onClick={handleToggleWishlist}
           className="absolute top-3 right-3 z-30 bg-white/80 backdrop-blur-sm p-2.5 rounded-full shadow-md hover:shadow-xl hover:scale-110 transition-all duration-300"
         >
-          {wishlist ? (
+          {isFavorited ? (
             <FaHeart className="text-red-500" />
           ) : (
             <FaRegHeart className="text-slate-400 group-hover:text-red-400" />

@@ -29,6 +29,7 @@ import ProfilePage from "./pages/Profile/ProfilePage";
 import OrderHistoryPage from "./pages/OrderHistoryPage/OrderHistoryPage";
 import OrderDetailPage from "./pages/OrderDetailPage/OrderDetailPage";
 import PaymentReturnPage from "./pages/PaymentReturnPage/PaymentReturnPage";
+import WishlistPage from "./pages/Wishlist/WishlistPage";
 
 //  IMPORT TRANG ADMIN USERS
 import User from "./pages/User";
@@ -64,6 +65,7 @@ function AppContent() {
           <Route path="/category" element={<CategoryPage />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/wishlist" element={<WishlistPage />} />
           <Route
             path="/profile"
             element={(
