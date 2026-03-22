@@ -8,10 +8,7 @@ import {
 } from "react-router-dom";
 import { useSelector } from "react-redux";
 
-import "./assets/css/bootstrap.min.css";
-import "./assets/css/main.css";
-import "./assets/css/blue.css";
-import "./assets/css/font-awesome.css";
+
 
 import HeaderComponent from "./components/HeaderComponent/HeaderComponent";
 import FooterComponent from "./components/FooterComponent/FooterComponent";

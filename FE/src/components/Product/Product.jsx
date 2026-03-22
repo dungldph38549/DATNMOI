@@ -45,9 +45,9 @@ const Product = ({ product }) => {
 
     const prices = Array.isArray(product?.variants)
       ? product.variants
-          .filter((v) => v && v.price != null)
-          .map((v) => Number(v.price))
-          .filter((n) => Number.isFinite(n))
+        .filter((v) => v && v.price != null)
+        .map((v) => Number(v.price))
+        .filter((n) => Number.isFinite(n))
       : [];
 
     if (prices.length > 0) {
@@ -126,94 +126,108 @@ const Product = ({ product }) => {
 
   return (
     <>
-      <div className="group bg-white rounded-xl shadow-md hover:shadow-xl transition duration-300 overflow-hidden relative">
+      <div className="group bg-white rounded-2xl shadow-sm hover:shadow-2xl transition-all duration-500 overflow-hidden relative flex flex-col h-full border border-slate-100 italic-none">
         {/* IMAGE */}
-        <Link to={`/product/${product._id}`}>
-          <div className="relative h-[260px] overflow-hidden">
-            <img
-              src={image1}
-              alt={product.name}
-              className="absolute w-full h-full object-cover transition duration-300 ease-out group-hover:opacity-0 group-hover:-translate-y-1 group-hover:scale-105 active:scale-95"
-              onError={onImageError}
-            />
+        <Link to={`/product/${product._id}`} className="block relative aspect-square overflow-hidden bg-slate-50">
+          <img
+            src={image1}
+            alt={product.name}
+            className="absolute inset-0 w-full h-full object-cover transition-all duration-700 ease-out group-hover:scale-110 group-hover:opacity-0"
+            onError={onImageError}
+          />
 
-            <img
-              src={image2}
-              alt={product.name}
-              className="w-full h-full object-cover opacity-0 transition duration-300 ease-out group-hover:opacity-100 group-hover:-translate-y-1 group-hover:scale-105 active:scale-95"
-              onError={onImageError}
-            />
+          <img
+            src={image2}
+            alt={product.name}
+            className="absolute inset-0 w-full h-full object-cover opacity-0 transition-all duration-700 ease-out group-hover:opacity-100 group-hover:scale-110"
+            onError={onImageError}
+          />
 
-            {product?.sold > 50 && (
-              <span className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded">
-                🔥 Best Seller
+          {/* OVERLAY ON HOVER */}
+          <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+          {product?.sold > 50 && (
+            <div className="absolute top-3 left-3 z-10">
+              <span className="bg-orange-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-lg shadow-orange-500/30">
+                🔥 Hot
               </span>
-            )}
+            </div>
+          )}
+
+          {/* QUICK VIEW ICON (Centered) */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 z-20 translate-y-4 group-hover:translate-y-0">
+            <button
+              onClick={(e) => { e.preventDefault(); setShowQuickView(true); }}
+              className="bg-white/90 backdrop-blur-md text-slate-900 p-4 rounded-full shadow-2xl hover:bg-primary hover:text-white transition-all transform hover:scale-110"
+            >
+              <FaEye size={20} />
+            </button>
           </div>
         </Link>
 
-        {/* WISHLIST */}
+        {/* WISHLIST (Floating) */}
         <button
           onClick={toggleWishlist}
-          className="absolute top-3 right-3 bg-white p-2 rounded-full shadow hover:scale-110 transition"
+          className="absolute top-3 right-3 z-30 bg-white/80 backdrop-blur-sm p-2.5 rounded-full shadow-md hover:shadow-xl hover:scale-110 transition-all duration-300"
         >
           {wishlist ? (
             <FaHeart className="text-red-500" />
           ) : (
-            <FaRegHeart className="text-gray-500" />
+            <FaRegHeart className="text-slate-400 group-hover:text-red-400" />
           )}
         </button>
 
-        {/* QUICK VIEW */}
-        <button
-          onClick={() => setShowQuickView(true)}
-          className="absolute bottom-3 right-3 bg-black text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition"
-        >
-          <FaEye />
-        </button>
-
         {/* INFO */}
-        <div className="p-4">
+        <div className="p-5 flex flex-col flex-1">
           <Link to={`/product/${product._id}`}>
-            <h3 className="text-sm font-medium text-gray-800 line-clamp-2 min-h-[40px] group-hover:text-red-500">
+            <h3 className="text-sm font-bold text-slate-800 line-clamp-2 min-h-[40px] mb-2 group-hover:text-primary transition-colors leading-tight">
               {product.name}
             </h3>
           </Link>
 
           {/* RATING */}
-          <div className="flex items-center mt-1 text-yellow-400 text-xs">
-            {[...Array(5)].map((_, i) => (
-              <FaStar
-                key={i}
-                className={i < (product.rating || 4) ? "" : "text-gray-300"}
-              />
-            ))}
-
-            <span className="text-gray-500 ml-1">({product.rating || 4})</span>
+          <div className="flex items-center mb-3 text-yellow-400 text-[10px]">
+            <div className="flex mr-1.5">
+              {[...Array(5)].map((_, i) => (
+                <FaStar
+                  key={i}
+                  className={i < (product.rating || 4) ? "drop-shadow-sm" : "text-slate-200"}
+                />
+              ))}
+            </div>
+            <span className="text-slate-400 font-bold">({product.rating || 4})</span>
           </div>
 
-          {/* PRICE */}
-          <div className="mt-2">
-            <span className="text-red-500 font-bold text-lg">
-              {hasVariants
-                ? minPrice === maxPrice
-                  ? `${minPrice.toLocaleString()}đ`
-                  : `Giá ${minPrice.toLocaleString()}đ - ${maxPrice.toLocaleString()}đ`
-                : `${(product.price ?? minPrice ?? 0).toLocaleString()}đ`}
-            </span>
+          {/* PRICE SECTON (Flexible height to keep buttons aligned) */}
+          <div className="mb-5 flex-1 flex flex-col justify-end">
+            <div className="flex flex-wrap items-baseline gap-1.5">
+              {hasVariants && minPrice !== maxPrice ? (
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest leading-none mb-1">Giá từ</span>
+                  <span className="text-primary font-black text-lg leading-none">
+                    {minPrice.toLocaleString("vi-VN")}₫
+                  </span>
+                </div>
+              ) : (
+                <span className="text-primary font-black text-xl leading-none">
+                  {(product.price ?? minPrice ?? 0).toLocaleString("vi-VN")}₫
+                </span>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* ADD CART */}
-        <div className="px-4 pb-4 ">
+          {/* ADD CART BUTTON (Aligned at bottom) */}
           <button
             onClick={handleAddCart}
-            className={`w-full flex items-center justify-center gap-2 text-white font-semibold py-2.5 rounded-lg shadow-md transition ${
-              added ? "bg-green-500" : "bg-red-600 hover:bg-red-700"
-            }`}
+            className={`w-full flex items-center justify-center gap-2 text-white text-sm font-black py-3.5 rounded-xl shadow-lg transition-all duration-300 transform active:scale-95 ${added
+                ? "bg-green-500 shadow-green-500/20"
+                : "bg-slate-900 hover:bg-primary shadow-slate-900/20 hover:shadow-primary/30"
+              }`}
           >
-            <FaShoppingCart />
-            {hasVariants ? "Chọn size" : added ? "Đã thêm" : "Thêm vào giỏ hàng"}
+            {added ? <FaShoppingCart /> : null}
+            <span className="uppercase tracking-widest">
+              {hasVariants ? "Chọn kích cỡ" : added ? "Đã thêm" : "Thêm vào giỏ"}
+            </span>
           </button>
         </div>
       </div>

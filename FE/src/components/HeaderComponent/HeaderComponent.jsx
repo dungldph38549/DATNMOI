@@ -1,11 +1,6 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  FaShoppingCart,
-  FaSearch,
-  FaUser,
-  FaClipboardList,
-} from "react-icons/fa";
+import { Link, useNavigate } from "react-router-dom";
+import { FaShoppingCart, FaSearch, FaUser, FaClipboardList, FaChevronDown } from "react-icons/fa";
 import { useSelector, useDispatch } from "react-redux";
 import { clearUser } from "../../redux/user";
 
@@ -20,9 +15,8 @@ const Header = () => {
   const [keyword, setKeyword] = useState("");
   const cartTotal = cart.reduce((sum, item) => sum + (item.price || 0) * (item.qty || 0), 0);
 
-  /* ================= NAVIGATION ================= */
-
   const goHome = () => navigate("/");
+
   const goCart = () => {
     if (!isLoggedIn) {
       alert("Vui lòng đăng nhập để xem giỏ hàng.");
@@ -31,6 +25,7 @@ const Header = () => {
     }
     navigate("/cart");
   };
+
   const goOrders = () => {
     if (!isLoggedIn) {
       alert("Vui lòng đăng nhập để xem đơn hàng.");
@@ -39,118 +34,133 @@ const Header = () => {
     }
     navigate("/orders");
   };
+
   const goLogin = () => navigate("/login");
+
   const handleLogout = () => {
     dispatch(clearUser());
     navigate("/", { replace: true });
   };
 
-  /* ================= SEARCH ================= */
-
   const handleSearch = (e) => {
     e.preventDefault();
-
     if (keyword.trim() === "") return;
-
     navigate(`/search?q=${keyword}`);
   };
 
   return (
-    <header className="bg-white shadow-md sticky top-0 z-50">
-      <div className="max-w-[1450px] mx-auto flex items-center justify-between px-12 py-7">
-        {/* LOGO */}
+    <header className="sticky top-0 w-full z-50 flex flex-col font-body bg-white shadow-sm border-b border-gray-100">
 
-        <div
-          onClick={goHome}
-          className="flex items-center gap-4 cursor-pointer"
-        >
-          <div className="bg-black text-white px-4 py-2 rounded-xl text-2xl font-bold leading-none">
-            EO
+      {/* TOP ANNOUNCEMENT BAR */}
+      <div className="bg-slate-900 text-slate-300 text-xs py-2 px-4">
+        <div className="container mx-auto flex justify-between items-center max-w-7xl">
+          <div className="flex gap-4 font-bold tracking-wide">
+            <span className="flex items-center gap-1 cursor-pointer hover:text-white transition-colors">VND <FaChevronDown size={10} /></span>
+            <span className="flex items-center gap-1 cursor-pointer hover:text-white transition-colors">Tiếng Việt <FaChevronDown size={10} /></span>
+          </div>
+          <div className="hidden md:flex gap-6 font-bold">
+            <span className="hover:text-primary transition-colors cursor-pointer text-slate-400">Trợ giúp & FAQ</span>
+            <span className="hover:text-primary transition-colors cursor-pointer text-slate-400">Theo dõi bộ sưu tập</span>
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN NAVBAR */}
+      <div className="py-4">
+        <div className="container mx-auto px-4 max-w-7xl flex flex-wrap items-center justify-between gap-4 lg:gap-8">
+
+          {/* BRAND LOGO */}
+          <div onClick={goHome} className="flex items-center gap-3 cursor-pointer group">
+            <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white font-display font-black text-xl shadow-lg group-hover:scale-105 transition-transform">
+              SH
+            </div>
+            <h1 className="text-2xl font-display font-black tracking-tight text-slate-900 drop-shadow-sm">
+              SNEAKER<span className="text-primary">HOUSE</span>
+            </h1>
           </div>
 
-          <span className="font-bold text-3xl tracking-wide">SNEAKERHOUSE</span>
-        </div>
+          {/* SEARCH BOX */}
+          <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-xl items-center bg-slate-50 rounded-2xl border border-slate-200 focus-within:border-primary focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/10 transition-all overflow-hidden group">
+            <div className="pl-5 pr-2 py-3 text-slate-400 group-focus-within:text-primary transition-colors">
+              <FaSearch size={16} />
+            </div>
+            <input
+              type="text"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder="Bạn muốn tìm giày gì hôm nay?"
+              className="flex-1 bg-transparent px-3 py-3 outline-none text-slate-700 text-sm font-bold placeholder-slate-400"
+            />
+            <button type="submit" className="hidden"></button>
+          </form>
 
-        {/* SEARCH */}
+          {/* ACTION BUTTONS (Gọn gàng, 1 dòng) */}
+          <div className="flex items-center gap-2 md:gap-4">
 
-        <form
-          onSubmit={handleSearch}
-          className="flex items-center bg-gray-100 rounded-full px-7 py-4 w-[640px]"
-        >
-          <FaSearch className="text-gray-400 mr-3 text-lg" />
+            {/* ORDERS BUTTON */}
+            <div onClick={goOrders} className="flex items-center gap-2 cursor-pointer group px-3 md:px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
+              <FaClipboardList size={20} className="text-slate-700 group-hover:text-primary transition-colors" />
+              <span className="hidden lg:block text-sm font-bold text-slate-700 group-hover:text-primary transition-colors">Đơn hàng</span>
+            </div>
 
-          <input
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            placeholder="Tìm kiếm sản phẩm..."
-            className="bg-transparent outline-none w-full text-base placeholder:text-gray-500"
-          />
-        </form>
-
-        {/* RIGHT MENU */}
-
-        <div className="flex items-center gap-10 text-xl">
-          {/* CART */}
-
-          <div
-            onClick={goCart}
-            className="flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors"
-          >
-            <FaShoppingCart className="text-3xl" />
-
-            <span>Giỏ hàng</span>
-
-            {cart.length > 0 && (
-              <>
-                <span className="bg-red-500 text-white text-sm px-2 rounded-full">
+            {/* CART BUTTON */}
+            <div onClick={goCart} className="flex items-center gap-2 cursor-pointer group px-3 md:px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors relative">
+              <FaShoppingCart size={20} className="text-slate-700 group-hover:text-primary transition-colors" />
+              {cart.length > 0 && (
+                <span className="absolute top-1 left-6 min-w-[18px] h-[18px] bg-primary text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
                   {cart.length}
                 </span>
-                <span className="text-sm text-slate-600">
-                  ({cartTotal.toLocaleString("vi-VN")}₫)
-                </span>
-              </>
-            )}
-          </div>
+              )}
+              <span className="hidden lg:block text-sm font-bold text-slate-700 group-hover:text-primary transition-colors ml-1">Giỏ hàng</span>
+            </div>
 
-          {/* ORDERS */}
+            {/* DIVIDER */}
+            <div className="w-px h-6 bg-slate-200 hidden md:block mx-1"></div>
 
-          <div
-            onClick={goOrders}
-            className="flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors"
-          >
-            <FaClipboardList className="text-2xl" />
-
-            <span>Đơn hàng</span>
-          </div>
-
-          {/* USER */}
-
-          {isLoggedIn ? (
-            <div className="flex items-center gap-4">
-              <div
-                className="flex items-center gap-2"
-                title={user?.email}
-              >
-                <FaUser className="text-2xl" />
-                <span>{user?.name || user?.email || "Tài khoản"}</span>
+            {/* USER BUTTON */}
+            {isLoggedIn ? (
+              <div className="relative group cursor-pointer z-50">
+                <div className="flex items-center gap-2 px-3 md:px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
+                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 border border-slate-200">
+                    <FaUser size={12} />
+                  </div>
+                  <span className="hidden lg:block text-sm font-bold text-slate-700 group-hover:text-primary transition-colors max-w-[120px] truncate">
+                    {user?.name?.split(' ')[0] || user?.email?.split('@')[0] || "Tài khoản"}
+                  </span>
+                </div>
+                {/* DROPDOWN */}
+                <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all transform origin-top translate-y-2 group-hover:translate-y-0">
+                  <div className="p-2 space-y-1">
+                    <div onClick={goOrders} className="block w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:text-primary hover:bg-primary/5 rounded-xl transition-colors">Lịch sử đơn hàng</div>
+                    {user?.isAdmin && (
+                      <Link to="/admin" className="block w-full text-left px-4 py-2.5 text-sm font-bold text-primary hover:bg-primary/5 rounded-xl transition-colors">Quản trị viên (Admin)</Link>
+                    )}
+                    <div className="h-px bg-slate-100 my-1"></div>
+                    <button onClick={handleLogout} className="block w-full text-left px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors">Đăng xuất</button>
+                  </div>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="text-base px-4 py-2 rounded-full border border-slate-300 hover:bg-slate-100"
-              >
-                Đăng xuất
-              </button>
-            </div>
-          ) : (
-            <div
-              onClick={goLogin}
-              className="flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors"
-            >
-              <FaUser className="text-2xl" />
-              <span>Đăng nhập</span>
-            </div>
-          )}
+            ) : (
+              <div onClick={goLogin} className="flex items-center gap-2 cursor-pointer ml-1">
+                <div className="bg-slate-900 text-white px-5 py-2.5 rounded-full font-bold text-sm hover:bg-primary transition-colors shadow-md hover:shadow-lg hover:shadow-primary/20 flex items-center gap-2">
+                  <FaUser size={14} /> <span className="hidden md:inline">Đăng nhập</span>
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+
+        {/* BOTTOM NAV LINKS */}
+        <div className="container mx-auto px-4 max-w-7xl mt-4 hidden md:block">
+          <ul className="flex items-center gap-8 text-sm font-bold text-slate-600 uppercase tracking-widest whitespace-nowrap overflow-x-auto no-scrollbar pb-1">
+            <li><Link to="/" className="text-slate-900 hover:text-primary transition-colors">Trang chủ</Link></li>
+            <li><Link to="/product" className="hover:text-primary transition-colors">Tất cả sản phẩm</Link></li>
+            <li><Link to="/product?category=nike" className="hover:text-primary transition-colors">Nike</Link></li>
+            <li><Link to="/product?category=adidas" className="hover:text-primary transition-colors">Adidas</Link></li>
+            <li><Link to="/product?category=puma" className="hover:text-primary transition-colors">Puma</Link></li>
+            <li><span className="text-secondary hover:text-pink-600 transition-colors cursor-pointer flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-secondary animate-ping"></span> Sale up to 50%</span></li>
+          </ul>
         </div>
       </div>
     </header>

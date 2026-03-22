@@ -5,7 +5,8 @@
 @tailwind utilities;
 
 body {
-  font-family: "Lexend", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  @apply bg-background-light text-slate-900;
 }
 
 .material-symbols-outlined {
