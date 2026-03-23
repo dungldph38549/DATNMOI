@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FaShoppingCart, FaSearch, FaUser, FaChevronDown, FaHeart } from "react-icons/fa";
+import { FaShoppingCart, FaSearch, FaUser, FaChevronDown, FaHeart, FaBoxOpen } from "react-icons/fa";
 import { useSelector, useDispatch } from "react-redux";
 import { clearUser } from "../../redux/user";
 
@@ -109,6 +109,10 @@ const Header = () => {
             </Link>
 
             {/* ORDERS BUTTON */}
+            <div onClick={goOrders} className="flex items-center gap-2 cursor-pointer group px-3 md:px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors relative">
+              <FaBoxOpen size={20} className="text-slate-700 group-hover:text-primary transition-colors" />
+              <span className="hidden lg:block text-sm font-bold text-slate-700 group-hover:text-primary transition-colors ml-1">Đơn hàng</span>
+            </div>
 
             {/* CART BUTTON */}
             <div onClick={goCart} className="flex items-center gap-2 cursor-pointer group px-3 md:px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors relative">

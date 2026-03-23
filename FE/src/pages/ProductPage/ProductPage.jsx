@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import Product from "../../components/Product/Product";
 import { fetchProducts, getVoucherByCode } from "../../api";
 import { FaFilter, FaTimes } from "react-icons/fa";
+import BackButton from "../../components/Common/BackButton";
 
 const PAGE_SIZE = 30;
 
@@ -118,6 +119,9 @@ const ProductPage = () => {
       </div>
 
       <div className="container mx-auto px-4 max-w-7xl">
+        <div className="mb-6">
+          <BackButton />
+        </div>
         {voucherScope && (
           <div className="mb-6 bg-green-50 border border-green-100 rounded-2xl px-5 py-4 flex items-center justify-between gap-4">
             <div>

@@ -15,6 +15,7 @@ import {
   updateCustomerById,
 } from "../../api";
 import { FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaCreditCard, FaTruck, FaMoneyBillWave, FaShieldAlt } from "react-icons/fa";
+import BackButton from "../../components/Common/BackButton";
 
 const VIETNAM_LOCATION_API = "https://provinces.open-api.vn/api";
 
@@ -560,6 +561,9 @@ const CheckOut = () => {
       </div>
 
       <div className="container mx-auto px-4 max-w-7xl">
+        <div className="mb-6">
+          <BackButton />
+        </div>
         <div className="flex flex-col lg:flex-row gap-10">
 
           {/* LEFT: CHECKOUT FORM */}

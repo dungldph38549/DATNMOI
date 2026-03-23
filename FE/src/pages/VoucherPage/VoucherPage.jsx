@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { getAllVouchers } from "../../api";
+import BackButton from "../../components/Common/BackButton";
 
 const VoucherPage = () => {
   const user = useSelector((state) => state.user);
@@ -85,6 +86,9 @@ const VoucherPage = () => {
   return (
     <main className="bg-background-light min-h-screen font-body pb-20 pt-24">
       <div className="container mx-auto px-4 max-w-7xl">
+        <div className="mb-6">
+          <BackButton />
+        </div>
         <div className="mb-8">
           <h1 className="text-4xl font-display font-black text-slate-900 tracking-tight">Kho Voucher</h1>
           <p className="text-slate-500 mt-2">Thu thập mã giảm giá tại đây và dùng ở bước thanh toán.</p>

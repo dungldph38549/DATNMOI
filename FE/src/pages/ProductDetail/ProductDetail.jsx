@@ -9,6 +9,7 @@ import {
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 import { FaStar, FaShoppingCart, FaCheckCircle, FaShippingFast, FaShieldAlt, FaHeart, FaRegHeart } from "react-icons/fa";
 import { getProductPriceInfo } from "../../utils/pricing";
+import BackButton from "../../components/Common/BackButton";
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -335,6 +336,9 @@ const ProductDetail = () => {
   return (
     <div className="bg-background-light min-h-screen font-body pb-20 pt-24">
       <div className="container mx-auto px-4 max-w-7xl">
+        <div className="mb-6">
+          <BackButton />
+        </div>
         <div className="flex flex-col lg:flex-row gap-12 mb-20 bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-slate-100">
 
           {/* LEFT: IMAGES */}

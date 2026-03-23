@@ -3,10 +3,15 @@ import { Link, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { getOrdersByUserOrGuest, confirmDelivery, returnOrderRequest, cancelOrderByUser } from "../../api";
 import { FaBoxOpen, FaCheckCircle, FaTruck, FaMapMarkerAlt, FaTimesCircle, FaChevronRight, FaUndoAlt, FaTimes } from "react-icons/fa";
+import BackButton from "../../components/Common/BackButton";
 
 const STATUS_LABELS = {
   pending: "Chờ xử lý", confirmed: "Đã xác nhận", shipped: "Đang giao", delivered: "Đã giao",
-  canceled: "Đã hủy", "return-request": "Yêu cầu hoàn hàng", accepted: "Đã chấp nhận hoàn", rejected: "Từ chối hoàn",
+  canceled: "Đã hủy",
+  "return-request": "Hoàn hàng: Đang yêu cầu",
+  accepted: "Hoàn hàng: Đã chấp nhận",
+  rejected: "Hoàn hàng: Bị từ chối",
+  returned: "Hoàn hàng: Hoàn tất",
 };
 
 const STATUS_ICONS = {
@@ -22,10 +27,11 @@ const STATUS_COLORS = {
 };
 
 const TRACKING_STEPS = ["pending", "confirmed", "shipped", "delivered"];
+const RETURN_STATUSES = new Set(["return-request", "accepted", "rejected", "returned"]);
 const PAGE_SIZE = 10;
 const getTrackingProgress = (status) => {
   if (status === "canceled") return -1;
-  if (status === "return-request" || status === "accepted" || status === "rejected") return 3;
+  if (RETURN_STATUSES.has(status)) return 3;
   return TRACKING_STEPS.indexOf(status);
 };
 
@@ -151,6 +157,9 @@ const OrderHistoryPage = () => {
       </div>
 
       <div className="container mx-auto px-4 max-w-5xl">
+        <div className="mb-6">
+          <BackButton />
+        </div>
         {loading ? (
           <div className="flex justify-center items-center py-20"><div className="w-10 h-10 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div></div>
         ) : orders.length === 0 ? (
@@ -227,7 +236,7 @@ const OrderHistoryPage = () => {
                   </div>
 
                   {/* TIMELINE */}
-                  {(st !== "canceled" && st !== "return-request" && st !== "rejected") && (
+                  {(st !== "canceled" && !RETURN_STATUSES.has(st)) && (
                     <div className="relative mb-8 pt-4">
                       <div className="absolute top-8 left-0 w-full h-1 bg-slate-100 rounded-full pointer-events-none" aria-hidden />
                       <div className="absolute top-8 left-0 h-1 bg-primary rounded-full transition-all duration-500 pointer-events-none" style={{ width: `${Math.max(0, getTrackingProgress(st) / 3 * 100)}%` }} aria-hidden />

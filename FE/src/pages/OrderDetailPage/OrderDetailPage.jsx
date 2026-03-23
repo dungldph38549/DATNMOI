@@ -6,7 +6,11 @@ import { FaBoxOpen, FaCheckCircle, FaTruck, FaMapMarkerAlt, FaTimesCircle, FaChe
 
 const STATUS_LABELS = {
   pending: "Chờ xử lý", confirmed: "Đã xác nhận", shipped: "Đang giao", delivered: "Đã giao",
-  canceled: "Đã hủy", "return-request": "Yêu cầu hoàn hàng", accepted: "Đã chấp nhận hoàn", rejected: "Từ chối hoàn",
+  canceled: "Đã hủy",
+  "return-request": "Hoàn hàng: Đang yêu cầu",
+  accepted: "Hoàn hàng: Đã chấp nhận",
+  rejected: "Hoàn hàng: Bị từ chối",
+  returned: "Hoàn hàng: Hoàn tất",
 };
 
 const STATUS_ICONS = {
@@ -22,9 +26,10 @@ const STATUS_COLORS = {
 };
 
 const TRACKING_STEPS = ["pending", "confirmed", "shipped", "delivered"];
+const RETURN_STATUSES = new Set(["return-request", "accepted", "rejected", "returned"]);
 const getTrackingProgress = (status) => {
   if (status === "canceled") return -1;
-  if (status === "return-request" || status === "accepted" || status === "rejected") return 3;
+  if (RETURN_STATUSES.has(status)) return 3;
   return TRACKING_STEPS.indexOf(status);
 };
 
@@ -200,7 +205,7 @@ const OrderDetailPage = () => {
             {/* TIMELINE */}
             <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100">
               <h3 className="text-xl font-display font-black text-slate-800 mb-8 border-b border-slate-100 pb-4">Trạng Thái Giao Hàng</h3>
-              {(st !== "canceled" && st !== "return-request" && st !== "rejected") ? (
+              {(st !== "canceled" && !RETURN_STATUSES.has(st)) ? (
                 <div className="relative mb-8 pt-4 pb-2 px-4 md:px-8">
                   <div className="absolute top-8 left-4 md:left-8 right-4 md:right-8 h-1.5 bg-slate-100 rounded-full pointer-events-none" aria-hidden />
                   <div className="absolute top-8 left-4 md:left-8 h-1.5 bg-primary rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(238,77,45,0.5)] pointer-events-none" style={{ width: `calc(${Math.max(0, getTrackingProgress(st) / 3 * 100)}% - 2rem)` }} aria-hidden />
