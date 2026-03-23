@@ -177,25 +177,46 @@ const SideItem = ({ item, active, onClick }) => (
 // ================================================================
 // AdminPage
 // ================================================================
+const getMobileMatch = () => {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(max-width: 767px)").matches;
+};
+
 const AdminPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [adminSession, setAdminSession] = useState(() => getAdminSession());
   const [selectedMenu, setSelectedMenu] = useState("dashboard");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? getMobileMatch() : false,
+  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    typeof window !== "undefined" ? getMobileMatch() : false,
+  );
 
-  // ── resize handler ──
+  // ── mobile / desktop (matchMedia ổn định hơn innerWidth khi zoom / DevTools) ──
   useEffect(() => {
-    const onResize = () => {
-      const mobile = window.innerWidth < 768;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const apply = () => {
+      const mobile = mq.matches;
       setIsMobile(mobile);
-      setSidebarCollapsed(mobile);
+      if (mobile) setSidebarCollapsed(true);
+      else setSidebarCollapsed(false);
     };
-    window.addEventListener("resize", onResize);
-    onResize();
-    return () => window.removeEventListener("resize", onResize);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
   }, []);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape" && isMobile && !sidebarCollapsed) {
+        setSidebarCollapsed(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isMobile, sidebarCollapsed]);
 
   // ── auth guard (admin only) ──
   useEffect(() => {
@@ -346,12 +367,14 @@ const AdminPage = () => {
         {/* Mobile overlay */}
         {isMobile && !sidebarCollapsed && (
           <div
+            role="presentation"
+            aria-hidden
             onClick={() => setSidebarCollapsed(true)}
             style={{
               position: "fixed",
               inset: 0,
               background: "rgba(0,0,0,0.4)",
-              zIndex: 40,
+              zIndex: 90,
             }}
           />
         )}
@@ -367,7 +390,8 @@ const AdminPage = () => {
             position: isMobile ? "fixed" : "sticky",
             top: 0,
             height: "100vh",
-            zIndex: 50,
+            zIndex: isMobile ? 100 : 1,
+            pointerEvents: "auto",
             transition: "transform 0.25s ease",
             transform:
               isMobile && sidebarCollapsed
@@ -646,12 +670,13 @@ const AdminPage = () => {
           {/* Mobile: nút mở sidebar (thay cho Top header đã cắt) */}
           {isMobile && sidebarCollapsed && (
             <button
+              type="button"
               onClick={() => setSidebarCollapsed(false)}
               style={{
                 position: "fixed",
                 top: 14,
                 left: 14,
-                zIndex: 60,
+                zIndex: 110,
                 width: 42,
                 height: 42,
                 borderRadius: 12,

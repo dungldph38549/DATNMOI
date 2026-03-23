@@ -6,13 +6,30 @@ const OrderStatusHistory = require("../models/orderStatusHistory.js");
 const { successResponse, errorResponse } = require("../utils/response.js");
 const User = require("../models/UserModel.js");
 const inventoryService = require("../services/inventoryService");
-const { VNPay } = require("vnpay");
+const {
+  VNPay,
+  IpnSuccess,
+  IpnFailChecksum,
+  IpnOrderNotFound,
+  InpOrderAlreadyConfirmed,
+  IpnInvalidAmount,
+  IpnUnknownError,
+} = require("vnpay");
+
+// Khi không khai báo VNP_* trong .env sẽ dùng fallback bên dưới.
+// Chỉ truyền host (không thêm /paymentv2/...): thư viện tự nối endpoint thanh toán.
+const vnpayEnv = (key, fallback) => {
+  const v = process.env[key];
+  if (v == null || String(v).trim() === "") return fallback;
+  return String(v).trim();
+};
 
 const getVnpayClient = () =>
   new VNPay({
-    tmnCode: process.env.VNP_TMN_CODE || "DEMOMERCHANT01",
-    secureSecret: process.env.VNP_HASH_SECRET || "SECRETKEY",
-    vnpayHost: process.env.VNP_URL || "https://sandbox.vnpayment.vn",
+    tmnCode: vnpayEnv("VNP_TMN_CODE", "DEMOMERCHANT01"),
+    secureSecret: vnpayEnv("VNP_HASH_SECRET", "SECRETKEY"),
+    // Chỉ hostname; thư viện tự ghép paymentv2/vpcpay.html (trùng URL sandbox VNPay cấp).
+    vnpayHost: vnpayEnv("VNP_URL", "https://sandbox.vnpayment.vn"),
     testMode: String(process.env.VNP_TEST_MODE || "true") !== "false",
   });
 
@@ -24,7 +41,34 @@ const getBackendPublicBaseUrl = (req) => {
   return `${proto}://${host}`;
 };
 
-/** Đặt hàng có thể trừ stock trên Product.variant mà không có bản ghi Inventory (createOrder fallback). */
+/**
+ * Tạo URL thanh toán VNPay. vnp_ReturnUrl phải là API backend để verify chữ ký.
+ * Nên set BE_URL (vd: http://localhost:3002) khi dev để VNPay redirect đúng host.
+ */
+const buildVnpayPaymentUrlForOrder = (req, order, returnUrl, cancelUrl) => {
+  const baseUrl = process.env.FE_URL || "http://localhost:3000";
+  // Giả sử bạn đã định nghĩa hàm getBackendPublicBaseUrl và getVnpayClient ở trên
+  const backendBaseUrl = getBackendPublicBaseUrl(req); 
+  
+  const redirectSuccess = encodeURIComponent(
+    returnUrl || `${baseUrl}/payment/return`
+  );
+  const redirectCancel = encodeURIComponent(
+    cancelUrl || `${baseUrl}/checkout`
+  );
+  
+  const vnp = getVnpayClient();
+  return vnp.buildPaymentUrl({
+    vnp_Amount: order.totalAmount,
+    vnp_TxnRef: String(order._id),
+    vnp_OrderInfo: `Thanh toan don hang ${order._id}`,
+    vnp_ReturnUrl: `${backendBaseUrl}/api/order/return-payment?redirect=${redirectSuccess}&cancelRedirect=${redirectCancel}`,
+    vnp_IpAddr: req.ip || "127.0.0.1",
+  });
+};
+
+/** * Đặt hàng có thể trừ stock trên Product.variant mà không có bản ghi Inventory (createOrder fallback). 
+ */
 const isInventorySkuMissingError = (err) => {
   const code = err?.status ?? err?.statusCode;
   if (code !== 404) return false;
@@ -35,17 +79,22 @@ const isInventorySkuMissingError = (err) => {
 const restoreVariantStockBySku = async (item, qty, session = null) => {
   const pid = item.productId?._id || item.productId;
   if (!pid) return;
+  
+  // Đảm bảo Product đã được require ở đầu file
   let q = Product.findById(pid);
   if (session) q = q.session(session);
+  
   const productDoc = await q;
   if (!productDoc?.hasVariants) return;
+  
   const variant = productDoc.variants?.find((v) => v.sku === item.sku);
   if (!variant) return;
+  
   variant.stock = Number(variant.stock || 0) + Number(qty || 0);
+  
   if (session) await productDoc.save({ session });
   else await productDoc.save();
 };
-
 // ================================================================
 // Tạo đơn hàng
 // ================================================================
@@ -65,6 +114,8 @@ exports.createOrder = async (req, res) => {
       email,
       products,
       voucherCode,
+      vnpReturnUrl,
+      vnpCancelUrl,
     } = req.body;
 
     let user = null;
@@ -186,7 +237,8 @@ exports.createOrder = async (req, res) => {
 
     // Sau khi đã đảm bảo dữ liệu hợp lệ, tiến hành reserve tồn kho cho các SKU có Inventory
     const subtotal = mappedProducts.reduce(
-      (sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
+      (sum, item) =>
+        sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
       0,
     );
 
@@ -196,7 +248,9 @@ exports.createOrder = async (req, res) => {
 
     if (voucherCode) {
       normalizedVoucherCode = String(voucherCode).trim().toUpperCase();
-      voucherDoc = await Voucher.findOne({ code: normalizedVoucherCode }).session(session);
+      voucherDoc = await Voucher.findOne({
+        code: normalizedVoucherCode,
+      }).session(session);
 
       if (!voucherDoc) {
         await session.abortTransaction();
@@ -211,7 +265,9 @@ exports.createOrder = async (req, res) => {
       }
 
       const now = new Date();
-      const start = voucherDoc.startDate ? new Date(voucherDoc.startDate) : null;
+      const start = voucherDoc.startDate
+        ? new Date(voucherDoc.startDate)
+        : null;
       const end = voucherDoc.endDate ? new Date(voucherDoc.endDate) : null;
       if ((start && now < start) || (end && now > end)) {
         await session.abortTransaction();
@@ -258,19 +314,27 @@ exports.createOrder = async (req, res) => {
         // thì trừ trực tiếp stock trên Product biến thể để vẫn cho đặt hàng.
         const msg = err?.message || "";
         const isSkuNotFound =
-          err?.status === 404 || msg.includes(`SKU "${item.sku}"`) || msg.includes("SKU không tồn tại");
+          err?.status === 404 ||
+          msg.includes(`SKU "${item.sku}"`) ||
+          msg.includes("SKU không tồn tại");
 
         if (!isSkuNotFound) throw err;
 
-        const productForStock = await Product.findById(item.productId).session(session);
+        const productForStock = await Product.findById(item.productId).session(
+          session,
+        );
         if (!productForStock) {
           throw err;
         }
 
-        const variant = productForStock.variants?.find((v) => v.sku === item.sku);
+        const variant = productForStock.variants?.find(
+          (v) => v.sku === item.sku,
+        );
         const available = variant?.stock ?? 0;
         if (!variant || available < item.quantity) {
-          throw new Error(`Không đủ hàng cho SKU ${item.sku} (khả dụng: ${available})`);
+          throw new Error(
+            `Không đủ hàng cho SKU ${item.sku} (khả dụng: ${available})`,
+          );
         }
 
         variant.stock = available - item.quantity;
@@ -311,6 +375,29 @@ exports.createOrder = async (req, res) => {
 
     await session.commitTransaction();
     session.endSession();
+
+    if (paymentMethod === "vnpay") {
+      const orderJson =
+        typeof savedOrder.toObject === "function"
+          ? savedOrder.toObject()
+          : savedOrder;
+      try {
+        const vnpayPaymentUrl = buildVnpayPaymentUrlForOrder(
+          req,
+          savedOrder,
+          vnpReturnUrl,
+          vnpCancelUrl,
+        );
+        return res.status(201).json({ ...orderJson, vnpayPaymentUrl });
+      } catch (vnpErr) {
+        return res.status(201).json({
+          ...orderJson,
+          vnpayPaymentUrl: null,
+          vnpayBuildError: vnpErr?.message || "Không tạo được link VNPay",
+        });
+      }
+    }
+
     return res.status(201).json(savedOrder);
   } catch (err) {
     // Nếu tạo đơn thất bại, cố gắng giải phóng phần hàng đã reserve (nếu có)
@@ -631,9 +718,12 @@ exports.updateOrder = async (req, res) => {
             continue;
           }
 
-          const productDoc = await Product.findById(item.productId).session(session);
+          const productDoc = await Product.findById(item.productId).session(
+            session,
+          );
           if (productDoc && !productDoc.hasVariants) {
-            productDoc.stock = Number(productDoc.stock || 0) + Number(item.quantity || 0);
+            productDoc.stock =
+              Number(productDoc.stock || 0) + Number(item.quantity || 0);
             await productDoc.save({ session });
           }
         }
@@ -711,9 +801,10 @@ exports.updateOrderById = async (req, res) => {
 
     const editableStatuses = ["pending", "confirmed"];
     if (!editableStatuses.includes(order.status)) {
-      return res
-        .status(400)
-        .json({ message: "Đơn hàng đã chuyển sang trạng thái giao, không thể chỉnh sửa/hủy" });
+      return res.status(400).json({
+        message:
+          "Đơn hàng đã chuyển sang trạng thái giao, không thể chỉnh sửa/hủy",
+      });
     }
 
     if (fullName) order.fullName = fullName;
@@ -746,7 +837,8 @@ exports.updateOrderById = async (req, res) => {
         try {
           const productDoc = await Product.findById(item.productId);
           if (productDoc && !productDoc.hasVariants) {
-            productDoc.stock = Number(productDoc.stock || 0) + Number(item.quantity || 0);
+            productDoc.stock =
+              Number(productDoc.stock || 0) + Number(item.quantity || 0);
             await productDoc.save();
           }
         } catch (_) {
@@ -1137,28 +1229,80 @@ exports.createVnpayUrl = async (req, res) => {
     if (order.paymentStatus === "paid")
       return res.status(400).json({ message: "Đơn hàng đã thanh toán" });
 
-    const baseUrl = process.env.FE_URL || "http://localhost:3000";
-    const backendBaseUrl = getBackendPublicBaseUrl(req);
-    const redirectSuccess = encodeURIComponent(
-      returnUrl || `${baseUrl}/payment/return`,
-    );
-    const redirectCancel = encodeURIComponent(cancelUrl || `${baseUrl}/checkout`);
-
-    const vnp = getVnpayClient();
-    const url = vnp.buildPaymentUrl({
-      vnp_Amount: order.totalAmount,
-      vnp_TxnRef: orderId,
-      vnp_OrderInfo: `Thanh toan don hang ${orderId}`,
-      // VNPay phải redirect về backend trước để verify chữ ký và cập nhật paymentStatus.
-      vnp_ReturnUrl: `${backendBaseUrl}/api/order/return-payment?redirect=${redirectSuccess}&cancelRedirect=${redirectCancel}`,
-      vnp_IpAddr: req.ip || "127.0.0.1",
-    });
+    const url = buildVnpayPaymentUrlForOrder(req, order, returnUrl, cancelUrl);
     res.status(200).json({ url });
   } catch (err) {
     const statusCode = err?.status || err?.statusCode || 500;
     res.status(statusCode).json({
       message: err?.message || err?.error || "Internal server error",
     });
+  }
+};
+
+// ================================================================
+// VNPay IPN (server-to-server) — khai báo URL tại merchant VNPay:
+// GET|POST {BE_URL}/api/order/vnpay-ipn
+// ================================================================
+const pickVnpParams = (input = {}) => {
+  const out = {};
+  for (const [key, value] of Object.entries(input || {})) {
+    if (key.startsWith("vnp_")) out[key] = value;
+  }
+  return out;
+};
+
+const mergeVnpayIpnParams = (req) => {
+  const out = pickVnpParams(req.query || {});
+  if (req.body && typeof req.body === "object") {
+    for (const [k, v] of Object.entries(req.body)) {
+      if (!k.startsWith("vnp_")) continue;
+      if (out[k] === undefined) out[k] = v;
+    }
+  }
+  return out;
+};
+
+exports.vnpayIpn = async (req, res) => {
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  try {
+    const params = mergeVnpayIpnParams(req);
+    const vnp = getVnpayClient();
+    const result = vnp.verifyIpnCall(params);
+
+    if (!result.isVerified) {
+      return res.status(200).json(IpnFailChecksum);
+    }
+
+    const orderId = result.vnp_TxnRef;
+    const order = await Order.findById(orderId);
+    if (!order || order.paymentMethod !== "vnpay") {
+      return res.status(200).json(IpnOrderNotFound);
+    }
+
+    const expected = Math.round(Number(order.totalAmount) * 100);
+    const received = Number(result.vnp_Amount);
+    if (expected !== received) {
+      return res.status(200).json(IpnInvalidAmount);
+    }
+
+    const ok =
+      result.isSuccess && String(result.vnp_ResponseCode ?? "") === "00";
+    if (ok) {
+      if (order.paymentStatus === "paid") {
+        return res.status(200).json(InpOrderAlreadyConfirmed);
+      }
+      await Order.findByIdAndUpdate(order._id, { paymentStatus: "paid" });
+      await OrderStatusHistory.create({
+        orderId: order._id,
+        paymentStatus: "paid",
+        note: "VNPay IPN xác nhận thanh toán",
+      });
+    }
+
+    return res.status(200).json(IpnSuccess);
+  } catch (err) {
+    console.error("[VNPay IPN]", err?.message || err);
+    return res.status(200).json(IpnUnknownError);
   }
 };
 
@@ -1191,7 +1335,8 @@ const cancelUnpaidVnpayOrder = async (orderId) => {
     try {
       const productDoc = await Product.findById(item.productId);
       if (productDoc && !productDoc.hasVariants) {
-        productDoc.stock = Number(productDoc.stock || 0) + Number(item.quantity || 0);
+        productDoc.stock =
+          Number(productDoc.stock || 0) + Number(item.quantity || 0);
         await productDoc.save();
       }
     } catch (_) {
@@ -1234,7 +1379,9 @@ exports.returnPayment = async (req, res) => {
     };
 
     const vnp = getVnpayClient();
-    const result = vnp.verifyReturnUrl(req.query);
+    // VNPay có thể trả kèm query custom từ ReturnUrl (redirect/cancelRedirect...),
+    // chỉ dùng nhóm tham số vnp_* để verify checksum.
+    const result = vnp.verifyReturnUrl(pickVnpParams(req.query || {}));
     const orderId = result.vnp_TxnRef;
     const successUrl = resolveSafeUrl(
       req.query?.redirect,
@@ -1246,7 +1393,15 @@ exports.returnPayment = async (req, res) => {
     );
 
     if (result.isVerified && result.isSuccess) {
-      await Order.findByIdAndUpdate(orderId, { paymentStatus: "paid" });
+      const order = await Order.findById(orderId);
+      if (order && order.paymentStatus !== "paid") {
+        await Order.findByIdAndUpdate(orderId, { paymentStatus: "paid" });
+        await OrderStatusHistory.create({
+          orderId,
+          paymentStatus: "paid",
+          note: "Thanh toán VNPay thành công",
+        });
+      }
       return res.redirect(`${successUrl}?success=1&orderId=${orderId}`);
     }
 
