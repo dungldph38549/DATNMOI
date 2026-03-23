@@ -6,6 +6,7 @@ import {
   createVoucher,
   updateVoucher,
   deleteVoucher,
+  getAllProducts,
 } from "../api/index";
 import dayjs from "dayjs";
 
@@ -19,8 +20,21 @@ export default function Vouchers() {
     queryKey: ["admin-vouchers"],
     queryFn: getAllVouchers,
   });
+  const { data: productData } = useQuery({
+    queryKey: ["admin-voucher-products"],
+    queryFn: () => getAllProducts({ page: 0, limit: 500 }),
+  });
 
   const list = data?.data ?? (Array.isArray(data) ? data : []);
+  const productList = Array.isArray(productData?.data)
+    ? productData.data
+    : Array.isArray(productData?.data?.data)
+      ? productData.data.data
+      : [];
+  const productOptions = productList.map((p) => ({
+    value: p?._id,
+    label: p?.name || p?._id,
+  }));
 
   const createMutation = useMutation({
     mutationFn: createVoucher,
@@ -71,6 +85,9 @@ export default function Vouchers() {
       endDate: values.endDate?.toDate?.() || values.endDate,
       usageLimit: values.usageLimit || 0,
       status: values.status || "active",
+      applicableProductIds: Array.isArray(values.applicableProductIds)
+        ? values.applicableProductIds
+        : [],
     };
     if (editingId) {
       updateMutation.mutate({ id: editingId, payload });
@@ -91,6 +108,9 @@ export default function Vouchers() {
       endDate: record.endDate ? dayjs(record.endDate) : null,
       usageLimit: record.usageLimit || 0,
       status: record.status || "active",
+      applicableProductIds: Array.isArray(record.applicableProductIds)
+        ? record.applicableProductIds.map((id) => String(id))
+        : [],
     });
     setModalOpen(true);
   };
@@ -112,6 +132,15 @@ export default function Vouchers() {
         r.discountType === "percent"
           ? `${r.discountValue}%`
           : `${Number(r.discountValue).toLocaleString()}đ`,
+    },
+    {
+      title: "Phạm vi",
+      key: "scope",
+      width: 140,
+      render: (_, r) =>
+        Array.isArray(r.applicableProductIds) && r.applicableProductIds.length > 0
+          ? `${r.applicableProductIds.length} sản phẩm`
+          : "Toàn bộ sản phẩm",
     },
     {
       title: "Đơn tối thiểu",
@@ -235,6 +264,19 @@ export default function Vouchers() {
           </Form.Item>
           <Form.Item name="usageLimit" label="Số lần dùng (0 = không giới hạn)">
             <InputNumber min={0} style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item
+            name="applicableProductIds"
+            label="Áp dụng cho sản phẩm"
+            extra="Để trống: áp dụng cho toàn bộ sản phẩm."
+          >
+            <Select
+              mode="multiple"
+              options={productOptions}
+              placeholder="Chọn sản phẩm áp dụng voucher"
+              allowClear
+              optionFilterProp="label"
+            />
           </Form.Item>
           <Form.Item name="status" label="Trạng thái" initialValue="active">
             <Select options={[{ value: "active", label: "Hoạt động" }, { value: "inactive", label: "Tạm tắt" }]} />

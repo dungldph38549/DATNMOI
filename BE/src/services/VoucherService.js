@@ -30,6 +30,17 @@ const validateVoucherBusiness = ({
   return null;
 };
 
+const normalizeApplicableProductIds = (value) => {
+  if (!Array.isArray(value)) return [];
+  const ids = value
+    .map((id) => String(id || "").trim())
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+  const unique = new Map();
+  ids.forEach((id) => unique.set(String(id), id));
+  return Array.from(unique.values());
+};
+
 const createVoucher = async (newVoucher) => {
   try {
     if (!newVoucher || typeof newVoucher !== "object") {
@@ -49,6 +60,7 @@ const createVoucher = async (newVoucher) => {
       endDate,
       usageLimit,
       status,
+      applicableProductIds,
     } = newVoucher;
 
     if (!code || discountValue === undefined || !startDate || !endDate) {
@@ -120,6 +132,7 @@ const createVoucher = async (newVoucher) => {
       endDate,
       usageLimit: numericUsageLimit,
       status: status || "active",
+      applicableProductIds: normalizeApplicableProductIds(applicableProductIds),
     });
 
     return {
@@ -155,6 +168,34 @@ const getVoucherDetail = async (voucherId) => {
     }
 
     const voucher = await Voucher.findById(voucherId);
+    if (!voucher) {
+      return {
+        status: "ERR",
+        message: "Voucher not found",
+      };
+    }
+
+    return {
+      status: "OK",
+      message: "SUCCESS",
+      data: voucher,
+    };
+  } catch (e) {
+    throw e;
+  }
+};
+
+const getVoucherByCode = async (code) => {
+  try {
+    const normalizedCode = String(code || "").trim().toUpperCase();
+    if (!normalizedCode) {
+      return {
+        status: "ERR",
+        message: "Voucher code is required",
+      };
+    }
+
+    const voucher = await Voucher.findOne({ code: normalizedCode });
     if (!voucher) {
       return {
         status: "ERR",
@@ -215,6 +256,11 @@ const updateVoucher = async (voucherId, updateData) => {
     }
     if (updateData.status !== undefined) {
       payload.status = updateData.status;
+    }
+    if (updateData.applicableProductIds !== undefined) {
+      payload.applicableProductIds = normalizeApplicableProductIds(
+        updateData.applicableProductIds,
+      );
     }
 
     if (updateData.discountValue !== undefined) {
@@ -326,6 +372,7 @@ module.exports = {
   createVoucher,
   getAllVouchers,
   getVoucherDetail,
+  getVoucherByCode,
   updateVoucher,
   deleteVoucher,
 };

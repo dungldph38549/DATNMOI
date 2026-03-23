@@ -521,16 +521,17 @@ export const deleteVoucher = async (id) => {
 };
 
 export const getVoucherByCode = async (code) => {
-  const list = await getAllVouchers();
-  const data = list?.data || list;
-  const arr = Array.isArray(data) ? data : data?.data || [];
-  return (
-    arr.find(
-      (v) =>
-        v.code &&
-        v.code.trim().toUpperCase() === String(code).trim().toUpperCase(),
-    ) || null
-  );
+  const normalizedCode = String(code || "").trim().toUpperCase();
+  if (!normalizedCode) return null;
+  try {
+    const res = await axiosInstance.get(
+      `/voucher/code/${encodeURIComponent(normalizedCode)}`,
+    );
+    return res?.data?.data || res?.data || null;
+  } catch (err) {
+    if (err?.response?.status === 404) return null;
+    throw err;
+  }
 };
 
 // ================== Review API (Customer) ==================

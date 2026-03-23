@@ -17,6 +17,14 @@ const {
 } = require("vnpay");
 const { pickBestActiveRule, calculateEffectivePrice } = require("../utils/salePricing");
 
+const ROLE_VOUCHER_USAGE_LIMIT = {
+  customer: 3,
+  staff: 5,
+  manager: 10,
+  admin: 0,
+};
+const GUEST_VOUCHER_USAGE_LIMIT = 2;
+
 // Khi không khai báo VNP_* trong .env sẽ dùng fallback bên dưới.
 // Chỉ truyền host (không thêm /paymentv2/...): thư viện tự nối endpoint thanh toán.
 const vnpayEnv = (key, fallback) => {
@@ -319,12 +327,65 @@ exports.createOrder = async (req, res) => {
         return res.status(422).json({ message: "Voucher đã hết lượt sử dụng" });
       }
 
+      const customAccountLimit = Number(user?.voucherUsageLimit);
+      let accountVoucherLimit = 0;
+      if (Number.isFinite(customAccountLimit) && customAccountLimit >= 0) {
+        accountVoucherLimit = customAccountLimit;
+      } else if (userId) {
+        accountVoucherLimit =
+          ROLE_VOUCHER_USAGE_LIMIT[String(user?.role || "customer")] ??
+          ROLE_VOUCHER_USAGE_LIMIT.customer;
+      } else {
+        accountVoucherLimit = GUEST_VOUCHER_USAGE_LIMIT;
+      }
+
+      if (accountVoucherLimit !== 0) {
+        const accountQuery = userId
+          ? { userId }
+          : { guestId: String(guestId || "").trim() };
+        const usedVoucherOrderCount = await Order.countDocuments({
+          ...accountQuery,
+          voucherCode: { $ne: null },
+          status: { $ne: "canceled" },
+        }).session(session);
+
+        if (usedVoucherOrderCount >= accountVoucherLimit) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(422).json({
+            message: `Tài khoản đã đạt giới hạn dùng voucher (${accountVoucherLimit} lần).`,
+          });
+        }
+      }
+
+      const applicableIds = Array.isArray(voucherDoc.applicableProductIds)
+        ? voucherDoc.applicableProductIds.map((id) => String(id))
+        : [];
+      const hasProductScope = applicableIds.length > 0;
+      const eligibleItems = hasProductScope
+        ? mappedProducts.filter((item) =>
+            applicableIds.includes(String(item.productId)),
+          )
+        : mappedProducts;
+      const eligibleSubtotal = eligibleItems.reduce(
+        (sum, item) =>
+          sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
+        0,
+      );
+      if (hasProductScope && eligibleSubtotal <= 0) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(422).json({
+          message: "Voucher này không áp dụng cho sản phẩm đã chọn",
+        });
+      }
+
       const discountValue = Number(voucherDoc.discountValue ?? 0);
       const rawDiscount =
         voucherDoc.discountType === "fixed"
           ? discountValue
-          : (subtotal * discountValue) / 100;
-      discountAmount = Math.max(0, Math.min(subtotal, rawDiscount));
+          : (eligibleSubtotal * discountValue) / 100;
+      discountAmount = Math.max(0, Math.min(eligibleSubtotal, rawDiscount));
     }
 
     for (const item of mappedProducts) {

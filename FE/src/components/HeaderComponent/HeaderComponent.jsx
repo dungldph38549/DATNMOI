@@ -166,6 +166,7 @@ const Header = () => {
             <li><Link to="/" className="text-slate-900 hover:text-primary transition-colors">Trang chủ</Link></li>
             <li><Link to="/product" className="hover:text-primary transition-colors">Tất cả sản phẩm</Link></li>
             <li><Link to="/product?category=phu-kien" className="hover:text-primary transition-colors">Phụ kiện</Link></li>
+            <li><Link to="/voucher" className="hover:text-primary transition-colors">Voucher</Link></li>
             <li>
               <Link to="/sale" className="text-secondary hover:text-pink-600 transition-colors cursor-pointer flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-ping"></span>

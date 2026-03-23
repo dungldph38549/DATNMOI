@@ -61,6 +61,13 @@ const voucherSchema = new mongoose.Schema(
       enum: ["active", "inactive"],
       default: "active",
     },
+    // Danh sách sản phẩm áp dụng voucher. Rỗng = áp dụng toàn bộ sản phẩm.
+    applicableProductIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product",
+      },
+    ],
   },
   {
     timestamps: true,

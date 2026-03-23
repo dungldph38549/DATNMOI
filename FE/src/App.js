@@ -31,6 +31,7 @@ import OrderDetailPage from "./pages/OrderDetailPage/OrderDetailPage";
 import PaymentReturnPage from "./pages/PaymentReturnPage/PaymentReturnPage";
 import WishlistPage from "./pages/Wishlist/WishlistPage";
 import SalePage from "./pages/SalePage/SalePage";
+import VoucherPage from "./pages/VoucherPage/VoucherPage";
 
 //  IMPORT TRANG ADMIN USERS
 import User from "./pages/User";
@@ -63,6 +64,7 @@ function AppContent() {
           <Route path="/" element={<HomePage />} />
           <Route path="/product" element={<ProductPage />} />
           <Route path="/sale" element={<SalePage />} />
+          <Route path="/voucher" element={<VoucherPage />} />
           <Route path="/product/:id" element={<ProductDetail />} />
           <Route path="/category" element={<CategoryPage />} />
           <Route path="/register" element={<Register />} />

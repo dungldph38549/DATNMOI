@@ -375,11 +375,29 @@ const Users = () => {
     setSelectedUser(user);
     const role = user.isAdmin ? "admin" : user.isStaff ? "staff" : "customer";
     setRoleValue(role);
-    form.setFieldsValue({ password: "", isBanned: user.isBanned || false });
+    form.setFieldsValue({
+      password: "",
+      isBanned: user.isBanned || false,
+      voucherUsageLimit:
+        user.voucherUsageLimit === null || user.voucherUsageLimit === undefined
+          ? ""
+          : String(user.voucherUsageLimit),
+    });
   };
 
   // ── Submit modal ──────────────────────────────────────────
   const handleSubmit = (values) => {
+    const voucherLimitRaw = String(values.voucherUsageLimit || "").trim();
+    let voucherUsageLimit = null;
+    if (voucherLimitRaw !== "") {
+      const parsed = Number(voucherLimitRaw);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        showToast("Giới hạn voucher phải là số >= 0", "error");
+        return;
+      }
+      voucherUsageLimit = Math.floor(parsed);
+    }
+
     updateUser({
       id: selectedUser._id,
       data: {
@@ -387,6 +405,7 @@ const Users = () => {
         isAdmin: roleValue === "admin",
         isStaff: roleValue === "staff",
         isBanned: values.isBanned,
+        voucherUsageLimit,
       },
     });
   };
@@ -680,6 +699,7 @@ const Users = () => {
                     "Email",
                     "SĐT",
                     "Vai trò",
+                    "Giới hạn voucher",
                     "Ngày tham gia",
                     "Trạng thái",
                     "Thao tác",
@@ -706,7 +726,7 @@ const Users = () => {
                 {users.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       style={{
                         padding: "40px",
                         textAlign: "center",
@@ -786,6 +806,21 @@ const Users = () => {
                           isAdmin={user.isAdmin}
                           isStaff={user.isStaff}
                         />
+                      </td>
+                      {/* Giới hạn voucher */}
+                      <td
+                        style={{
+                          padding: "14px 18px",
+                          fontSize: 13,
+                          color: T.textMid,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {user.voucherUsageLimit == null
+                          ? "Mặc định theo hạng"
+                          : Number(user.voucherUsageLimit) === 0
+                            ? "Không giới hạn"
+                            : `${Number(user.voucherUsageLimit)} lần`}
                       </td>
                       {/* Ngày tham gia */}
                       <td
@@ -961,6 +996,35 @@ const Users = () => {
                 <div
                   style={{ borderTop: `1px solid ${T.border}`, paddingTop: 16 }}
                 >
+                  {/* Giới hạn voucher theo tài khoản */}
+                  <div style={{ marginBottom: 14 }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: T.textMid,
+                        marginBottom: 6,
+                      }}
+                    >
+                      Giới hạn dùng voucher{" "}
+                      <span style={{ color: T.textMuted, fontWeight: 400 }}>
+                        (để trống = theo hạng tài khoản, 0 = không giới hạn)
+                      </span>
+                    </div>
+                    <Form.Item name="voucherUsageLimit" noStyle>
+                      <Input
+                        type="number"
+                        min={0}
+                        placeholder="Ví dụ: 3"
+                        style={{
+                          borderRadius: 10,
+                          fontFamily: "'Plus Jakarta Sans', sans-serif",
+                          fontSize: 13,
+                        }}
+                      />
+                    </Form.Item>
+                  </div>
+
                   {/* Mật khẩu mới */}
                   <div style={{ marginBottom: 14 }}>
                     <div

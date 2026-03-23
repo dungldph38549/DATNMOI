@@ -1,13 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import Product from "../../components/Product/Product";
-import { fetchProducts } from "../../api";
+import { fetchProducts, getVoucherByCode } from "../../api";
 import { FaFilter, FaTimes } from "react-icons/fa";
 
 const PAGE_SIZE = 30;
 
 const ProductPage = () => {
+  const location = useLocation();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [voucherScope, setVoucherScope] = useState(null);
+  const [voucherLoading, setVoucherLoading] = useState(false);
 
   const [sort, setSort] = useState("");
   const [price, setPrice] = useState("");
@@ -29,8 +33,39 @@ const ProductPage = () => {
     load();
   }, []);
 
+  useEffect(() => {
+    const voucherCode = new URLSearchParams(location.search).get("voucher");
+    if (!voucherCode) {
+      setVoucherScope(null);
+      return;
+    }
+    let cancelled = false;
+    const loadVoucher = async () => {
+      try {
+        setVoucherLoading(true);
+        const voucher = await getVoucherByCode(voucherCode);
+        if (cancelled) return;
+        setVoucherScope(voucher || null);
+      } catch {
+        if (!cancelled) setVoucherScope(null);
+      } finally {
+        if (!cancelled) setVoucherLoading(false);
+      }
+    };
+    loadVoucher();
+    return () => {
+      cancelled = true;
+    };
+  }, [location.search]);
+
   const filteredProducts = useMemo(() => {
     let data = [...products];
+    const applicableIds = Array.isArray(voucherScope?.applicableProductIds)
+      ? voucherScope.applicableProductIds.map((id) => String(id))
+      : [];
+    if (applicableIds.length > 0) {
+      data = data.filter((p) => applicableIds.includes(String(p?._id)));
+    }
 
     const getMinPrice = (p) => {
       const pr = p?.priceRange;
@@ -56,7 +91,7 @@ const ProductPage = () => {
     if (sort === "new") data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return data;
-  }, [products, price, rating, sort]);
+  }, [products, price, rating, sort, voucherScope]);
 
   const totalPage = Math.ceil(filteredProducts.length / PAGE_SIZE);
   const showProducts = filteredProducts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -83,11 +118,32 @@ const ProductPage = () => {
       </div>
 
       <div className="container mx-auto px-4 max-w-7xl">
+        {voucherScope && (
+          <div className="mb-6 bg-green-50 border border-green-100 rounded-2xl px-5 py-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-black text-green-700">
+                Đang chọn sản phẩm cho voucher: {String(voucherScope.code || "").toUpperCase()}
+              </p>
+              <p className="text-xs font-semibold text-green-600 mt-1">
+                {Array.isArray(voucherScope.applicableProductIds) && voucherScope.applicableProductIds.length > 0
+                  ? "Đang hiển thị các sản phẩm áp dụng voucher này."
+                  : "Voucher áp dụng toàn bộ sản phẩm."}
+              </p>
+            </div>
+            <Link
+              to={`/checkout?voucher=${encodeURIComponent(String(voucherScope.code || "").toUpperCase())}`}
+              className="h-10 px-4 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 transition-colors inline-flex items-center"
+            >
+              Đi đến thanh toán
+            </Link>
+          </div>
+        )}
+
         {/* TOP FILTER BAR */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-10 bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
           <div className="flex gap-2">
             <span className="bg-slate-100 text-slate-600 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2">
-              <FaFilter className="text-primary" /> {filteredProducts.length} Items
+              <FaFilter className="text-primary" /> {voucherLoading ? "Đang lọc voucher..." : `${filteredProducts.length} Items`}
             </span>
             {(price || rating || sort) && (
               <button onClick={clearAllFilter} className="bg-red-50 text-red-500 hover:bg-red-100 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1 transition-colors">
