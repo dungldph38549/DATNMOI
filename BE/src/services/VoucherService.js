@@ -1,6 +1,35 @@
 const mongoose = require("mongoose");
 const Voucher = require("../models/VoucherModel");
 
+const normalizeDate = (value) => {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const validateVoucherBusiness = ({
+  discountType,
+  discountValue,
+  startDate,
+  endDate,
+}) => {
+  if (!["percent", "fixed"].includes(discountType || "percent")) {
+    return "discountType phải là percent hoặc fixed";
+  }
+  if (discountType === "percent" && Number(discountValue) > 100) {
+    return "Mã giảm theo % không được vượt quá 100";
+  }
+  const start = normalizeDate(startDate);
+  const end = normalizeDate(endDate);
+  if (!start || !end) {
+    return "Ngày bắt đầu/kết thúc không hợp lệ";
+  }
+  if (end < start) {
+    return "Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu";
+  }
+  return null;
+};
+
 const createVoucher = async (newVoucher) => {
   try {
     if (!newVoucher || typeof newVoucher !== "object") {
@@ -57,6 +86,19 @@ const createVoucher = async (newVoucher) => {
       return {
         status: "ERR",
         message: "usageLimit must be a non-negative number",
+      };
+    }
+
+    const businessError = validateVoucherBusiness({
+      discountType: discountType || "percent",
+      discountValue: numericDiscountValue,
+      startDate,
+      endDate,
+    });
+    if (businessError) {
+      return {
+        status: "ERR",
+        message: businessError,
       };
     }
 
@@ -219,6 +261,23 @@ const updateVoucher = async (voucherId, updateData) => {
           message: "Voucher code already exists",
         };
       }
+    }
+
+    const finalDiscountType = payload.discountType ?? voucher.discountType;
+    const finalDiscountValue = payload.discountValue ?? voucher.discountValue;
+    const finalStartDate = payload.startDate ?? voucher.startDate;
+    const finalEndDate = payload.endDate ?? voucher.endDate;
+    const businessError = validateVoucherBusiness({
+      discountType: finalDiscountType,
+      discountValue: finalDiscountValue,
+      startDate: finalStartDate,
+      endDate: finalEndDate,
+    });
+    if (businessError) {
+      return {
+        status: "ERR",
+        message: businessError,
+      };
     }
 
     const updated = await Voucher.findByIdAndUpdate(

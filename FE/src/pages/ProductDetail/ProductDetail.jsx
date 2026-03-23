@@ -7,7 +7,8 @@ import {
   getProductReviews, getStocks, relationProduct, uploadImages
 } from "../../api";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
-import { FaStar, FaShoppingCart, FaCheckCircle, FaShippingFast, FaShieldAlt, FaTimes, FaHeart, FaRegHeart } from "react-icons/fa";
+import { FaStar, FaShoppingCart, FaCheckCircle, FaShippingFast, FaShieldAlt, FaHeart, FaRegHeart } from "react-icons/fa";
+import { getProductPriceInfo } from "../../utils/pricing";
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -110,8 +111,16 @@ const ProductDetail = () => {
 
   const displayPrice = useMemo(() => {
     if (!product) return 0;
-    if (hasVariants) return selectedVariant?.price ?? product?.variants?.[0]?.price ?? 0;
-    return product.price ?? 0;
+    if (hasVariants) {
+      const selectedInfo = getProductPriceInfo(product, selectedVariant ?? product?.variants?.[0] ?? null);
+      return selectedInfo.effectivePrice;
+    }
+    return getProductPriceInfo(product).effectivePrice;
+  }, [product, selectedVariant, hasVariants]);
+  const selectedPriceInfo = useMemo(() => {
+    if (!product) return { originalPrice: 0, effectivePrice: 0, hasSale: false, discountPercent: 0 };
+    if (hasVariants) return getProductPriceInfo(product, selectedVariant ?? product?.variants?.[0] ?? null);
+    return getProductPriceInfo(product);
   }, [product, selectedVariant, hasVariants]);
 
   const ratingAverage = reviewStats?.average ?? product?.rating ?? 4.5;
@@ -196,7 +205,9 @@ const ProductDetail = () => {
 
     dispatch(addToCart({
       productId: product._id, name: product.name, image: product.image,
-      price: displayPrice, qty: qtySafe, sku: skuToSave, size: sizeToSave
+      price: displayPrice,
+      originalPrice: Number(selectedPriceInfo.originalPrice || displayPrice),
+      qty: qtySafe, sku: skuToSave, size: sizeToSave
     }));
 
     try {
@@ -207,15 +218,62 @@ const ProductDetail = () => {
     return true;
   };
 
+  const buildBuyNowCartKey = () => {
+    const baseSku = hasVariants ? (selectedSku || "NO-SKU") : "default";
+    return `${String(product?._id || "unknown")}::BUY_NOW::${String(baseSku)}::${Date.now()}`;
+  };
+
   const handleToggleWishlist = () => {
     if (!product) return;
     dispatch(toggleWishlist(product));
   };
 
   const handleBuyNow = async () => {
-    const added = await handleAddToCart();
-    if (!added) return;
-    navigate("/checkout");
+    if (!product) return;
+    const sizeToSave = hasVariants ? selectedSizeValue : null;
+    const skuToSave = hasVariants ? selectedSku : null;
+
+    if (hasVariants && !skuToSave) {
+      alert("Vui lòng chọn size!");
+      return;
+    }
+    if (stockInfo?.available === false) {
+      alert("Sản phẩm hiện đã hết hàng theo size đã chọn.");
+      return;
+    }
+
+    const qtySafe = (() => {
+      if (!stockInfo?.available) return quantity;
+      const max = Number(stockInfo?.countInStock ?? 0);
+      if (!Number.isFinite(max) || max <= 0) return quantity;
+      return Math.min(quantity, max);
+    })();
+
+    const buyNowCartKey = buildBuyNowCartKey();
+    const buyNowItem = {
+      cartKey: buyNowCartKey,
+      productId: product._id,
+      name: product.name,
+      image: product.image,
+      price: displayPrice,
+      originalPrice: Number(selectedPriceInfo.originalPrice || displayPrice),
+      qty: qtySafe,
+      sku: skuToSave,
+      size: sizeToSave,
+    };
+    dispatch(
+      addToCart({
+        ...buyNowItem,
+        noMerge: true,
+      }),
+    );
+
+    navigate("/checkout", {
+      state: {
+        selectedItemKeys: [buyNowCartKey],
+        buyNowItem,
+      },
+    });
   };
 
   const handleSelectReviewFiles = (e) => {
@@ -322,6 +380,11 @@ const ProductDetail = () => {
             </div>
 
             <div className="mb-8 p-6 bg-slate-50 rounded-2xl border border-slate-100">
+              {selectedPriceInfo.hasSale && (
+                <p className="text-slate-400 line-through font-bold text-lg mb-1">
+                  {Number(selectedPriceInfo.originalPrice).toLocaleString("vi-VN")}₫
+                </p>
+              )}
               <p className="text-4xl md:text-5xl font-black text-primary mb-2">
                 {Number(displayPrice).toLocaleString("vi-VN")}₫
               </p>
@@ -558,7 +621,7 @@ const ProductDetail = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               {relatedProducts?.slice(0, 4)?.map((p) => {
                 const img = p?.image || p?.srcImages?.[0] || "";
-                const price = p?.price ?? p?.variants?.[0]?.price ?? 0;
+                const priceInfo = getProductPriceInfo(p);
                 return (
                   <Link key={p._id} to={`/product/${p._id}`} className="group bg-white rounded-3xl border border-slate-100 p-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
                     <div className="aspect-square bg-slate-50 rounded-2xl mb-4 overflow-hidden flex items-center justify-center p-2 relative">
@@ -567,7 +630,10 @@ const ProductDetail = () => {
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-800 line-clamp-1 group-hover:text-primary transition-colors mb-2">{p.name}</h3>
-                      <p className="font-black text-secondary">{Number(price).toLocaleString("vi-VN")}₫</p>
+                      <div>
+                        {priceInfo.hasSale && <p className="text-xs text-slate-400 line-through">{Number(priceInfo.originalPrice).toLocaleString("vi-VN")}₫</p>}
+                        <p className="font-black text-secondary">{Number(priceInfo.effectivePrice).toLocaleString("vi-VN")}₫</p>
+                      </div>
                     </div>
                   </Link>
                 );

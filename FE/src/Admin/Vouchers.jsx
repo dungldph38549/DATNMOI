@@ -70,6 +70,7 @@ export default function Vouchers() {
       startDate: values.startDate?.toDate?.() || values.startDate,
       endDate: values.endDate?.toDate?.() || values.endDate,
       usageLimit: values.usageLimit || 0,
+      status: values.status || "active",
     };
     if (editingId) {
       updateMutation.mutate({ id: editingId, payload });
@@ -89,6 +90,7 @@ export default function Vouchers() {
       startDate: record.startDate ? dayjs(record.startDate) : null,
       endDate: record.endDate ? dayjs(record.endDate) : null,
       usageLimit: record.usageLimit || 0,
+      status: record.status || "active",
     });
     setModalOpen(true);
   };
@@ -186,20 +188,56 @@ export default function Vouchers() {
           <Form.Item name="discountType" label="Loại giảm" initialValue="percent">
             <Select options={[{ value: "percent", label: "Phần trăm" }, { value: "fixed", label: "Số tiền cố định" }]} />
           </Form.Item>
-          <Form.Item name="discountValue" label="Giá trị giảm" rules={[{ required: true }]}>
+          <Form.Item
+            name="discountValue"
+            label="Giá trị giảm"
+            rules={[
+              { required: true, message: "Nhập giá trị giảm" },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (value == null) return Promise.resolve();
+                  if (Number(value) < 0) return Promise.reject(new Error("Giá trị giảm phải >= 0"));
+                  if (getFieldValue("discountType") === "percent" && Number(value) > 100) {
+                    return Promise.reject(new Error("Giảm theo % không được > 100"));
+                  }
+                  return Promise.resolve();
+                },
+              }),
+            ]}
+          >
             <InputNumber min={0} style={{ width: "100%" }} />
           </Form.Item>
           <Form.Item name="minOrderValue" label="Đơn tối thiểu (đ)">
             <InputNumber min={0} style={{ width: "100%" }} />
           </Form.Item>
-          <Form.Item name="startDate" label="Từ ngày" rules={[{ required: true }]}>
-            <DatePicker style={{ width: "100%" }} />
+          <Form.Item name="startDate" label="Từ ngày" rules={[{ required: true, message: "Chọn ngày bắt đầu" }]}>
+            <DatePicker showTime style={{ width: "100%" }} format="DD/MM/YYYY HH:mm" />
           </Form.Item>
-          <Form.Item name="endDate" label="Đến ngày" rules={[{ required: true }]}>
-            <DatePicker style={{ width: "100%" }} />
+          <Form.Item
+            name="endDate"
+            label="Đến ngày"
+            dependencies={["startDate"]}
+            rules={[
+              { required: true, message: "Chọn ngày kết thúc" },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  const start = getFieldValue("startDate");
+                  if (!value || !start) return Promise.resolve();
+                  if (dayjs(value).isBefore(dayjs(start))) {
+                    return Promise.reject(new Error("Ngày kết thúc phải >= ngày bắt đầu"));
+                  }
+                  return Promise.resolve();
+                },
+              }),
+            ]}
+          >
+            <DatePicker showTime style={{ width: "100%" }} format="DD/MM/YYYY HH:mm" />
           </Form.Item>
           <Form.Item name="usageLimit" label="Số lần dùng (0 = không giới hạn)">
             <InputNumber min={0} style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item name="status" label="Trạng thái" initialValue="active">
+            <Select options={[{ value: "active", label: "Hoạt động" }, { value: "inactive", label: "Tạm tắt" }]} />
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={createMutation.isPending || updateMutation.isPending}>

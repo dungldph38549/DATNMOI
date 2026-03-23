@@ -22,6 +22,8 @@ const loadCart = () => {
       ...i,
       qty: i.qty ?? i.quantity ?? 1,
       price: Number(i.price ?? 0),
+      originalPrice:
+        i.originalPrice == null ? null : Number(i.originalPrice),
       sku:
         i.sku == null ? null : String(i.sku).trim().toUpperCase(),
       size: i.size ?? null,
@@ -60,16 +62,28 @@ const cartSlice = createSlice({
       const name = payload.name || "Unnamed product";
       const image = payload.image || "";
       const price = Number(payload.price || 0);
+      const originalPrice =
+        payload.originalPrice == null ? null : Number(payload.originalPrice);
       const skuRaw = payload.sku ?? null;
       const sku =
         skuRaw == null ? null : String(skuRaw).trim().toUpperCase();
       const size = payload.size ?? null;
-      const cartKey = buildCartKey({ productId, sku, size });
+      const forceCartKey =
+        payload.cartKey != null && String(payload.cartKey).trim() !== ""
+          ? String(payload.cartKey).trim()
+          : null;
+      const noMerge = !!payload.noMerge;
+      const cartKey = forceCartKey || buildCartKey({ productId, sku, size });
 
-      const existing = state.items.find((i) => i.cartKey === cartKey);
+      const existing = noMerge
+        ? null
+        : state.items.find((i) => i.cartKey === cartKey);
       if (existing) {
         existing.qty += qty;
         if (price) existing.price = price;
+        if (originalPrice != null && Number.isFinite(originalPrice)) {
+          existing.originalPrice = originalPrice;
+        }
       } else {
         state.items.push({
           cartKey,
@@ -77,6 +91,7 @@ const cartSlice = createSlice({
           name,
           image,
           price,
+          originalPrice,
           qty,
           sku,
           size,
@@ -121,7 +136,7 @@ const cartSlice = createSlice({
       saveCart(state);
     },
     updateCartVariant: (state, action) => {
-      const { cartKey, sku, size } = action.payload || {};
+      const { cartKey, sku, size, price, originalPrice } = action.payload || {};
       if (!cartKey) return;
       const item = state.items.find((i) => i.cartKey === cartKey);
       if (!item) return;
@@ -143,6 +158,12 @@ const cartSlice = createSlice({
 
       item.sku = normalizedSku;
       item.size = normalizedSize;
+      if (price != null && Number.isFinite(Number(price))) {
+        item.price = Number(price);
+      }
+      if (originalPrice != null && Number.isFinite(Number(originalPrice))) {
+        item.originalPrice = Number(originalPrice);
+      }
       item.cartKey = nextCartKey;
 
       // Nếu đổi biến thể trùng item đã có sẵn thì gộp qty vào dòng đó.
@@ -171,6 +192,18 @@ const cartSlice = createSlice({
       );
       saveCart(state);
     },
+    removeBuyNowItems: (state, action) => {
+      const keys = Array.isArray(action.payload) ? action.payload : null;
+      const keySet = keys ? new Set(keys.map((k) => String(k))) : null;
+      state.items = state.items.filter((i) => {
+        const itemKey = String(i.cartKey || "");
+        const isBuyNow = itemKey.includes("::BUY_NOW::");
+        if (!isBuyNow) return true;
+        if (!keySet) return false;
+        return !keySet.has(itemKey);
+      });
+      saveCart(state);
+    },
   },
 });
 
@@ -181,6 +214,7 @@ export const {
   clearCart,
   removeManyFromCart,
   updateCartVariant,
+  removeBuyNowItems,
 } =
   cartSlice.actions;
 

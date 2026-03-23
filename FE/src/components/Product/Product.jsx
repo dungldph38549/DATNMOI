@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   FaStar,
@@ -10,6 +10,7 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
+import { getProductPriceInfo } from "../../utils/pricing";
 
 const Product = ({ product }) => {
   const dispatch = useDispatch();
@@ -56,6 +57,7 @@ const Product = ({ product }) => {
       maxPrice: Number.isFinite(single) ? single : 0,
     };
   }, [product]);
+  const cardPriceInfo = useMemo(() => getProductPriceInfo(product), [product]);
 
   if (!product) return null;
 
@@ -97,12 +99,13 @@ const Product = ({ product }) => {
       return;
     }
 
-    const safePrice = Number(product?.price ?? minPrice ?? 0) || 0;
+    const safePrice = Number(cardPriceInfo.effectivePrice ?? product?.price ?? minPrice ?? 0) || 0;
     dispatch(
       addToCart({
         productId: product._id,
         name: product.name,
         price: safePrice,
+        originalPrice: Number(cardPriceInfo.originalPrice || safePrice),
         image: product.image,
         qty: 1,
       }),
@@ -138,6 +141,13 @@ const Product = ({ product }) => {
             <div className="absolute top-3 left-3 z-10">
               <span className="bg-orange-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-lg shadow-orange-500/30">
                 🔥 Hot
+              </span>
+            </div>
+          )}
+          {cardPriceInfo.hasSale && (
+            <div className="absolute top-3 left-3 z-10 translate-y-7">
+              <span className="bg-red-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-lg">
+                -{cardPriceInfo.discountPercent}%
               </span>
             </div>
           )}
@@ -197,9 +207,16 @@ const Product = ({ product }) => {
                   </span>
                 </div>
               ) : (
-                <span className="text-primary font-black text-xl leading-none">
-                  {(product.price ?? minPrice ?? 0).toLocaleString("vi-VN")}₫
-                </span>
+                <div className="flex flex-col gap-1">
+                  {cardPriceInfo.hasSale && (
+                    <span className="text-slate-400 line-through text-sm font-bold leading-none">
+                      {cardPriceInfo.originalPrice.toLocaleString("vi-VN")}₫
+                    </span>
+                  )}
+                  <span className="text-primary font-black text-xl leading-none">
+                    {cardPriceInfo.effectivePrice.toLocaleString("vi-VN")}₫
+                  </span>
+                </div>
               )}
             </div>
           </div>
@@ -245,7 +262,7 @@ const Product = ({ product }) => {
                 ? minPrice === maxPrice
                   ? `${minPrice.toLocaleString()}đ`
                   : `Giá ${minPrice.toLocaleString()}đ - ${maxPrice.toLocaleString()}đ`
-                : `${(product.price ?? minPrice ?? 0).toLocaleString()}đ`}
+                : `${cardPriceInfo.effectivePrice.toLocaleString()}đ`}
             </p>
 
             <button

@@ -212,7 +212,14 @@ const OrderHistoryPage = () => {
                             <h4 className="font-bold text-slate-800 text-sm md:text-base line-clamp-1">{p.productId?.name || p.name || "Sản phẩm"}</h4>
                             <p className="text-sm font-semibold text-slate-400">x{p.quantity}</p>
                           </div>
-                          <span className="font-black text-slate-800">{formatMoney(p.price * p.quantity)}</span>
+                          <div className="text-right">
+                            {Number(p.basePrice || 0) > Number(p.price || 0) && (
+                              <p className="text-xs text-slate-400 line-through font-bold">
+                                {formatMoney((p.basePrice || 0) * (p.quantity || 0))}
+                              </p>
+                            )}
+                            <span className="font-black text-slate-800">{formatMoney(p.price * p.quantity)}</span>
+                          </div>
                         </div>
                       </div>
                     ))}

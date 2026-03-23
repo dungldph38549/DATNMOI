@@ -242,6 +242,15 @@ export const toggleVisible = async ({ id }) => {
   return res.data;
 };
 
+export const getProductSaleReport = async ({ startDate, endDate } = {}) => {
+  const params = new URLSearchParams();
+  if (startDate) params.append("startDate", startDate);
+  if (endDate) params.append("endDate", endDate);
+  const query = params.toString();
+  const res = await axiosInstance.get(`/product/admin/sale-report${query ? `?${query}` : ""}`);
+  return res.data;
+};
+
 // ── UPLOAD ────────────────────────────────────────────────────
 
 export const uploadImage = async (payload) => {

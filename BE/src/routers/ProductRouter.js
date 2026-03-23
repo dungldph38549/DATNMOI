@@ -32,6 +32,8 @@ router.get("/brand/:brandId", PC.getByBrand);
 router.post("/get-stock", PC.getStock);
 router.post("/relation", PC.relationProduct);
 router.post("/get-products", PC.getProducts);
+router.get("/admin/sale-report", adminGuard, PC.getSaleReport);
+router.get("/admin/get-all", adminGuard, PC.getAllProducts);
 
 // /:id phải đặt sau các route tĩnh
 router.get("/:id", PC.getProductById);
@@ -39,7 +41,6 @@ router.get("/:id", PC.getProductById);
 // ================================================================
 // ADMIN
 // ================================================================
-router.get("/admin/get-all", adminGuard, PC.getAllProducts);
 router.post("/create", adminGuard, PC.createProduct);
 router.post("/:id/upload-image", adminGuard, PC.uploadImage);
 router.put("/:id", adminGuard, PC.updateProduct);

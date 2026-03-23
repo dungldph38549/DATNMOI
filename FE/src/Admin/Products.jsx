@@ -204,6 +204,29 @@ const VariantTable = ({ variants }) => {
 };
 
 const getAdminDisplayPrice = (record) => {
+  const effectiveMin = Number(record?.priceRange?.min);
+  const effectiveMax = Number(record?.priceRange?.max);
+  const originalMin = Number(record?.originalPriceRange?.min ?? record?.originalPrice);
+  const originalMax = Number(record?.originalPriceRange?.max ?? record?.originalPrice);
+
+  if (
+    Number.isFinite(effectiveMin) &&
+    Number.isFinite(effectiveMax) &&
+    Number.isFinite(originalMin) &&
+    Number.isFinite(originalMax) &&
+    (effectiveMin < originalMin || effectiveMax < originalMax)
+  ) {
+    const saleText =
+      effectiveMin === effectiveMax
+        ? `${effectiveMin.toLocaleString("vi-VN")}₫`
+        : `${effectiveMin.toLocaleString("vi-VN")} - ${effectiveMax.toLocaleString("vi-VN")}₫`;
+    const originalText =
+      originalMin === originalMax
+        ? `${originalMin.toLocaleString("vi-VN")}₫`
+        : `${originalMin.toLocaleString("vi-VN")} - ${originalMax.toLocaleString("vi-VN")}₫`;
+    return `${saleText} (gốc ${originalText})`;
+  }
+
   const minFromRange = Number(record?.priceRange?.min);
   const maxFromRange = Number(record?.priceRange?.max);
 

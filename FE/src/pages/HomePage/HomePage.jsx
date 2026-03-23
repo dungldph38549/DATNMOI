@@ -18,7 +18,6 @@ const HomePage = () => {
   const [hotProducts, setHotProducts] = useState([]);
   const [newProducts, setNewProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [sort, setSort] = useState("new");
   const [slide, setSlide] = useState(0);
@@ -36,7 +35,6 @@ const HomePage = () => {
 
   useEffect(() => {
     const load = async () => {
-      setLoading(true);
       try {
         const [featuredRes, bestRes, newRes] = await Promise.all([
           getFeaturedProducts(8),
@@ -66,7 +64,6 @@ const HomePage = () => {
       } catch (err) {
         console.error("Load products error:", err);
       }
-      setLoading(false);
     };
     load();
   }, []);

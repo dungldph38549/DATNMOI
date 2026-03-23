@@ -164,6 +164,10 @@ const OrderDetailPage = () => {
     typeof order.status === "string"
       ? order.status.trim().toLowerCase()
       : order.status;
+  const saleDiscountTotal = (order?.products || []).reduce(
+    (sum, p) => sum + Math.max(0, Number((p.basePrice ?? p.price) - (p.price ?? 0))) * Number(p.quantity || 0),
+    0,
+  );
 
   return (
     <div className="bg-background-light min-h-screen font-body pb-20 pt-24">
@@ -305,7 +309,14 @@ const OrderDetailPage = () => {
                           <span className="bg-white border shadow-sm px-2 py-1 rounded-md text-slate-500">x{p.quantity}</span>
                         </div>
                       </div>
-                      <span className="font-black text-slate-900 ml-4">{formatMoney(p.price * p.quantity)}</span>
+                      <div className="text-right ml-4">
+                        {Number(p.basePrice || 0) > Number(p.price || 0) && (
+                          <p className="text-xs text-slate-400 line-through font-bold">
+                            {formatMoney((p.basePrice || 0) * (p.quantity || 0))}
+                          </p>
+                        )}
+                        <span className="font-black text-slate-900">{formatMoney(p.price * p.quantity)}</span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -350,6 +361,7 @@ const OrderDetailPage = () => {
 
                 <div className="space-y-3 text-sm font-semibold text-slate-500 mb-6 border-b border-slate-100 pb-6">
                   <div className="flex justify-between"><span className="text-slate-400">Tạm tính:</span> <span className="text-slate-800">{formatMoney(order.totalAmount - (order.shippingFee || 0) + (order.discount || 0))}</span></div>
+                  {saleDiscountTotal > 0 && <div className="flex justify-between text-blue-600"><span>Giảm giá sản phẩm:</span> <span>-{formatMoney(saleDiscountTotal)}</span></div>}
                   <div className="flex justify-between"><span className="text-slate-400">Phí giao hàng:</span> <span className="text-slate-800">{formatMoney(order.shippingFee || 0)}</span></div>
                   {(order.discount || 0) > 0 && <div className="flex justify-between text-green-600"><span>Giảm giá:</span> <span>-{formatMoney(order.discount)}</span></div>}
                 </div>

@@ -15,6 +15,7 @@ const {
   IpnInvalidAmount,
   IpnUnknownError,
 } = require("vnpay");
+const { pickBestActiveRule, calculateEffectivePrice } = require("../utils/salePricing");
 
 // Khi không khai báo VNP_* trong .env sẽ dùng fallback bên dưới.
 // Chỉ truyền host (không thêm /paymentv2/...): thư viện tự nối endpoint thanh toán.
@@ -204,11 +205,24 @@ exports.createOrder = async (req, res) => {
           });
         }
 
+        const saleRule = pickBestActiveRule({
+          rules: product.saleRules,
+          sku: variant.sku,
+          now: new Date(),
+        });
+        const pricing = calculateEffectivePrice({
+          basePrice: variant.price,
+          saleRule,
+        });
         mappedProducts.push({
           productId: item.productId,
           sku: variant.sku,
           quantity: item.quantity,
-          price: variant.price,
+          price: pricing.effectivePrice,
+          basePrice: pricing.basePrice,
+          lineDiscount: pricing.discountAmount,
+          appliedSaleRuleId: pricing.saleRule?._id || null,
+          appliedSaleName: pricing.saleRule?.name || null,
           attributes: Object.fromEntries(variant.attributes),
         });
       } else {
@@ -225,11 +239,24 @@ exports.createOrder = async (req, res) => {
         product.stock = availableStock - Number(item.quantity || 0);
         await product.save({ session });
 
+        const saleRule = pickBestActiveRule({
+          rules: product.saleRules,
+          sku: null,
+          now: new Date(),
+        });
+        const pricing = calculateEffectivePrice({
+          basePrice: product.price,
+          saleRule,
+        });
         mappedProducts.push({
           productId: item.productId,
           sku: null,
           quantity: item.quantity,
-          price: product.price,
+          price: pricing.effectivePrice,
+          basePrice: pricing.basePrice,
+          lineDiscount: pricing.discountAmount,
+          appliedSaleRuleId: pricing.saleRule?._id || null,
+          appliedSaleName: pricing.saleRule?.name || null,
           attributes: {},
         });
       }
