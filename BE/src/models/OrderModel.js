@@ -104,6 +104,7 @@ const orderSchema = new mongoose.Schema(
         "confirmed",
         "shipped",
         "delivered",
+        "received",
         "canceled",
         "return-request",
         "accepted",

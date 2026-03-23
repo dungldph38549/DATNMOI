@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
 import {
-  addToCartAPI, createReview, getOrdersByUser, getProductById,
+  addToCartAPI, createReview, getMyReviewByProduct, getOrdersByUser, getProductById,
   getProductReviews, getStocks, relationProduct, uploadImages
 } from "../../api";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
@@ -29,6 +29,7 @@ const ProductDetail = () => {
   const [relatedLoading, setRelatedLoading] = useState(false);
 
   const [reviews, setReviews] = useState([]);
+  const [myReview, setMyReview] = useState(null);
   const [reviewStats, setReviewStats] = useState(null);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsReload, setReviewsReload] = useState(0);
@@ -39,6 +40,7 @@ const ProductDetail = () => {
   const [reviewFiles, setReviewFiles] = useState([]);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewSubmitError, setReviewSubmitError] = useState("");
+  const [reviewSubmitSuccess, setReviewSubmitSuccess] = useState("");
 
   const [checkingStock, setCheckingStock] = useState(false);
   const [stockInfo, setStockInfo] = useState(null);
@@ -182,12 +184,25 @@ const ProductDetail = () => {
       setReviewsLoading(true);
       try {
         const res = await getProductReviews({ productId: product._id, page: 1, limit: 10, sort: "newest" });
-        setReviews(res?.reviews ?? []);
+        const publicReviews = Array.isArray(res?.reviews) ? res.reviews : [];
+        let mine = null;
+        if (user?.login) {
+          try {
+            mine = await getMyReviewByProduct(product._id);
+          } catch (_) {
+            mine = null;
+          }
+        }
+        setMyReview(mine);
+        const mergedReviews = mine
+          ? [mine, ...publicReviews.filter((r) => String(r?._id) !== String(mine?._id))]
+          : publicReviews;
+        setReviews(mergedReviews);
         setReviewStats(res?.stats ?? null);
-      } catch (err) { setReviews([]); setReviewStats(null); } finally { setReviewsLoading(false); }
+      } catch (err) { setReviews([]); setMyReview(null); setReviewStats(null); } finally { setReviewsLoading(false); }
     };
     run();
-  }, [product, reviewsReload]);
+  }, [product, reviewsReload, user?.login]);
 
   const handleAddToCart = async () => {
     if (!product) return false;
@@ -293,6 +308,7 @@ const ProductDetail = () => {
 
     setReviewSubmitting(true);
     setReviewSubmitError("");
+    setReviewSubmitSuccess("");
     try {
       let orderId = null;
       const ordersResp = await getOrdersByUser(user.id, 1, 20);
@@ -311,6 +327,7 @@ const ProductDetail = () => {
 
       await createReview({ productId: product._id, rating: reviewRating, title: reviewTitle.trim() || null, content: reviewContent.trim() || null, images, orderId });
       setReviewRating(0); setReviewTitle(""); setReviewContent(""); setReviewFiles([]); setReviewsReload((x) => x + 1);
+      setReviewSubmitSuccess("Đã gửi đánh giá thành công. Đánh giá sẽ hiển thị sau khi được duyệt.");
     } catch (err) {
       setReviewSubmitError(err?.response?.data?.message || err?.message || "Không thể gửi review");
     } finally {
@@ -539,6 +556,7 @@ const ProductDetail = () => {
                     ) : (
                       <div>
                         {reviewSubmitError && <p className="text-red-500 bg-red-50 p-3 rounded-lg font-medium mb-4">{reviewSubmitError}</p>}
+                        {reviewSubmitSuccess && <p className="text-green-700 bg-green-50 p-3 rounded-lg font-medium mb-4">{reviewSubmitSuccess}</p>}
                         <div className="flex items-center gap-4 mb-4">
                           <span className="font-bold text-slate-700">Đánh giá của bạn:</span>
                           <div className="flex gap-2">
@@ -583,6 +601,11 @@ const ProductDetail = () => {
                                 <div className="flex text-secondary text-sm">
                                   {[...Array(5)].map((_, i) => <FaStar key={i} className={i < r.rating ? "opacity-100" : "opacity-30"} />)}
                                 </div>
+                                {String(r?._id) === String(myReview?._id) && (
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-sm ${r?.status === "approved" ? "bg-green-100 text-green-700" : r?.status === "rejected" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                                    {r?.status === "approved" ? "Đã duyệt" : r?.status === "rejected" ? "Bị từ chối" : "Chờ duyệt"}
+                                  </span>
+                                )}
                                 {r.verifiedPurchase && <span className="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-sm">Đã mua</span>}
                               </div>
                             </div>

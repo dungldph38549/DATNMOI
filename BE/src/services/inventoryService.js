@@ -3,6 +3,7 @@
 // Toàn bộ business logic tồn kho — controller gọi vào đây
 // ================================================================
 const Inventory = require("../models/Inventory");
+const Product = require("../models/ProductModel");
 const mongoose = require("mongoose");
 const { emitStockUpdate } = require("../socket/inventorySocket");
 const { sendLowStockAlert } = require("../jobs/alertJob");
@@ -18,9 +19,18 @@ class AppError extends Error {
 
 // ── GET /api/inventory?productId= ────────────────────────────
 const getByProduct = async (productId) => {
+  // Backward-compatible:
+  // - Có productId: trả theo sản phẩm
+  // - Không có productId: trả toàn bộ inventory (tránh 500 cho các màn cũ gọi /api/inventory)
+  if (!productId) {
+    return Inventory.find({})
+      .populate("productId", "name")
+      .populate("warehouses.warehouseId", "name code location")
+      .sort({ status: 1, sku: 1 })
+      .lean();
+  }
   if (!isValid(productId)) throw new AppError("productId không hợp lệ");
-  const items = await Inventory.getByProduct(productId);
-  return items;
+  return Inventory.getByProduct(productId);
 };
 
 // ── GET /api/inventory/:id ────────────────────────────────────
@@ -49,16 +59,52 @@ const createInventory = async ({
   lowStockThreshold,
 }) => {
   if (!isValid(productId)) throw new AppError("productId không hợp lệ");
-  const existed = await Inventory.findOne({ sku });
-  if (existed) throw new AppError(`SKU "${sku}" đã tồn tại`, 409);
+  const normalizedSku = String(sku || "").trim().toUpperCase();
+  if (!normalizedSku) throw new AppError("SKU là bắt buộc");
 
-  const inv = await Inventory.create({
-    productId,
-    variantId: variantId || null,
-    sku,
-    lowStockThreshold: lowStockThreshold || 10,
-  });
-  return inv;
+  const existedBySku = await Inventory.findOne({ sku: normalizedSku });
+  if (existedBySku) throw new AppError(`SKU "${normalizedSku}" đã tồn tại`, 409);
+
+  const product = await Product.findById(productId).select("hasVariants variants.sku");
+  if (!product) throw new AppError("Không tìm thấy sản phẩm", 404);
+
+  let resolvedVariantId = variantId || null;
+  if (product.hasVariants) {
+    const matchedVariant = (product.variants || []).find(
+      (v) => String(v?.sku || "").trim().toUpperCase() === normalizedSku,
+    );
+    if (!matchedVariant) {
+      throw new AppError(
+        `SKU "${normalizedSku}" không thuộc sản phẩm đã chọn`,
+        422,
+      );
+    }
+    resolvedVariantId = matchedVariant._id;
+  } else {
+    resolvedVariantId = null;
+    const existedBase = await Inventory.findOne({ productId, variantId: null });
+    if (existedBase) {
+      throw new AppError(
+        "Sản phẩm không biến thể chỉ có thể có một bản ghi tồn kho",
+        409,
+      );
+    }
+  }
+
+  try {
+    const inv = await Inventory.create({
+      productId,
+      variantId: resolvedVariantId,
+      sku: normalizedSku,
+      lowStockThreshold: lowStockThreshold || 10,
+    });
+    return inv;
+  } catch (err) {
+    if (err?.code === 11000) {
+      throw new AppError("Bản ghi tồn kho đã tồn tại cho sản phẩm/biến thể này", 409);
+    }
+    throw err;
+  }
 };
 
 // ── POST /api/inventory/:id/import  — Nhập kho ───────────────

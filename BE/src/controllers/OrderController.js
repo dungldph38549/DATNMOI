@@ -641,6 +641,7 @@ const statusLabels = {
   confirmed: "Đã xác nhận",
   shipped: "Đang giao",
   delivered: "Đã giao",
+  received: "Giao hàng thành công",
   canceled: "Đã hủy",
   "return-request": "Yêu cầu hoàn hàng",
   accepted: "Chấp nhận hoàn hàng",
@@ -659,6 +660,7 @@ exports.updateOrder = async (req, res) => {
       "confirmed",
       "shipped",
       "delivered",
+      "received",
       "canceled",
       "return-request",
       "accepted",
@@ -670,6 +672,7 @@ exports.updateOrder = async (req, res) => {
       confirmed: ["shipped", "canceled"],
       shipped: ["delivered"],
       delivered: ["return-request"],
+      received: [],
       canceled: [],
       "return-request": ["accepted", "rejected"],
       accepted: [],
@@ -962,56 +965,32 @@ exports.comfirmDelivery = async (req, res) => {
     if (!order)
       return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
 
-    // Luồng củ: đang giao → đã giao + đã thanh toán (giữ cho tương thích / gọi API trực tiếp)
-    if (order.status === "shipped") {
-      const updatedOrder = await Order.findByIdAndUpdate(
-        id,
-        { status: "delivered", paymentStatus: "paid" },
-        { new: true },
-      ).populate("products.productId");
-
-      await OrderStatusHistory.create({
-        oldStatus: "shipped",
-        newStatus: "delivered",
-        orderId: order._id,
-        paymentStatus: updatedOrder.paymentStatus === "paid" ? null : "paid",
-      });
-
-      return res.status(200).json(updatedOrder);
-    }
-
-    // Luồng hiển thị trên web: chỉ bấm xác nhận khi đơn đã ở trạng thái "đã giao" (COD chưa thanh toán)
+    // Chỉ bấm xác nhận khi đơn đã ở trạng thái "đã giao"
     if (order.status === "delivered") {
-      if (order.paymentStatus === "paid") {
-        const fresh = await Order.findById(id).populate("products.productId");
-        return res.status(200).json(fresh);
-      }
-      if (order.paymentMethod !== "cod") {
-        return res.status(400).json({
-          message:
-            "Đơn chưa thanh toán VNPay — vui lòng thanh toán online, không xác nhận COD tại đây.",
-        });
-      }
-      const updatedOrder = await Order.findByIdAndUpdate(
-        id,
-        { paymentStatus: "paid" },
-        { new: true },
-      ).populate("products.productId");
+      const patch =
+        order.paymentMethod === "cod" && order.paymentStatus !== "paid"
+          ? { status: "received", paymentStatus: "paid" }
+          : { status: "received" };
+      const updatedOrder = await Order.findByIdAndUpdate(id, patch, {
+        new: true,
+      }).populate("products.productId");
 
       await OrderStatusHistory.create({
         oldStatus: "delivered",
-        newStatus: "delivered",
+        newStatus: "received",
         orderId: order._id,
-        paymentStatus: "paid",
-        note: "Khách xác nhận đã nhận hàng (thanh toán COD)",
+        paymentStatus:
+          order.paymentMethod === "cod" && order.paymentStatus !== "paid"
+            ? "paid"
+            : null,
+        note: "Người dùng xác nhận đã nhận được hàng",
       });
 
       return res.status(200).json(updatedOrder);
     }
 
     return res.status(400).json({
-      message:
-        "Chỉ có thể xác nhận khi đơn đã giao (đã giao) hoặc đang trên luồng đang giao (API nội bộ).",
+      message: "Chỉ có thể xác nhận khi đơn đã giao.",
     });
   } catch (err) {
     const statusCode = err?.status || err?.statusCode || 500;

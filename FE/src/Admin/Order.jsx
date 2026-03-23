@@ -13,6 +13,7 @@ const STATUS_OPTIONS = [
   { value: "confirmed", label: "Đã xác nhận" },
   { value: "shipped", label: "Đang giao" },
   { value: "delivered", label: "Đã giao" },
+  { value: "received", label: "Giao hàng thành công" },
   { value: "canceled", label: "Đã hủy" },
   { value: "return-request", label: "Yêu cầu hoàn hàng" },
   { value: "accepted", label: "Chấp nhận hoàn hàng" },
@@ -24,6 +25,7 @@ const TRANSITIONS = {
   confirmed: ["shipped", "canceled"],
   shipped: ["delivered"],
   delivered: ["return-request"],
+  received: [],
   canceled: [],
   "return-request": ["accepted", "rejected"],
   accepted: [],
@@ -33,7 +35,7 @@ const TRANSITIONS = {
 /** Nhãn bước tiếp theo trong Select (giữ nguyên value gửi API). */
 const labelForNextStatus = (fromNormalized, toValue) => {
   if (fromNormalized === "delivered" && toValue === "return-request") {
-    return "Người dùng đã nhận";
+    return "Giao hàng thành công";
   }
   return STATUS_OPTIONS.find((o) => o.value === toValue)?.label || toValue;
 };

@@ -191,8 +191,9 @@ userSchema.virtual("currentMonthAttendance").get(function () {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const attendance = Array.isArray(this.attendance) ? this.attendance : [];
 
-  return this.attendance.filter(
+  return attendance.filter(
     (att) => att.date >= startOfMonth && att.date <= endOfMonth,
   );
 });

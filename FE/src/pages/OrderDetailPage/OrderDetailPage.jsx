@@ -1,11 +1,21 @@
 import React, { useEffect, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { getOrderById, confirmDelivery, returnOrderRequest, createVnpayUrl, cancelOrderByUser } from "../../api";
-import { FaBoxOpen, FaCheckCircle, FaTruck, FaMapMarkerAlt, FaTimesCircle, FaChevronLeft, FaUndoAlt, FaCreditCard, FaMoneyBillWave, FaShieldAlt, FaTimes } from "react-icons/fa";
+import {
+  getOrderById,
+  confirmDelivery,
+  returnOrderRequest,
+  createVnpayUrl,
+  cancelOrderByUser,
+  createReview,
+  uploadImages,
+  getMyReviewByProduct,
+} from "../../api";
+import { FaBoxOpen, FaCheckCircle, FaTruck, FaMapMarkerAlt, FaTimesCircle, FaChevronLeft, FaUndoAlt, FaCreditCard, FaMoneyBillWave, FaShieldAlt, FaTimes, FaStar } from "react-icons/fa";
 
 const STATUS_LABELS = {
   pending: "Chờ xử lý", confirmed: "Đã xác nhận", shipped: "Đang giao", delivered: "Đã giao",
+  received: "Giao hàng thành công",
   canceled: "Đã hủy",
   "return-request": "Hoàn hàng: Đang yêu cầu",
   accepted: "Hoàn hàng: Đã chấp nhận",
@@ -15,17 +25,19 @@ const STATUS_LABELS = {
 
 const STATUS_ICONS = {
   pending: <FaBoxOpen />, confirmed: <FaCheckCircle />, shipped: <FaTruck />, delivered: <FaMapMarkerAlt />,
+  received: <FaCheckCircle />,
   canceled: <FaTimesCircle />, "return-request": <FaUndoAlt />, accepted: <FaCheckCircle />, rejected: <FaTimesCircle />
 };
 
 const STATUS_COLORS = {
   pending: "bg-blue-50 text-blue-600 border-blue-200", confirmed: "bg-indigo-50 text-indigo-600 border-indigo-200",
   shipped: "bg-purple-50 text-purple-600 border-purple-200", delivered: "bg-green-50 text-green-600 border-green-200",
+  received: "bg-emerald-50 text-emerald-700 border-emerald-200",
   canceled: "bg-red-50 text-red-600 border-red-200", "return-request": "bg-orange-50 text-orange-600 border-orange-200",
   accepted: "bg-teal-50 text-teal-600 border-teal-200", rejected: "bg-red-50 text-red-600 border-red-200",
 };
 
-const TRACKING_STEPS = ["pending", "confirmed", "shipped", "delivered"];
+const TRACKING_STEPS = ["pending", "confirmed", "shipped", "delivered", "received"];
 const RETURN_STATUSES = new Set(["return-request", "accepted", "rejected", "returned"]);
 const getTrackingProgress = (status) => {
   if (status === "canceled") return -1;
@@ -57,12 +69,22 @@ const getHistoryHighlightIndex = (chron, orderStatus) => {
 const OrderDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [order, setOrder] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [returnReason, setReturnReason] = useState("");
   const [returnSubmitting, setReturnSubmitting] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState(null);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewTitle, setReviewTitle] = useState("");
+  const [reviewContent, setReviewContent] = useState("");
+  const [reviewFiles, setReviewFiles] = useState([]);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState("");
+  const [myReviewsByProduct, setMyReviewsByProduct] = useState({});
   const user = useSelector((state) => state.user);
   const isLoggedIn = !!user?.login;
 
@@ -80,12 +102,41 @@ const OrderDetailPage = () => {
     load();
   }, [id]);
 
+  useEffect(() => {
+    const run = async () => {
+      const status = typeof order?.status === "string" ? order.status.trim().toLowerCase() : order?.status;
+      if (!isLoggedIn || status !== "delivered" || !Array.isArray(order?.products) || order.products.length === 0) {
+        setMyReviewsByProduct({});
+        return;
+      }
+      const productIds = Array.from(
+        new Set(
+          order.products
+            .map((p) => String(p?.productId?._id || p?.productId || ""))
+            .filter(Boolean),
+        ),
+      );
+      const entries = await Promise.all(
+        productIds.map(async (pid) => {
+          try {
+            const review = await getMyReviewByProduct(pid);
+            return [pid, review];
+          } catch (_) {
+            return [pid, null];
+          }
+        }),
+      );
+      setMyReviewsByProduct(Object.fromEntries(entries));
+    };
+    run();
+  }, [isLoggedIn, order]);
+
   const handleConfirmDelivery = async () => {
     const wasPaid = order?.paymentStatus === "paid";
     try {
       await confirmDelivery(id);
       setOrder((o) =>
-        o ? { ...o, status: "delivered", paymentStatus: "paid" } : o,
+        o ? { ...o, status: "received", paymentStatus: "paid" } : o,
       );
       alert(
         wasPaid
@@ -146,6 +197,95 @@ const OrderDetailPage = () => {
     } catch (err) { alert(err?.response?.data?.message || "Không thể hủy đơn hàng."); }
   };
 
+  const openReviewModal = (item) => {
+    setReviewTarget(item);
+    setReviewRating(5);
+    setReviewTitle("");
+    setReviewContent("");
+    setReviewFiles([]);
+    setReviewError("");
+    setReviewModalOpen(true);
+  };
+
+  const closeReviewModal = () => {
+    if (reviewSubmitting) return;
+    setReviewModalOpen(false);
+    setReviewTarget(null);
+    setReviewFiles([]);
+    setReviewError("");
+  };
+
+  const handleSelectReviewFiles = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const remaining = Math.max(0, 5 - reviewFiles.length);
+    if (remaining <= 0) return;
+    setReviewFiles((prev) => [...prev, ...files.slice(0, remaining)]);
+    e.target.value = null;
+  };
+
+  const submitReview = async () => {
+    if (!reviewTarget?.productId?._id && !reviewTarget?.productId) return;
+    if (!reviewRating || reviewRating < 1 || reviewRating > 5) {
+      setReviewError("Vui lòng chọn số sao từ 1 đến 5.");
+      return;
+    }
+    setReviewSubmitting(true);
+    setReviewError("");
+    try {
+      let images = [];
+      if (reviewFiles.length > 0) {
+        const fd = new FormData();
+        reviewFiles.forEach((f) => fd.append("files", f));
+        const uploadRes = await uploadImages(fd);
+        const paths = uploadRes?.paths ?? uploadRes?.data?.paths ?? uploadRes?.data ?? [];
+        if (Array.isArray(paths)) images = paths.map((p) => ({ url: p }));
+      }
+
+      await createReview({
+        productId: reviewTarget?.productId?._id || reviewTarget?.productId,
+        orderId: order?._id,
+        rating: reviewRating,
+        title: reviewTitle.trim() || null,
+        content: reviewContent.trim() || null,
+        images,
+      });
+      const productIdKey = String(reviewTarget?.productId?._id || reviewTarget?.productId || "");
+      if (productIdKey) {
+        setMyReviewsByProduct((prev) => ({
+          ...prev,
+          [productIdKey]: {
+            rating: reviewRating,
+            title: reviewTitle.trim() || null,
+            content: reviewContent.trim() || null,
+            status: "pending",
+          },
+        }));
+      }
+      alert("Đã gửi đánh giá. Đánh giá sẽ hiển thị sau khi được duyệt.");
+      closeReviewModal();
+    } catch (err) {
+      setReviewError(err?.response?.data?.message || "Không thể gửi đánh giá.");
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const st =
+    typeof order?.status === "string"
+      ? order.status.trim().toLowerCase()
+      : order?.status;
+  const canReviewOrder = st === "received" || RETURN_STATUSES.has(st);
+
+  useEffect(() => {
+    if (!location?.state?.openReview) return;
+    if (!canReviewOrder || !isLoggedIn) return;
+    const firstProduct = Array.isArray(order?.products) ? order.products[0] : null;
+    if (!firstProduct) return;
+    openReviewModal(firstProduct);
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location?.state, canReviewOrder, isLoggedIn, order, navigate, location.pathname]);
+
   if (loading) return (
     <div className="min-h-screen bg-background-light pt-24 pb-20 flex justify-center items-center">
       <div className="flex flex-col items-center gap-4">
@@ -165,10 +305,6 @@ const OrderDetailPage = () => {
     </div>
   );
 
-  const st =
-    typeof order.status === "string"
-      ? order.status.trim().toLowerCase()
-      : order.status;
   const saleDiscountTotal = (order?.products || []).reduce(
     (sum, p) => sum + Math.max(0, Number((p.basePrice ?? p.price) - (p.price ?? 0))) * Number(p.quantity || 0),
     0,
@@ -208,7 +344,7 @@ const OrderDetailPage = () => {
               {(st !== "canceled" && !RETURN_STATUSES.has(st)) ? (
                 <div className="relative mb-8 pt-4 pb-2 px-4 md:px-8">
                   <div className="absolute top-8 left-4 md:left-8 right-4 md:right-8 h-1.5 bg-slate-100 rounded-full pointer-events-none" aria-hidden />
-                  <div className="absolute top-8 left-4 md:left-8 h-1.5 bg-primary rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(238,77,45,0.5)] pointer-events-none" style={{ width: `calc(${Math.max(0, getTrackingProgress(st) / 3 * 100)}% - 2rem)` }} aria-hidden />
+                  <div className="absolute top-8 left-4 md:left-8 h-1.5 bg-primary rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(238,77,45,0.5)] pointer-events-none" style={{ width: `calc(${Math.max(0, getTrackingProgress(st) / Math.max(1, TRACKING_STEPS.length - 1) * 100)}% - 2rem)` }} aria-hidden />
 
                   <div className="relative flex justify-between text-xs font-bold text-slate-400">
                     {TRACKING_STEPS.map((step, idx) => {
@@ -313,6 +449,38 @@ const OrderDetailPage = () => {
                           <span className="bg-white border shadow-sm px-2 py-1 rounded-md text-slate-500">Size: {p.size || "Mặc định"}</span>
                           <span className="bg-white border shadow-sm px-2 py-1 rounded-md text-slate-500">x{p.quantity}</span>
                         </div>
+                        {canReviewOrder && isLoggedIn && (() => {
+                          const productIdKey = String(p?.productId?._id || p?.productId || "");
+                          const myReview = myReviewsByProduct[productIdKey];
+                          if (myReview) {
+                            return (
+                              <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                                <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                                  <span>Đánh giá của bạn:</span>
+                                  <span className="inline-flex items-center gap-1 text-secondary">
+                                    <FaStar size={11} />
+                                    {myReview.rating || 0}/5
+                                  </span>
+                                  <span className={`ml-auto px-2 py-0.5 rounded border text-[10px] ${myReview.status === "approved" ? "bg-green-50 text-green-700 border-green-200" : myReview.status === "rejected" ? "bg-red-50 text-red-700 border-red-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+                                    {myReview.status === "approved" ? "Đã duyệt" : myReview.status === "rejected" ? "Bị từ chối" : "Chờ duyệt"}
+                                  </span>
+                                </div>
+                                {myReview.title && <p className="mt-1 text-xs font-semibold text-slate-700 line-clamp-1">{myReview.title}</p>}
+                                {myReview.content && <p className="mt-1 text-xs text-slate-500 line-clamp-2">{myReview.content}</p>}
+                              </div>
+                            );
+                          }
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => openReviewModal(p)}
+                              className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/15 transition-colors"
+                            >
+                              <FaStar size={12} />
+                              Đánh giá
+                            </button>
+                          );
+                        })()}
                       </div>
                       <div className="text-right ml-4">
                         {Number(p.basePrice || 0) > Number(p.price || 0) && (
@@ -497,6 +665,112 @@ const OrderDetailPage = () => {
                 className="flex-1 py-3.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20 disabled:opacity-60"
               >
                 {returnSubmitting ? "Đang gửi..." : "Gửi yêu cầu"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reviewModalOpen && (
+        <div
+          className="fixed inset-0 z-[210] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="review-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !reviewSubmitting) closeReviewModal();
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-6 md:p-8 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start gap-4 mb-5">
+              <h3 id="review-modal-title" className="text-xl font-display font-black text-slate-800 leading-tight">
+                Đánh giá sản phẩm
+              </h3>
+              <button
+                type="button"
+                onClick={closeReviewModal}
+                disabled={reviewSubmitting}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
+                aria-label="Đóng"
+              >
+                <FaTimes size={18} />
+              </button>
+            </div>
+            <p className="text-sm text-slate-500 mb-4">
+              {reviewTarget?.productId?.name || reviewTarget?.name || "Sản phẩm"}
+            </p>
+            {reviewError && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+                {reviewError}
+              </div>
+            )}
+
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Số sao</label>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setReviewRating(n)}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${reviewRating >= n ? "bg-secondary text-white" : "bg-white text-slate-300 border border-slate-200 hover:border-secondary hover:text-secondary"}`}
+                  >
+                    <FaStar />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <input
+              value={reviewTitle}
+              onChange={(e) => setReviewTitle(e.target.value)}
+              placeholder="Tiêu đề (tuỳ chọn)"
+              className="w-full border-2 border-slate-100 rounded-xl px-4 py-3 text-slate-800 font-medium placeholder:text-slate-400 focus:border-primary focus:ring-0 focus:outline-none mb-3"
+            />
+            <textarea
+              value={reviewContent}
+              onChange={(e) => setReviewContent(e.target.value)}
+              rows={4}
+              maxLength={500}
+              placeholder="Nội dung đánh giá..."
+              className="w-full border-2 border-slate-100 rounded-xl px-4 py-3 text-slate-800 font-medium placeholder:text-slate-400 focus:border-primary focus:ring-0 focus:outline-none resize-y min-h-[110px]"
+            />
+            <p className="text-xs text-slate-400 mt-1 text-right">{reviewContent.length}/500</p>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <label className="cursor-pointer bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-bold px-4 py-2.5 rounded-xl transition-colors">
+                Thêm ảnh
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  disabled={reviewSubmitting}
+                  onChange={handleSelectReviewFiles}
+                  className="hidden"
+                />
+              </label>
+              <span className="text-xs font-semibold text-slate-500">{reviewFiles.length}/5 ảnh</span>
+            </div>
+
+            <div className="flex flex-col-reverse sm:flex-row gap-3 mt-6">
+              <button
+                type="button"
+                onClick={closeReviewModal}
+                disabled={reviewSubmitting}
+                className="flex-1 py-3.5 border-2 border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={submitReview}
+                disabled={reviewSubmitting}
+                className="flex-1 py-3.5 bg-primary text-white font-bold rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-60"
+              >
+                {reviewSubmitting ? "Đang gửi..." : "Gửi đánh giá"}
               </button>
             </div>
           </div>

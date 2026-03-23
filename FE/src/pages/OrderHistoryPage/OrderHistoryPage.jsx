@@ -7,6 +7,7 @@ import BackButton from "../../components/Common/BackButton";
 
 const STATUS_LABELS = {
   pending: "Chờ xử lý", confirmed: "Đã xác nhận", shipped: "Đang giao", delivered: "Đã giao",
+  received: "Giao hàng thành công",
   canceled: "Đã hủy",
   "return-request": "Hoàn hàng: Đang yêu cầu",
   accepted: "Hoàn hàng: Đã chấp nhận",
@@ -16,17 +17,19 @@ const STATUS_LABELS = {
 
 const STATUS_ICONS = {
   pending: <FaBoxOpen />, confirmed: <FaCheckCircle />, shipped: <FaTruck />, delivered: <FaMapMarkerAlt />,
+  received: <FaCheckCircle />,
   canceled: <FaTimesCircle />, "return-request": <FaUndoAlt />, accepted: <FaCheckCircle />, rejected: <FaTimesCircle />
 };
 
 const STATUS_COLORS = {
   pending: "bg-blue-50 text-blue-600 border-blue-200", confirmed: "bg-indigo-50 text-indigo-600 border-indigo-200",
   shipped: "bg-purple-50 text-purple-600 border-purple-200", delivered: "bg-green-50 text-green-600 border-green-200",
+  received: "bg-emerald-50 text-emerald-700 border-emerald-200",
   canceled: "bg-red-50 text-red-600 border-red-200", "return-request": "bg-orange-50 text-orange-600 border-orange-200",
   accepted: "bg-teal-50 text-teal-600 border-teal-200", rejected: "bg-red-50 text-red-600 border-red-200",
 };
 
-const TRACKING_STEPS = ["pending", "confirmed", "shipped", "delivered"];
+const TRACKING_STEPS = ["pending", "confirmed", "shipped", "delivered", "received"];
 const RETURN_STATUSES = new Set(["return-request", "accepted", "rejected", "returned"]);
 const PAGE_SIZE = 10;
 const getTrackingProgress = (status) => {
@@ -83,7 +86,7 @@ const OrderHistoryPage = () => {
       setOrders((prev) =>
         prev.map((o) =>
           String(o._id) === String(orderId)
-            ? { ...o, status: "delivered", paymentStatus: "paid" }
+            ? { ...o, status: "received", paymentStatus: "paid" }
             : o,
         ),
       );
@@ -176,6 +179,7 @@ const OrderHistoryPage = () => {
                 typeof order.status === "string"
                   ? order.status.trim().toLowerCase()
                   : order.status;
+              const canReviewOrder = st === "received" || RETURN_STATUSES.has(st);
               return (
               <div key={order._id} className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
 
@@ -191,9 +195,20 @@ const OrderHistoryPage = () => {
                     <span className="text-sm font-semibold text-slate-400">{new Date(order.createdAt).toLocaleString("vi-VN")}</span>
                   </div>
 
-                  <Link to={`/orders/${order._id}`} className="group flex items-center gap-2 text-primary font-bold hover:text-secondary transition-colors text-sm bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl">
-                    Chi tiết đơn hàng <FaChevronRight className="group-hover:translate-x-1 transition-transform" />
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    {canReviewOrder && (
+                      <Link
+                        to={`/orders/${order._id}`}
+                        state={{ openReview: true }}
+                        className="group flex items-center gap-2 text-amber-700 font-bold hover:text-amber-800 transition-colors text-sm bg-amber-50 hover:bg-amber-100 px-4 py-2 rounded-xl"
+                      >
+                        Đánh giá
+                      </Link>
+                    )}
+                    <Link to={`/orders/${order._id}`} className="group flex items-center gap-2 text-primary font-bold hover:text-secondary transition-colors text-sm bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl">
+                      Chi tiết đơn hàng <FaChevronRight className="group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </div>
                 </div>
 
                 {/* ORDER DETAILS */}
@@ -239,7 +254,7 @@ const OrderHistoryPage = () => {
                   {(st !== "canceled" && !RETURN_STATUSES.has(st)) && (
                     <div className="relative mb-8 pt-4">
                       <div className="absolute top-8 left-0 w-full h-1 bg-slate-100 rounded-full pointer-events-none" aria-hidden />
-                      <div className="absolute top-8 left-0 h-1 bg-primary rounded-full transition-all duration-500 pointer-events-none" style={{ width: `${Math.max(0, getTrackingProgress(st) / 3 * 100)}%` }} aria-hidden />
+                      <div className="absolute top-8 left-0 h-1 bg-primary rounded-full transition-all duration-500 pointer-events-none" style={{ width: `${Math.max(0, getTrackingProgress(st) / Math.max(1, TRACKING_STEPS.length - 1) * 100)}%` }} aria-hidden />
 
                       <div className="relative flex justify-between text-xs font-bold text-slate-400">
                         {TRACKING_STEPS.map((step, idx) => {
@@ -309,6 +324,14 @@ const OrderHistoryPage = () => {
                                 Đăng nhập
                               </button>
                             )}
+                          </div>
+                          <div className="min-w-0 col-span-2">
+                            <Link
+                              to={`/orders/${order._id}`}
+                              className="w-full inline-flex justify-center items-center px-3 py-3 bg-primary/10 text-primary text-sm font-bold rounded-xl hover:bg-primary/15 transition-colors"
+                            >
+                              Đánh giá sản phẩm
+                            </Link>
                           </div>
                         </div>
                       )}

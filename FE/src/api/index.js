@@ -569,6 +569,13 @@ export const createReview = async (payload) => {
   return res.data;
 };
 
+export const getMyReviewByProduct = async (productId) => {
+  const res = await axiosInstance.get("/reviews/mine", {
+    params: { productId },
+  });
+  return res?.data?.data ?? null;
+};
+
 // ================== Review API (Admin) ==================
 export const getAdminReviews = async ({
   status = "pending",
