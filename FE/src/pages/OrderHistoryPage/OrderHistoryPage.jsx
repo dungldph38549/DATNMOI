@@ -31,6 +31,7 @@ const STATUS_COLORS = {
 
 const TRACKING_STEPS = ["pending", "confirmed", "shipped", "delivered", "received"];
 const RETURN_STATUSES = new Set(["return-request", "accepted", "rejected", "returned"]);
+const REVIEWABLE_STATUSES = new Set(["delivered", "received"]);
 const PAGE_SIZE = 10;
 const getTrackingProgress = (status) => {
   if (status === "canceled") return -1;
@@ -179,7 +180,7 @@ const OrderHistoryPage = () => {
                 typeof order.status === "string"
                   ? order.status.trim().toLowerCase()
                   : order.status;
-              const canReviewOrder = st === "received" || RETURN_STATUSES.has(st);
+              const canReviewOrder = REVIEWABLE_STATUSES.has(st);
               return (
               <div key={order._id} className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
 

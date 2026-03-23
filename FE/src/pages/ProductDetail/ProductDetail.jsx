@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
@@ -60,7 +60,7 @@ const ProductDetail = () => {
     return `http://localhost:3002/uploads/${img.startsWith("/") ? img.slice(1) : img}`;
   };
 
-  const getVariantSizeValue = (variant) => {
+  const getVariantSizeValue = useCallback((variant) => {
     const attrs = variant?.attributes;
     if (!attrs) return null;
     if (typeof attrs.get === "function") return attrs.get("Size") ?? attrs.get("size") ?? attrs.get("SIZE") ?? null;
@@ -71,12 +71,12 @@ const ProductDetail = () => {
       if (foundKey) return attrs[foundKey];
     }
     return null;
-  };
+  }, []);
 
-  const getVariantSizeLabel = (variant) => {
+  const getVariantSizeLabel = useCallback((variant) => {
     const val = getVariantSizeValue(variant);
     return val != null ? String(val) : variant?.sku ?? "";
-  };
+  }, [getVariantSizeValue]);
 
   const hasVariants = Array.isArray(product?.variants) && product.variants.length > 0;
 
@@ -99,7 +99,7 @@ const ProductDetail = () => {
     if (!product || !hasVariants) return [];
     const labels = product.variants.map((v) => getVariantSizeLabel(v)).filter((s) => s != null && String(s).trim() !== "");
     return Array.from(new Set(labels.map((s) => String(s))));
-  }, [product, hasVariants]);
+  }, [product, hasVariants, getVariantSizeLabel]);
 
   const selectedVariant = useMemo(() => {
     if (!hasVariants || !selectedSize || !Array.isArray(product?.variants)) return null;
@@ -107,7 +107,7 @@ const ProductDetail = () => {
       const label = getVariantSizeLabel(v);
       return label != null && String(label) === String(selectedSize);
     }) ?? null;
-  }, [product, selectedSize, hasVariants]);
+  }, [product, selectedSize, hasVariants, getVariantSizeLabel]);
 
   const selectedSku = selectedVariant?.sku ?? null;
   const selectedSizeValue = getVariantSizeValue(selectedVariant) ?? null;
@@ -140,7 +140,7 @@ const ProductDetail = () => {
     const firstInStock = product?.variants?.find((v) => (getVariantSizeLabel(v) ?? "").trim() !== "" && v?.stock > 0);
     const nextSize = firstInStock ? String(getVariantSizeLabel(firstInStock)) : availableSizes[0];
     setSelectedSize(nextSize);
-  }, [product, availableSizes, selectedSize, hasVariants]);
+  }, [product, availableSizes, selectedSize, hasVariants, getVariantSizeLabel]);
 
   useEffect(() => {
     const run = async () => {

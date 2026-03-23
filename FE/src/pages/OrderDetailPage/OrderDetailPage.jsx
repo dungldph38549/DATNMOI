@@ -39,6 +39,7 @@ const STATUS_COLORS = {
 
 const TRACKING_STEPS = ["pending", "confirmed", "shipped", "delivered", "received"];
 const RETURN_STATUSES = new Set(["return-request", "accepted", "rejected", "returned"]);
+const REVIEWABLE_STATUSES = new Set(["delivered", "received"]);
 const getTrackingProgress = (status) => {
   if (status === "canceled") return -1;
   if (RETURN_STATUSES.has(status)) return 3;
@@ -105,7 +106,7 @@ const OrderDetailPage = () => {
   useEffect(() => {
     const run = async () => {
       const status = typeof order?.status === "string" ? order.status.trim().toLowerCase() : order?.status;
-      if (!isLoggedIn || status !== "delivered" || !Array.isArray(order?.products) || order.products.length === 0) {
+      if (!isLoggedIn || !REVIEWABLE_STATUSES.has(status) || !Array.isArray(order?.products) || order.products.length === 0) {
         setMyReviewsByProduct({});
         return;
       }
@@ -275,7 +276,7 @@ const OrderDetailPage = () => {
     typeof order?.status === "string"
       ? order.status.trim().toLowerCase()
       : order?.status;
-  const canReviewOrder = st === "received" || RETURN_STATUSES.has(st);
+  const canReviewOrder = REVIEWABLE_STATUSES.has(st);
 
   useEffect(() => {
     if (!location?.state?.openReview) return;
