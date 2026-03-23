@@ -30,6 +30,7 @@ import OrderHistoryPage from "./pages/OrderHistoryPage/OrderHistoryPage";
 import OrderDetailPage from "./pages/OrderDetailPage/OrderDetailPage";
 import PaymentReturnPage from "./pages/PaymentReturnPage/PaymentReturnPage";
 import WishlistPage from "./pages/Wishlist/WishlistPage";
+import SalePage from "./pages/SalePage/SalePage";
 
 //  IMPORT TRANG ADMIN USERS
 import User from "./pages/User";
@@ -66,6 +67,7 @@ function AppContent() {
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/wishlist" element={<WishlistPage />} />
+          <Route path="/sale" element={<SalePage />} />
           <Route
             path="/profile"
             element={(

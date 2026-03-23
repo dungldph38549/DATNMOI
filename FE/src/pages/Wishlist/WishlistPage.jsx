@@ -134,6 +134,13 @@ const WishlistPage = () => {
                                     >
                                         <FaTrash size={14} />
                                     </button>
+                                    {item.isSale && (
+                                        <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+                                            <span className="bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-lg shadow-red-500/30 animate-pulse">
+                                                -{item.discountPercentage || 50}% OFF
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="p-6 flex flex-col flex-1">
                                     <h3 className="font-display font-bold text-lg text-slate-800 mb-3 line-clamp-2 leading-tight group-hover:text-primary transition-colors min-h-[56px]">
@@ -141,8 +148,13 @@ const WishlistPage = () => {
                                     </h3>
                                     <div className="flex items-center justify-between mt-auto">
                                         <div className="flex flex-col">
-                                            {((item?.priceRange?.min != null && item?.priceRange?.max != null) || (Array.isArray(item?.variants) && item.variants.length > 1)) && (
+                                            {((item?.priceRange?.min != null && item?.priceRange?.max != null) || (Array.isArray(item?.variants) && item.variants.length > 1)) && !item.isSale && (
                                                 <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest leading-none mb-1">Giá từ</span>
+                                            )}
+                                            {item.isSale && (
+                                                <span className="text-xs text-slate-400 line-through font-bold mb-1 opacity-70">
+                                                    {(item.originalPrice || (item.price * 2)).toLocaleString("vi-VN")}₫
+                                                </span>
                                             )}
                                             <span className="text-secondary font-black text-xl leading-none">
                                                 {getDisplayPrice(item)}

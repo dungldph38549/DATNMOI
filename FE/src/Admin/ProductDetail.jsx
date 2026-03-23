@@ -142,6 +142,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
   const [visible, setVisible] = useState(true);
   const [featured, setFeatured] = useState(false);
   const [hasVar, setHasVar] = useState(false);
+  const [isSale, setIsSale] = useState(false);
 
   const { data: productData } = useQuery({
     queryKey: ["admin-product-detail", productId],
@@ -225,8 +226,57 @@ const ProductDetail = ({ productId = null, onClose }) => {
       setHasVar(!!productData.hasVariants);
       setVisible(productData.isVisible ?? true);
       setFeatured(productData.isFeatured ?? false);
+      setIsSale(productData.isSale ?? false);
     }
   }, [productData, form]);
+ 
+  const handleValuesChange = (changedValues, allValues) => {
+    const { isSale, originalPrice, discountPercentage, price, hasVariants, variants } = allValues;
+    
+    const isOriginalPriceChanged = changedValues.hasOwnProperty("originalPrice");
+    const isDiscountChanged = changedValues.hasOwnProperty("discountPercentage");
+    const isPriceChanged = changedValues.hasOwnProperty("price");
+    const isSaleToggled = changedValues.hasOwnProperty("isSale");
+    const isVariantsChanged = changedValues.hasOwnProperty("variants");
+
+    if (isSale) {
+      if (isOriginalPriceChanged || isDiscountChanged || (isSaleToggled && isSale)) {
+        // Tính Giá bán từ Giá gốc & % Giảm giá
+        if (originalPrice && discountPercentage) {
+          const newPrice = Math.round(originalPrice * (1 - discountPercentage / 100));
+          form.setFieldValue("price", newPrice);
+          if (hasVariants && Array.isArray(variants)) {
+            form.setFieldValue("variants", variants.map(v => ({ ...v, price: newPrice })));
+          }
+        }
+      } else if (isPriceChanged && originalPrice > 0) {
+        // Tính % Giảm giá từ Giá gốc & Giá bán (cho phép 1 chữ số thập phân để chính xác hơn)
+        const newDiscount = Math.round(((originalPrice - price) / originalPrice) * 1000) / 10;
+        form.setFieldValue("discountPercentage", newDiscount > 0 ? newDiscount : 0);
+        
+        // Đồng bộ giá này xuống các biến thể
+        if (hasVariants && Array.isArray(variants)) {
+          form.setFieldValue("variants", variants.map(v => ({ ...v, price: price })));
+        }
+      } else if (isVariantsChanged && hasVariants && Array.isArray(variants)) {
+        // Biến thể mới thêm vào sẽ lấy giá hiện tại
+        const currentTargetPrice = price || (originalPrice && discountPercentage ? Math.round(originalPrice * (1 - discountPercentage / 100)) : originalPrice);
+        const hasEmptyPrice = variants.some(v => v.price === undefined || v.price === null || v.price === "");
+        if (hasEmptyPrice) {
+          form.setFieldValue("variants", variants.map(v => ({
+            ...v,
+            price: (v.price === undefined || v.price === null || v.price === "") ? currentTargetPrice : v.price
+          })));
+        }
+      }
+    } else if (isSaleToggled && !isSale && originalPrice) {
+      // Khi tắt Sale -> Khôi phục giá bán = giá gốc
+      form.setFieldValue("price", originalPrice);
+      if (hasVariants && Array.isArray(variants)) {
+        form.setFieldValue("variants", variants.map(v => ({ ...v, price: originalPrice })));
+      }
+    }
+  };
 
   const handleMainUpload = async (file) => {
     const fd = new FormData();
@@ -258,6 +308,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
       hasVariants: hasVar,
       isVisible: visible,
       isFeatured: featured,
+      isSale: isSale,
       srcImages: form.getFieldValue("srcImages"),
     };
 
@@ -429,6 +480,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
           layout="vertical"
           onFinish={onFinish}
           onFinishFailed={onFinishFailed}
+          onValuesChange={handleValuesChange}
           initialValues={{ hasVariants: false, variants: [], attributes: [] }}
         >
           <div
@@ -535,7 +587,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                       }}
                     >
                       <div>
-                        <FieldLabel>Giá (₫)</FieldLabel>
+                      <FieldLabel>Giá bán thực tế (₫)</FieldLabel>
                         <Form.Item
                           name="price"
                           // Backend validate: price phải > 0 (không cho phép 0)
@@ -581,6 +633,62 @@ const ProductDetail = ({ productId = null, onClose }) => {
                     </div>
                   )}
                 </div>
+              </SectionCard>
+
+              {/* Sale & Khuyến mãi */}
+              <SectionCard icon="tag" title="Sale & Khuyến mãi">
+                <div style={{ marginBottom: 20 }}>
+                  <Toggle
+                    checked={isSale}
+                    onChange={(v) => {
+                      setIsSale(v);
+                      form.setFieldValue("isSale", v);
+                    }}
+                    label="Kích hoạt Sale"
+                    sub="Hiển thị huy hiệu và giá khuyến mãi"
+                  />
+                </div>
+                {isSale && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <div style={{ marginBottom: 16 }}>
+                      <FieldLabel>Giá Niêm yết (Giá gốc - để gạch ngang)</FieldLabel>
+                      <Form.Item name="originalPrice">
+                        <InputNumber
+                          style={{ width: "100%" }}
+                          formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                          parser={(v) => v.replace(/\$\s?|(,*)/g, "")}
+                          placeholder="VD: 5,000,000"
+                        />
+                      </Form.Item>
+                    </div>
+                    <div style={{ marginBottom: 16 }}>
+                      <FieldLabel>% Giảm giá hiển thị (Vd: 50)</FieldLabel>
+                      <Form.Item name="discountPercentage">
+                        <InputNumber
+                          min={0}
+                          max={100}
+                          style={{ width: "100%" }}
+                          placeholder="VD: 50"
+                        />
+                      </Form.Item>
+                    </div>
+                  </div>
+                )}
+                <Form.Item shouldUpdate={(prev, curr) => prev.price !== curr.price || prev.originalPrice !== curr.originalPrice || prev.isSale !== curr.isSale}>
+                  {({ getFieldValue }) => {
+                    const s = getFieldValue("isSale");
+                    const p = getFieldValue("price");
+                    const op = getFieldValue("originalPrice");
+                    if (s && p && op && p > op) {
+                      return (
+                        <div style={{ color: "#ef4444", fontSize: 12, fontWeight: "bold", marginTop: -12, marginBottom: 16 }}>
+                          ⚠️ Lưu ý: Giá bán ({p.toLocaleString()}đ) đang cao hơn Giá gốc ({op.toLocaleString()}đ). Bạn nên kiểm tra lại.
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                </Form.Item>
               </SectionCard>
 
               {/* Biến thể */}

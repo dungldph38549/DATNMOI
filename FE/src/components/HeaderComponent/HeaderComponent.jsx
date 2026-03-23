@@ -169,7 +169,7 @@ const Header = () => {
             <li><Link to="/product?category=nike" className="hover:text-primary transition-colors">Nike</Link></li>
             <li><Link to="/product?category=adidas" className="hover:text-primary transition-colors">Adidas</Link></li>
             <li><Link to="/product?category=puma" className="hover:text-primary transition-colors">Puma</Link></li>
-            <li><span className="text-secondary hover:text-pink-600 transition-colors cursor-pointer flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-secondary animate-ping"></span> Sale up to 50%</span></li>
+            <li><Link to="/sale" className="text-secondary hover:text-pink-600 transition-colors cursor-pointer flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-secondary animate-ping"></span> Sale up to 50%</Link></li>
           </ul>
         </div>
       </div>

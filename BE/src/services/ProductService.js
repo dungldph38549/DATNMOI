@@ -140,6 +140,9 @@ const createProduct = async (newProduct) => {
     style,
     isVisible,
     isFeatured,
+    isSale,
+    discountPercentage,
+    originalPrice,
     tags,
   } = newProduct;
 
@@ -172,6 +175,9 @@ const createProduct = async (newProduct) => {
     style: style || "",
     isVisible: isVisible !== false,
     isFeatured: !!isFeatured,
+    isSale: !!isSale,
+    discountPercentage: toNum(discountPercentage),
+    originalPrice: toNum(originalPrice),
     tags: Array.isArray(tags) ? tags : [],
     attributes: Array.isArray(attributes) ? attributes : [],
   };
@@ -216,6 +222,9 @@ const updateProduct = async (productId, updateData) => {
     style,
     isVisible,
     isFeatured,
+    isSale,
+    discountPercentage,
+    originalPrice,
     tags,
   } = updateData;
 
@@ -232,6 +241,9 @@ const updateProduct = async (productId, updateData) => {
   if (style !== undefined) payload.style = style;
   if (isVisible !== undefined) payload.isVisible = isVisible;
   if (isFeatured !== undefined) payload.isFeatured = isFeatured;
+  if (isSale !== undefined) payload.isSale = isSale;
+  if (discountPercentage !== undefined) payload.discountPercentage = toNum(discountPercentage);
+  if (originalPrice !== undefined) payload.originalPrice = toNum(originalPrice);
   if (hasVariants !== undefined) payload.hasVariants = !!hasVariants;
   if (Array.isArray(srcImages)) payload.srcImages = srcImages;
   if (Array.isArray(tags)) payload.tags = tags;
@@ -289,8 +301,12 @@ const getProducts = async (
   page = 0,
   filter = {},
   sort = "newest",
+  isSale = undefined,
 ) => {
   const query = { isDeleted: { $ne: true } };
+  if (isSale !== undefined) {
+    query.isSale = isSale === true || isSale === "true";
+  }
 
   if (filter.brandId) query.brandId = filter.brandId;
   if (filter.categoryId) query.categoryId = filter.categoryId;

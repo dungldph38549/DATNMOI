@@ -142,6 +142,14 @@ const Product = ({ product }) => {
             </div>
           )}
 
+          {product.isSale && (
+            <div className="absolute top-3 left-3 z-10 flex flex-col gap-2">
+              <span className="bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-lg shadow-red-500/30 animate-pulse">
+                {product.discountPercentage ? `-${product.discountPercentage}% OFF` : "-50% OFF"}
+              </span>
+            </div>
+          )}
+
           {/* QUICK VIEW ICON (Centered) */}
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 z-20 translate-y-4 group-hover:translate-y-0">
             <button
@@ -189,18 +197,25 @@ const Product = ({ product }) => {
           {/* PRICE SECTON (Flexible height to keep buttons aligned) */}
           <div className="mb-5 flex-1 flex flex-col justify-end">
             <div className="flex flex-wrap items-baseline gap-1.5">
-              {hasVariants && minPrice !== maxPrice ? (
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest leading-none mb-1">Giá từ</span>
-                  <span className="text-primary font-black text-lg leading-none">
-                    {minPrice.toLocaleString("vi-VN")}₫
+              <div className="flex flex-col">
+                {product.isSale && (
+                  <span className="text-xs text-slate-400 line-through font-bold mb-1 opacity-70">
+                    {(product.originalPrice || (product.price * 2)).toLocaleString("vi-VN")}₫
                   </span>
-                </div>
-              ) : (
-                <span className="text-primary font-black text-xl leading-none">
-                  {(product.price ?? minPrice ?? 0).toLocaleString("vi-VN")}₫
-                </span>
-              )}
+                )}
+                {hasVariants && minPrice !== maxPrice ? (
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest leading-none mb-1">Giá từ</span>
+                    <span className="text-primary font-black text-lg leading-none">
+                      {minPrice.toLocaleString("vi-VN")}₫
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-primary font-black text-xl leading-none">
+                    {(product.price ?? minPrice ?? 0).toLocaleString("vi-VN")}₫
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 

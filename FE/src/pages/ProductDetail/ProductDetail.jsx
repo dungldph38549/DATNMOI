@@ -289,7 +289,12 @@ const ProductDetail = () => {
                 alt={product.name}
               />
               {product.isNew && (
-                <span className="absolute top-6 left-6 bg-primary text-white text-xs font-bold px-4 py-2 rounded-full uppercase tracking-wider backdrop-blur-md shadow-lg">New Arrival</span>
+                <span className="absolute top-6 left-6 bg-primary text-white text-xs font-bold px-4 py-2 rounded-full uppercase tracking-wider backdrop-blur-md shadow-lg z-10">New Arrival</span>
+              )}
+              {product.isSale && (
+                <span className="absolute top-6 right-6 bg-red-600 text-white text-xs font-bold px-4 py-2 rounded-full uppercase tracking-wider backdrop-blur-md shadow-lg z-10 animate-bounce">
+                  {product.discountPercentage ? `-${product.discountPercentage}% OFF` : "SALE"}
+                </span>
               )}
             </div>
 
@@ -321,10 +326,22 @@ const ProductDetail = () => {
               <span className="text-slate-500 font-medium">{product.soldCount || ratingTotal} Đã Bán</span>
             </div>
 
-            <div className="mb-8 p-6 bg-slate-50 rounded-2xl border border-slate-100">
-              <p className="text-4xl md:text-5xl font-black text-primary mb-2">
-                {Number(displayPrice).toLocaleString("vi-VN")}₫
-              </p>
+            <div className="mb-8 p-6 bg-slate-50 rounded-2xl border border-slate-100 relative overflow-hidden">
+              <div className="flex flex-col gap-1">
+                {product.isSale && (
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="text-xl text-slate-400 line-through font-bold opacity-70">
+                      {(product.originalPrice || (displayPrice * 2)).toLocaleString("vi-VN")}₫
+                    </span>
+                    <span className="bg-red-100 text-red-600 text-[10px] font-black px-2 py-1 rounded-md uppercase">
+                      Giảm {product.discountPercentage || 50}%
+                    </span>
+                  </div>
+                )}
+                <p className="text-4xl md:text-5xl font-black text-primary mb-2">
+                  {Number(displayPrice).toLocaleString("vi-VN")}₫
+                </p>
+              </div>
               <div className="flex items-center gap-2 text-green-600 font-bold text-sm bg-green-100/50 w-fit px-3 py-1.5 rounded-lg">
                 <FaCheckCircle /> Còn hàng
               </div>
@@ -564,10 +581,24 @@ const ProductDetail = () => {
                     <div className="aspect-square bg-slate-50 rounded-2xl mb-4 overflow-hidden flex items-center justify-center p-2 relative">
                       <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity z-10"></div>
                       <img src={getImage(img)} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      {p.isSale && (
+                        <div className="absolute top-2 left-2 z-10">
+                          <span className="bg-red-600 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                            -{p.discountPercentage || 50}%
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-800 line-clamp-1 group-hover:text-primary transition-colors mb-2">{p.name}</h3>
-                      <p className="font-black text-secondary">{Number(price).toLocaleString("vi-VN")}₫</p>
+                      <div className="flex flex-col gap-0.5">
+                        {p.isSale && (
+                          <span className="text-[10px] text-slate-400 line-through font-bold opacity-70">
+                            {(p.originalPrice || (price * 2)).toLocaleString("vi-VN")}₫
+                          </span>
+                        )}
+                        <p className="font-black text-secondary">{Number(price).toLocaleString("vi-VN")}₫</p>
+                      </div>
                     </div>
                   </Link>
                 );

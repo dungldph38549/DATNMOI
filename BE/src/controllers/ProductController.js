@@ -43,6 +43,7 @@ exports.getProducts = async (req, res) => {
       maxPrice,
       sizes,
       colors,
+      isSale,
     } = req.body;
 
     const filter = {};
@@ -64,6 +65,7 @@ exports.getProducts = async (req, res) => {
       Number(page) || 0,
       filter,
       sort, // newest | price_asc | price_desc | best_seller | rating
+      isSale,
     );
     res.json(products);
   } catch (err) {
