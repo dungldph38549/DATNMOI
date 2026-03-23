@@ -68,6 +68,7 @@ function CheckOutPage() {
         sku: item.sku == null ? null : String(item.sku).trim().toUpperCase(),
       }));
 
+      const baseUrl = window.location.origin;
       const orderPayload = {
         ...(userId ? { userId } : {}),
         ...(guestId ? { guestId } : {}),
@@ -83,22 +84,39 @@ function CheckOutPage() {
         discount: 0,
         shippingFee,
         totalAmount: totalPrice,
+        ...(paymentMethod === "ONLINE"
+          ? {
+              vnpReturnUrl: `${baseUrl}/payment/return`,
+              vnpCancelUrl: `${baseUrl}/checkoutpage`,
+            }
+          : {}),
       };
 
       const order = await createOrder(orderPayload);
 
       if (order?.paymentMethod === "vnpay" && order?._id) {
-        const baseUrl = window.location.origin;
-        const { url } = await createVnpayUrl(
-          order._id,
-          `${baseUrl}/payment/return`,
-          `${baseUrl}/checkoutpage`,
-        );
-        if (url) {
+        let payUrl = order.vnpayPaymentUrl;
+        if (!payUrl) {
+          const { url } = await createVnpayUrl(
+            order._id,
+            `${baseUrl}/payment/return`,
+            `${baseUrl}/checkoutpage`,
+          );
+          payUrl = url;
+        }
+        if (payUrl) {
           dispatch(clearCart());
-          window.location.href = url;
+          window.location.href = payUrl;
           return;
         }
+        if (order.vnpayBuildError) {
+          alert(order.vnpayBuildError);
+          return;
+        }
+        alert(
+          "Không nhận được link thanh toán VNPay. Kiểm tra backend và .env (BE_URL, VNP_TMN_CODE).",
+        );
+        return;
       }
 
       // Best-effort update profile

@@ -132,14 +132,21 @@ const CheckOut = () => {
         sku: item.sku == null ? null : String(item.sku).trim().toUpperCase(),
       }));
 
+      const baseUrl = window.location.origin;
       const orderPayload = {
         ...(userId ? { userId } : {}),
         ...(guestId ? { guestId } : {}),
         fullName: form.fullName, email: form.email, phone: form.phone, address: form.address,
-        paymentMethod: paymentMethod === "VNPay" ? "vnpay" : "cod",
+        paymentMethod: paymentMethod === "vnpay" ? "vnpay" : "cod",
         shippingMethod: shippingMethod === "fast" ? "fast" : "standard",
         products, discount, voucherCode: voucherCode.trim() || null,
         shippingFee: shipping, totalAmount: total,
+        ...(paymentMethod === "vnpay"
+          ? {
+              vnpReturnUrl: `${baseUrl}/payment/return`,
+              vnpCancelUrl: `${baseUrl}/checkout`,
+            }
+          : {}),
       };
 
       const order = await createOrder(orderPayload);
@@ -153,13 +160,28 @@ const CheckOut = () => {
       };
 
       if (order?.paymentMethod === "vnpay" && order?._id) {
-        const baseUrl = window.location.origin;
-        const { url } = await createVnpayUrl(order._id, `${baseUrl}/payment/return`, `${baseUrl}/checkout`);
-        if (url) {
+        let payUrl = order.vnpayPaymentUrl;
+        if (!payUrl) {
+          const { url } = await createVnpayUrl(
+            order._id,
+            `${baseUrl}/payment/return`,
+            `${baseUrl}/checkout`,
+          );
+          payUrl = url;
+        }
+        if (payUrl) {
           persistCheckoutInfo(); await updateProfileIfLoggedIn();
           dispatch(removeManyFromCart(checkoutItems.map((i) => i.cartKey || i.productId)));
-          window.location.href = url; return;
+          window.location.href = payUrl; return;
         }
+        if (order.vnpayBuildError) {
+          alert(order.vnpayBuildError);
+          return;
+        }
+        alert(
+          "Không nhận được link thanh toán VNPay. Kiểm tra backend (log lỗi), biến BE_URL / VNP_TMN_CODE trong .env.",
+        );
+        return;
       }
 
       dispatch(removeManyFromCart(checkoutItems.map((i) => i.cartKey || i.productId)));
