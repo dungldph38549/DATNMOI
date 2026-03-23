@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FaShoppingCart, FaSearch, FaUser, FaClipboardList, FaChevronDown } from "react-icons/fa";
+import { FaShoppingCart, FaSearch, FaUser, FaClipboardList, FaChevronDown, FaHeart } from "react-icons/fa";
 import { useSelector, useDispatch } from "react-redux";
 import { clearUser } from "../../redux/user";
 
@@ -9,6 +9,7 @@ const Header = () => {
   const dispatch = useDispatch();
 
   const cart = useSelector((state) => state.cart.items || []);
+  const wishlist = useSelector((state) => state.wishlist.items || []);
   const user = useSelector((state) => state.user);
   const isLoggedIn = !!(user?.login && user?.token);
 
@@ -97,11 +98,18 @@ const Header = () => {
           {/* ACTION BUTTONS (Gọn gàng, 1 dòng) */}
           <div className="flex items-center gap-2 md:gap-4">
 
+            {/* WISHLIST BUTTON */}
+            <Link to="/wishlist" className="flex items-center gap-2 cursor-pointer group px-3 md:px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors relative">
+              <FaHeart size={20} className="text-slate-700 group-hover:text-red-500 transition-colors" />
+              {wishlist.length > 0 && (
+                <span className="absolute top-1 left-6 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                  {wishlist.length}
+                </span>
+              )}
+              <span className="hidden lg:block text-sm font-bold text-slate-700 group-hover:text-red-500 transition-colors">Yêu thích</span>
+            </Link>
+
             {/* ORDERS BUTTON */}
-            <div onClick={goOrders} className="flex items-center gap-2 cursor-pointer group px-3 md:px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
-              <FaClipboardList size={20} className="text-slate-700 group-hover:text-primary transition-colors" />
-              <span className="hidden lg:block text-sm font-bold text-slate-700 group-hover:text-primary transition-colors">Đơn hàng</span>
-            </div>
 
             {/* CART BUTTON */}
             <div onClick={goCart} className="flex items-center gap-2 cursor-pointer group px-3 md:px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors relative">

@@ -132,7 +132,7 @@ const SideItem = ({ item, active, onClick }) => (
       borderRadius: 12,
       border: "none",
       cursor: "pointer",
-      fontFamily: "'Lexend', sans-serif",
+      fontFamily: "'Plus Jakarta Sans', sans-serif",
       transition: "all 0.15s",
       background: active ? T.primaryBg : "transparent",
       color: active ? T.primary : T.textMid,
@@ -304,7 +304,7 @@ const AdminPage = () => {
           justifyContent: "center",
           height: "100vh",
           background: T.bg,
-          fontFamily: "'Lexend', sans-serif",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
         }}
       >
         <div style={{ textAlign: "center" }}>
@@ -338,7 +338,6 @@ const AdminPage = () => {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
         .material-symbols-outlined {
           font-family: 'Material Symbols Outlined';
@@ -347,7 +346,7 @@ const AdminPage = () => {
           white-space: nowrap; font-size: 24px;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Lexend', sans-serif; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
         ::-webkit-scrollbar       { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 99px; }
@@ -361,7 +360,7 @@ const AdminPage = () => {
           display: "flex",
           minHeight: "100vh",
           background: T.bg,
-          fontFamily: "'Lexend', sans-serif",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
           position: "relative",
         }}
       >
@@ -633,7 +632,7 @@ const AdminPage = () => {
                 color: T.textMid,
                 fontSize: 13,
                 fontWeight: 500,
-                fontFamily: "'Lexend', sans-serif",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
                 transition: "all 0.15s",
               }}
               onMouseEnter={(e) => {

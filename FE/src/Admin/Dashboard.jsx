@@ -182,7 +182,7 @@ const CustomTooltip = ({ active, payload, label, type }) => {
         borderRadius: 10,
         padding: "10px 14px",
         boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-        fontFamily: "'Lexend', sans-serif",
+        fontFamily: "'Plus Jakarta Sans', sans-serif",
         fontSize: 12,
       }}
     >
@@ -293,7 +293,7 @@ const Dashboard = () => {
           justifyContent: "center",
           height: 320,
           gap: 14,
-          fontFamily: "'Lexend', sans-serif",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
         }}
       >
         <div
@@ -317,14 +317,13 @@ const Dashboard = () => {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
         .material-symbols-outlined { font-family:'Material Symbols Outlined'; font-style:normal; line-height:1; text-transform:none; display:inline-block; white-space:nowrap; }
         @keyframes fadeIn { from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)} }
         @keyframes spin   { to{transform:rotate(360deg)} }
-        .sh-dash { font-family:'Lexend',sans-serif; background:${T.bg}; padding:28px; animation:fadeIn 0.2s ease; }
+        .sh-dash { font-family:'Plus Jakarta Sans',sans-serif; background:${T.bg}; padding:28px; animation:fadeIn 0.2s ease; }
         .sh-tr:hover td { background:#FFFBF5 !important; }
-        .ant-picker { border-radius:10px !important; font-family:'Lexend',sans-serif !important; border:1.5px solid ${T.border} !important; }
+        .ant-picker { border-radius:10px !important; font-family:'Plus Jakarta Sans',sans-serif !important; border:1.5px solid ${T.border} !important; }
         .ant-picker:hover,.ant-picker-focused { border-color:${T.primary} !important; box-shadow:0 0 0 3px rgba(244,157,37,0.10) !important; }
         .recharts-cartesian-grid-horizontal line, .recharts-cartesian-grid-vertical line { stroke: #F1F5F9; }
         .recharts-tooltip-wrapper { outline:none; }
@@ -412,7 +411,7 @@ const Dashboard = () => {
             }}
             format="DD/MM/YYYY"
             allowClear={false}
-            style={{ fontFamily: "'Lexend', sans-serif" }}
+            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
           />
         </div>
 
@@ -463,7 +462,7 @@ const Dashboard = () => {
                   <XAxis
                     dataKey="name"
                     tick={{
-                      fontFamily: "'Lexend'",
+                      fontFamily: "'Plus Jakarta Sans'",
                       fontSize: 11,
                       fill: T.textMuted,
                     }}
@@ -473,7 +472,7 @@ const Dashboard = () => {
                   <YAxis
                     tickFormatter={(v) => `${(v / 1_000_000).toFixed(1)}M`}
                     tick={{
-                      fontFamily: "'Lexend'",
+                      fontFamily: "'Plus Jakarta Sans'",
                       fontSize: 11,
                       fill: T.textMuted,
                     }}
@@ -528,7 +527,7 @@ const Dashboard = () => {
                   <XAxis
                     dataKey="name"
                     tick={{
-                      fontFamily: "'Lexend'",
+                      fontFamily: "'Plus Jakarta Sans'",
                       fontSize: 11,
                       fill: T.textMuted,
                     }}
@@ -537,7 +536,7 @@ const Dashboard = () => {
                   />
                   <YAxis
                     tick={{
-                      fontFamily: "'Lexend'",
+                      fontFamily: "'Plus Jakarta Sans'",
                       fontSize: 11,
                       fill: T.textMuted,
                     }}

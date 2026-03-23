@@ -93,7 +93,7 @@
 //           width: "100%",
 //           maxWidth: 420,
 //           padding: "28px 28px 24px",
-//           fontFamily: "'Lexend', sans-serif",
+//           fontFamily: "'Plus Jakarta Sans', sans-serif",
 //           animation: "slideUp 0.2s ease",
 //         }}
 //       >
@@ -164,7 +164,7 @@
 //           width: "100%",
 //           maxWidth: 360,
 //           padding: 28,
-//           fontFamily: "'Lexend', sans-serif",
+//           fontFamily: "'Plus Jakarta Sans', sans-serif",
 //           animation: "slideUp 0.15s ease",
 //           textAlign: "center",
 //         }}
@@ -223,7 +223,7 @@
 //               fontWeight: 600,
 //               fontSize: 13,
 //               cursor: "pointer",
-//               fontFamily: "'Lexend',sans-serif",
+//               fontFamily: "'Plus Jakarta Sans',sans-serif",
 //             }}
 //           >
 //             Huỷ
@@ -241,7 +241,7 @@
 //               fontWeight: 700,
 //               fontSize: 13,
 //               cursor: "pointer",
-//               fontFamily: "'Lexend',sans-serif",
+//               fontFamily: "'Plus Jakarta Sans',sans-serif",
 //               opacity: loading ? 0.7 : 1,
 //             }}
 //           >
@@ -268,7 +268,7 @@
 //     border: `1.5px solid ${T.border}`,
 //     outline: "none",
 //     fontSize: 13,
-//     fontFamily: "'Lexend',sans-serif",
+//     fontFamily: "'Plus Jakarta Sans',sans-serif",
 //     background: "#F8FAFC",
 //     boxSizing: "border-box",
 //     color: T.text,
@@ -400,7 +400,7 @@
 //           fontWeight: 700,
 //           fontSize: 13,
 //           cursor: "pointer",
-//           fontFamily: "'Lexend',sans-serif",
+//           fontFamily: "'Plus Jakarta Sans',sans-serif",
 //           boxShadow: "0 4px 14px rgba(244,157,37,0.28)",
 //           opacity: loading ? 0.7 : 1,
 //           marginTop: 4,
@@ -526,7 +526,7 @@
 //           justifyContent: "center",
 //           height: 300,
 //           gap: 12,
-//           fontFamily: "'Lexend',sans-serif",
+//           fontFamily: "'Plus Jakarta Sans',sans-serif",
 //         }}
 //       >
 //         <div
@@ -556,7 +556,7 @@
 //           height: 240,
 //           gap: 8,
 //           color: T.textMuted,
-//           fontFamily: "'Lexend',sans-serif",
+//           fontFamily: "'Plus Jakarta Sans',sans-serif",
 //         }}
 //       >
 //         <span
@@ -575,7 +575,6 @@
 //   return (
 //     <>
 //       <style>{`
-//         @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
 //         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
 //         .material-symbols-outlined{font-family:'Material Symbols Outlined';font-style:normal;line-height:1;display:inline-block;white-space:nowrap;}
 //         @keyframes spin    { to{transform:rotate(360deg)} }
@@ -589,7 +588,7 @@
 //       <div
 //         style={{
 //           padding: 28,
-//           fontFamily: "'Lexend',sans-serif",
+//           fontFamily: "'Plus Jakarta Sans',sans-serif",
 //           background: T.bg,
 //           minHeight: "100vh",
 //         }}
@@ -669,7 +668,7 @@
 //               fontWeight: 700,
 //               fontSize: 13,
 //               cursor: "pointer",
-//               fontFamily: "'Lexend',sans-serif",
+//               fontFamily: "'Plus Jakarta Sans',sans-serif",
 //               boxShadow: "0 4px 16px rgba(244,157,37,0.30)",
 //             }}
 //           >
@@ -724,7 +723,7 @@
 //                 background: "#F1F5F9",
 //                 fontSize: 13,
 //                 color: T.text,
-//                 fontFamily: "'Lexend',sans-serif",
+//                 fontFamily: "'Plus Jakarta Sans',sans-serif",
 //                 boxSizing: "border-box",
 //               }}
 //             />
@@ -746,7 +745,7 @@
 //                   fontSize: 13,
 //                   fontWeight: 500,
 //                   cursor: "pointer",
-//                   fontFamily: "'Lexend',sans-serif",
+//                   fontFamily: "'Plus Jakarta Sans',sans-serif",
 //                   whiteSpace: "nowrap",
 //                 }}
 //               >
@@ -1191,7 +1190,7 @@ const SHModal = ({ open, title, onClose, children }) => {
           width: "100%",
           maxWidth: 420,
           padding: "28px 28px 24px",
-          fontFamily: "'Lexend', sans-serif",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
           animation: "slideUp 0.2s ease",
         }}
       >
@@ -1253,7 +1252,7 @@ const CategoryFormBody = ({
     border: `1.5px solid ${T.border}`,
     outline: "none",
     fontSize: 13,
-    fontFamily: "'Lexend',sans-serif",
+    fontFamily: "'Plus Jakarta Sans',sans-serif",
     background: "#F8FAFC",
     boxSizing: "border-box",
     color: T.text,
@@ -1385,7 +1384,7 @@ const CategoryFormBody = ({
           fontWeight: 700,
           fontSize: 13,
           cursor: "pointer",
-          fontFamily: "'Lexend',sans-serif",
+          fontFamily: "'Plus Jakarta Sans',sans-serif",
           boxShadow: "0 4px 14px rgba(244,157,37,0.28)",
           opacity: loading ? 0.7 : 1,
           marginTop: 4,
@@ -1496,7 +1495,6 @@ export default function Categories() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
         .material-symbols-outlined{font-family:'Material Symbols Outlined';font-style:normal;line-height:1;display:inline-block;white-space:nowrap;}
         @keyframes spin    { to{transform:rotate(360deg)} }
@@ -1510,7 +1508,7 @@ export default function Categories() {
       <div
         style={{
           padding: 28,
-          fontFamily: "'Lexend',sans-serif",
+          fontFamily: "'Plus Jakarta Sans',sans-serif",
           background: T.bg,
           minHeight: "100vh",
         }}
@@ -1591,7 +1589,7 @@ export default function Categories() {
               fontWeight: 700,
               fontSize: 13,
               cursor: "pointer",
-              fontFamily: "'Lexend',sans-serif",
+              fontFamily: "'Plus Jakarta Sans',sans-serif",
               boxShadow: "0 4px 16px rgba(244,157,37,0.30)",
             }}
           >
@@ -1646,7 +1644,7 @@ export default function Categories() {
                 background: "#F1F5F9",
                 fontSize: 13,
                 color: T.text,
-                fontFamily: "'Lexend',sans-serif",
+                fontFamily: "'Plus Jakarta Sans',sans-serif",
                 boxSizing: "border-box",
               }}
             />
@@ -1669,7 +1667,7 @@ export default function Categories() {
                   fontSize: 13,
                   fontWeight: 500,
                   cursor: "pointer",
-                  fontFamily: "'Lexend',sans-serif",
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
                   whiteSpace: "nowrap",
                 }}
               >

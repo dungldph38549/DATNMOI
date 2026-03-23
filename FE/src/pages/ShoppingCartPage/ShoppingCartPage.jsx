@@ -137,12 +137,12 @@ const ShoppingCartPage = () => {
   };
 
   const formatMoney = (v) => `${Number(v || 0).toLocaleString("vi-VN")}đ`;
-  const PLACEHOLDER_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='28' font-family='Arial'>No Image</text></svg>";
+  const PLACEHOLDER_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='28' font-family='Plus Jakarta Sans'>No Image</text></svg>";
 
   const getImageUrl = (img) => {
     if (!img || typeof img !== "string") return PLACEHOLDER_IMG;
     if (img.startsWith("http")) return img;
-    return `http://localhost:3002/${img.startsWith("/") ? img.slice(1) : img}`;
+    return `http://localhost:3002/uploads/${img.startsWith("/") ? img.slice(1) : img}`;
   };
 
   return (
@@ -218,7 +218,7 @@ const ShoppingCartPage = () => {
                             <svg className="absolute w-3.5 h-3.5 text-white scale-0 peer-checked:scale-100 transition-transform pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                           </div>
                           <Link to={`/product/${item.productId}`} className="w-24 h-24 sm:w-32 sm:h-32 bg-slate-50 rounded-xl overflow-hidden border border-slate-100 shrink-0 group">
-                            <img src={getImageUrl(item.image)} alt={item.name} onError={(e) => { e.target.src = PLACEHOLDER_IMG; }} className="w-full h-full object-cover mix-blend-multiply group-hover:scale-110 transition-transform duration-500" />
+                            <img src={getImageUrl(item.image)} alt={item.name} onError={(e) => { e.target.src = PLACEHOLDER_IMG; }} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                           </Link>
                         </div>
 
