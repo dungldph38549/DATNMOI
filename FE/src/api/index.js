@@ -524,6 +524,28 @@ export const getVoucherByCode = async (code) => {
   );
 };
 
+// ================== Size API ==================
+
+export const getAllSizes = async () => {
+  const res = await axiosInstance.get("/size/get-all");
+  return res.data;
+};
+
+export const createSize = async (payload) => {
+  const res = await axiosInstance.post("/size/create", payload);
+  return res.data;
+};
+
+export const updateSize = async (id, payload) => {
+  const res = await axiosInstance.put(`/size/update/${id}`, payload);
+  return res.data;
+};
+
+export const deleteSize = async (id) => {
+  const res = await axiosInstance.delete(`/size/delete/${id}`);
+  return res.data;
+};
+
 // ================== Review API (Customer) ==================
 /**
  * GET /api/reviews

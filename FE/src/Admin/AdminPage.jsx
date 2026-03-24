@@ -7,6 +7,7 @@ import Brands from "./Brands";
 import Dashboard from "./Dashboard";
 import Users from "./Users";
 import Vouchers from "./Vouchers";
+import Sizes from "./Sizes";
 import InventoryDashboard from "./Inventorydashboard";
 import Reviews from "./Reviews";
 // import OrderReturn from "./OrderReturn";
@@ -17,7 +18,8 @@ import { clearUser } from "../redux/user";
 
 const getAdminSession = () => {
   try {
-    const raw = localStorage.getItem("admin_v1") || localStorage.getItem("admin");
+    const raw =
+      localStorage.getItem("admin_v1") || localStorage.getItem("admin");
     if (!raw) return null;
     return JSON.parse(raw);
   } catch {
@@ -78,6 +80,12 @@ const MENU = [
     icon: "confirmation_number",
     label: "Voucher",
     desc: "Mã giảm giá & khuyến mãi",
+  },
+  {
+    key: "sizes",
+    icon: "straighten",
+    label: "Size",
+    desc: "Danh sách size cho biến thể",
   },
   {
     key: "categories",
@@ -255,6 +263,8 @@ const AdminPage = () => {
         return <Users />;
       case "vouchers":
         return <Vouchers />;
+      case "sizes":
+        return <Sizes />;
       case "brands":
         return <Brands />;
       case "categories":

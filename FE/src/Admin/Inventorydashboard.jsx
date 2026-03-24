@@ -373,9 +373,16 @@ const CreateInventoryModal = ({ onClose, onDone }) => {
 
   const [form, setForm] = useState({
     productId: "",
+    variantId: "",
     sku: "",
     lowStockThreshold: 10,
   });
+
+  const selectedProduct = products.find((p) => p._id === form.productId);
+  const hasVariants =
+    !!selectedProduct?.hasVariants &&
+    Array.isArray(selectedProduct?.variants) &&
+    selectedProduct.variants.length > 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -405,10 +412,12 @@ const CreateInventoryModal = ({ onClose, onDone }) => {
 
   const submit = async () => {
     if (!form.productId || !form.sku.trim()) return;
+    if (hasVariants && !form.variantId) return;
     setLoading(true);
     try {
       await createInventory({
         productId: form.productId,
+        variantId: hasVariants ? form.variantId : undefined,
         sku: form.sku.trim().toUpperCase(),
         lowStockThreshold: Number(form.lowStockThreshold) || 10,
       });
@@ -437,9 +446,20 @@ const CreateInventoryModal = ({ onClose, onDone }) => {
           <Select
             label="Sản phẩm *"
             value={form.productId}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, productId: e.target.value }))
-            }
+            onChange={(e) => {
+              const productId = e.target.value;
+              const product = products.find((p) => p._id === productId);
+              const firstVariant =
+                product?.hasVariants && Array.isArray(product?.variants)
+                  ? product.variants[0]
+                  : null;
+              setForm((f) => ({
+                ...f,
+                productId,
+                variantId: firstVariant?._id || "",
+                sku: firstVariant?.sku || "",
+              }));
+            }}
           >
             <option value="" disabled>
               Chọn sản phẩm
@@ -451,12 +471,47 @@ const CreateInventoryModal = ({ onClose, onDone }) => {
             ))}
           </Select>
 
+          {hasVariants && (
+            <Select
+              label="Biến thể *"
+              value={form.variantId}
+              onChange={(e) => {
+                const variantId = e.target.value;
+                const variant = selectedProduct?.variants?.find(
+                  (v) => v._id === variantId,
+                );
+                setForm((f) => ({
+                  ...f,
+                  variantId,
+                  sku: variant?.sku || "",
+                }));
+              }}
+            >
+              <option value="" disabled>
+                Chọn biến thể
+              </option>
+              {selectedProduct?.variants?.map((v) => {
+                const attrs = v?.attributes
+                  ? Object.entries(v.attributes)
+                      .map(([k, val]) => `${k}: ${val}`)
+                      .join(" · ")
+                  : "";
+                return (
+                  <option key={v._id} value={v._id}>
+                    {v.sku} {attrs ? `(${attrs})` : ""}
+                  </option>
+                );
+              })}
+            </Select>
+          )}
+
           <Input
             label="SKU *"
             type="text"
             value={form.sku}
             onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
             placeholder="VD: NIKE-RED-42"
+            disabled={hasVariants}
           />
 
           <Input
