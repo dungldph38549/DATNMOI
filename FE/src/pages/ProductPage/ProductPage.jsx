@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Product from "../../components/Product/Product";
-import { fetchProducts, getVoucherByCode } from "../../api";
+import { fetchProducts, getReviewStatsByProduct, getVoucherByCode } from "../../api";
 import { FaFilter, FaTimes } from "react-icons/fa";
 import BackButton from "../../components/Common/BackButton";
 
@@ -13,6 +13,7 @@ const ProductPage = () => {
   const [loading, setLoading] = useState(false);
   const [voucherScope, setVoucherScope] = useState(null);
   const [voucherLoading, setVoucherLoading] = useState(false);
+  const [reviewStatsByProductId, setReviewStatsByProductId] = useState({});
 
   const [sort, setSort] = useState("");
   const [price, setPrice] = useState("");
@@ -59,6 +60,41 @@ const ProductPage = () => {
     };
   }, [location.search]);
 
+  useEffect(() => {
+    const ids = (Array.isArray(products) ? products : [])
+      .map((p) => String(p?._id || ""))
+      .filter(Boolean);
+    if (!ids.length) {
+      setReviewStatsByProductId({});
+      return;
+    }
+
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const statsList = await Promise.all(
+          ids.map(async (id) => {
+            try {
+              const res = await getReviewStatsByProduct(id);
+              const stats = res?.data ?? res ?? {};
+              return [id, stats];
+            } catch {
+              return [id, { average: 0, total: 0 }];
+            }
+          }),
+        );
+        if (cancelled) return;
+        setReviewStatsByProductId(Object.fromEntries(statsList));
+      } catch {
+        if (!cancelled) setReviewStatsByProductId({});
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
     let data = [...products];
     const applicableIds = Array.isArray(voucherScope?.applicableProductIds)
@@ -79,20 +115,34 @@ const ProductPage = () => {
       return 0;
     };
 
+    const getProductRating = (p) => {
+      const id = String(p?._id || "");
+      const stats = id ? reviewStatsByProductId[id] : null;
+      const fromStats = Number(stats?.average);
+      if (Number.isFinite(fromStats)) return fromStats;
+      const fromProduct = Number(p?.rating);
+      if (Number.isFinite(fromProduct)) return fromProduct;
+      return 0;
+    };
+
     if (price === "low") data = data.filter((p) => getMinPrice(p) < 500000);
     if (price === "mid") data = data.filter((p) => getMinPrice(p) >= 500000 && getMinPrice(p) <= 2000000);
     if (price === "high") data = data.filter((p) => getMinPrice(p) > 2000000);
 
-    if (rating === "4") data = data.filter((p) => p.rating >= 4);
-    if (rating === "3") data = data.filter((p) => p.rating >= 3);
+    if (rating === "4") data = data.filter((p) => getProductRating(p) >= 4);
+    if (rating === "3") data = data.filter((p) => getProductRating(p) >= 3);
 
     if (sort === "priceAsc") data.sort((a, b) => getMinPrice(a) - getMinPrice(b));
     if (sort === "priceDesc") data.sort((a, b) => getMinPrice(b) - getMinPrice(a));
-    if (sort === "rating") data.sort((a, b) => b.rating - a.rating);
+    if (sort === "rating") data.sort((a, b) => getProductRating(b) - getProductRating(a));
     if (sort === "new") data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return data;
-  }, [products, price, rating, sort, voucherScope]);
+  }, [products, price, rating, sort, voucherScope, reviewStatsByProductId]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [price, rating, sort, voucherScope]);
 
   const totalPage = Math.ceil(filteredProducts.length / PAGE_SIZE);
   const showProducts = filteredProducts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -101,6 +151,14 @@ const ProductPage = () => {
     setPrice("");
     setRating("");
     setSort("");
+  };
+
+  const togglePriceFilter = (nextValue) => {
+    setPrice((prev) => (prev === nextValue ? "" : nextValue));
+  };
+
+  const toggleRatingFilter = (nextValue) => {
+    setRating((prev) => (prev === nextValue ? "" : nextValue));
   };
 
   return (
@@ -193,7 +251,8 @@ const ProductPage = () => {
                         name="price"
                         className="peer appearance-none w-5 h-5 border-2 border-slate-300 rounded-full checked:border-primary transition-colors cursor-pointer"
                         checked={price === item.id}
-                        onChange={() => setPrice(item.id)}
+                        onClick={() => togglePriceFilter(item.id)}
+                        onChange={() => {}}
                       />
                       <div className="absolute w-2.5 h-2.5 bg-primary rounded-full opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none"></div>
                     </div>
@@ -221,7 +280,8 @@ const ProductPage = () => {
                         name="rating"
                         className="peer appearance-none w-5 h-5 border-2 border-slate-300 rounded-[4px] checked:border-primary checked:bg-primary transition-colors cursor-pointer"
                         checked={rating === item.id}
-                        onChange={() => setRating(item.id)}
+                        onClick={() => toggleRatingFilter(item.id)}
+                        onChange={() => {}}
                       />
                       <FaFilter className="absolute text-white scale-0 peer-checked:scale-75 transition-transform pointer-events-none" size={10} />
                     </div>
