@@ -561,6 +561,14 @@ export const getProductReviews = async ({
 };
 
 /**
+ * GET /api/reviews/stats/:productId
+ */
+export const getReviewStatsByProduct = async (productId) => {
+  const res = await axiosInstance.get(`/reviews/stats/${productId}`);
+  return res.data;
+};
+
+/**
  * POST /api/reviews
  * Body: { productId, rating, title, content, images, orderId? }
  */
