@@ -11,6 +11,7 @@ import {
   uploadImages,
   getAllBrands,
   getAllCategories,
+  getAllSizes,
 } from "./../api/index";
 
 // Backend đang chạy tại 3002. Nếu build/ENV bị lệch (vẫn còn 3001), ảnh sẽ request sai port và lỗi ERR_CONNECTION_REFUSED.
@@ -133,6 +134,13 @@ const inputStyle = {
   boxSizing: "border-box",
 };
 
+const normalizeAttr = (v) =>
+  String(v || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
 // ================================================================
 // ProductDetail — Card only (no Sidebar / header / layout wrapper)
 // ================================================================
@@ -158,6 +166,11 @@ const ProductDetail = ({ productId = null, onClose }) => {
   const { data: categories } = useQuery({
     queryKey: ["admin-categories"],
     queryFn: () => getAllCategories("all"),
+    keepPreviousData: true,
+  });
+  const { data: sizes } = useQuery({
+    queryKey: ["admin-sizes"],
+    queryFn: getAllSizes,
     keepPreviousData: true,
   });
 
@@ -625,6 +638,17 @@ const ProductDetail = ({ productId = null, onClose }) => {
                           mode="tags"
                           placeholder="VD: Color, Size"
                           style={{ width: "100%" }}
+                          tokenSeparators={[","]}
+                          onChange={(vals) => {
+                            const normalized = (vals || [])
+                              .flatMap((v) => String(v).split(","))
+                              .map((v) => v.trim())
+                              .filter(Boolean);
+                            form.setFieldValue(
+                              "attributes",
+                              Array.from(new Set(normalized)),
+                            );
+                          }}
                         />
                       </Form.Item>
                     </div>
@@ -634,6 +658,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                     >
                       {({ getFieldValue }) => {
                         const attributes = getFieldValue("attributes") || [];
+                        const sizeOptions = sizes?.data || [];
                         return (
                           <Form.List name="variants">
                             {(fields, { add, remove }) => (
@@ -784,16 +809,37 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                                 ]}
                                                 rules={[{ required: true }]}
                                               >
-                                                <input
-                                                  className="sneaker-input"
-                                                  style={{
-                                                    ...inputStyle,
-                                                    padding: "6px 10px",
-                                                    fontSize: 12,
-                                                    width: 90,
-                                                  }}
-                                                  placeholder={attr}
-                                                />
+                                                {[
+                                                  "size",
+                                                  "kich thuoc",
+                                                  "kích thước",
+                                                ].some((k) =>
+                                                  normalizeAttr(attr).includes(
+                                                    normalizeAttr(k),
+                                                  ),
+                                                ) ? (
+                                                  <Select
+                                                    placeholder="Chọn size"
+                                                    style={{ width: 120 }}
+                                                    options={sizeOptions.map(
+                                                      (s) => ({
+                                                        value: s.name,
+                                                        label: s.name,
+                                                      }),
+                                                    )}
+                                                  />
+                                                ) : (
+                                                  <input
+                                                    className="sneaker-input"
+                                                    style={{
+                                                      ...inputStyle,
+                                                      padding: "6px 10px",
+                                                      fontSize: 12,
+                                                      width: 90,
+                                                    }}
+                                                    placeholder={attr}
+                                                  />
+                                                )}
                                               </Form.Item>
                                             </td>
                                           ))}
