@@ -23,14 +23,18 @@ function getReviewImageSrc(img) {
 
 export default function Reviews() {
   const queryClient = useQueryClient();
+  const [statusFilter, setStatusFilter] = useState("pending");
 
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [selectedReviewId, setSelectedReviewId] = useState(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-reviews", "pending"],
-    queryFn: () => getAdminReviews({ status: "pending" }),
+    queryKey: ["admin-reviews", statusFilter],
+    queryFn: () =>
+      getAdminReviews({
+        status: statusFilter === "all" ? undefined : statusFilter,
+      }),
   });
 
   const reviews = useMemo(() => data?.reviews ?? [], [data]);
@@ -39,7 +43,7 @@ export default function Reviews() {
     mutationFn: (id) => approveAdminReview(id),
     onSuccess: () => {
       message.success("Đã duyệt review");
-      queryClient.invalidateQueries({ queryKey: ["admin-reviews", "pending"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-reviews"] });
     },
     onError: (err) => {
       message.error(err?.response?.data?.message || "Lỗi duyệt review");
@@ -50,7 +54,7 @@ export default function Reviews() {
     mutationFn: ({ id, reason }) => rejectAdminReview(id, reason),
     onSuccess: () => {
       message.success("Đã từ chối review");
-      queryClient.invalidateQueries({ queryKey: ["admin-reviews", "pending"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-reviews"] });
       setRejectModalOpen(false);
       setSelectedReviewId(null);
       setRejectReason("");
@@ -124,8 +128,24 @@ export default function Reviews() {
               <div style={{ color: "#94A3B8", fontSize: 12 }}>Không có ảnh</div>
             )}
           </div>
+          {r.status === "rejected" && r.rejectedReason && (
+            <div style={{ marginTop: 8, color: "#DC2626", fontSize: 12 }}>
+              Lý do từ chối: {r.rejectedReason}
+            </div>
+          )}
         </div>
       ),
+    },
+    {
+      title: "Trạng thái",
+      dataIndex: "status",
+      key: "status",
+      width: 120,
+      render: (v) => {
+        if (v === "approved") return <Tag color="green">Đã duyệt</Tag>;
+        if (v === "rejected") return <Tag color="red">Đã từ chối</Tag>;
+        return <Tag color="gold">Chờ duyệt</Tag>;
+      },
     },
     {
       title: "Verified",
@@ -147,12 +167,16 @@ export default function Reviews() {
       width: 180,
       render: (_, r) => (
         <div style={{ display: "flex", gap: 8 }}>
-          <Button size="small" onClick={() => approveMutation.mutate(r._id)} loading={approveMutation.isPending}>
-            Duyệt
-          </Button>
-          <Button danger size="small" onClick={() => openReject(r._id)}>
-            Từ chối
-          </Button>
+          {r.status !== "approved" && (
+            <Button size="small" onClick={() => approveMutation.mutate(r._id)} loading={approveMutation.isPending}>
+              Duyệt
+            </Button>
+          )}
+          {r.status !== "rejected" && (
+            <Button danger size="small" onClick={() => openReject(r._id)}>
+              Từ chối
+            </Button>
+          )}
         </div>
       ),
     },
@@ -162,7 +186,20 @@ export default function Reviews() {
     <div style={{ padding: 24 }}>
       <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 style={{ margin: 0 }}>Quản lý đánh giá</h2>
-        <Tag color="gold">Chờ duyệt</Tag>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button type={statusFilter === "all" ? "primary" : "default"} onClick={() => setStatusFilter("all")}>
+            Tất cả
+          </Button>
+          <Button type={statusFilter === "pending" ? "primary" : "default"} onClick={() => setStatusFilter("pending")}>
+            Chờ duyệt
+          </Button>
+          <Button type={statusFilter === "approved" ? "primary" : "default"} onClick={() => setStatusFilter("approved")}>
+            Đã duyệt
+          </Button>
+          <Button type={statusFilter === "rejected" ? "primary" : "default"} onClick={() => setStatusFilter("rejected")}>
+            Đã từ chối
+          </Button>
+        </div>
       </div>
 
       <Table rowKey="_id" loading={isLoading} dataSource={reviews} columns={columns} />

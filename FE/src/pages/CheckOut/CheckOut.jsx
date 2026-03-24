@@ -1,8 +1,9 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   addToCart,
+  removeBuyNowItems,
   removeManyFromCart,
   removeFromCart,
 } from "../../redux/cart/cartSlice";
@@ -14,13 +15,31 @@ import {
   updateCustomerById,
 } from "../../api";
 import { FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaCreditCard, FaTruck, FaMoneyBillWave, FaShieldAlt } from "react-icons/fa";
+import BackButton from "../../components/Common/BackButton";
+
+const VIETNAM_LOCATION_API = "https://provinces.open-api.vn/api";
 
 const CheckOut = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
 
-  const items = useSelector((state) => state.cart.items);
+  const allItems = useSelector((state) => state.cart.items);
+  const items = useMemo(
+    () =>
+      (allItems || []).filter(
+        (item) =>
+          !String(item?.cartKey || "").includes("::BUY_NOW::"),
+      ),
+    [allItems],
+  );
+  const buyNowItems = useMemo(
+    () =>
+      (allItems || []).filter((item) =>
+        String(item?.cartKey || "").includes("::BUY_NOW::"),
+      ),
+    [allItems],
+  );
   const user = useSelector((state) => state.user);
 
   const selectedItemKeys = useMemo(() => {
@@ -31,16 +50,56 @@ const CheckOut = () => {
   }, [location?.state?.selectedItemKeys, location?.state?.selectedItemIds]);
 
   const selectedIdSet = useMemo(() => new Set(selectedItemKeys.map((id) => String(id))), [selectedItemKeys]);
+  const buyNowStateItem = useMemo(() => {
+    const item = location?.state?.buyNowItem;
+    if (!item) return null;
+    return {
+      ...item,
+      qty: Number(item.qty || 1),
+      price: Number(item.price || 0),
+      originalPrice:
+        item.originalPrice == null ? null : Number(item.originalPrice),
+    };
+  }, [location?.state?.buyNowItem]);
 
   const checkoutItems = useMemo(() => {
     if (selectedIdSet.size === 0) return items;
-    return items.filter((item) => {
+    const source = [...items, ...buyNowItems];
+    const selected = source.filter((item) => {
       const lineKey = item.cartKey || item.productId;
       return selectedIdSet.has(String(lineKey));
     });
-  }, [items, selectedIdSet]);
+    if (selected.length === 0 && buyNowStateItem) return [buyNowStateItem];
+    return selected;
+  }, [items, buyNowItems, selectedIdSet, buyNowStateItem]);
+  const buyNowSelectedKeys = useMemo(
+    () =>
+      selectedItemKeys.filter((key) =>
+        String(key || "").includes("::BUY_NOW::"),
+      ),
+    [selectedItemKeys],
+  );
+  const hasPlacedOrderRef = useRef(false);
 
   const subtotal = useMemo(() => checkoutItems.reduce((sum, i) => sum + Number(i.qty || 0) * Number(i.price || 0), 0), [checkoutItems]);
+
+  useEffect(() => {
+    // Dọn item BUY_NOW rác từ phiên trước (không nằm trong checkout hiện tại)
+    const selectedSet = new Set(buyNowSelectedKeys.map((k) => String(k)));
+    const staleKeys = buyNowItems
+      .map((i) => String(i.cartKey || ""))
+      .filter((k) => !selectedSet.has(k));
+    if (staleKeys.length > 0) dispatch(removeBuyNowItems(staleKeys));
+  }, [buyNowItems, buyNowSelectedKeys, dispatch]);
+
+  useEffect(() => {
+    // Nếu rời trang checkout khi chưa đặt thành công thì xóa item BUY_NOW của phiên hiện tại
+    return () => {
+      if (!hasPlacedOrderRef.current && buyNowSelectedKeys.length > 0) {
+        dispatch(removeBuyNowItems(buyNowSelectedKeys));
+      }
+    };
+  }, [buyNowSelectedKeys, dispatch]);
 
   const LAST_CHECKOUT_KEY = "last_checkout_v1";
   const safeJsonParse = (raw) => { try { return JSON.parse(raw); } catch { return null; } };
@@ -54,13 +113,27 @@ const CheckOut = () => {
   const [discount, setDiscount] = useState(0);
   const [voucherChecking, setVoucherChecking] = useState(false);
   const [voucherError, setVoucherError] = useState("");
+  const [appliedVoucher, setAppliedVoucher] = useState(null);
+  const [collectedVoucherCodes, setCollectedVoucherCodes] = useState([]);
 
   const [form, setForm] = useState({
     fullName: lastCheckout?.fullName ?? "",
     email: lastCheckout?.email ?? "",
     phone: lastCheckout?.phone ?? "",
     address: lastCheckout?.address ?? "",
-    note: lastCheckout?.note ?? "",
+    note: "",
+  });
+  const [streetAddress, setStreetAddress] = useState(lastCheckout?.streetAddress ?? "");
+  const [selectedProvinceCode, setSelectedProvinceCode] = useState(lastCheckout?.provinceCode ? String(lastCheckout.provinceCode) : "");
+  const [selectedDistrictCode, setSelectedDistrictCode] = useState(lastCheckout?.districtCode ? String(lastCheckout.districtCode) : "");
+  const [selectedWardCode, setSelectedWardCode] = useState(lastCheckout?.wardCode ? String(lastCheckout.wardCode) : "");
+  const [provinces, setProvinces] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [wards, setWards] = useState([]);
+  const [addressLoading, setAddressLoading] = useState({
+    province: false,
+    district: false,
+    ward: false,
   });
 
   useEffect(() => {
@@ -71,44 +144,248 @@ const CheckOut = () => {
   }, [user]);
 
   useEffect(() => {
-    const code = voucherCode.trim();
-    if (!code) { setDiscount(0); setVoucherError(""); return; }
-
     let cancelled = false;
-    const timer = setTimeout(async () => {
+    const loadProvinces = async () => {
       try {
-        setVoucherChecking(true);
-        const voucher = await getVoucherByCode(code);
-        if (cancelled) return;
-
-        if (!voucher) { setDiscount(0); setVoucherError("Mã giảm giá không hợp lệ"); return; }
-        const now = new Date();
-        const start = voucher.startDate ? new Date(voucher.startDate) : null;
-        const end = voucher.endDate ? new Date(voucher.endDate) : null;
-        const statusOk = voucher.status === "active";
-        const timeOk = (!start || now >= start) && (!end || now <= end);
-        const minOk = subtotal >= (voucher.minOrderValue ?? 0);
-        const usageLimit = voucher.usageLimit ?? 0;
-        const usedCount = voucher.usedCount ?? 0;
-        const usageOk = usageLimit === 0 || usedCount < usageLimit;
-
-        if (!statusOk) { setDiscount(0); setVoucherError("Mã không hoạt động"); return; }
-        if (!timeOk) { setDiscount(0); setVoucherError("Mã đã hết hạn"); return; }
-        if (!minOk) { setDiscount(0); setVoucherError(`Đơn tối thiểu ${Number(voucher.minOrderValue ?? 0).toLocaleString()}đ`); return; }
-        if (!usageOk) { setDiscount(0); setVoucherError("Mã đã hết lượt"); return; }
-
-        const rawDiscount = voucher.discountType === "fixed" ? Number(voucher.discountValue ?? 0) : (subtotal * Number(voucher.discountValue ?? 0)) / 100;
-        const discountAmount = Math.max(0, Math.min(subtotal, rawDiscount));
-        setDiscount(discountAmount); setVoucherError("");
-      } catch (e) {
-        if (cancelled) return;
-        setDiscount(0); setVoucherError("Lỗi kết nối kiểm tra mã.");
+        setAddressLoading((s) => ({ ...s, province: true }));
+        const res = await fetch(`${VIETNAM_LOCATION_API}/p/`);
+        const data = await res.json();
+        if (!cancelled) setProvinces(Array.isArray(data) ? data : []);
+      } catch {
+        if (!cancelled) setProvinces([]);
       } finally {
-        if (!cancelled) setVoucherChecking(false);
+        if (!cancelled) setAddressLoading((s) => ({ ...s, province: false }));
       }
-    }, 400);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [voucherCode, subtotal]);
+    };
+    loadProvinces();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadDistricts = async () => {
+      if (!selectedProvinceCode) {
+        setDistricts([]);
+        setWards([]);
+        setSelectedDistrictCode("");
+        setSelectedWardCode("");
+        return;
+      }
+      try {
+        setAddressLoading((s) => ({ ...s, district: true }));
+        const res = await fetch(`${VIETNAM_LOCATION_API}/p/${selectedProvinceCode}?depth=2`);
+        const data = await res.json();
+        if (!cancelled) {
+          const nextDistricts = Array.isArray(data?.districts) ? data.districts : [];
+          setDistricts(nextDistricts);
+          const hasDistrict = nextDistricts.some((d) => String(d.code) === String(selectedDistrictCode));
+          if (!hasDistrict) {
+            setSelectedDistrictCode("");
+            setSelectedWardCode("");
+            setWards([]);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setDistricts([]);
+          setSelectedDistrictCode("");
+          setSelectedWardCode("");
+          setWards([]);
+        }
+      } finally {
+        if (!cancelled) setAddressLoading((s) => ({ ...s, district: false }));
+      }
+    };
+    loadDistricts();
+    return () => { cancelled = true; };
+  }, [selectedProvinceCode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadWards = async () => {
+      if (!selectedDistrictCode) {
+        setWards([]);
+        setSelectedWardCode("");
+        return;
+      }
+      try {
+        setAddressLoading((s) => ({ ...s, ward: true }));
+        const res = await fetch(`${VIETNAM_LOCATION_API}/d/${selectedDistrictCode}?depth=2`);
+        const data = await res.json();
+        if (!cancelled) {
+          const nextWards = Array.isArray(data?.wards) ? data.wards : [];
+          setWards(nextWards);
+          const hasWard = nextWards.some((w) => String(w.code) === String(selectedWardCode));
+          if (!hasWard) setSelectedWardCode("");
+        }
+      } catch {
+        if (!cancelled) {
+          setWards([]);
+          setSelectedWardCode("");
+        }
+      } finally {
+        if (!cancelled) setAddressLoading((s) => ({ ...s, ward: false }));
+      }
+    };
+    loadWards();
+    return () => { cancelled = true; };
+  }, [selectedDistrictCode]);
+
+  const fullAddress = useMemo(() => {
+    const provinceName = provinces.find((p) => String(p.code) === String(selectedProvinceCode))?.name || "";
+    const districtName = districts.find((d) => String(d.code) === String(selectedDistrictCode))?.name || "";
+    const wardName = wards.find((w) => String(w.code) === String(selectedWardCode))?.name || "";
+    return [streetAddress.trim(), wardName, districtName, provinceName].filter(Boolean).join(", ");
+  }, [streetAddress, selectedProvinceCode, selectedDistrictCode, selectedWardCode, provinces, districts, wards]);
+
+  const getVoucherStorageKey = () => {
+    const identity = user?._id || user?.id || user?.email || "guest";
+    return `collected_vouchers_v1_${String(identity)}`;
+  };
+
+  const loadCollectedVoucherCodes = () => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(getVoucherStorageKey()) || "[]");
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map((code) => String(code || "").trim().toUpperCase()).filter(Boolean);
+    } catch {
+      return [];
+    }
+  };
+
+  useEffect(() => {
+    setCollectedVoucherCodes(loadCollectedVoucherCodes());
+  }, [user?._id, user?.id, user?.email]);
+
+  const validateVoucherWithSubtotal = (voucher, currentSubtotal, currentItems) => {
+    if (!voucher) return { ok: false, message: "Mã giảm giá không hợp lệ", amount: 0 };
+    const now = new Date();
+    const start = voucher.startDate ? new Date(voucher.startDate) : null;
+    const end = voucher.endDate ? new Date(voucher.endDate) : null;
+    const statusOk = voucher.status === "active";
+    const timeOk = (!start || now >= start) && (!end || now <= end);
+    const minOk = currentSubtotal >= Number(voucher.minOrderValue ?? 0);
+    const usageLimit = Number(voucher.usageLimit ?? 0);
+    const usedCount = Number(voucher.usedCount ?? 0);
+    const usageOk = usageLimit === 0 || usedCount < usageLimit;
+
+    if (!statusOk) return { ok: false, message: "Mã không hoạt động", amount: 0 };
+    if (!timeOk) return { ok: false, message: "Mã đã hết hạn", amount: 0 };
+    if (!minOk) {
+      return {
+        ok: false,
+        message: `Đơn tối thiểu ${Number(voucher.minOrderValue ?? 0).toLocaleString("vi-VN")}đ`,
+        amount: 0,
+      };
+    }
+    if (!usageOk) return { ok: false, message: "Mã đã hết lượt", amount: 0 };
+
+    const applicableIds = Array.isArray(voucher.applicableProductIds)
+      ? voucher.applicableProductIds.map((id) => String(id))
+      : [];
+    const hasProductScope = applicableIds.length > 0;
+    const eligibleSubtotal = hasProductScope
+      ? (currentItems || []).reduce((sum, item) => {
+          const pid = String(item?.productId || item?._id || "");
+          if (!applicableIds.includes(pid)) return sum;
+          return sum + Number(item?.qty || 0) * Number(item?.price || 0);
+        }, 0)
+      : currentSubtotal;
+    if (hasProductScope && eligibleSubtotal <= 0) {
+      return { ok: false, message: "Voucher này không áp dụng cho sản phẩm trong giỏ.", amount: 0 };
+    }
+
+    const rawDiscount =
+      voucher.discountType === "fixed"
+        ? Number(voucher.discountValue ?? 0)
+        : (eligibleSubtotal * Number(voucher.discountValue ?? 0)) / 100;
+    const amount = Math.max(0, Math.min(eligibleSubtotal, rawDiscount));
+    return { ok: true, message: "", amount };
+  };
+
+  const onApplyVoucher = async () => {
+    const normalizedCode = String(voucherCode || "").trim().toUpperCase();
+    if (!normalizedCode) {
+      setVoucherError("Vui lòng nhập mã giảm giá");
+      setAppliedVoucher(null);
+      setDiscount(0);
+      return;
+    }
+
+    const collectedSet = new Set(collectedVoucherCodes);
+    if (!collectedSet.has(normalizedCode)) {
+      setVoucherError("Bạn chưa thu thập mã này. Vào trang Voucher để thu thập trước.");
+      setAppliedVoucher(null);
+      setDiscount(0);
+      return;
+    }
+
+    try {
+      setVoucherChecking(true);
+      const voucher = await getVoucherByCode(normalizedCode);
+      const result = validateVoucherWithSubtotal(voucher, subtotal, checkoutItems);
+      if (!result.ok) {
+        setVoucherError(result.message);
+        setAppliedVoucher(null);
+        setDiscount(0);
+        return;
+      }
+      setVoucherCode(normalizedCode);
+      setAppliedVoucher(voucher);
+      setDiscount(result.amount);
+      setVoucherError("");
+      try { localStorage.removeItem("pending_checkout_voucher_v1"); } catch { }
+    } catch {
+      setVoucherError("Lỗi kết nối kiểm tra mã.");
+      setAppliedVoucher(null);
+      setDiscount(0);
+    } finally {
+      setVoucherChecking(false);
+    }
+  };
+
+  const onRemoveVoucher = () => {
+    setAppliedVoucher(null);
+    setDiscount(0);
+    setVoucherError("");
+  };
+
+  const onSelectCollectedVoucher = (code) => {
+    const normalizedCode = String(code || "").trim().toUpperCase();
+    if (!normalizedCode) return;
+    setVoucherCode(normalizedCode);
+    setVoucherError("");
+    if (appliedVoucher) {
+      setAppliedVoucher(null);
+      setDiscount(0);
+    }
+  };
+
+  useEffect(() => {
+    if (!appliedVoucher) return;
+    const result = validateVoucherWithSubtotal(appliedVoucher, subtotal, checkoutItems);
+    if (!result.ok) {
+      setAppliedVoucher(null);
+      setDiscount(0);
+      setVoucherError("Mã không còn hợp lệ với giỏ hàng hiện tại.");
+      return;
+    }
+    setDiscount(result.amount);
+  }, [subtotal, appliedVoucher, checkoutItems]);
+
+  useEffect(() => {
+    const queryVoucherCode = new URLSearchParams(location.search).get("voucher");
+    if (queryVoucherCode) {
+      setVoucherCode(String(queryVoucherCode).trim().toUpperCase());
+      return;
+    }
+    try {
+      const pending = localStorage.getItem("pending_checkout_voucher_v1");
+      if (pending) setVoucherCode(String(pending).trim().toUpperCase());
+    } catch {
+      // ignore localStorage read error
+    }
+  }, [location.search]);
 
   const shipping = useMemo(() => (shippingMethod === "fast" ? 30000 : 0), [shippingMethod]);
   const total = Math.max(0, subtotal + shipping - discount);
@@ -123,6 +400,10 @@ const CheckOut = () => {
     if (!userId && (!guestId || guestId.length < 6)) { alert("Không xác định được tài khoản. Vui lòng đăng nhập lại."); return; }
     if (checkoutItems.length === 0) { alert("Giỏ hàng trống"); return; }
     if (!form.email?.trim()) { alert("Vui lòng nhập email"); return; }
+    if (!selectedProvinceCode || !selectedDistrictCode || !selectedWardCode || !streetAddress.trim()) {
+      alert("Vui lòng chọn đầy đủ Tỉnh/Thành, Quận/Huyện, Phường/Xã và nhập số nhà, tên đường.");
+      return;
+    }
 
     try {
       setLoading(true);
@@ -136,10 +417,12 @@ const CheckOut = () => {
       const orderPayload = {
         ...(userId ? { userId } : {}),
         ...(guestId ? { guestId } : {}),
-        fullName: form.fullName, email: form.email, phone: form.phone, address: form.address,
+        fullName: form.fullName, email: form.email, phone: form.phone, address: fullAddress,
         paymentMethod: paymentMethod === "vnpay" ? "vnpay" : "cod",
         shippingMethod: shippingMethod === "fast" ? "fast" : "standard",
-        products, discount, voucherCode: voucherCode.trim() || null,
+        products,
+        discount,
+        voucherCode: appliedVoucher ? voucherCode.trim() : null,
         shippingFee: shipping, totalAmount: total,
         ...(paymentMethod === "vnpay"
           ? {
@@ -151,12 +434,28 @@ const CheckOut = () => {
 
       const order = await createOrder(orderPayload);
       const persistCheckoutInfo = () => {
-        try { localStorage.setItem(LAST_CHECKOUT_KEY, JSON.stringify({ ...form, shippingMethod, paymentMethod, voucherCode: voucherCode.trim() || null })); } catch { }
+        try {
+          localStorage.setItem(
+            LAST_CHECKOUT_KEY,
+            JSON.stringify({
+              ...form,
+              note: "",
+              address: fullAddress,
+              streetAddress: streetAddress.trim(),
+              provinceCode: selectedProvinceCode || null,
+              districtCode: selectedDistrictCode || null,
+              wardCode: selectedWardCode || null,
+              shippingMethod,
+              paymentMethod,
+              voucherCode: appliedVoucher ? voucherCode.trim() : null,
+            }),
+          );
+        } catch { }
       };
 
       const updateProfileIfLoggedIn = async () => {
         if (!isLoggedIn || !user?.id) return;
-        try { await updateCustomerById({ id: user.id, name: form.fullName, email: form.email, phone: form.phone, address: form.address }); } catch (err) { }
+        try { await updateCustomerById({ id: user.id, name: form.fullName, email: form.email, phone: form.phone, address: fullAddress }); } catch (err) { }
       };
 
       if (order?.paymentMethod === "vnpay" && order?._id) {
@@ -170,6 +469,7 @@ const CheckOut = () => {
           payUrl = url;
         }
         if (payUrl) {
+          hasPlacedOrderRef.current = true;
           persistCheckoutInfo(); await updateProfileIfLoggedIn();
           dispatch(removeManyFromCart(checkoutItems.map((i) => i.cartKey || i.productId)));
           window.location.href = payUrl; return;
@@ -184,6 +484,7 @@ const CheckOut = () => {
         return;
       }
 
+      hasPlacedOrderRef.current = true;
       dispatch(removeManyFromCart(checkoutItems.map((i) => i.cartKey || i.productId)));
       persistCheckoutInfo();
       await updateProfileIfLoggedIn();
@@ -260,6 +561,9 @@ const CheckOut = () => {
       </div>
 
       <div className="container mx-auto px-4 max-w-7xl">
+        <div className="mb-6">
+          <BackButton />
+        </div>
         <div className="flex flex-col lg:flex-row gap-10">
 
           {/* LEFT: CHECKOUT FORM */}
@@ -310,9 +614,62 @@ const CheckOut = () => {
 
                   <div>
                     <label className="block text-sm font-bold text-slate-600 mb-2">Địa chỉ nhận hàng *</label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <select
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 font-medium text-slate-700 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
+                        value={selectedProvinceCode}
+                        onChange={(e) => setSelectedProvinceCode(e.target.value)}
+                        required
+                        disabled={addressLoading.province}
+                      >
+                        <option value="">{addressLoading.province ? "Đang tải Tỉnh/Thành..." : "Chọn Tỉnh/Thành"}</option>
+                        {provinces.map((province) => (
+                          <option key={province.code} value={province.code}>
+                            {province.name}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 font-medium text-slate-700 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm disabled:bg-slate-100 disabled:text-slate-400"
+                        value={selectedDistrictCode}
+                        onChange={(e) => setSelectedDistrictCode(e.target.value)}
+                        required
+                        disabled={!selectedProvinceCode || addressLoading.district}
+                      >
+                        <option value="">
+                          {!selectedProvinceCode ? "Chọn Quận/Huyện" : addressLoading.district ? "Đang tải Quận/Huyện..." : "Chọn Quận/Huyện"}
+                        </option>
+                        {districts.map((district) => (
+                          <option key={district.code} value={district.code}>
+                            {district.name}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 font-medium text-slate-700 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm disabled:bg-slate-100 disabled:text-slate-400"
+                        value={selectedWardCode}
+                        onChange={(e) => setSelectedWardCode(e.target.value)}
+                        required
+                        disabled={!selectedDistrictCode || addressLoading.ward}
+                      >
+                        <option value="">
+                          {!selectedDistrictCode ? "Chọn Phường/Xã" : addressLoading.ward ? "Đang tải Phường/Xã..." : "Chọn Phường/Xã"}
+                        </option>
+                        {wards.map((ward) => (
+                          <option key={ward.code} value={ward.code}>
+                            {ward.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <div className="relative">
-                      <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 pl-12 font-medium text-slate-700 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
-                        value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} required placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" />
+                      <input
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 pl-12 font-medium text-slate-700 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
+                        value={streetAddress}
+                        onChange={(e) => setStreetAddress(e.target.value)}
+                        required
+                        placeholder="Địa chỉ cụ thể..."
+                      />
                       <FaMapMarkerAlt className="absolute left-4 top-[17px] text-slate-400" />
                     </div>
                   </div>
@@ -400,31 +757,83 @@ const CheckOut = () => {
                 </div>
               </div>
 
+            </form>
+          </div>
+
+          {/* RIGHT: ORDER SUMMARY */}
+          <div className="w-full lg:w-[40%] xl:w-[35%] lg:sticky lg:top-28">
+            <div className="space-y-6">
               {/* VOUCHER */}
-              <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100">
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
                 <h2 className="text-xl font-display font-black text-slate-800 mb-4 flex items-center gap-3">
                   <span className="text-xl">🎟️</span> Mã Khuyến Mãi
                 </h2>
+                <div className="mb-3">
+                  <label className="block text-sm font-bold text-slate-600 mb-2">Mã đã thu thập của tôi</label>
+                  <select
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 font-semibold text-slate-700 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
+                    value=""
+                    onChange={(e) => onSelectCollectedVoucher(e.target.value)}
+                    disabled={collectedVoucherCodes.length === 0}
+                  >
+                    <option value="">
+                      {collectedVoucherCodes.length === 0
+                        ? "Chưa có mã đã thu thập"
+                        : "Chọn nhanh mã đã thu thập"}
+                    </option>
+                    {collectedVoucherCodes.map((code) => (
+                      <option key={code} value={code}>
+                        {code}
+                      </option>
+                    ))}
+                  </select>
+                  {collectedVoucherCodes.length > 0 && (
+                    <p className="text-xs font-semibold text-slate-400 mt-2 ml-1">
+                      Chọn mã từ danh sách để điền nhanh, sau đó bấm "Áp dụng".
+                    </p>
+                  )}
+                </div>
                 <div className="relative">
                   <input
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-4 font-bold text-slate-700 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm uppercase tracking-wide"
                     placeholder="NHẬP MÃ GIẢM GIÁ (NẾU CÓ)"
-                    value={voucherCode} onChange={(e) => setVoucherCode(e.target.value)}
+                    value={voucherCode}
+                    onChange={(e) => {
+                      setVoucherCode(e.target.value);
+                      if (appliedVoucher) {
+                        setAppliedVoucher(null);
+                        setDiscount(0);
+                      }
+                      if (voucherError) setVoucherError("");
+                    }}
                   />
                   {voucherChecking && <span className="absolute right-5 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">Đang tìm...</span>}
                   {discount > 0 && !voucherChecking && (
                     <span className="absolute right-5 top-1/2 -translate-y-1/2 text-sm font-bold text-green-500 bg-green-50 px-3 py-1 rounded-lg">Áp dụng thành công!</span>
                   )}
                 </div>
+                <div className="mt-3 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={onApplyVoucher}
+                    disabled={voucherChecking || !voucherCode.trim()}
+                    className="h-11 px-5 rounded-xl bg-slate-900 text-white font-bold hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {voucherChecking ? "Đang kiểm tra..." : "Áp dụng"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onRemoveVoucher}
+                    disabled={!appliedVoucher && discount <= 0}
+                    className="h-11 px-5 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Bỏ mã
+                  </button>
+                </div>
                 {voucherError && <p className="text-sm font-bold text-red-500 mt-2 ml-1">{voucherError}</p>}
               </div>
 
-            </form>
-          </div>
-
-          {/* RIGHT: ORDER SUMMARY */}
-          <div className="w-full lg:w-[40%] xl:w-[35%] lg:sticky lg:top-28">
-            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col h-full max-h-[85vh]">
+              <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col h-full max-h-[85vh]">
               <h2 className="text-xl font-display font-black text-slate-800 mb-6">Chi Tiết Đơn Hàng</h2>
 
               {/* ORDER ITEMS */}
@@ -491,6 +900,7 @@ const CheckOut = () => {
                 </div>
               </div>
             </div>
+          </div>
           </div>
 
         </div>

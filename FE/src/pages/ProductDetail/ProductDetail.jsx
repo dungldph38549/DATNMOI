@@ -1,13 +1,15 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
 import {
-  addToCartAPI, createReview, getOrdersByUser, getProductById,
+  addToCartAPI, createReview, getMyReviewByProduct, getOrdersByUser, getProductById,
   getProductReviews, getStocks, relationProduct, uploadImages
 } from "../../api";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
-import { FaStar, FaShoppingCart, FaCheckCircle, FaShippingFast, FaShieldAlt, FaTimes, FaHeart, FaRegHeart } from "react-icons/fa";
+import { FaStar, FaShoppingCart, FaCheckCircle, FaShippingFast, FaShieldAlt, FaHeart, FaRegHeart } from "react-icons/fa";
+import { getProductPriceInfo } from "../../utils/pricing";
+import BackButton from "../../components/Common/BackButton";
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -27,6 +29,7 @@ const ProductDetail = () => {
   const [relatedLoading, setRelatedLoading] = useState(false);
 
   const [reviews, setReviews] = useState([]);
+  const [myReview, setMyReview] = useState(null);
   const [reviewStats, setReviewStats] = useState(null);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsReload, setReviewsReload] = useState(0);
@@ -37,6 +40,7 @@ const ProductDetail = () => {
   const [reviewFiles, setReviewFiles] = useState([]);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewSubmitError, setReviewSubmitError] = useState("");
+  const [reviewSubmitSuccess, setReviewSubmitSuccess] = useState("");
 
   const [checkingStock, setCheckingStock] = useState(false);
   const [stockInfo, setStockInfo] = useState(null);
@@ -56,7 +60,7 @@ const ProductDetail = () => {
     return `http://localhost:3002/uploads/${img.startsWith("/") ? img.slice(1) : img}`;
   };
 
-  const getVariantSizeValue = (variant) => {
+  const getVariantSizeValue = useCallback((variant) => {
     const attrs = variant?.attributes;
     if (!attrs) return null;
     if (typeof attrs.get === "function") return attrs.get("Size") ?? attrs.get("size") ?? attrs.get("SIZE") ?? null;
@@ -67,12 +71,12 @@ const ProductDetail = () => {
       if (foundKey) return attrs[foundKey];
     }
     return null;
-  };
+  }, []);
 
-  const getVariantSizeLabel = (variant) => {
+  const getVariantSizeLabel = useCallback((variant) => {
     const val = getVariantSizeValue(variant);
     return val != null ? String(val) : variant?.sku ?? "";
-  };
+  }, [getVariantSizeValue]);
 
   const hasVariants = Array.isArray(product?.variants) && product.variants.length > 0;
 
@@ -95,7 +99,7 @@ const ProductDetail = () => {
     if (!product || !hasVariants) return [];
     const labels = product.variants.map((v) => getVariantSizeLabel(v)).filter((s) => s != null && String(s).trim() !== "");
     return Array.from(new Set(labels.map((s) => String(s))));
-  }, [product, hasVariants]);
+  }, [product, hasVariants, getVariantSizeLabel]);
 
   const selectedVariant = useMemo(() => {
     if (!hasVariants || !selectedSize || !Array.isArray(product?.variants)) return null;
@@ -103,15 +107,23 @@ const ProductDetail = () => {
       const label = getVariantSizeLabel(v);
       return label != null && String(label) === String(selectedSize);
     }) ?? null;
-  }, [product, selectedSize, hasVariants]);
+  }, [product, selectedSize, hasVariants, getVariantSizeLabel]);
 
   const selectedSku = selectedVariant?.sku ?? null;
   const selectedSizeValue = getVariantSizeValue(selectedVariant) ?? null;
 
   const displayPrice = useMemo(() => {
     if (!product) return 0;
-    if (hasVariants) return selectedVariant?.price ?? product?.variants?.[0]?.price ?? 0;
-    return product.price ?? 0;
+    if (hasVariants) {
+      const selectedInfo = getProductPriceInfo(product, selectedVariant ?? product?.variants?.[0] ?? null);
+      return selectedInfo.effectivePrice;
+    }
+    return getProductPriceInfo(product).effectivePrice;
+  }, [product, selectedVariant, hasVariants]);
+  const selectedPriceInfo = useMemo(() => {
+    if (!product) return { originalPrice: 0, effectivePrice: 0, hasSale: false, discountPercent: 0 };
+    if (hasVariants) return getProductPriceInfo(product, selectedVariant ?? product?.variants?.[0] ?? null);
+    return getProductPriceInfo(product);
   }, [product, selectedVariant, hasVariants]);
 
   const ratingAverage = reviewStats?.average ?? product?.rating ?? 4.5;
@@ -128,7 +140,7 @@ const ProductDetail = () => {
     const firstInStock = product?.variants?.find((v) => (getVariantSizeLabel(v) ?? "").trim() !== "" && v?.stock > 0);
     const nextSize = firstInStock ? String(getVariantSizeLabel(firstInStock)) : availableSizes[0];
     setSelectedSize(nextSize);
-  }, [product, availableSizes, selectedSize, hasVariants]);
+  }, [product, availableSizes, selectedSize, hasVariants, getVariantSizeLabel]);
 
   useEffect(() => {
     const run = async () => {
@@ -172,12 +184,25 @@ const ProductDetail = () => {
       setReviewsLoading(true);
       try {
         const res = await getProductReviews({ productId: product._id, page: 1, limit: 10, sort: "newest" });
-        setReviews(res?.reviews ?? []);
+        const publicReviews = Array.isArray(res?.reviews) ? res.reviews : [];
+        let mine = null;
+        if (user?.login) {
+          try {
+            mine = await getMyReviewByProduct(product._id);
+          } catch (_) {
+            mine = null;
+          }
+        }
+        setMyReview(mine);
+        const mergedReviews = mine
+          ? [mine, ...publicReviews.filter((r) => String(r?._id) !== String(mine?._id))]
+          : publicReviews;
+        setReviews(mergedReviews);
         setReviewStats(res?.stats ?? null);
-      } catch (err) { setReviews([]); setReviewStats(null); } finally { setReviewsLoading(false); }
+      } catch (err) { setReviews([]); setMyReview(null); setReviewStats(null); } finally { setReviewsLoading(false); }
     };
     run();
-  }, [product, reviewsReload]);
+  }, [product, reviewsReload, user?.login]);
 
   const handleAddToCart = async () => {
     if (!product) return false;
@@ -196,7 +221,9 @@ const ProductDetail = () => {
 
     dispatch(addToCart({
       productId: product._id, name: product.name, image: product.image,
-      price: displayPrice, qty: qtySafe, sku: skuToSave, size: sizeToSave
+      price: displayPrice,
+      originalPrice: Number(selectedPriceInfo.originalPrice || displayPrice),
+      qty: qtySafe, sku: skuToSave, size: sizeToSave
     }));
 
     try {
@@ -207,15 +234,62 @@ const ProductDetail = () => {
     return true;
   };
 
+  const buildBuyNowCartKey = () => {
+    const baseSku = hasVariants ? (selectedSku || "NO-SKU") : "default";
+    return `${String(product?._id || "unknown")}::BUY_NOW::${String(baseSku)}::${Date.now()}`;
+  };
+
   const handleToggleWishlist = () => {
     if (!product) return;
     dispatch(toggleWishlist(product));
   };
 
   const handleBuyNow = async () => {
-    const added = await handleAddToCart();
-    if (!added) return;
-    navigate("/checkout");
+    if (!product) return;
+    const sizeToSave = hasVariants ? selectedSizeValue : null;
+    const skuToSave = hasVariants ? selectedSku : null;
+
+    if (hasVariants && !skuToSave) {
+      alert("Vui lòng chọn size!");
+      return;
+    }
+    if (stockInfo?.available === false) {
+      alert("Sản phẩm hiện đã hết hàng theo size đã chọn.");
+      return;
+    }
+
+    const qtySafe = (() => {
+      if (!stockInfo?.available) return quantity;
+      const max = Number(stockInfo?.countInStock ?? 0);
+      if (!Number.isFinite(max) || max <= 0) return quantity;
+      return Math.min(quantity, max);
+    })();
+
+    const buyNowCartKey = buildBuyNowCartKey();
+    const buyNowItem = {
+      cartKey: buyNowCartKey,
+      productId: product._id,
+      name: product.name,
+      image: product.image,
+      price: displayPrice,
+      originalPrice: Number(selectedPriceInfo.originalPrice || displayPrice),
+      qty: qtySafe,
+      sku: skuToSave,
+      size: sizeToSave,
+    };
+    dispatch(
+      addToCart({
+        ...buyNowItem,
+        noMerge: true,
+      }),
+    );
+
+    navigate("/checkout", {
+      state: {
+        selectedItemKeys: [buyNowCartKey],
+        buyNowItem,
+      },
+    });
   };
 
   const handleSelectReviewFiles = (e) => {
@@ -234,6 +308,7 @@ const ProductDetail = () => {
 
     setReviewSubmitting(true);
     setReviewSubmitError("");
+    setReviewSubmitSuccess("");
     try {
       let orderId = null;
       const ordersResp = await getOrdersByUser(user.id, 1, 20);
@@ -252,6 +327,7 @@ const ProductDetail = () => {
 
       await createReview({ productId: product._id, rating: reviewRating, title: reviewTitle.trim() || null, content: reviewContent.trim() || null, images, orderId });
       setReviewRating(0); setReviewTitle(""); setReviewContent(""); setReviewFiles([]); setReviewsReload((x) => x + 1);
+      setReviewSubmitSuccess("Đã gửi đánh giá thành công. Đánh giá sẽ hiển thị sau khi được duyệt.");
     } catch (err) {
       setReviewSubmitError(err?.response?.data?.message || err?.message || "Không thể gửi review");
     } finally {
@@ -277,6 +353,9 @@ const ProductDetail = () => {
   return (
     <div className="bg-background-light min-h-screen font-body pb-20 pt-24">
       <div className="container mx-auto px-4 max-w-7xl">
+        <div className="mb-6">
+          <BackButton />
+        </div>
         <div className="flex flex-col lg:flex-row gap-12 mb-20 bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-slate-100">
 
           {/* LEFT: IMAGES */}
@@ -322,6 +401,11 @@ const ProductDetail = () => {
             </div>
 
             <div className="mb-8 p-6 bg-slate-50 rounded-2xl border border-slate-100">
+              {selectedPriceInfo.hasSale && (
+                <p className="text-slate-400 line-through font-bold text-lg mb-1">
+                  {Number(selectedPriceInfo.originalPrice).toLocaleString("vi-VN")}₫
+                </p>
+              )}
               <p className="text-4xl md:text-5xl font-black text-primary mb-2">
                 {Number(displayPrice).toLocaleString("vi-VN")}₫
               </p>
@@ -472,6 +556,7 @@ const ProductDetail = () => {
                     ) : (
                       <div>
                         {reviewSubmitError && <p className="text-red-500 bg-red-50 p-3 rounded-lg font-medium mb-4">{reviewSubmitError}</p>}
+                        {reviewSubmitSuccess && <p className="text-green-700 bg-green-50 p-3 rounded-lg font-medium mb-4">{reviewSubmitSuccess}</p>}
                         <div className="flex items-center gap-4 mb-4">
                           <span className="font-bold text-slate-700">Đánh giá của bạn:</span>
                           <div className="flex gap-2">
@@ -516,6 +601,11 @@ const ProductDetail = () => {
                                 <div className="flex text-secondary text-sm">
                                   {[...Array(5)].map((_, i) => <FaStar key={i} className={i < r.rating ? "opacity-100" : "opacity-30"} />)}
                                 </div>
+                                {String(r?._id) === String(myReview?._id) && (
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-sm ${r?.status === "approved" ? "bg-green-100 text-green-700" : r?.status === "rejected" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                                    {r?.status === "approved" ? "Đã duyệt" : r?.status === "rejected" ? "Bị từ chối" : "Chờ duyệt"}
+                                  </span>
+                                )}
                                 {r.verifiedPurchase && <span className="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-sm">Đã mua</span>}
                               </div>
                             </div>
@@ -558,7 +648,7 @@ const ProductDetail = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               {relatedProducts?.slice(0, 4)?.map((p) => {
                 const img = p?.image || p?.srcImages?.[0] || "";
-                const price = p?.price ?? p?.variants?.[0]?.price ?? 0;
+                const priceInfo = getProductPriceInfo(p);
                 return (
                   <Link key={p._id} to={`/product/${p._id}`} className="group bg-white rounded-3xl border border-slate-100 p-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
                     <div className="aspect-square bg-slate-50 rounded-2xl mb-4 overflow-hidden flex items-center justify-center p-2 relative">
@@ -567,7 +657,10 @@ const ProductDetail = () => {
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-800 line-clamp-1 group-hover:text-primary transition-colors mb-2">{p.name}</h3>
-                      <p className="font-black text-secondary">{Number(price).toLocaleString("vi-VN")}₫</p>
+                      <div>
+                        {priceInfo.hasSale && <p className="text-xs text-slate-400 line-through">{Number(priceInfo.originalPrice).toLocaleString("vi-VN")}₫</p>}
+                        <p className="font-black text-secondary">{Number(priceInfo.effectivePrice).toLocaleString("vi-VN")}₫</p>
+                      </div>
                     </div>
                   </Link>
                 );

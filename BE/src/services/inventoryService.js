@@ -3,9 +3,9 @@
 // Toàn bộ business logic tồn kho — controller gọi vào đây
 // ================================================================
 const Inventory = require("../models/Inventory");
-const mongoose = require("mongoose");
-const Product = require("../models/ProductModel");
-const { emitStockUpdate } = require("../socket/inventorySocket");
+const Product   = require("../models/ProductModel");
+const mongoose  = require("mongoose");
+const { emitStockUpdate }   = require("../socket/inventorySocket");
 const { sendLowStockAlert } = require("../jobs/alertJob");
 
 const isValid = (id) => mongoose.isValidObjectId(id);
@@ -19,9 +19,15 @@ class AppError extends Error {
 
 // ── GET /api/inventory?productId= ────────────────────────────
 const getByProduct = async (productId) => {
+  if (!productId) {
+    return Inventory.find({})
+      .populate("productId", "name")
+      .populate("warehouses.warehouseId", "name code location")
+      .sort({ status: 1, sku: 1 })
+      .lean();
+  }
   if (!isValid(productId)) throw new AppError("productId không hợp lệ");
-  const items = await Inventory.getByProduct(productId);
-  return items;
+  return Inventory.getByProduct(productId);
 };
 
 // ── GET /api/inventory/:id ────────────────────────────────────
@@ -43,81 +49,71 @@ const getBySku = async (sku) => {
 };
 
 // ── POST /api/inventory  — Tạo mới ───────────────────────────
-const createInventory = async ({
-  productId,
-  variantId,
-  sku,
-  lowStockThreshold,
-}) => {
+const createInventory = async ({ productId, variantId, sku, lowStockThreshold }) => {
   if (!isValid(productId)) throw new AppError("productId không hợp lệ");
-  const normalizedSku = String(sku || "")
-    .trim()
-    .toUpperCase();
-  if (!normalizedSku) throw new AppError("SKU là bắt buộc");
-  if (variantId && !isValid(variantId)) throw new AppError("variantId không hợp lệ");
 
-  const product = await Product.findById(productId).select("hasVariants variants.sku");
+  const normalizedSku = String(sku || "").trim().toUpperCase();
+  if (!normalizedSku) throw new AppError("SKU là bắt buộc");
+
+  // Kiểm tra SKU trùng
+  const existedBySku = await Inventory.findOne({ sku: normalizedSku });
+  if (existedBySku) throw new AppError(`SKU "${normalizedSku}" đã tồn tại`, 409);
+
+  const product = await Product.findById(productId).select("hasVariants variants.sku variants._id");
   if (!product) throw new AppError("Không tìm thấy sản phẩm", 404);
 
-  if (product.hasVariants && !variantId) {
-    throw new AppError("Sản phẩm có biến thể, vui lòng chọn biến thể", 400);
-  }
-
   let resolvedVariantId = variantId || null;
+
   if (product.hasVariants) {
+    // Tìm variant theo variantId hoặc fallback theo SKU
     let matchedVariant = null;
-    if (variantId) {
+
+    if (variantId && isValid(variantId)) {
       matchedVariant = product.variants.find(
         (v) => String(v._id) === String(variantId),
       );
     }
 
-    // Một số flow FE có thể gửi variantId không đúng định dạng string ObjectId.
-    // Fallback theo SKU để vẫn map đúng biến thể của sản phẩm.
+    // Fallback: tìm theo SKU nếu chưa khớp
     if (!matchedVariant) {
       matchedVariant = product.variants.find(
         (v) => String(v.sku || "").trim().toUpperCase() === normalizedSku,
       );
     }
-    if (!matchedVariant) {
-      throw new AppError("Biến thể không thuộc sản phẩm đã chọn", 400);
-    }
-    if (String(matchedVariant.sku || "").trim().toUpperCase() !== normalizedSku) {
-      throw new AppError("SKU không khớp với biến thể đã chọn", 400);
-    }
+
+    if (!matchedVariant)
+      throw new AppError(`SKU "${normalizedSku}" không thuộc sản phẩm đã chọn`, 422);
+
     resolvedVariantId = matchedVariant._id;
+  } else {
+    resolvedVariantId = null;
+    const existedBase = await Inventory.findOne({ productId, variantId: null });
+    if (existedBase)
+      throw new AppError("Sản phẩm không biến thể chỉ có thể có một bản ghi tồn kho", 409);
   }
 
-  const existed = await Inventory.findOne({
-    sku: { $regex: `^${normalizedSku}$`, $options: "i" },
-  });
-  if (existed) throw new AppError(`SKU "${normalizedSku}" đã tồn tại`, 409);
-
+  // Kiểm tra cặp (productId, variantId) trùng
   const existedByPair = await Inventory.findOne({
     productId,
     variantId: resolvedVariantId || null,
   });
-  if (existedByPair) {
+  if (existedByPair)
     throw new AppError("Sản phẩm/biến thể này đã có tồn kho", 409);
-  }
 
   try {
     const inv = await Inventory.create({
       productId,
-      variantId: resolvedVariantId || null,
-      sku: normalizedSku,
+      variantId: resolvedVariantId,
+      sku:       normalizedSku,
       lowStockThreshold: Number(lowStockThreshold) || 10,
     });
     return inv;
   } catch (err) {
     if (err?.code === 11000) {
-      // 2 unique indexes: sku hoặc (productId, variantId)
-      if (err?.keyPattern?.sku) {
+      if (err?.keyPattern?.sku)
         throw new AppError(`SKU "${normalizedSku}" đã tồn tại`, 409);
-      }
-      if (err?.keyPattern?.productId && err?.keyPattern?.variantId) {
+      if (err?.keyPattern?.productId && err?.keyPattern?.variantId)
         throw new AppError("Sản phẩm/biến thể này đã có tồn kho", 409);
-      }
       throw new AppError("Dữ liệu tồn kho bị trùng", 409);
     }
     throw err;
@@ -131,14 +127,7 @@ const importStock = async (id, { qty, warehouseId, note }, userId) => {
   if (!inv) throw new AppError("Không tìm thấy inventory", 404);
 
   await inv.importStock(Number(qty), warehouseId, userId, note);
-
-  // Emit realtime sau khi cập nhật
-  emitStockUpdate({
-    inventoryId: id,
-    sku: inv.sku,
-    available: inv.available,
-    status: inv.status,
-  });
+  emitStockUpdate({ inventoryId: id, sku: inv.sku, available: inv.available, status: inv.status });
   return inv;
 };
 
@@ -149,37 +138,24 @@ const exportStock = async (id, { qty, warehouseId, orderId, note }, userId) => {
   if (!inv) throw new AppError("Không tìm thấy inventory", 404);
 
   await inv.exportStock(Number(qty), warehouseId, orderId, userId, note);
+  emitStockUpdate({ inventoryId: id, sku: inv.sku, available: inv.available, status: inv.status });
 
-  emitStockUpdate({
-    inventoryId: id,
-    sku: inv.sku,
-    available: inv.available,
-    status: inv.status,
-  });
-
-  // Cảnh báo low stock nếu cần
   if (inv.status === "low_stock" && !inv.alertSent) {
     await sendLowStockAlert(inv);
     inv.alertSent = true;
     await inv.save();
   }
-
   return inv;
 };
 
-// ── POST /api/inventory/:id/reserve  — Giữ hàng khi đặt đơn ─
+// ── POST /api/inventory/:id/reserve  — Giữ hàng ─────────────
 const reserveStock = async (id, { qty, orderId }, userId) => {
   if (!isValid(id)) throw new AppError("ID không hợp lệ");
   const inv = await Inventory.findById(id);
   if (!inv) throw new AppError("Không tìm thấy inventory", 404);
 
   await inv.reserveStock(Number(qty), orderId, userId);
-  emitStockUpdate({
-    inventoryId: id,
-    sku: inv.sku,
-    available: inv.available,
-    status: inv.status,
-  });
+  emitStockUpdate({ inventoryId: id, sku: inv.sku, available: inv.available, status: inv.status });
   return inv;
 };
 
@@ -190,12 +166,7 @@ const releaseReserve = async (id, { qty, orderId }, userId) => {
   if (!inv) throw new AppError("Không tìm thấy inventory", 404);
 
   await inv.releaseReserve(Number(qty), orderId, userId);
-  emitStockUpdate({
-    inventoryId: id,
-    sku: inv.sku,
-    available: inv.available,
-    status: inv.status,
-  });
+  emitStockUpdate({ inventoryId: id, sku: inv.sku, available: inv.available, status: inv.status });
   return inv;
 };
 
@@ -206,72 +177,48 @@ const adjustStock = async (id, { newQty, warehouseId, note }, userId) => {
   if (!inv) throw new AppError("Không tìm thấy inventory", 404);
 
   await inv.adjustStock(Number(newQty), warehouseId, userId, note);
-  emitStockUpdate({
-    inventoryId: id,
-    sku: inv.sku,
-    available: inv.available,
-    status: inv.status,
-  });
+  emitStockUpdate({ inventoryId: id, sku: inv.sku, available: inv.available, status: inv.status });
   return inv;
 };
 
 // ── POST /api/inventory/:id/transfer  — Chuyển kho ───────────
-const transferStock = async (
-  id,
-  { qty, fromWarehouseId, toWarehouseId, note },
-  userId,
-) => {
+const transferStock = async (id, { qty, fromWarehouseId, toWarehouseId, note }, userId) => {
   if (!isValid(id)) throw new AppError("ID không hợp lệ");
   const inv = await Inventory.findById(id);
   if (!inv) throw new AppError("Không tìm thấy inventory", 404);
 
-  await inv.transferStock(
-    Number(qty),
-    fromWarehouseId,
-    toWarehouseId,
-    userId,
-    note,
-  );
-  emitStockUpdate({
-    inventoryId: id,
-    sku: inv.sku,
-    available: inv.available,
-    status: inv.status,
-  });
+  await inv.transferStock(Number(qty), fromWarehouseId, toWarehouseId, userId, note);
+  emitStockUpdate({ inventoryId: id, sku: inv.sku, available: inv.available, status: inv.status });
   return inv;
 };
 
-// ── GET /api/inventory/low-stock  — Hàng sắp hết ─────────────
-const getLowStock = async () => {
-  return Inventory.getLowStock();
-};
+// ── GET /api/inventory/low-stock ─────────────────────────────
+const getLowStock = async () => Inventory.getLowStock();
 
-// ── GET /api/inventory/admin/list  — Danh sách tồn kho (admin) ─
+// ── GET /api/inventory/admin/list ────────────────────────────
 const getList = async ({ status, q } = {}) => {
-  const Product = require("../models/ProductModel");
   const filter = {};
   if (status) filter.status = status;
   if (q && q.trim()) {
-    const regex = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    const regex      = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
     const productIds = await Product.find({ name: regex }).distinct("_id");
     filter.$or = [{ sku: regex }];
     if (productIds.length) filter.$or.push({ productId: { $in: productIds } });
   }
-  const items = await Inventory.find(filter)
+  return Inventory.find(filter)
     .populate("productId", "name")
     .populate("warehouses.warehouseId", "name code location")
     .sort({ status: 1, sku: 1 })
     .lean();
-  return items;
 };
 
-// ── GET /api/inventory/:id/logs  — Lịch sử giao dịch ─────────
+// ── GET /api/inventory/:id/logs ───────────────────────────────
 const getAuditLogs = async (id, { page = 1, limit = 20, type } = {}) => {
   if (!isValid(id)) throw new AppError("ID không hợp lệ");
   const inv = await Inventory.findById(id).select("auditLogs sku");
   if (!inv) throw new AppError("Không tìm thấy inventory", 404);
 
-  let logs = [...inv.auditLogs].reverse(); // mới nhất lên đầu
+  let logs = [...inv.auditLogs].reverse();
   if (type) logs = logs.filter((l) => l.type === type);
 
   const total = logs.length;
@@ -279,26 +226,16 @@ const getAuditLogs = async (id, { page = 1, limit = 20, type } = {}) => {
 
   return {
     items,
-    meta: {
-      total,
-      page: +page,
-      limit: +limit,
-      pages: Math.ceil(total / limit),
-    },
+    meta: { total, page: +page, limit: +limit, pages: Math.ceil(total / limit) },
   };
 };
 
-// ── Dùng nội bộ (Order service gọi) — reserve khi tạo đơn ────
+// ── Internal — Order service dùng ────────────────────────────
 const reserveBySku = async (sku, qty, orderId, userId) => {
   const inv = await Inventory.findOne({ sku });
   if (!inv) throw new AppError(`SKU "${sku}" không tồn tại`, 404);
   await inv.reserveStock(qty, orderId, userId);
-  emitStockUpdate({
-    inventoryId: inv._id,
-    sku: inv.sku,
-    available: inv.available,
-    status: inv.status,
-  });
+  emitStockUpdate({ inventoryId: inv._id, sku: inv.sku, available: inv.available, status: inv.status });
   return inv;
 };
 
@@ -306,12 +243,7 @@ const releaseBySku = async (sku, qty, orderId, userId) => {
   const inv = await Inventory.findOne({ sku });
   if (!inv) throw new AppError(`SKU "${sku}" không tồn tại`, 404);
   await inv.releaseReserve(qty, orderId, userId);
-  emitStockUpdate({
-    inventoryId: inv._id,
-    sku: inv.sku,
-    available: inv.available,
-    status: inv.status,
-  });
+  emitStockUpdate({ inventoryId: inv._id, sku: inv.sku, available: inv.available, status: inv.status });
   return inv;
 };
 
@@ -319,12 +251,7 @@ const exportBySku = async (sku, qty, orderId, userId, warehouseId, note) => {
   const inv = await Inventory.findOne({ sku });
   if (!inv) throw new AppError(`SKU "${sku}" không tồn tại`, 404);
   await inv.exportStock(Number(qty), warehouseId, orderId, userId, note);
-  emitStockUpdate({
-    inventoryId: inv._id,
-    sku: inv.sku,
-    available: inv.available,
-    status: inv.status,
-  });
+  emitStockUpdate({ inventoryId: inv._id, sku: inv.sku, available: inv.available, status: inv.status });
   return inv;
 };
 
@@ -342,7 +269,6 @@ module.exports = {
   transferStock,
   getLowStock,
   getAuditLogs,
-  // internal
   reserveBySku,
   releaseBySku,
   exportBySku,

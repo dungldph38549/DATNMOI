@@ -1,6 +1,7 @@
 const Product = require("../models/ProductModel.js");
 const ProductService = require("../services/ProductService");
 const { successResponse, errorResponse } = require("../utils/response.js");
+const { enrichProductPricing } = require("../utils/salePricing");
 
 // ================================================================
 // CREATE — Tạo sản phẩm mới
@@ -312,9 +313,10 @@ exports.getByBrand = async (req, res) => {
       isDeleted: { $ne: true },
     })
       .populate("brandId", "name logo")
-      .populate("categoryId", "name");
+      .populate("categoryId", "name")
+      .lean();
 
-    successResponse({ res, data: products });
+    successResponse({ res, data: products.map((item) => enrichProductPricing(item)) });
   } catch (err) {
     errorResponse({ res, message: err.message, statusCode: 500 });
   }
@@ -341,9 +343,10 @@ exports.getByBrandAndCategory = async (req, res) => {
     const products = await Product.find(filter)
       .populate("brandId", "name logo")
       .populate("categoryId", "name")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    successResponse({ res, data: products });
+    successResponse({ res, data: products.map((item) => enrichProductPricing(item)) });
   } catch (err) {
     errorResponse({ res, message: err.message, statusCode: 500 });
   }
@@ -363,9 +366,10 @@ exports.getFeaturedProducts = async (req, res) => {
       .populate("brandId", "name logo")
       .populate("categoryId", "name")
       .limit(Number(limit))
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    successResponse({ res, data: products });
+    successResponse({ res, data: products.map((item) => enrichProductPricing(item)) });
   } catch (err) {
     errorResponse({ res, message: err.message, statusCode: 500 });
   }
@@ -387,9 +391,10 @@ exports.getNewArrivals = async (req, res) => {
       .populate("brandId", "name logo")
       .populate("categoryId", "name")
       .limit(Number(limit))
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    successResponse({ res, data: products });
+    successResponse({ res, data: products.map((item) => enrichProductPricing(item)) });
   } catch (err) {
     errorResponse({ res, message: err.message, statusCode: 500 });
   }
@@ -406,9 +411,10 @@ exports.getBestSellers = async (req, res) => {
       .populate("brandId", "name logo")
       .populate("categoryId", "name")
       .limit(Number(limit))
-      .sort({ soldCount: -1 });
+      .sort({ soldCount: -1 })
+      .lean();
 
-    successResponse({ res, data: products });
+    successResponse({ res, data: products.map((item) => enrichProductPricing(item)) });
   } catch (err) {
     errorResponse({ res, message: err.message, statusCode: 500 });
   }
@@ -439,18 +445,69 @@ exports.searchProducts = async (req, res) => {
         .populate("categoryId", "name")
         .skip(Number(page) * Number(limit))
         .limit(Number(limit))
-        .sort({ createdAt: -1 }),
+        .sort({ createdAt: -1 })
+        .lean(),
       Product.countDocuments(filter),
     ]);
 
     res.json({
-      data: products,
+      data: products.map((item) => enrichProductPricing(item)),
       total,
       page: Number(page),
       limit: Number(limit),
       pages: Math.ceil(total / Number(limit)),
       keyword,
     });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ================================================================
+// ADMIN: Báo cáo hiệu quả sale
+// GET /api/product/admin/sale-report?startDate=&endDate=
+// ================================================================
+exports.getSaleReport = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const now = new Date();
+    const start = startDate ? new Date(startDate) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = endDate ? new Date(endDate) : now;
+
+    const products = await Product.find({
+      isDeleted: { $ne: true },
+      createdAt: { $lte: end },
+    }).lean();
+
+    const activeRules = [];
+    products.forEach((product) => {
+      const rules = Array.isArray(product.saleRules) ? product.saleRules : [];
+      rules.forEach((rule) => {
+        const ruleStart = rule?.startAt ? new Date(rule.startAt) : null;
+        const ruleEnd = rule?.endAt ? new Date(rule.endAt) : null;
+        const isInRange = (!ruleStart || ruleStart <= end) && (!ruleEnd || ruleEnd >= start);
+        if (rule?.status === "active" && isInRange) {
+          activeRules.push({
+            productId: product._id,
+            productName: product.name,
+            ruleName: rule.name || "Sale sản phẩm",
+            scope: rule.scope || "product",
+            discountType: rule.discountType || "percent",
+            discountValue: Number(rule.discountValue || 0),
+            priority: Number(rule.priority || 0),
+            startAt: rule.startAt || null,
+            endAt: rule.endAt || null,
+          });
+        }
+      });
+    });
+
+    const summary = {
+      totalProducts: products.length,
+      totalActiveSaleRules: activeRules.length,
+    };
+
+    res.status(200).json({ summary, rules: activeRules });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

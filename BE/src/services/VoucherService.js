@@ -1,6 +1,46 @@
 const mongoose = require("mongoose");
 const Voucher = require("../models/VoucherModel");
 
+const normalizeDate = (value) => {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const validateVoucherBusiness = ({
+  discountType,
+  discountValue,
+  startDate,
+  endDate,
+}) => {
+  if (!["percent", "fixed"].includes(discountType || "percent")) {
+    return "discountType phải là percent hoặc fixed";
+  }
+  if (discountType === "percent" && Number(discountValue) > 100) {
+    return "Mã giảm theo % không được vượt quá 100";
+  }
+  const start = normalizeDate(startDate);
+  const end = normalizeDate(endDate);
+  if (!start || !end) {
+    return "Ngày bắt đầu/kết thúc không hợp lệ";
+  }
+  if (end < start) {
+    return "Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu";
+  }
+  return null;
+};
+
+const normalizeApplicableProductIds = (value) => {
+  if (!Array.isArray(value)) return [];
+  const ids = value
+    .map((id) => String(id || "").trim())
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+  const unique = new Map();
+  ids.forEach((id) => unique.set(String(id), id));
+  return Array.from(unique.values());
+};
+
 const createVoucher = async (newVoucher) => {
   try {
     if (!newVoucher || typeof newVoucher !== "object") {
@@ -20,6 +60,7 @@ const createVoucher = async (newVoucher) => {
       endDate,
       usageLimit,
       status,
+      applicableProductIds,
     } = newVoucher;
 
     if (!code || discountValue === undefined || !startDate || !endDate) {
@@ -60,6 +101,19 @@ const createVoucher = async (newVoucher) => {
       };
     }
 
+    const businessError = validateVoucherBusiness({
+      discountType: discountType || "percent",
+      discountValue: numericDiscountValue,
+      startDate,
+      endDate,
+    });
+    if (businessError) {
+      return {
+        status: "ERR",
+        message: businessError,
+      };
+    }
+
     const existing = await Voucher.findOne({ code: code.trim().toUpperCase() });
     if (existing) {
       return {
@@ -78,6 +132,7 @@ const createVoucher = async (newVoucher) => {
       endDate,
       usageLimit: numericUsageLimit,
       status: status || "active",
+      applicableProductIds: normalizeApplicableProductIds(applicableProductIds),
     });
 
     return {
@@ -113,6 +168,34 @@ const getVoucherDetail = async (voucherId) => {
     }
 
     const voucher = await Voucher.findById(voucherId);
+    if (!voucher) {
+      return {
+        status: "ERR",
+        message: "Voucher not found",
+      };
+    }
+
+    return {
+      status: "OK",
+      message: "SUCCESS",
+      data: voucher,
+    };
+  } catch (e) {
+    throw e;
+  }
+};
+
+const getVoucherByCode = async (code) => {
+  try {
+    const normalizedCode = String(code || "").trim().toUpperCase();
+    if (!normalizedCode) {
+      return {
+        status: "ERR",
+        message: "Voucher code is required",
+      };
+    }
+
+    const voucher = await Voucher.findOne({ code: normalizedCode });
     if (!voucher) {
       return {
         status: "ERR",
@@ -174,6 +257,11 @@ const updateVoucher = async (voucherId, updateData) => {
     if (updateData.status !== undefined) {
       payload.status = updateData.status;
     }
+    if (updateData.applicableProductIds !== undefined) {
+      payload.applicableProductIds = normalizeApplicableProductIds(
+        updateData.applicableProductIds,
+      );
+    }
 
     if (updateData.discountValue !== undefined) {
       const num = Number(updateData.discountValue);
@@ -219,6 +307,23 @@ const updateVoucher = async (voucherId, updateData) => {
           message: "Voucher code already exists",
         };
       }
+    }
+
+    const finalDiscountType = payload.discountType ?? voucher.discountType;
+    const finalDiscountValue = payload.discountValue ?? voucher.discountValue;
+    const finalStartDate = payload.startDate ?? voucher.startDate;
+    const finalEndDate = payload.endDate ?? voucher.endDate;
+    const businessError = validateVoucherBusiness({
+      discountType: finalDiscountType,
+      discountValue: finalDiscountValue,
+      startDate: finalStartDate,
+      endDate: finalEndDate,
+    });
+    if (businessError) {
+      return {
+        status: "ERR",
+        message: businessError,
+      };
     }
 
     const updated = await Voucher.findByIdAndUpdate(
@@ -267,6 +372,7 @@ module.exports = {
   createVoucher,
   getAllVouchers,
   getVoucherDetail,
+  getVoucherByCode,
   updateVoucher,
   deleteVoucher,
 };

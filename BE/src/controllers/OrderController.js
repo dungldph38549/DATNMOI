@@ -15,6 +15,15 @@ const {
   IpnInvalidAmount,
   IpnUnknownError,
 } = require("vnpay");
+const { pickBestActiveRule, calculateEffectivePrice } = require("../utils/salePricing");
+
+const ROLE_VOUCHER_USAGE_LIMIT = {
+  customer: 3,
+  staff: 5,
+  manager: 10,
+  admin: 0,
+};
+const GUEST_VOUCHER_USAGE_LIMIT = 2;
 
 // Khi không khai báo VNP_* trong .env sẽ dùng fallback bên dưới.
 // Chỉ truyền host (không thêm /paymentv2/...): thư viện tự nối endpoint thanh toán.
@@ -204,11 +213,24 @@ exports.createOrder = async (req, res) => {
           });
         }
 
+        const saleRule = pickBestActiveRule({
+          rules: product.saleRules,
+          sku: variant.sku,
+          now: new Date(),
+        });
+        const pricing = calculateEffectivePrice({
+          basePrice: variant.price,
+          saleRule,
+        });
         mappedProducts.push({
           productId: item.productId,
           sku: variant.sku,
           quantity: item.quantity,
-          price: variant.price,
+          price: pricing.effectivePrice,
+          basePrice: pricing.basePrice,
+          lineDiscount: pricing.discountAmount,
+          appliedSaleRuleId: pricing.saleRule?._id || null,
+          appliedSaleName: pricing.saleRule?.name || null,
           attributes: Object.fromEntries(variant.attributes),
         });
       } else {
@@ -225,11 +247,24 @@ exports.createOrder = async (req, res) => {
         product.stock = availableStock - Number(item.quantity || 0);
         await product.save({ session });
 
+        const saleRule = pickBestActiveRule({
+          rules: product.saleRules,
+          sku: null,
+          now: new Date(),
+        });
+        const pricing = calculateEffectivePrice({
+          basePrice: product.price,
+          saleRule,
+        });
         mappedProducts.push({
           productId: item.productId,
           sku: null,
           quantity: item.quantity,
-          price: product.price,
+          price: pricing.effectivePrice,
+          basePrice: pricing.basePrice,
+          lineDiscount: pricing.discountAmount,
+          appliedSaleRuleId: pricing.saleRule?._id || null,
+          appliedSaleName: pricing.saleRule?.name || null,
           attributes: {},
         });
       }
@@ -292,12 +327,65 @@ exports.createOrder = async (req, res) => {
         return res.status(422).json({ message: "Voucher đã hết lượt sử dụng" });
       }
 
+      const customAccountLimit = Number(user?.voucherUsageLimit);
+      let accountVoucherLimit = 0;
+      if (Number.isFinite(customAccountLimit) && customAccountLimit >= 0) {
+        accountVoucherLimit = customAccountLimit;
+      } else if (userId) {
+        accountVoucherLimit =
+          ROLE_VOUCHER_USAGE_LIMIT[String(user?.role || "customer")] ??
+          ROLE_VOUCHER_USAGE_LIMIT.customer;
+      } else {
+        accountVoucherLimit = GUEST_VOUCHER_USAGE_LIMIT;
+      }
+
+      if (accountVoucherLimit !== 0) {
+        const accountQuery = userId
+          ? { userId }
+          : { guestId: String(guestId || "").trim() };
+        const usedVoucherOrderCount = await Order.countDocuments({
+          ...accountQuery,
+          voucherCode: { $ne: null },
+          status: { $ne: "canceled" },
+        }).session(session);
+
+        if (usedVoucherOrderCount >= accountVoucherLimit) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(422).json({
+            message: `Tài khoản đã đạt giới hạn dùng voucher (${accountVoucherLimit} lần).`,
+          });
+        }
+      }
+
+      const applicableIds = Array.isArray(voucherDoc.applicableProductIds)
+        ? voucherDoc.applicableProductIds.map((id) => String(id))
+        : [];
+      const hasProductScope = applicableIds.length > 0;
+      const eligibleItems = hasProductScope
+        ? mappedProducts.filter((item) =>
+            applicableIds.includes(String(item.productId)),
+          )
+        : mappedProducts;
+      const eligibleSubtotal = eligibleItems.reduce(
+        (sum, item) =>
+          sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
+        0,
+      );
+      if (hasProductScope && eligibleSubtotal <= 0) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(422).json({
+          message: "Voucher này không áp dụng cho sản phẩm đã chọn",
+        });
+      }
+
       const discountValue = Number(voucherDoc.discountValue ?? 0);
       const rawDiscount =
         voucherDoc.discountType === "fixed"
           ? discountValue
-          : (subtotal * discountValue) / 100;
-      discountAmount = Math.max(0, Math.min(subtotal, rawDiscount));
+          : (eligibleSubtotal * discountValue) / 100;
+      discountAmount = Math.max(0, Math.min(eligibleSubtotal, rawDiscount));
     }
 
     for (const item of mappedProducts) {
@@ -553,6 +641,7 @@ const statusLabels = {
   confirmed: "Đã xác nhận",
   shipped: "Đang giao",
   delivered: "Đã giao",
+  received: "Giao hàng thành công",
   canceled: "Đã hủy",
   "return-request": "Yêu cầu hoàn hàng",
   accepted: "Chấp nhận hoàn hàng",
@@ -571,6 +660,7 @@ exports.updateOrder = async (req, res) => {
       "confirmed",
       "shipped",
       "delivered",
+      "received",
       "canceled",
       "return-request",
       "accepted",
@@ -582,6 +672,7 @@ exports.updateOrder = async (req, res) => {
       confirmed: ["shipped", "canceled"],
       shipped: ["delivered"],
       delivered: ["return-request"],
+      received: [],
       canceled: [],
       "return-request": ["accepted", "rejected"],
       accepted: [],
@@ -874,56 +965,32 @@ exports.comfirmDelivery = async (req, res) => {
     if (!order)
       return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
 
-    // Luồng củ: đang giao → đã giao + đã thanh toán (giữ cho tương thích / gọi API trực tiếp)
-    if (order.status === "shipped") {
-      const updatedOrder = await Order.findByIdAndUpdate(
-        id,
-        { status: "delivered", paymentStatus: "paid" },
-        { new: true },
-      ).populate("products.productId");
-
-      await OrderStatusHistory.create({
-        oldStatus: "shipped",
-        newStatus: "delivered",
-        orderId: order._id,
-        paymentStatus: updatedOrder.paymentStatus === "paid" ? null : "paid",
-      });
-
-      return res.status(200).json(updatedOrder);
-    }
-
-    // Luồng hiển thị trên web: chỉ bấm xác nhận khi đơn đã ở trạng thái "đã giao" (COD chưa thanh toán)
+    // Chỉ bấm xác nhận khi đơn đã ở trạng thái "đã giao"
     if (order.status === "delivered") {
-      if (order.paymentStatus === "paid") {
-        const fresh = await Order.findById(id).populate("products.productId");
-        return res.status(200).json(fresh);
-      }
-      if (order.paymentMethod !== "cod") {
-        return res.status(400).json({
-          message:
-            "Đơn chưa thanh toán VNPay — vui lòng thanh toán online, không xác nhận COD tại đây.",
-        });
-      }
-      const updatedOrder = await Order.findByIdAndUpdate(
-        id,
-        { paymentStatus: "paid" },
-        { new: true },
-      ).populate("products.productId");
+      const patch =
+        order.paymentMethod === "cod" && order.paymentStatus !== "paid"
+          ? { status: "received", paymentStatus: "paid" }
+          : { status: "received" };
+      const updatedOrder = await Order.findByIdAndUpdate(id, patch, {
+        new: true,
+      }).populate("products.productId");
 
       await OrderStatusHistory.create({
         oldStatus: "delivered",
-        newStatus: "delivered",
+        newStatus: "received",
         orderId: order._id,
-        paymentStatus: "paid",
-        note: "Khách xác nhận đã nhận hàng (thanh toán COD)",
+        paymentStatus:
+          order.paymentMethod === "cod" && order.paymentStatus !== "paid"
+            ? "paid"
+            : null,
+        note: "Người dùng xác nhận đã nhận được hàng",
       });
 
       return res.status(200).json(updatedOrder);
     }
 
     return res.status(400).json({
-      message:
-        "Chỉ có thể xác nhận khi đơn đã giao (đã giao) hoặc đang trên luồng đang giao (API nội bộ).",
+      message: "Chỉ có thể xác nhận khi đơn đã giao.",
     });
   } catch (err) {
     const statusCode = err?.status || err?.statusCode || 500;

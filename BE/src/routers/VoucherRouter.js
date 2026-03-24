@@ -6,6 +6,8 @@ const VoucherController = require("../controllers/VoucherController");
 router.post("/create", VoucherController.createVoucher);
 // GET /api/voucher
 router.get("/", VoucherController.getAllVouchers);
+// GET /api/voucher/code/:code
+router.get("/code/:code", VoucherController.getVoucherByCode);
 // GET /api/voucher/:id
 router.get("/:id", VoucherController.getVoucherDetail);
 // PUT /api/voucher/:id

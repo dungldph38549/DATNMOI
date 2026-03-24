@@ -35,6 +35,21 @@ const variantSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 });
 
+const saleRuleSchema = new mongoose.Schema(
+  {
+    name: { type: String, trim: true, default: "" },
+    scope: { type: String, enum: ["product", "variant"], default: "product" },
+    variantSku: { type: String, trim: true, uppercase: true, default: null },
+    discountType: { type: String, enum: ["percent", "fixed"], required: true },
+    discountValue: { type: Number, required: true, min: [0, "Giá trị giảm không được âm"] },
+    startAt: { type: Date, default: null },
+    endAt: { type: Date, default: null },
+    priority: { type: Number, default: 0 },
+    status: { type: String, enum: ["active", "inactive"], default: "active" },
+  },
+  { _id: true },
+);
+
 // ── Product schema ─────────────────────────────────────────────
 const productSchema = new mongoose.Schema(
   {
@@ -97,6 +112,7 @@ const productSchema = new mongoose.Schema(
     hasVariants: { type: Boolean, default: false },
     attributes:  [{ type: String, trim: true }],
     variants:    [variantSchema],
+    saleRules:   { type: [saleRuleSchema], default: [] },
 
     gender: {
       type: String,
@@ -221,6 +237,17 @@ productSchema.pre("validate", function () {
   const skus = this.variants.map((v) => v.sku);
   const dup  = skus.find((s, i) => skus.indexOf(s) !== i);
   if (dup) throw new Error(`SKU "${dup}" bị trùng trong cùng sản phẩm.`);
+
+  if (Array.isArray(this.saleRules) && this.saleRules.length > 0) {
+    for (const rule of this.saleRules) {
+      if (rule.endAt && rule.startAt && new Date(rule.endAt) < new Date(rule.startAt)) {
+        throw new Error("Thời gian kết thúc sale phải lớn hơn thời gian bắt đầu.");
+      }
+      if (rule.scope === "variant" && !rule.variantSku) {
+        throw new Error("Sale theo biến thể bắt buộc có variantSku.");
+      }
+    }
+  }
 });
 
 // ── Statics ────────────────────────────────────────────────────

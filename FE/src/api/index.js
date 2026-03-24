@@ -242,6 +242,15 @@ export const toggleVisible = async ({ id }) => {
   return res.data;
 };
 
+export const getProductSaleReport = async ({ startDate, endDate } = {}) => {
+  const params = new URLSearchParams();
+  if (startDate) params.append("startDate", startDate);
+  if (endDate) params.append("endDate", endDate);
+  const query = params.toString();
+  const res = await axiosInstance.get(`/product/admin/sale-report${query ? `?${query}` : ""}`);
+  return res.data;
+};
+
 // ── UPLOAD ────────────────────────────────────────────────────
 
 export const uploadImage = async (payload) => {
@@ -512,16 +521,17 @@ export const deleteVoucher = async (id) => {
 };
 
 export const getVoucherByCode = async (code) => {
-  const list = await getAllVouchers();
-  const data = list?.data || list;
-  const arr = Array.isArray(data) ? data : data?.data || [];
-  return (
-    arr.find(
-      (v) =>
-        v.code &&
-        v.code.trim().toUpperCase() === String(code).trim().toUpperCase(),
-    ) || null
-  );
+  const normalizedCode = String(code || "").trim().toUpperCase();
+  if (!normalizedCode) return null;
+  try {
+    const res = await axiosInstance.get(
+      `/voucher/code/${encodeURIComponent(normalizedCode)}`,
+    );
+    return res?.data?.data || res?.data || null;
+  } catch (err) {
+    if (err?.response?.status === 404) return null;
+    throw err;
+  }
 };
 
 // ================== Size API ==================
@@ -573,12 +583,27 @@ export const getProductReviews = async ({
 };
 
 /**
+ * GET /api/reviews/stats/:productId
+ */
+export const getReviewStatsByProduct = async (productId) => {
+  const res = await axiosInstance.get(`/reviews/stats/${productId}`);
+  return res.data;
+};
+
+/**
  * POST /api/reviews
  * Body: { productId, rating, title, content, images, orderId? }
  */
 export const createReview = async (payload) => {
   const res = await axiosInstance.post("/reviews", payload);
   return res.data;
+};
+
+export const getMyReviewByProduct = async (productId) => {
+  const res = await axiosInstance.get("/reviews/mine", {
+    params: { productId },
+  });
+  return res?.data?.data ?? null;
 };
 
 // ================== Review API (Admin) ==================

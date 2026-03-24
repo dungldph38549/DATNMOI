@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Form, InputNumber, Select } from "antd";
+import { Form, InputNumber, Select, Input } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import Swal from "sweetalert2";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -150,6 +150,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
   const [visible, setVisible] = useState(true);
   const [featured, setFeatured] = useState(false);
   const [hasVar, setHasVar] = useState(false);
+  const [saleEnabled, setSaleEnabled] = useState(false);
 
   const { data: productData } = useQuery({
     queryKey: ["admin-product-detail", productId],
@@ -222,6 +223,8 @@ const ProductDetail = ({ productId = null, onClose }) => {
       const isHasVariants = !!productData.hasVariants;
       form.setFieldsValue({
         ...productData,
+        categoryId: productData?.categoryId?._id || productData?.categoryId || undefined,
+        brandId: productData?.brandId?._id || productData?.brandId || undefined,
         countInStock: productData.stock ?? productData.countInStock,
         attributes: productData.attributes || [],
         variants: productData.variants || [],
@@ -238,6 +241,17 @@ const ProductDetail = ({ productId = null, onClose }) => {
       setHasVar(!!productData.hasVariants);
       setVisible(productData.isVisible ?? true);
       setFeatured(productData.isFeatured ?? false);
+      const activeSale = Array.isArray(productData.saleRules)
+        ? productData.saleRules.find((r) => r?.status === "active") || productData.saleRules[0]
+        : null;
+      setSaleEnabled(!!activeSale);
+      form.setFieldsValue({
+        saleType: activeSale?.discountType || "percent",
+        saleValue: activeSale?.discountValue ?? null,
+        saleStartAt: activeSale?.startAt ? String(activeSale.startAt).slice(0, 16) : "",
+        saleEndAt: activeSale?.endAt ? String(activeSale.endAt).slice(0, 16) : "",
+        salePriority: activeSale?.priority ?? 0,
+      });
     }
   }, [productData, form]);
 
@@ -273,6 +287,20 @@ const ProductDetail = ({ productId = null, onClose }) => {
       isFeatured: featured,
       srcImages: form.getFieldValue("srcImages"),
     };
+    payload.saleRules = saleEnabled && Number(values.saleValue) > 0
+      ? [
+          {
+            name: "Sale sản phẩm",
+            scope: "product",
+            discountType: values.saleType || "percent",
+            discountValue: Number(values.saleValue || 0),
+            startAt: values.saleStartAt ? new Date(values.saleStartAt).toISOString() : null,
+            endAt: values.saleEndAt ? new Date(values.saleEndAt).toISOString() : null,
+            priority: Number(values.salePriority || 0),
+            status: "active",
+          },
+        ]
+      : [];
 
     // Normalize attributes/variants để tránh lỗi validate khi FE bị trùng tag/whitespace.
     if (hasVar) {
@@ -465,23 +493,19 @@ const ProductDetail = ({ productId = null, onClose }) => {
                 <div
                   style={{ display: "flex", flexDirection: "column", gap: 18 }}
                 >
-                  <Form.Item
-                    name="name"
-                    rules={[{ required: true, message: "Vui lòng nhập tên" }]}
-                  >
-                    <div>
-                      <FieldLabel>Tên sản phẩm</FieldLabel>
-                      <input
+                  <div>
+                    <FieldLabel>Tên sản phẩm</FieldLabel>
+                    <Form.Item
+                      name="name"
+                      rules={[{ required: true, message: "Vui lòng nhập tên" }]}
+                    >
+                      <Input
                         className="sneaker-input"
                         style={inputStyle}
                         placeholder="VD: Nike Air Jordan 1 Retro High"
-                        onChange={(e) =>
-                          form.setFieldValue("name", e.target.value)
-                        }
-                        defaultValue={form.getFieldValue("name") || ""}
                       />
-                    </div>
-                  </Form.Item>
+                    </Form.Item>
+                  </div>
 
                   <div
                     style={{
@@ -490,9 +514,9 @@ const ProductDetail = ({ productId = null, onClose }) => {
                       gap: 16,
                     }}
                   >
-                    <Form.Item name="categoryId" rules={[{ required: true }]}>
-                      <div>
-                        <FieldLabel>Danh mục</FieldLabel>
+                    <div>
+                      <FieldLabel>Danh mục</FieldLabel>
+                      <Form.Item name="categoryId" rules={[{ required: true }]}>
                         <Select
                           placeholder="Chọn danh mục"
                           style={{ width: "100%" }}
@@ -500,13 +524,12 @@ const ProductDetail = ({ productId = null, onClose }) => {
                             label: c.name,
                             value: c._id,
                           }))}
-                          onChange={(v) => form.setFieldValue("categoryId", v)}
                         />
-                      </div>
-                    </Form.Item>
-                    <Form.Item name="brandId" rules={[{ required: true }]}>
-                      <div>
-                        <FieldLabel>Thương hiệu</FieldLabel>
+                      </Form.Item>
+                    </div>
+                    <div>
+                      <FieldLabel>Thương hiệu</FieldLabel>
+                      <Form.Item name="brandId" rules={[{ required: true }]}>
                         <Select
                           placeholder="Chọn thương hiệu"
                           style={{ width: "100%" }}
@@ -514,16 +537,15 @@ const ProductDetail = ({ productId = null, onClose }) => {
                             label: b.name,
                             value: b._id,
                           }))}
-                          onChange={(v) => form.setFieldValue("brandId", v)}
                         />
-                      </div>
-                    </Form.Item>
+                      </Form.Item>
+                    </div>
                   </div>
 
-                  <Form.Item name="description" rules={[{ required: true }]}>
-                    <div>
-                      <FieldLabel>Mô tả sản phẩm</FieldLabel>
-                      <textarea
+                  <div>
+                    <FieldLabel>Mô tả sản phẩm</FieldLabel>
+                    <Form.Item name="description" rules={[{ required: true }]}>
+                      <Input.TextArea
                         className="sneaker-input"
                         style={{
                           ...inputStyle,
@@ -532,12 +554,9 @@ const ProductDetail = ({ productId = null, onClose }) => {
                         }}
                         placeholder="Nhập mô tả chi tiết về chất liệu, thiết kế..."
                         rows={4}
-                        onChange={(e) =>
-                          form.setFieldValue("description", e.target.value)
-                        }
                       />
-                    </div>
-                  </Form.Item>
+                    </Form.Item>
+                  </div>
 
                   {!hasVar && (
                     <div
@@ -1137,6 +1156,60 @@ const ProductDetail = ({ productId = null, onClose }) => {
                     label="Sản phẩm nổi bật"
                     sub="Đưa vào danh sách đầu trang"
                   />
+                </div>
+              </SectionCard>
+
+              <SectionCard icon="local_offer" title="Cấu hình Sale">
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <Toggle
+                    checked={saleEnabled}
+                    onChange={setSaleEnabled}
+                    label="Bật sale cho sản phẩm"
+                    sub="Áp dụng trước voucher tại checkout"
+                  />
+                  {saleEnabled && (
+                    <>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div>
+                          <FieldLabel>Loại giảm</FieldLabel>
+                          <Form.Item name="saleType" initialValue="percent">
+                            <Select
+                              options={[
+                                { label: "Phần trăm (%)", value: "percent" },
+                                { label: "Giảm cố định (đ)", value: "fixed" },
+                              ]}
+                            />
+                          </Form.Item>
+                        </div>
+                        <div>
+                          <FieldLabel>Giá trị giảm</FieldLabel>
+                          <Form.Item name="saleValue" rules={[{ required: saleEnabled, type: "number", min: 0 }]}>
+                            <InputNumber style={{ width: "100%", borderRadius: 12 }} placeholder="Nhập giá trị giảm" />
+                          </Form.Item>
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div>
+                          <FieldLabel>Bắt đầu</FieldLabel>
+                          <Form.Item name="saleStartAt">
+                            <Input type="datetime-local" className="sneaker-input" style={inputStyle} />
+                          </Form.Item>
+                        </div>
+                        <div>
+                          <FieldLabel>Kết thúc</FieldLabel>
+                          <Form.Item name="saleEndAt">
+                            <Input type="datetime-local" className="sneaker-input" style={inputStyle} />
+                          </Form.Item>
+                        </div>
+                      </div>
+                      <div>
+                        <FieldLabel>Độ ưu tiên</FieldLabel>
+                        <Form.Item name="salePriority" initialValue={0}>
+                          <InputNumber style={{ width: "100%", borderRadius: 12 }} min={0} placeholder="0" />
+                        </Form.Item>
+                      </div>
+                    </>
+                  )}
                 </div>
               </SectionCard>
             </div>

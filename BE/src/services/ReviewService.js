@@ -3,10 +3,19 @@
 // Toàn bộ business logic — controller chỉ đọc req/res
 // ================================================================
 const Review = require("../models/Review");
+const Order = require("../models/OrderModel");
 const mongoose = require("mongoose");
 
 const toId = (id) => new mongoose.Types.ObjectId(id);
 const isValid = (id) => mongoose.isValidObjectId(id);
+const REVIEW_ELIGIBLE_ORDER_STATUSES = [
+  "received",
+  "delivered",
+  "return-request",
+  "accepted",
+  "rejected",
+  "returned",
+];
 
 class AppError extends Error {
   constructor(message, status = 400) {
@@ -81,16 +90,79 @@ const getReviewById = async (id) => {
   return review;
 };
 
+// ── GET /api/reviews/mine?productId=... ─────────────────────
+const getMyReview = async ({ productId }, userId) => {
+  const resolvedUserId = userId?._id || userId?.id || userId;
+  if (!isValid(productId)) throw new AppError("productId không hợp lệ");
+  if (!isValid(resolvedUserId)) throw new AppError("userId không hợp lệ");
+  const review = await Review.findOne({
+    productId: toId(productId),
+    userId: toId(resolvedUserId),
+    isDeleted: false,
+  })
+    .populate("userId", "name avatar")
+    .lean({ virtuals: true });
+  return review || null;
+};
+
 // ── POST /api/reviews ────────────────────────────────────────
 const createReview = async (
   { productId, rating, title, content, images, orderId },
-  userId,
+  user,
 ) => {
+  const userId = user?._id || user?.id || user;
+  const normalizedEmail = String(user?.email || "")
+    .trim()
+    .toLowerCase();
   if (!isValid(productId)) throw new AppError("productId không hợp lệ");
+  if (!isValid(userId)) throw new AppError("userId không hợp lệ");
   if (!rating || rating < 1 || rating > 5)
     throw new AppError("Rating phải từ 1 đến 5");
 
   await Review.checkRateLimit(userId, 5);
+
+  const purchaseOr = [{ userId: toId(userId) }];
+  if (normalizedEmail) {
+    const escapedEmail = String(user.email)
+      .trim()
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    purchaseOr.push({ email: { $regex: `^${escapedEmail}$`, $options: "i" } });
+  }
+  const purchaseFilter = {
+    $or: purchaseOr,
+    status: { $in: REVIEW_ELIGIBLE_ORDER_STATUSES },
+    products: { $elemMatch: { productId: toId(productId) } },
+  };
+  let verifiedOrderId = null;
+  if (orderId) {
+    if (!isValid(orderId)) throw new AppError("orderId không hợp lệ");
+    const matchedOrder = await Order.findOne({
+      _id: toId(orderId),
+      status: { $in: REVIEW_ELIGIBLE_ORDER_STATUSES },
+      products: { $elemMatch: { productId: toId(productId) } },
+    }).select("_id userId email");
+    if (!matchedOrder)
+      throw new AppError("Đơn hàng không hợp lệ để xác thực đánh giá", 422);
+    const orderOwnerId = matchedOrder?.userId ? String(matchedOrder.userId) : "";
+    const orderEmail = String(matchedOrder?.email || "")
+      .trim()
+      .toLowerCase();
+    const isOrderOwner =
+      (orderOwnerId && orderOwnerId === String(userId)) ||
+      (normalizedEmail && orderEmail && normalizedEmail === orderEmail);
+    if (!isOrderOwner) {
+      throw new AppError("Bạn không có quyền đánh giá từ đơn hàng này", 403);
+    }
+    verifiedOrderId = matchedOrder._id;
+  } else {
+    const hasPurchased = await Order.exists(purchaseFilter);
+    if (!hasPurchased)
+      throw new AppError("Bạn chỉ có thể đánh giá sau khi đã mua sản phẩm này", 403);
+    const latestOrder = await Order.findOne(purchaseFilter)
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .select("_id");
+    verifiedOrderId = latestOrder?._id || null;
+  }
 
   if (await Review.hasReviewed(userId, productId))
     throw new AppError("Bạn đã đánh giá sản phẩm này rồi", 409);
@@ -102,7 +174,8 @@ const createReview = async (
     title: title?.trim() || null,
     content: content?.trim() || null,
     images: images || [],
-    orderId: orderId || null,
+    orderId: verifiedOrderId,
+    status: "pending",
   });
   await review.populate("userId", "name avatar");
   return review;
@@ -259,6 +332,7 @@ const rejectReview = async (id, reason) => {
 module.exports = {
   getReviews,
   getReviewById,
+  getMyReview,
   createReview,
   updateReview,
   deleteReview,

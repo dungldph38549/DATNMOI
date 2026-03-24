@@ -3,6 +3,7 @@
 // ================================================================
 const mongoose = require("mongoose");
 const Product = require("../models/ProductModel");
+const { enrichProductPricing, normalizeSaleRules } = require("../utils/salePricing");
 
 // ── Helpers ────────────────────────────────────────────────────
 const tryParse = (str) => {
@@ -31,6 +32,9 @@ const normalizeVariants = (variants) =>
     images: Array.isArray(v.images) ? v.images : [],
     isActive: v.isActive !== false,
   }));
+
+const normalizeSaleRulesInput = (saleRules) =>
+  normalizeSaleRules(Array.isArray(saleRules) ? saleRules : []);
 
 // ================================================================
 // GET ALL — Admin (phân trang + filter + soft delete)
@@ -92,7 +96,7 @@ const getAllProducts = async (
   ]);
 
   return {
-    data: items,
+    data: items.map((item) => enrichProductPricing(item)),
     total,
     page: Number(page),
     limit: limitNum,
@@ -107,10 +111,11 @@ const getAllProductsAdmin = getAllProducts;
 // ================================================================
 const getProductById = async (id) => {
   if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
-  return Product.findById(id)
+  const product = await Product.findById(id)
     .populate("brandId", "name logo")
     .populate("categoryId", "name")
     .lean();
+  return product ? enrichProductPricing(product) : null;
 };
 
 const getProductDetail = getProductById;
@@ -141,6 +146,7 @@ const createProduct = async (newProduct) => {
     isVisible,
     isFeatured,
     tags,
+    saleRules,
   } = newProduct;
 
   if (!name || !description) throw new Error("Thiếu tên hoặc mô tả sản phẩm");
@@ -174,6 +180,7 @@ const createProduct = async (newProduct) => {
     isFeatured: !!isFeatured,
     tags: Array.isArray(tags) ? tags : [],
     attributes: Array.isArray(attributes) ? attributes : [],
+    saleRules: normalizeSaleRulesInput(saleRules),
   };
 
   if (!hasVar) {
@@ -217,6 +224,7 @@ const updateProduct = async (productId, updateData) => {
     isVisible,
     isFeatured,
     tags,
+    saleRules,
   } = updateData;
 
   const payload = {};
@@ -236,6 +244,7 @@ const updateProduct = async (productId, updateData) => {
   if (Array.isArray(srcImages)) payload.srcImages = srcImages;
   if (Array.isArray(tags)) payload.tags = tags;
   if (Array.isArray(attributes)) payload.attributes = attributes;
+  if (saleRules !== undefined) payload.saleRules = normalizeSaleRulesInput(saleRules);
 
   if (countInStock !== undefined || stock !== undefined) {
     const num = toNum(stock !== undefined ? stock : countInStock);
@@ -258,11 +267,12 @@ const updateProduct = async (productId, updateData) => {
     if (dup) throw new Error("Tên sản phẩm đã tồn tại");
   }
 
-  return Product.findByIdAndUpdate(
+  const updated = await Product.findByIdAndUpdate(
     productId,
     { $set: payload },
     { new: true, runValidators: true },
   );
+  return enrichProductPricing(updated);
 };
 
 // ================================================================
@@ -329,7 +339,7 @@ const getProducts = async (
   ]);
 
   return {
-    data,
+    data: data.map((item) => enrichProductPricing(item)),
     total,
     page: Number(page),
     limit: limitNum,
@@ -342,11 +352,12 @@ const getProducts = async (
 // ================================================================
 const getProductsByCategory = async (categoryId) => {
   if (!categoryId || !mongoose.Types.ObjectId.isValid(categoryId)) return [];
-  return Product.find({ categoryId, isDeleted: { $ne: true } })
+  const data = await Product.find({ categoryId, isDeleted: { $ne: true } })
     .populate("brandId", "name logo")
     .populate("categoryId", "name")
     .sort({ createdAt: -1 })
     .lean();
+  return data.map((item) => enrichProductPricing(item));
 };
 
 // ================================================================
@@ -356,12 +367,13 @@ const relationProduct = async (categoryId, brandId, excludeId) => {
   const query = { isDeleted: { $ne: true }, _id: { $ne: excludeId } };
   if (categoryId) query.categoryId = categoryId;
   if (brandId) query.brandId = brandId;
-  return Product.find(query)
+  const data = await Product.find(query)
     .populate("brandId", "name logo")
     .populate("categoryId", "name")
     .sort({ createdAt: -1 })
     .limit(8)
     .lean();
+  return data.map((item) => enrichProductPricing(item));
 };
 
 // ================================================================

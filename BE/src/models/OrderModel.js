@@ -54,6 +54,22 @@ const orderSchema = new mongoose.Schema(
           type: Number,
           required: true,
         },
+        basePrice: {
+          type: Number,
+          default: 0,
+        },
+        lineDiscount: {
+          type: Number,
+          default: 0,
+        },
+        appliedSaleRuleId: {
+          type: mongoose.Schema.Types.ObjectId,
+          default: null,
+        },
+        appliedSaleName: {
+          type: String,
+          default: null,
+        },
         attributes: {
           type: Object,
           default: {},
@@ -88,6 +104,7 @@ const orderSchema = new mongoose.Schema(
         "confirmed",
         "shipped",
         "delivered",
+        "received",
         "canceled",
         "return-request",
         "accepted",

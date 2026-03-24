@@ -11,7 +11,15 @@ import {
 import { FaTrashAlt, FaChevronDown, FaArrowRight } from "react-icons/fa";
 
 const ShoppingCartPage = () => {
-  const cartItems = useSelector((state) => state.cart.items);
+  const allCartItems = useSelector((state) => state.cart.items);
+  const cartItems = useMemo(
+    () =>
+      (allCartItems || []).filter(
+        (item) =>
+          !String(item?.cartKey || "").includes("::BUY_NOW::"),
+      ),
+    [allCartItems],
+  );
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [selectedItemKeys, setSelectedItemKeys] = useState([]);
@@ -104,7 +112,13 @@ const ShoppingCartPage = () => {
           size = found ? attrs[found] : null;
         }
         const label = size != null ? String(size) : String(v?.sku || "");
-        return { size: label, sku: v?.sku ? String(v.sku).trim().toUpperCase() : null, stock: Number(v?.stock ?? 0) };
+          return {
+            size: label,
+            sku: v?.sku ? String(v.sku).trim().toUpperCase() : null,
+            stock: Number(v?.stock ?? 0),
+            price: Number(v?.effectivePrice ?? v?.price ?? 0),
+            originalPrice: Number(v?.originalPrice ?? v?.price ?? 0),
+          };
       }).filter((v) => v.size);
       setVariantOptionsByProduct((prev) => ({ ...prev, [productId]: normalized }));
     } catch { setVariantOptionsByProduct((prev) => ({ ...prev, [productId]: [] })); }
@@ -122,7 +136,11 @@ const ShoppingCartPage = () => {
     const options = variantOptionsByProduct[variantModal.productId] || [];
     const selectedOption = options.find((o) => String(o.size) === String(variantModal.selectedSize)) || null;
     dispatch(updateCartVariant({
-      cartKey: variantModal.itemKey, sku: selectedOption?.sku || null, size: variantModal.selectedSize,
+      cartKey: variantModal.itemKey,
+      sku: selectedOption?.sku || null,
+      size: variantModal.selectedSize,
+      price: selectedOption?.price,
+      originalPrice: selectedOption?.originalPrice,
     }));
     setVariantModal({ open: false, itemKey: null, productId: null, currentSize: "", selectedSize: "" });
   };
@@ -196,6 +214,7 @@ const ShoppingCartPage = () => {
                   {cartItems.map((item) => {
                     const itemKey = getItemKey(item);
                     const unit = Number(item.price || 0);
+                    const originalUnit = Number(item.originalPrice ?? unit);
                     const qty = Number(item.qty || 1);
                     const maxStock = Number(stockByItemKey[itemKey]);
                     const hasStockData = Number.isFinite(maxStock);
@@ -232,6 +251,11 @@ const ShoppingCartPage = () => {
                               </button>
                             </div>
                             <div className="text-right">
+                              {originalUnit > unit && (
+                                <p className="text-xs font-semibold text-slate-400 line-through">
+                                  {formatMoney(originalUnit)}
+                                </p>
+                              )}
                               <p className="font-black text-lg text-secondary">{formatMoney(unit)}</p>
                               {unit !== unit * qty && <p className="text-xs font-semibold text-slate-400 mt-0.5">Tổng: {formatMoney(unit * qty)}</p>}
                             </div>

@@ -1,13 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import Product from "../../components/Product/Product";
-import { fetchProducts } from "../../api";
+import { fetchProducts, getReviewStatsByProduct, getVoucherByCode } from "../../api";
 import { FaFilter, FaTimes } from "react-icons/fa";
+import BackButton from "../../components/Common/BackButton";
 
 const PAGE_SIZE = 30;
 
 const ProductPage = () => {
+  const location = useLocation();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [voucherScope, setVoucherScope] = useState(null);
+  const [voucherLoading, setVoucherLoading] = useState(false);
+  const [reviewStatsByProductId, setReviewStatsByProductId] = useState({});
 
   const [sort, setSort] = useState("");
   const [price, setPrice] = useState("");
@@ -29,8 +35,74 @@ const ProductPage = () => {
     load();
   }, []);
 
+  useEffect(() => {
+    const voucherCode = new URLSearchParams(location.search).get("voucher");
+    if (!voucherCode) {
+      setVoucherScope(null);
+      return;
+    }
+    let cancelled = false;
+    const loadVoucher = async () => {
+      try {
+        setVoucherLoading(true);
+        const voucher = await getVoucherByCode(voucherCode);
+        if (cancelled) return;
+        setVoucherScope(voucher || null);
+      } catch {
+        if (!cancelled) setVoucherScope(null);
+      } finally {
+        if (!cancelled) setVoucherLoading(false);
+      }
+    };
+    loadVoucher();
+    return () => {
+      cancelled = true;
+    };
+  }, [location.search]);
+
+  useEffect(() => {
+    const ids = (Array.isArray(products) ? products : [])
+      .map((p) => String(p?._id || ""))
+      .filter(Boolean);
+    if (!ids.length) {
+      setReviewStatsByProductId({});
+      return;
+    }
+
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const statsList = await Promise.all(
+          ids.map(async (id) => {
+            try {
+              const res = await getReviewStatsByProduct(id);
+              const stats = res?.data ?? res ?? {};
+              return [id, stats];
+            } catch {
+              return [id, { average: 0, total: 0 }];
+            }
+          }),
+        );
+        if (cancelled) return;
+        setReviewStatsByProductId(Object.fromEntries(statsList));
+      } catch {
+        if (!cancelled) setReviewStatsByProductId({});
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
     let data = [...products];
+    const applicableIds = Array.isArray(voucherScope?.applicableProductIds)
+      ? voucherScope.applicableProductIds.map((id) => String(id))
+      : [];
+    if (applicableIds.length > 0) {
+      data = data.filter((p) => applicableIds.includes(String(p?._id)));
+    }
 
     const getMinPrice = (p) => {
       const pr = p?.priceRange;
@@ -43,20 +115,34 @@ const ProductPage = () => {
       return 0;
     };
 
+    const getProductRating = (p) => {
+      const id = String(p?._id || "");
+      const stats = id ? reviewStatsByProductId[id] : null;
+      const fromStats = Number(stats?.average);
+      if (Number.isFinite(fromStats)) return fromStats;
+      const fromProduct = Number(p?.rating);
+      if (Number.isFinite(fromProduct)) return fromProduct;
+      return 0;
+    };
+
     if (price === "low") data = data.filter((p) => getMinPrice(p) < 500000);
     if (price === "mid") data = data.filter((p) => getMinPrice(p) >= 500000 && getMinPrice(p) <= 2000000);
     if (price === "high") data = data.filter((p) => getMinPrice(p) > 2000000);
 
-    if (rating === "4") data = data.filter((p) => p.rating >= 4);
-    if (rating === "3") data = data.filter((p) => p.rating >= 3);
+    if (rating === "4") data = data.filter((p) => getProductRating(p) >= 4);
+    if (rating === "3") data = data.filter((p) => getProductRating(p) >= 3);
 
     if (sort === "priceAsc") data.sort((a, b) => getMinPrice(a) - getMinPrice(b));
     if (sort === "priceDesc") data.sort((a, b) => getMinPrice(b) - getMinPrice(a));
-    if (sort === "rating") data.sort((a, b) => b.rating - a.rating);
+    if (sort === "rating") data.sort((a, b) => getProductRating(b) - getProductRating(a));
     if (sort === "new") data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return data;
-  }, [products, price, rating, sort]);
+  }, [products, price, rating, sort, voucherScope, reviewStatsByProductId]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [price, rating, sort, voucherScope]);
 
   const totalPage = Math.ceil(filteredProducts.length / PAGE_SIZE);
   const showProducts = filteredProducts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -65,6 +151,14 @@ const ProductPage = () => {
     setPrice("");
     setRating("");
     setSort("");
+  };
+
+  const togglePriceFilter = (nextValue) => {
+    setPrice((prev) => (prev === nextValue ? "" : nextValue));
+  };
+
+  const toggleRatingFilter = (nextValue) => {
+    setRating((prev) => (prev === nextValue ? "" : nextValue));
   };
 
   return (
@@ -83,11 +177,35 @@ const ProductPage = () => {
       </div>
 
       <div className="container mx-auto px-4 max-w-7xl">
+        <div className="mb-6">
+          <BackButton />
+        </div>
+        {voucherScope && (
+          <div className="mb-6 bg-green-50 border border-green-100 rounded-2xl px-5 py-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-black text-green-700">
+                Đang chọn sản phẩm cho voucher: {String(voucherScope.code || "").toUpperCase()}
+              </p>
+              <p className="text-xs font-semibold text-green-600 mt-1">
+                {Array.isArray(voucherScope.applicableProductIds) && voucherScope.applicableProductIds.length > 0
+                  ? "Đang hiển thị các sản phẩm áp dụng voucher này."
+                  : "Voucher áp dụng toàn bộ sản phẩm."}
+              </p>
+            </div>
+            <Link
+              to={`/checkout?voucher=${encodeURIComponent(String(voucherScope.code || "").toUpperCase())}`}
+              className="h-10 px-4 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 transition-colors inline-flex items-center"
+            >
+              Đi đến thanh toán
+            </Link>
+          </div>
+        )}
+
         {/* TOP FILTER BAR */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-10 bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
           <div className="flex gap-2">
             <span className="bg-slate-100 text-slate-600 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2">
-              <FaFilter className="text-primary" /> {filteredProducts.length} Items
+              <FaFilter className="text-primary" /> {voucherLoading ? "Đang lọc voucher..." : `${filteredProducts.length} Items`}
             </span>
             {(price || rating || sort) && (
               <button onClick={clearAllFilter} className="bg-red-50 text-red-500 hover:bg-red-100 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1 transition-colors">
@@ -133,7 +251,8 @@ const ProductPage = () => {
                         name="price"
                         className="peer appearance-none w-5 h-5 border-2 border-slate-300 rounded-full checked:border-primary transition-colors cursor-pointer"
                         checked={price === item.id}
-                        onChange={() => setPrice(item.id)}
+                        onClick={() => togglePriceFilter(item.id)}
+                        onChange={() => {}}
                       />
                       <div className="absolute w-2.5 h-2.5 bg-primary rounded-full opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none"></div>
                     </div>
@@ -161,7 +280,8 @@ const ProductPage = () => {
                         name="rating"
                         className="peer appearance-none w-5 h-5 border-2 border-slate-300 rounded-[4px] checked:border-primary checked:bg-primary transition-colors cursor-pointer"
                         checked={rating === item.id}
-                        onChange={() => setRating(item.id)}
+                        onClick={() => toggleRatingFilter(item.id)}
+                        onChange={() => {}}
                       />
                       <FaFilter className="absolute text-white scale-0 peer-checked:scale-75 transition-transform pointer-events-none" size={10} />
                     </div>

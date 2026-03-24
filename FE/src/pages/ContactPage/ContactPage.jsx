@@ -1,5 +1,4 @@
 import React from "react";
-import { Link } from "react-router-dom";
 import { FaMapMarkerAlt, FaPhoneAlt, FaEnvelope, FaPaperPlane } from "react-icons/fa";
 
 const ContactPage = () => {

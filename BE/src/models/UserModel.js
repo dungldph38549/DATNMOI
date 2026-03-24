@@ -154,6 +154,13 @@ const userSchema = new mongoose.Schema(
     emailVerificationToken: { type: String },
     passwordResetToken: { type: String },
     passwordResetExpires: { type: Date },
+    // Giới hạn số đơn có áp voucher cho tài khoản (0 = không giới hạn).
+    // null/undefined sẽ dùng mức mặc định theo role trong OrderController.
+    voucherUsageLimit: {
+      type: Number,
+      min: [0, "voucherUsageLimit không được âm"],
+      default: null,
+    },
 
     deletedAt: { type: Date, default: null, index: true },
     deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
@@ -184,8 +191,9 @@ userSchema.virtual("currentMonthAttendance").get(function () {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const attendance = Array.isArray(this.attendance) ? this.attendance : [];
 
-  return this.attendance.filter(
+  return attendance.filter(
     (att) => att.date >= startOfMonth && att.date <= endOfMonth,
   );
 });
