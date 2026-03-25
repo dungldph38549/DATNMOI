@@ -12,8 +12,12 @@ const {
 // Tạo đơn hàng mới
 router.post("/", orderController.createOrder);
 
-// VNPay return URL (public - VNPay redirect về đây)
+// VNPay return URL (public - trình duyệt redirect sau thanh toán)
 router.get("/return-payment", orderController.returnPayment);
+
+// VNPay IPN (public - server VNPay gọi; đăng ký URL này trên cổng merchant sandbox)
+router.get("/vnpay-ipn", orderController.vnpayIpn);
+router.post("/vnpay-ipn", orderController.vnpayIpn);
 
 // Lấy tất cả đơn hàng (Admin only)
 router.get("/", authAdminMiddleware, orderController.getAllOrders);
@@ -56,6 +60,7 @@ router.put("/:id/reject-return", authAdminMiddleware, orderController.acceptOrRe
 
 // Cập nhật đơn hàng từ admin
 router.put("/:id", authAdminMiddleware, orderController.updateOrder);
+router.put("/admin/:id", authAdminMiddleware, orderController.updateOrder);
 
 // Cập nhật đơn hàng từ user
 router.patch("/:id", authMiddleware, orderController.updateOrderById);

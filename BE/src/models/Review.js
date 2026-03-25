@@ -118,7 +118,7 @@ const reviewSchema = new mongoose.Schema(
         values: ["pending", "approved", "rejected"],
         message: "Status không hợp lệ",
       },
-      default: "approved",
+      default: "pending",
       index: true,
     },
     rejectedReason: { type: String, default: null },
@@ -176,7 +176,8 @@ reviewSchema.virtual("trustBadge").get(function () {
   return this.verifiedPurchase ? "Đã mua hàng" : null;
 });
 reviewSchema.virtual("activeReplyCount").get(function () {
-  return this.replies?.filter((r) => !r.isDeleted).length ?? 0;
+  const replies = Array.isArray(this.replies) ? this.replies : [];
+  return replies.filter((r) => !r.isDeleted).length;
 });
 
 // ================================================================
@@ -213,45 +214,58 @@ reviewSchema.methods.editReview = function (updates, maxEdits = 3) {
 
 reviewSchema.methods.toggleLike = function (userId) {
   const id = userId.toString();
-  const i = this.likes.findIndex((u) => u.toString() === id);
+  const likes = Array.isArray(this.likes) ? this.likes : [];
+  const dislikes = Array.isArray(this.dislikes) ? this.dislikes : [];
+  const i = likes.findIndex((u) => u.toString() === id);
   if (i === -1) {
-    this.likes.push(userId);
-    this.dislikes = this.dislikes.filter((u) => u.toString() !== id);
+    likes.push(userId);
+    this.likes = likes;
+    this.dislikes = dislikes.filter((u) => u.toString() !== id);
   } else {
-    this.likes.splice(i, 1);
+    likes.splice(i, 1);
+    this.likes = likes;
   }
   return this.save();
 };
 
 reviewSchema.methods.toggleDislike = function (userId) {
   const id = userId.toString();
-  const i = this.dislikes.findIndex((u) => u.toString() === id);
+  const dislikes = Array.isArray(this.dislikes) ? this.dislikes : [];
+  const likes = Array.isArray(this.likes) ? this.likes : [];
+  const i = dislikes.findIndex((u) => u.toString() === id);
   if (i === -1) {
-    this.dislikes.push(userId);
-    this.likes = this.likes.filter((u) => u.toString() !== id);
+    dislikes.push(userId);
+    this.dislikes = dislikes;
+    this.likes = likes.filter((u) => u.toString() !== id);
   } else {
-    this.dislikes.splice(i, 1);
+    dislikes.splice(i, 1);
+    this.dislikes = dislikes;
   }
   return this.save();
 };
 
 reviewSchema.methods.addReply = function ({ userId, role, content }) {
+  if (!Array.isArray(this.replies)) this.replies = [];
   this.replies.push({ userId, role, content });
-  this.replyCount = this.replies.filter((r) => !r.isDeleted).length;
+  const replies = Array.isArray(this.replies) ? this.replies : [];
+  this.replyCount = replies.filter((r) => !r.isDeleted).length;
   return this.save();
 };
 
 reviewSchema.methods.softDeleteReply = function (replyId) {
+  if (!Array.isArray(this.replies)) this.replies = [];
   const reply = this.replies.id(replyId);
   if (!reply) throw new Error("Không tìm thấy reply");
   reply.isDeleted = true;
   reply.deletedAt = new Date();
-  this.replyCount = this.replies.filter((r) => !r.isDeleted).length;
+  const replies = Array.isArray(this.replies) ? this.replies : [];
+  this.replyCount = replies.filter((r) => !r.isDeleted).length;
   return this.save();
 };
 
 reviewSchema.methods.getRepliesPaginated = function (page = 1, limit = 5) {
-  const active = this.replies.filter((r) => !r.isDeleted);
+  const replies = Array.isArray(this.replies) ? this.replies : [];
+  const active = replies.filter((r) => !r.isDeleted);
   const total = active.length;
   const items = active.slice((page - 1) * limit, page * limit);
   return {
@@ -340,19 +354,19 @@ reviewSchema.statics.checkRateLimit = async function (userId, maxPerHour = 5) {
 // ================================================================
 // HOOKS
 // ================================================================
-reviewSchema.pre("save", function (next) {
+reviewSchema.pre("save", function () {
   if (this.isNew && this.orderId) this.verifiedPurchase = true;
-  next();
 });
 
-reviewSchema.pre("save", function (next) {
+reviewSchema.pre("save", function () {
   const strip = (s) => s?.replace(/<[^>]*>/g, "").trim() ?? s;
   if (this.isModified("content")) this.content = strip(this.content);
   if (this.isModified("title")) this.title = strip(this.title);
-  this.replies.forEach((r) => {
+  const replies = Array.isArray(this.replies) ? this.replies : [];
+  replies.forEach((r) => {
     if (r.isNew) r.content = strip(r.content);
   });
-  next();
+  this.replies = replies;
 });
 
 // ================================================================

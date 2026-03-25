@@ -1,14 +1,14 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Form, Select, InputNumber } from "antd";
 import Swal from "sweetalert2";
 import ProductDetail from "./ProductDetail.jsx";
 import {
   getAllProducts,
-  deleteProductById,
   restoreProductById,
   getAllCategories,
   getAllBrands,
+  getInventoryList,
 } from "./../api/index";
 
 // ── Design tokens ──────────────────────────────────────────────
@@ -203,6 +203,73 @@ const VariantTable = ({ variants }) => {
   );
 };
 
+const getAdminDisplayPrice = (record) => {
+  const effectiveMin = Number(record?.priceRange?.min);
+  const effectiveMax = Number(record?.priceRange?.max);
+  const originalMin = Number(record?.originalPriceRange?.min ?? record?.originalPrice);
+  const originalMax = Number(record?.originalPriceRange?.max ?? record?.originalPrice);
+
+  if (
+    Number.isFinite(effectiveMin) &&
+    Number.isFinite(effectiveMax) &&
+    Number.isFinite(originalMin) &&
+    Number.isFinite(originalMax) &&
+    (effectiveMin < originalMin || effectiveMax < originalMax)
+  ) {
+    const saleText =
+      effectiveMin === effectiveMax
+        ? `${effectiveMin.toLocaleString("vi-VN")}₫`
+        : `${effectiveMin.toLocaleString("vi-VN")} - ${effectiveMax.toLocaleString("vi-VN")}₫`;
+    const originalText =
+      originalMin === originalMax
+        ? `${originalMin.toLocaleString("vi-VN")}₫`
+        : `${originalMin.toLocaleString("vi-VN")} - ${originalMax.toLocaleString("vi-VN")}₫`;
+    return `${saleText} (gốc ${originalText})`;
+  }
+
+  const minFromRange = Number(record?.priceRange?.min);
+  const maxFromRange = Number(record?.priceRange?.max);
+
+  if (Number.isFinite(minFromRange) && Number.isFinite(maxFromRange)) {
+    return minFromRange === maxFromRange
+      ? `${minFromRange.toLocaleString("vi-VN")}₫`
+      : `${minFromRange.toLocaleString("vi-VN")} - ${maxFromRange.toLocaleString("vi-VN")}₫`;
+  }
+
+  if (Array.isArray(record?.variants) && record.variants.length > 0) {
+    const prices = record.variants
+      .map((v) => Number(v?.price))
+      .filter((n) => Number.isFinite(n));
+    if (prices.length > 0) {
+      const min = Math.min(...prices);
+      const max = Math.max(...prices);
+      return min === max
+        ? `${min.toLocaleString("vi-VN")}₫`
+        : `${min.toLocaleString("vi-VN")} - ${max.toLocaleString("vi-VN")}₫`;
+    }
+  }
+
+  const single = Number(record?.price);
+  if (Number.isFinite(single)) return `${single.toLocaleString("vi-VN")}₫`;
+  return "—";
+};
+
+const getAdminStockCount = (record, inventoryByProductId = {}) => {
+  if (Array.isArray(record?.variants) && record.variants.length > 0) {
+    const inventoryStock = Number(inventoryByProductId?.[record?._id]);
+    if (Number.isFinite(inventoryStock)) return inventoryStock;
+
+    const totalVariantStock = record.variants.reduce((sum, v) => {
+      const n = Number(v?.stock);
+      return sum + (Number.isFinite(n) ? n : 0);
+    }, 0);
+    return totalVariantStock;
+  }
+
+  const singleStock = Number(record?.countInStock ?? record?.stock);
+  return Number.isFinite(singleStock) ? singleStock : null;
+};
+
 // ── Pagination ─────────────────────────────────────────────────
 const Pagination = ({ page, total, limit, onChange }) => {
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -234,7 +301,7 @@ const Pagination = ({ page, total, limit, onChange }) => {
     fontWeight: active ? 700 : 500,
     fontSize: 13,
     cursor: "pointer",
-    fontFamily: "'Lexend', sans-serif",
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
     padding: "0 10px",
   });
   return (
@@ -353,33 +420,16 @@ export default function Products() {
       getAllProducts({ page: page - 1, limit, isListProductRemoved, filter }),
     keepPreviousData: true,
   });
+  const { data: inventoryList } = useQuery({
+    queryKey: ["admin-inventory-list"],
+    queryFn: () => getInventoryList({}),
+    keepPreviousData: true,
+  });
 
   // ── Handlers ───────────────────────────────────────────────
   const handleList = () => {
     setIsListProductRemoved((prev) => (prev === 1 ? 0 : 1));
     setPage(1);
-  };
-
-  const handleDelete = async (id) => {
-    const result = await Swal.fire({
-      title: "Xoá sản phẩm này?",
-      text: "Hành động này không thể hoàn tác!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#EF4444",
-      cancelButtonColor: "#94A3B8",
-      confirmButtonText: "Xoá",
-      cancelButtonText: "Huỷ",
-    });
-    if (result.isConfirmed) {
-      try {
-        await deleteProductById({ id });
-        queryClient.invalidateQueries({ queryKey: ["admin-products"] });
-        Swal.fire("Đã xoá!", "Sản phẩm đã được xoá.", "success");
-      } catch {
-        Swal.fire("Thất bại", "Không thể xoá sản phẩm.", "error");
-      }
-    }
   };
 
   const handleRestore = async (id) => {
@@ -426,6 +476,15 @@ export default function Products() {
     if (!search.trim()) return true;
     return p.name?.toLowerCase().includes(search.toLowerCase());
   });
+  const inventoryByProductId = (inventoryList || []).reduce((acc, inv) => {
+    const productId =
+      typeof inv?.productId === "object" ? inv?.productId?._id : inv?.productId;
+    if (!productId) return acc;
+    const available = Number(inv?.available);
+    if (!Number.isFinite(available)) return acc;
+    acc[productId] = Number(acc[productId] || 0) + available;
+    return acc;
+  }, {});
 
   // ── ProductDetail view ─────────────────────────────────────
   if (productSelected) {
@@ -443,7 +502,6 @@ export default function Products() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
         .material-symbols-outlined { font-family:'Material Symbols Outlined'; font-style:normal; line-height:1; text-transform:none; display:inline-block; white-space:nowrap; font-size:24px; }
         @keyframes fadeIn  { from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)} }
@@ -452,7 +510,7 @@ export default function Products() {
         .sh-filter .ant-input, .sh-filter .ant-input-number,
         .sh-filter .ant-select-selector {
           border-radius: 10px !important;
-          font-family: 'Lexend', sans-serif !important;
+          font-family: 'Plus Jakarta Sans', sans-serif !important;
           font-size: 13px !important;
           border: 1.5px solid #E2E8F0 !important;
         }
@@ -467,7 +525,7 @@ export default function Products() {
       <div
         style={{
           padding: 28,
-          fontFamily: "'Lexend', sans-serif",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
           minHeight: "100vh",
           background: T.bg,
         }}
@@ -514,7 +572,7 @@ export default function Products() {
                 fontWeight: 600,
                 fontSize: 12,
                 cursor: "pointer",
-                fontFamily: "'Lexend', sans-serif",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
                 borderColor: isListProductRemoved ? T.primary : T.border,
               }}
             >
@@ -540,7 +598,7 @@ export default function Products() {
                 fontWeight: 700,
                 fontSize: 13,
                 cursor: "pointer",
-                fontFamily: "'Lexend', sans-serif",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
                 boxShadow: "0 4px 14px rgba(244,157,37,0.30)",
               }}
             >
@@ -593,7 +651,7 @@ export default function Products() {
                   outline: "none",
                   fontSize: 13,
                   color: T.text,
-                  fontFamily: "'Lexend', sans-serif",
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
                   background: "#F8FAFC",
                   boxSizing: "border-box",
                 }}
@@ -615,7 +673,7 @@ export default function Products() {
                 fontSize: 12,
                 fontWeight: 600,
                 cursor: "pointer",
-                fontFamily: "'Lexend', sans-serif",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
                 whiteSpace: "nowrap",
               }}
             >
@@ -662,7 +720,7 @@ export default function Products() {
                         borderRadius: 10,
                         border: `1.5px solid ${T.border}`,
                         fontSize: 13,
-                        fontFamily: "'Lexend', sans-serif",
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
                         outline: "none",
                       }}
                       onFocus={(e) => (e.target.style.borderColor = T.primary)}
@@ -722,7 +780,7 @@ export default function Products() {
                         fontWeight: 600,
                         fontSize: 12,
                         cursor: "pointer",
-                        fontFamily: "'Lexend', sans-serif",
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
                       }}
                     >
                       Lọc
@@ -739,7 +797,7 @@ export default function Products() {
                         fontWeight: 600,
                         fontSize: 12,
                         cursor: "pointer",
-                        fontFamily: "'Lexend', sans-serif",
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
                       }}
                     >
                       Reset
@@ -881,10 +939,13 @@ export default function Products() {
                   ) : (
                     products.map((record) => {
                       const isExpanded = expandedRow === record._id;
+                      const stockCount = getAdminStockCount(
+                        record,
+                        inventoryByProductId,
+                      );
                       return (
-                        <>
+                        <React.Fragment key={record._id}>
                           <tr
-                            key={record._id}
                             className="sh-prod-row"
                             style={{
                               borderBottom: `1px solid #F1F5F9`,
@@ -1033,31 +1094,17 @@ export default function Products() {
                                 whiteSpace: "nowrap",
                               }}
                             >
-                              {record.hasVariants
-                                ? "—"
-                                : `${record.price?.toLocaleString("vi-VN")}₫`}
+                              {getAdminDisplayPrice(record)}
                             </td>
                             {/* Stock */}
                             <td style={{ padding: "12px 16px" }}>
-                              {record.hasVariants ? (
-                                <span
-                                  style={{ fontSize: 12, color: T.textMuted }}
-                                >
-                                  Có biến thể
-                                </span>
-                              ) : (
-                                <StockBar count={record.countInStock} />
-                              )}
+                              <StockBar count={stockCount} />
                             </td>
                             {/* Status */}
                             <td style={{ padding: "12px 16px" }}>
                               <StatusBadge
                                 deleted={!!record.deletedAt}
-                                count={
-                                  record.hasVariants
-                                    ? undefined
-                                    : record.countInStock
-                                }
+                                count={stockCount}
                               />
                             </td>
                             {/* Created date */}
@@ -1091,7 +1138,7 @@ export default function Products() {
                                         fontSize: 12,
                                         fontWeight: 600,
                                         cursor: "pointer",
-                                        fontFamily: "'Lexend', sans-serif",
+                                        fontFamily: "'Plus Jakarta Sans', sans-serif",
                                         display: "flex",
                                         alignItems: "center",
                                         gap: 4,
@@ -1115,42 +1162,6 @@ export default function Products() {
                                       </span>
                                       Sửa
                                     </button>
-                                    <button
-                                      onClick={() => handleDelete(record._id)}
-                                      style={{
-                                        padding: "6px 10px",
-                                        borderRadius: 8,
-                                        border: `1.5px solid ${T.border}`,
-                                        background: "#fff",
-                                        color: T.textMuted,
-                                        fontSize: 12,
-                                        cursor: "pointer",
-                                        display: "flex",
-                                        alignItems: "center",
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        e.currentTarget.style.borderColor =
-                                          T.red;
-                                        e.currentTarget.style.color = T.red;
-                                        e.currentTarget.style.background =
-                                          T.redBg;
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        e.currentTarget.style.borderColor =
-                                          T.border;
-                                        e.currentTarget.style.color =
-                                          T.textMuted;
-                                        e.currentTarget.style.background =
-                                          "#fff";
-                                      }}
-                                    >
-                                      <span
-                                        className="material-symbols-outlined"
-                                        style={{ fontSize: 14 }}
-                                      >
-                                        delete
-                                      </span>
-                                    </button>
                                   </>
                                 )}
                                 {record.deletedAt && (
@@ -1165,7 +1176,7 @@ export default function Products() {
                                       fontSize: 12,
                                       fontWeight: 600,
                                       cursor: "pointer",
-                                      fontFamily: "'Lexend', sans-serif",
+                                      fontFamily: "'Plus Jakarta Sans', sans-serif",
                                       display: "flex",
                                       alignItems: "center",
                                       gap: 4,
@@ -1187,7 +1198,6 @@ export default function Products() {
                           {/* Expanded variant row */}
                           {isExpanded && (
                             <tr
-                              key={`${record._id}-variants`}
                               style={{ background: "#FFFBF5" }}
                             >
                               <td
@@ -1201,7 +1211,7 @@ export default function Products() {
                               </td>
                             </tr>
                           )}
-                        </>
+                        </React.Fragment>
                       );
                     })
                   )}

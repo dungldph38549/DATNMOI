@@ -15,6 +15,25 @@ import axiosInstance from "./axiosConfig";
 //   return res.data;
 // };
 
+export const addToCartAPI = async (payload) => {
+  // Back-end: POST /api/cart/:userId/items
+  // payload: { userId, productId, qty, sku?, size? }
+  const { userId, productId, qty, sku, size } = payload || {};
+  if (!userId || !productId) throw new Error("Missing userId or productId");
+  const res = await axiosInstance.post(`/cart/${userId}/items`, {
+    productId,
+    qty,
+    sku: sku ?? null,
+    size: size ?? null,
+  });
+  return res.data;
+};
+
+export const getCart = async (userId) => {
+  const res = await axiosInstance.get(`/cart/${userId}`);
+  return res.data;
+};
+
 // ================== User ==================
 
 export const loginUser = async (payload) => {
@@ -33,7 +52,8 @@ export const getUserById = async (id) => {
 };
 
 export const updateUserById = async (id, payload) => {
-  const res = await axiosInstance.put(`/user/update/${id}`, payload);
+  // Backend admin update: PUT /api/user/admin/:id
+  const res = await axiosInstance.put(`/user/admin/${id}`, payload);
   return res.data;
 };
 
@@ -43,7 +63,12 @@ export const updateCustomerById = async (payload) => {
 };
 
 export const getAllUser = async (page, limit) => {
+  // Backend staff list (có phân trang): GET /api/user/list?page=&limit=
+
+  // Admin: danh sách user có phân trang
+  // Backend: GET /api/user/list?page=&limit=
   const res = await axiosInstance.get(`/user/list?page=${page}&limit=${limit}`);
+
   return res.data;
 };
 // ================== Product API ==================
@@ -217,6 +242,15 @@ export const toggleVisible = async ({ id }) => {
   return res.data;
 };
 
+export const getProductSaleReport = async ({ startDate, endDate } = {}) => {
+  const params = new URLSearchParams();
+  if (startDate) params.append("startDate", startDate);
+  if (endDate) params.append("endDate", endDate);
+  const query = params.toString();
+  const res = await axiosInstance.get(`/product/admin/sale-report${query ? `?${query}` : ""}`);
+  return res.data;
+};
+
 // ── UPLOAD ────────────────────────────────────────────────────
 
 export const uploadImage = async (payload) => {
@@ -314,6 +348,62 @@ export const deleteCategories = async (ids) => {
   return res.data;
 };
 
+// ================== Inventory API (Admin) ==================
+
+const inventoryData = (res) => res?.data?.data ?? res?.data;
+
+/** GET /api/inventory/admin/list?status=&q= */
+export const getInventoryList = async (params = {}) => {
+  const res = await axiosInstance.get("/inventory/admin/list", { params });
+  return inventoryData(res);
+};
+
+/** GET /api/inventory/:id */
+export const getInventoryById = async (id) => {
+  const res = await axiosInstance.get(`/inventory/${id}`);
+  return inventoryData(res);
+};
+
+/** GET /api/inventory/:id/logs?page=&limit=&type= */
+export const getInventoryLogs = async (id, params = {}) => {
+  const res = await axiosInstance.get(`/inventory/${id}/logs`, { params });
+  return inventoryData(res);
+};
+
+/** POST /api/inventory/:id/import — body: { qty, warehouseId, note } */
+export const importInventoryStock = async (id, body) => {
+  const res = await axiosInstance.post(`/inventory/${id}/import`, body);
+  return inventoryData(res);
+};
+
+/** POST /api/inventory — create inventory by SKU
+ * Body: { productId, variantId?, sku, lowStockThreshold? }
+ */
+export const createInventory = async (payload) => {
+  const res = await axiosInstance.post("/inventory", payload);
+  return inventoryData(res);
+};
+
+/** PATCH /api/inventory/:id/adjust — body: { newQty, warehouseId?, note } */
+export const adjustInventoryStock = async (id, body) => {
+  const res = await axiosInstance.patch(`/inventory/${id}/adjust`, body);
+  return inventoryData(res);
+};
+
+/** POST /api/inventory/:id/transfer — body: { qty, fromWarehouseId, toWarehouseId, note } */
+export const transferInventoryStock = async (id, body) => {
+  const res = await axiosInstance.post(`/inventory/${id}/transfer`, body);
+  return inventoryData(res);
+};
+
+// ================== Warehouse API ==================
+
+/** GET /api/warehouses */
+export const getWarehouses = async (params = {}) => {
+  const res = await axiosInstance.get("/warehouses", { params });
+  return res?.data?.data ?? res?.data ?? [];
+};
+
 // ================== Order API ==================
 
 export const createOrder = async (payload) => {
@@ -328,18 +418,47 @@ export const getOrdersByUser = async (userId, page = 1, limit = 10) => {
   return res.data;
 };
 
+export const getOrdersByUserOrGuest = async ({
+  userId,
+  guestId,
+  page = 1,
+  limit = 10,
+} = {}) => {
+  const params = { page, limit };
+  if (userId) params.userId = userId;
+  if (guestId) params.guestId = guestId;
+  const res = await axiosInstance.get(`/order/user`, { params });
+  return res.data;
+};
+
 export const getOrderById = async (id) => {
   const res = await axiosInstance.get(`/order/${id}`);
   return res.data;
 };
 
 export const updateOrderStatus = async (id, body) => {
-  const res = await axiosInstance.put(`/order/${id}`, body);
-  return res.data;
+  const endpoints = [`/order/${id}`, `/order/admin/${id}`];
+  let lastError = null;
+  for (const endpoint of endpoints) {
+    try {
+      const res = await axiosInstance.put(endpoint, body);
+      return res.data;
+    } catch (err) {
+      lastError = err;
+      // Nếu 404 thì thử endpoint tiếp theo, các lỗi khác ném luôn.
+      if (err?.response?.status !== 404) break;
+    }
+  }
+  throw lastError;
 };
 
 export const confirmDelivery = async (id) => {
   const res = await axiosInstance.post(`/order/comfirmDelivery/${id}`);
+  return res.data;
+};
+
+export const cancelOrderByUser = async (id) => {
+  const res = await axiosInstance.patch(`/order/${id}`, { status: "canceled" });
   return res.data;
 };
 
@@ -370,9 +489,7 @@ export const rejectReturn = async (id, note) => {
 
 // Admin: lấy tất cả đơn hàng
 export const getAllOrders = async (page = 0, limit = 10) => {
-  const res = await axiosInstance.get(
-    `/order?page=${page}&limit=${limit}`,
-  );
+  const res = await axiosInstance.get(`/order?page=${page}&limit=${limit}`);
   return res.data;
 };
 
@@ -404,14 +521,110 @@ export const deleteVoucher = async (id) => {
 };
 
 export const getVoucherByCode = async (code) => {
-  const list = await getAllVouchers();
-  const data = list?.data || list;
-  const arr = Array.isArray(data) ? data : data?.data || [];
-  return (
-    arr.find(
-      (v) =>
-        v.code &&
-        v.code.trim().toUpperCase() === String(code).trim().toUpperCase(),
-    ) || null
-  );
+  const normalizedCode = String(code || "").trim().toUpperCase();
+  if (!normalizedCode) return null;
+  try {
+    const res = await axiosInstance.get(
+      `/voucher/code/${encodeURIComponent(normalizedCode)}`,
+    );
+    return res?.data?.data || res?.data || null;
+  } catch (err) {
+    if (err?.response?.status === 404) return null;
+    throw err;
+  }
+};
+
+// ================== Size API ==================
+
+export const getAllSizes = async () => {
+  const res = await axiosInstance.get("/size/get-all");
+  return res.data;
+};
+
+export const createSize = async (payload) => {
+  const res = await axiosInstance.post("/size/create", payload);
+  return res.data;
+};
+
+export const updateSize = async (id, payload) => {
+  const res = await axiosInstance.put(`/size/update/${id}`, payload);
+  return res.data;
+};
+
+export const deleteSize = async (id) => {
+  const res = await axiosInstance.delete(`/size/delete/${id}`);
+  return res.data;
+};
+
+// ================== Review API (Customer) ==================
+/**
+ * GET /api/reviews
+ * Query params: productId, page, limit, rating, verified, sort
+ */
+export const getProductReviews = async ({
+  productId,
+  page = 1,
+  limit = 10,
+  rating,
+  verified,
+  sort = "newest",
+} = {}) => {
+  const res = await axiosInstance.get("/reviews", {
+    params: {
+      productId,
+      page,
+      limit,
+      rating,
+      verified,
+      sort,
+    },
+  });
+  return res.data;
+};
+
+/**
+ * GET /api/reviews/stats/:productId
+ */
+export const getReviewStatsByProduct = async (productId) => {
+  const res = await axiosInstance.get(`/reviews/stats/${productId}`);
+  return res.data;
+};
+
+/**
+ * POST /api/reviews
+ * Body: { productId, rating, title, content, images, orderId? }
+ */
+export const createReview = async (payload) => {
+  const res = await axiosInstance.post("/reviews", payload);
+  return res.data;
+};
+
+export const getMyReviewByProduct = async (productId) => {
+  const res = await axiosInstance.get("/reviews/mine", {
+    params: { productId },
+  });
+  return res?.data?.data ?? null;
+};
+
+// ================== Review API (Admin) ==================
+export const getAdminReviews = async ({
+  status = "pending",
+  productId,
+} = {}) => {
+  const res = await axiosInstance.get("/admin/reviews", {
+    params: { status, productId },
+  });
+  return res.data;
+};
+
+export const approveAdminReview = async (id) => {
+  const res = await axiosInstance.patch(`/admin/reviews/${id}/approve`);
+  return res.data;
+};
+
+export const rejectAdminReview = async (id, reason = "") => {
+  const res = await axiosInstance.patch(`/admin/reviews/${id}/reject`, {
+    reason,
+  });
+  return res.data;
 };

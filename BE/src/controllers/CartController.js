@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
-const Cart = require("../model/CartModel");
-const Product = require("../model/ProductModel");
+const Cart = require("../models/CartModel");
+const Product = require("../models/ProductModel");
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -36,7 +36,11 @@ const getCart = async (req, res, next) => {
       },
     });
   } catch (err) {
-    next(err);
+    if (typeof next === "function") return next(err);
+    return res.status(500).json({
+      status: "ERR",
+      message: err?.message || "Internal server error",
+    });
   }
 };
 
@@ -44,7 +48,7 @@ const getCart = async (req, res, next) => {
 const addItem = async (req, res, next) => {
   try {
     const { userId } = req.params;
-    const { productId, qty } = req.body || {};
+    const { productId, qty, sku, size } = req.body || {};
 
     if (!isValidObjectId(userId)) {
       return res
@@ -73,7 +77,39 @@ const addItem = async (req, res, next) => {
         .json({ status: "ERR", message: "Sản phẩm không tồn tại" });
     }
 
-    if (product.countInStock < quantity) {
+    // Nếu có SKU (product có variants) thì kiểm tra tồn kho theo biến thể.
+    let availableStock = 0;
+    let variantPrice = product.price;
+    let variantSize = size ?? null;
+
+    if (sku && product?.hasVariants) {
+      const variant = product.variants.find((v) => v.sku === sku);
+      if (!variant) {
+        return res.status(400).json({
+          status: "ERR",
+          message: `Không tìm thấy biến thể SKU ${sku}`,
+        });
+      }
+      availableStock = variant.stock ?? 0;
+      variantPrice = variant.price ?? product.price;
+      // Map attributes trong Mongoose có thể là Map hoặc object tuỳ trường hợp
+      const maybeGet = variant?.attributes?.get?.("Size");
+      variantSize = size ?? maybeGet ?? variant?.attributes?.Size ?? null;
+    } else {
+      // Không có SKU → lấy tồn kho tổng sản phẩm
+      availableStock = product.stock ?? product.countInStock ?? product?.totalStock ?? 0;
+      // Nếu product có variants mà chưa gửi SKU, vẫn cố gắng lấy tồn kho tổng để tránh lỗi.
+      if (availableStock === 0 && product?.hasVariants && Array.isArray(product.variants)) {
+        availableStock = product.variants.reduce((sum, v) => sum + (v.stock ?? 0), 0);
+        if (!variantPrice && product.variants[0]) variantPrice = product.variants[0].price ?? product.price;
+        if (!variantSize && product.variants[0]?.attributes) {
+          const firstSize = product.variants[0]?.attributes?.get?.("Size");
+          variantSize = firstSize ?? product.variants[0]?.attributes?.Size ?? null;
+        }
+      }
+    }
+
+    if (availableStock < quantity) {
       return res.status(400).json({
         status: "ERR",
         message: "Số lượng vượt quá tồn kho",
@@ -88,7 +124,22 @@ const addItem = async (req, res, next) => {
 
     if (existing) {
       const newQty = existing.qty + quantity;
-      if (newQty > product.countInStock) {
+      // Nếu thêm cùng sản phẩm nhưng SKU thay đổi → cập nhật SKU/size/price cho đúng biến thể.
+      if (sku && existing.sku !== sku) {
+        existing.sku = sku;
+        existing.size = variantSize;
+        existing.price = variantPrice ?? existing.price;
+      }
+
+      // Tính lại availableStock theo SKU hiện tại nếu có.
+      const currentSku = sku ?? existing.sku;
+      let currentAvailableStock = availableStock;
+      if (currentSku && product?.hasVariants) {
+        const variant = product.variants.find((v) => v.sku === currentSku);
+        currentAvailableStock = variant?.stock ?? 0;
+      }
+
+      if (newQty > currentAvailableStock) {
         return res.status(400).json({
           status: "ERR",
           message: "Tổng số lượng trong giỏ vượt quá tồn kho",
@@ -98,9 +149,11 @@ const addItem = async (req, res, next) => {
     } else {
       cart.items.push({
         product: product._id,
+        sku: product?.hasVariants ? sku ?? null : null,
+        size: product?.hasVariants ? variantSize : null,
         name: product.name,
         image: product.image,
-        price: product.price,
+        price: product?.hasVariants ? variantPrice ?? product.price : product.price,
         qty: quantity,
       });
     }
@@ -119,7 +172,11 @@ const addItem = async (req, res, next) => {
       },
     });
   } catch (err) {
-    next(err);
+    if (typeof next === "function") return next(err);
+    return res.status(500).json({
+      status: "ERR",
+      message: err?.message || "Internal server error",
+    });
   }
 };
 
@@ -167,7 +224,18 @@ const updateItemQty = async (req, res, next) => {
           .json({ status: "ERR", message: "Sản phẩm không tồn tại" });
       }
 
-      if (quantity > product.countInStock) {
+      // Nếu item có SKU (variant) thì kiểm tra theo SKU.
+      let availableStock = product.stock ?? product.countInStock ?? product?.totalStock ?? 0;
+      if (item?.sku && product?.hasVariants) {
+        const variant = product.variants.find((v) => v.sku === item.sku);
+        availableStock = variant?.stock ?? 0;
+      }
+      // Fallback: nếu product có variants nhưng không có sku hợp lệ → lấy tổng tồn kho.
+      if (availableStock === 0 && product?.hasVariants && Array.isArray(product.variants)) {
+        availableStock = product.variants.reduce((sum, v) => sum + (v.stock ?? 0), 0);
+      }
+
+      if (quantity > availableStock) {
         return res.status(400).json({
           status: "ERR",
           message: "Số lượng vượt quá tồn kho",
@@ -191,7 +259,11 @@ const updateItemQty = async (req, res, next) => {
       },
     });
   } catch (err) {
-    next(err);
+    if (typeof next === "function") return next(err);
+    return res.status(500).json({
+      status: "ERR",
+      message: err?.message || "Internal server error",
+    });
   }
 };
 
@@ -233,7 +305,11 @@ const removeItem = async (req, res, next) => {
       },
     });
   } catch (err) {
-    next(err);
+    if (typeof next === "function") return next(err);
+    return res.status(500).json({
+      status: "ERR",
+      message: err?.message || "Internal server error",
+    });
   }
 };
 
@@ -264,7 +340,11 @@ const clearCart = async (req, res, next) => {
       },
     });
   } catch (err) {
-    next(err);
+    if (typeof next === "function") return next(err);
+    return res.status(500).json({
+      status: "ERR",
+      message: err?.message || "Internal server error",
+    });
   }
 };
 

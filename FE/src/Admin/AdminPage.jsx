@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import Order from "./Order";
 import Products from "./Products";
 import Categories from "./Categories";
@@ -7,13 +7,25 @@ import Brands from "./Brands";
 import Dashboard from "./Dashboard";
 import Users from "./Users";
 import Vouchers from "./Vouchers";
+import Sizes from "./Sizes";
 import InventoryDashboard from "./Inventorydashboard";
+import Reviews from "./Reviews";
 // import OrderReturn from "./OrderReturn";
 // import Comments from "./Comments";
-// import InventoryManagement from "./InventoryManagement";
 // import StaffManagement from "./StaffManagement";
 import { Link, useNavigate } from "react-router-dom";
 import { clearUser } from "../redux/user";
+
+const getAdminSession = () => {
+  try {
+    const raw =
+      localStorage.getItem("admin_v1") || localStorage.getItem("admin");
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
 
 // ================================================================
 // Design tokens — SneakerHouse
@@ -70,6 +82,12 @@ const MENU = [
     desc: "Mã giảm giá & khuyến mãi",
   },
   {
+    key: "sizes",
+    icon: "straighten",
+    label: "Size",
+    desc: "Danh sách size cho biến thể",
+  },
+  {
     key: "categories",
     icon: "category",
     label: "Danh mục",
@@ -122,7 +140,7 @@ const SideItem = ({ item, active, onClick }) => (
       borderRadius: 12,
       border: "none",
       cursor: "pointer",
-      fontFamily: "'Lexend', sans-serif",
+      fontFamily: "'Plus Jakarta Sans', sans-serif",
       transition: "all 0.15s",
       background: active ? T.primaryBg : "transparent",
       color: active ? T.primary : T.textMid,
@@ -167,40 +185,71 @@ const SideItem = ({ item, active, onClick }) => (
 // ================================================================
 // AdminPage
 // ================================================================
+const getMobileMatch = () => {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(max-width: 767px)").matches;
+};
+
 const AdminPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const user = useSelector((state) => state.user);
+  const [adminSession, setAdminSession] = useState(() => getAdminSession());
   const [selectedMenu, setSelectedMenu] = useState("dashboard");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? getMobileMatch() : false,
+  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    typeof window !== "undefined" ? getMobileMatch() : false,
+  );
 
-  // ── resize handler ──
+  // ── mobile / desktop (matchMedia ổn định hơn innerWidth khi zoom / DevTools) ──
   useEffect(() => {
-    const onResize = () => {
-      const mobile = window.innerWidth < 768;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const apply = () => {
+      const mobile = mq.matches;
       setIsMobile(mobile);
-      setSidebarCollapsed(mobile);
+      if (mobile) setSidebarCollapsed(true);
+      else setSidebarCollapsed(false);
     };
-    window.addEventListener("resize", onResize);
-    onResize();
-    return () => window.removeEventListener("resize", onResize);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
   }, []);
 
-  // ── auth guard ──
-  // useEffect(() => {
-  //   if (!user || !user.login || !user.isAdmin) {
-  //     navigate("/login");
-  //   }
-  // }, [user, navigate]);
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape" && isMobile && !sidebarCollapsed) {
+        setSidebarCollapsed(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isMobile, sidebarCollapsed]);
+
+  // ── auth guard (admin only) ──
+  useEffect(() => {
+    const freshAdmin = getAdminSession();
+    setAdminSession(freshAdmin);
+
+    const isLoggedIn = !!freshAdmin?.login;
+    const isAdmin = !!freshAdmin?.isAdmin;
+
+    // Nếu chưa đăng nhập -> chuyển về trang login
+    if (!isLoggedIn) {
+      navigate("/login");
+      return;
+    }
+
+    // Nếu đã đăng nhập nhưng không phải admin -> chặn truy cập admin
+    if (!isAdmin) {
+      navigate("/login", { replace: true });
+    }
+  }, [navigate]);
 
   const handleMenuClick = (key) => {
-    // Tạm thời bỏ điều kiện if (user?.isAdmin) để test UI dễ dàng hơn
     setSelectedMenu(key);
     if (isMobile) setSidebarCollapsed(true);
   };
-
-  const currentItem = MENU.find((m) => m.key === selectedMenu);
 
   const renderContent = () => {
     switch (selectedMenu) {
@@ -209,24 +258,25 @@ const AdminPage = () => {
       case "products":
         return <Products />;
       case "orders":
-        return <Order />;
+        return <Order mode="all" />;
       case "users":
         return <Users />;
       case "vouchers":
         return <Vouchers />;
+      case "sizes":
+        return <Sizes />;
       case "brands":
         return <Brands />;
       case "categories":
         return <Categories />;
-      //   case "order-returns":
-      //     return <OrderReturn />;
-      //   case "comments":
-      //     return <Comments />;
+      case "order-returns":
+        return <Order mode="returns" />;
+      case "comments":
+        return <Reviews />;
       case "inventory":
         return <InventoryDashboard />;
       case "staff":
-        //     return <StaffManagement />;
-        break;
+        return <Users />;
       default:
         return (
           <div
@@ -255,7 +305,7 @@ const AdminPage = () => {
   };
 
   // ── loading state ──
-  if (!user) {
+  if (!adminSession) {
     return (
       <div
         style={{
@@ -264,7 +314,7 @@ const AdminPage = () => {
           justifyContent: "center",
           height: "100vh",
           background: T.bg,
-          fontFamily: "'Lexend', sans-serif",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
         }}
       >
         <div style={{ textAlign: "center" }}>
@@ -288,7 +338,7 @@ const AdminPage = () => {
     );
   }
 
-  const initials = (user.name || user.email || "A")
+  const initials = (adminSession.name || adminSession.email || "A")
     .split(" ")
     .map((w) => w[0])
     .slice(0, 2)
@@ -298,7 +348,6 @@ const AdminPage = () => {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
         .material-symbols-outlined {
           font-family: 'Material Symbols Outlined';
@@ -307,7 +356,7 @@ const AdminPage = () => {
           white-space: nowrap; font-size: 24px;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Lexend', sans-serif; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
         ::-webkit-scrollbar       { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 99px; }
@@ -321,19 +370,21 @@ const AdminPage = () => {
           display: "flex",
           minHeight: "100vh",
           background: T.bg,
-          fontFamily: "'Lexend', sans-serif",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
           position: "relative",
         }}
       >
         {/* Mobile overlay */}
         {isMobile && !sidebarCollapsed && (
           <div
+            role="presentation"
+            aria-hidden
             onClick={() => setSidebarCollapsed(true)}
             style={{
               position: "fixed",
               inset: 0,
               background: "rgba(0,0,0,0.4)",
-              zIndex: 40,
+              zIndex: 90,
             }}
           />
         )}
@@ -349,7 +400,8 @@ const AdminPage = () => {
             position: isMobile ? "fixed" : "sticky",
             top: 0,
             height: "100vh",
-            zIndex: 50,
+            zIndex: isMobile ? 100 : 1,
+            pointerEvents: "auto",
             transition: "transform 0.25s ease",
             transform:
               isMobile && sidebarCollapsed
@@ -479,7 +531,7 @@ const AdminPage = () => {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {user.name || "Admin"}
+                  {adminSession.name || "Admin"}
                 </div>
                 <div
                   style={{
@@ -490,7 +542,7 @@ const AdminPage = () => {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {user.email}
+                  {adminSession.email}
                 </div>
               </div>
               <div
@@ -570,6 +622,10 @@ const AdminPage = () => {
             </Link>
             <button
               onClick={() => {
+                localStorage.removeItem("admin_v1");
+                localStorage.removeItem("admin");
+                localStorage.removeItem("admin_access_token");
+                localStorage.removeItem("admin_token");
                 dispatch(clearUser());
                 navigate("/login");
               }}
@@ -586,7 +642,7 @@ const AdminPage = () => {
                 color: T.textMid,
                 fontSize: 13,
                 fontWeight: 500,
-                fontFamily: "'Lexend', sans-serif",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
                 transition: "all 0.15s",
               }}
               onMouseEnter={(e) => {
@@ -620,183 +676,36 @@ const AdminPage = () => {
             marginLeft: isMobile ? 0 : 0,
           }}
         >
-          {/* Top header */}
-          <header
-            style={{
-              background: T.bgCard,
-              borderBottom: `1px solid ${T.border}`,
-              padding: "0 28px",
-              height: 64,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              position: "sticky",
-              top: 0,
-              zIndex: 20,
-              flexShrink: 0,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              {/* Mobile hamburger */}
-              {isMobile && (
-                <button
-                  onClick={() => setSidebarCollapsed(false)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: T.textMid,
-                    padding: 4,
-                  }}
-                >
-                  <span
-                    className="material-symbols-outlined"
-                    style={{ fontSize: 24 }}
-                  >
-                    menu
-                  </span>
-                </button>
-              )}
-              {/* Breadcrumb */}
-              <div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 11,
-                      color: T.textMuted,
-                      fontWeight: 500,
-                    }}
-                  >
-                    Admin
-                  </span>
-                  <span style={{ fontSize: 11, color: T.textMuted }}>/</span>
-                  <span
-                    style={{ fontSize: 11, color: T.primary, fontWeight: 600 }}
-                  >
-                    {currentItem?.label}
-                  </span>
-                </div>
-                <h1
-                  style={{
-                    fontSize: 17,
-                    fontWeight: 800,
-                    color: T.text,
-                    letterSpacing: "-0.2px",
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {currentItem?.desc || currentItem?.label}
-                </h1>
-              </div>
-            </div>
-
-            {/* Right actions */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {/* Date */}
-              <div
-                style={{
-                  display: isMobile ? "none" : "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 12px",
-                  background: "#F8FAFC",
-                  borderRadius: 10,
-                  border: `1px solid ${T.border}`,
-                  fontSize: 12,
-                  color: T.textMuted,
-                  fontWeight: 500,
-                }}
-              >
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: 15 }}
-                >
-                  calendar_today
-                </span>
-                {new Date().toLocaleDateString("vi-VN", {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
-              </div>
-
-              {/* Notification bell */}
-              <button
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  border: `1px solid ${T.border}`,
-                  background: T.bgCard,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  position: "relative",
-                }}
-              >
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: 18, color: T.textMid }}
-                >
-                  notifications
-                </span>
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 6,
-                    right: 6,
-                    width: 7,
-                    height: 7,
-                    borderRadius: "50%",
-                    background: T.red,
-                    border: "1.5px solid #fff",
-                  }}
-                />
-              </button>
-
-              {/* New product shortcut */}
-              <button
-                onClick={() => handleMenuClick("products")}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "8px 16px",
-                  borderRadius: 10,
-                  background: T.primary,
-                  border: "none",
-                  color: "#fff",
-                  fontWeight: 700,
-                  fontSize: 12,
-                  cursor: "pointer",
-                  fontFamily: "'Lexend', sans-serif",
-                  boxShadow: "0 2px 10px rgba(244,157,37,0.30)",
-                  transition: "opacity 0.15s",
-                  whiteSpace: "nowrap",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.88")}
-                onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-              >
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: 16 }}
-                >
-                  add
-                </span>
-                Sản phẩm mới
-              </button>
-            </div>
-          </header>
-
           {/* Content */}
+          {/* Mobile: nút mở sidebar (thay cho Top header đã cắt) */}
+          {isMobile && sidebarCollapsed && (
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed(false)}
+              style={{
+                position: "fixed",
+                top: 14,
+                left: 14,
+                zIndex: 110,
+                width: 42,
+                height: 42,
+                borderRadius: 12,
+                background: T.bgCard,
+                border: `1px solid ${T.border}`,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <span
+                className="material-symbols-outlined"
+                style={{ fontSize: 24, color: T.textMid }}
+              >
+                menu
+              </span>
+            </button>
+          )}
           <main
             key={selectedMenu}
             className="sh-content-anim"

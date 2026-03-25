@@ -31,14 +31,26 @@ const decodeToken = async (token) => {
     const user = await User.findById(payload.id).select("-password");
     if (!user) throw new Error("USER_NOT_FOUND");
 
+    // UserModel dùng: role + isActive (soft ban qua isActive)
+    const isBanned = user.isActive === false || user.isBanned === true;
+    // userModel dùng `role` ("customer" | "staff" | "manager" | "admin")
+    // nhưng có thể DB cũ chỉ có `isAdmin` -> ưu tiên isAdmin để tránh bị chặn 403 sai.
+    const systemRole = user.role; // may be undefined for legacy docs
+    const normalizedRole =
+      user.isAdmin === true || systemRole === "admin"
+        ? "admin"
+        : ["staff", "manager"].includes(systemRole)
+          ? "staff"
+          : "user";
+
     return {
       id: user._id.toString(),
       email: user.email,
       name: user.name,
-      isAdmin: user.isAdmin || false,
-      isStaff: user.isStaff || false,
-      isBanned: user.isBanned || false,
-      role: user.isAdmin ? "admin" : user.isStaff ? "staff" : "user",
+      isAdmin: normalizedRole === "admin",
+      isStaff: normalizedRole === "staff",
+      isBanned,
+      role: normalizedRole,
     };
   }
 

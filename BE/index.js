@@ -12,6 +12,7 @@ const { Server } = require("socket.io");
 const routes = require("./src/routers");
 const { initSocket } = require("./src/socket/inventorySocket");
 const { scheduleLowStockScan } = require("./src/jobs/alertJob");
+const { cleanupUnpaidVnpayOrders } = require("./src/services/vnpayCleanupService");
 
 const app = express();
 const server = http.createServer(app);
@@ -105,6 +106,11 @@ app.use((err, req, res, next) => {
   const status = err.status || 500;
   const message = err.message || "Lỗi máy chủ nội bộ";
 
+  // Log stack để truy lỗi "next is not a function" chính xác.
+  // (Chỉ log ra console, không ảnh hưởng API client)
+  console.error("[GlobalError]", message);
+  if (err?.stack) console.error(err.stack);
+
   if (err instanceof multer.MulterError) {
     return res
       .status(400)
@@ -114,6 +120,8 @@ app.use((err, req, res, next) => {
   res.status(status).json({
     success: false,
     message,
+    // Debug nhanh cho lỗi hay gặp (không cần bật NODE_ENV=development)
+    ...(err?.message?.includes("next is not a function") && { stack: err.stack }),
     ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
   });
 });
@@ -121,20 +129,68 @@ app.use((err, req, res, next) => {
 // 8. Khởi chạy Socket & Jobs
 initSocket(io);
 scheduleLowStockScan();
+setInterval(async () => {
+  try {
+    const result = await cleanupUnpaidVnpayOrders();
+    if (result?.canceled > 0) {
+      console.log(
+        `[VNPayCleanup] Auto-canceled ${result.canceled}/${result.scanned} unpaid orders`,
+      );
+    }
+  } catch (err) {
+    console.error("[VNPayCleanup] Job error:", err?.message);
+  }
+}, Number(process.env.VNPAY_CLEANUP_INTERVAL_MS || 60 * 1000));
 
 // 9. Kết nối MongoDB và Start Server
 const startServer = async () => {
   try {
-    if (!process.env.ACCESS_TOKEN) {
+    if (!process.env.ACCESS_TOKEN && !process.env.ACCESS_TOKEN_SECRET) {
       console.warn("⚠️ ACCESS_TOKEN chưa có trong .env — các route cần đăng nhập sẽ lỗi.");
     }
 
-    const mongoURI = process.env.MONGO_DB;
-    if (!mongoURI) throw new Error("MONGO_DB is not defined in .env");
+    const connectionCandidates = [
+      process.env.MONGO_DB,
+      process.env.MONGO_URL,
+      process.env.MONGO_LOCAL,
+      "mongodb://127.0.0.1:27017/DATN1",
+    ].filter(Boolean);
 
-    console.log("⏳ Connecting to MongoDB...");
-    await mongoose.connect(mongoURI);
-    console.log("✅ Connected to MongoDB successfully!");
+    if (connectionCandidates.length === 0) {
+      throw new Error(
+        "Mongo URI is not defined. Hãy thêm MONGO_DB hoặc MONGO_URL trong .env",
+      );
+    }
+
+    let connected = false;
+    let lastError = null;
+    const mongoConnectOptions = {
+      serverSelectionTimeoutMS: Number(
+        process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 30000,
+      ),
+      connectTimeoutMS: Number(process.env.MONGO_CONNECT_TIMEOUT_MS || 30000),
+      socketTimeoutMS: Number(process.env.MONGO_SOCKET_TIMEOUT_MS || 45000),
+      maxPoolSize: Number(process.env.MONGO_MAX_POOL_SIZE || 10),
+      family: 4,
+    };
+
+    for (const uri of connectionCandidates) {
+      try {
+        console.log("⏳ Connecting to MongoDB...");
+        await mongoose.connect(uri, mongoConnectOptions);
+        connected = true;
+        console.log("✅ Connected to MongoDB successfully!");
+        break;
+      } catch (err) {
+        lastError = err;
+        console.warn(`⚠️ Kết nối DB thất bại với URI: ${uri}`);
+        console.warn(`   ↳ Lý do: ${err.message}`);
+      }
+    }
+
+    if (!connected) {
+      throw lastError || new Error("Không thể kết nối MongoDB");
+    }
 
     server.listen(PORT, () => {
       console.log(`🚀 Server running at http://localhost:${PORT}`);
@@ -144,6 +200,7 @@ const startServer = async () => {
     process.exit(1);
   }
 };
+
 
 startServer();
 

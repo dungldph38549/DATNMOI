@@ -24,21 +24,35 @@ const variantSchema = new mongoose.Schema({
     type: Number,
     default: 0,
     min: 0,
+    set: (v) => (Number.isFinite(Number(v)) ? Number(v) : 0),
   },
   attributes: {
-    // { Size: "42", Color: "Đen" }
     type: Map,
     of: String,
     required: [true, "Thuộc tính của biến thể là bắt buộc"],
   },
-  images: [{ type: String, trim: true }],
+  images:   [{ type: String, trim: true }],
   isActive: { type: Boolean, default: true },
 });
+
+const saleRuleSchema = new mongoose.Schema(
+  {
+    name: { type: String, trim: true, default: "" },
+    scope: { type: String, enum: ["product", "variant"], default: "product" },
+    variantSku: { type: String, trim: true, uppercase: true, default: null },
+    discountType: { type: String, enum: ["percent", "fixed"], required: true },
+    discountValue: { type: Number, required: true, min: [0, "Giá trị giảm không được âm"] },
+    startAt: { type: Date, default: null },
+    endAt: { type: Date, default: null },
+    priority: { type: Number, default: 0 },
+    status: { type: String, enum: ["active", "inactive"], default: "active" },
+  },
+  { _id: true },
+);
 
 // ── Product schema ─────────────────────────────────────────────
 const productSchema = new mongoose.Schema(
   {
-    // ── Thông tin cơ bản ────────────────────────────────────
     name: {
       type: String,
       required: [true, "Tên sản phẩm là bắt buộc"],
@@ -63,7 +77,6 @@ const productSchema = new mongoose.Schema(
       maxLength: [500, "Mô tả ngắn không được vượt quá 500 ký tự"],
     },
 
-    // ── Danh mục & thương hiệu ───────────────────────────────
     brandId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Brand",
@@ -77,107 +90,63 @@ const productSchema = new mongoose.Schema(
       index: true,
     },
 
-    // ── Ảnh ─────────────────────────────────────────────────
-    image: {
-      type: String,
-      required: [true, "Ảnh chính của sản phẩm là bắt buộc"],
-      trim: true,
-    },
-    // Ảnh phụ — controller dùng tên "srcImages"
+    image:     { type: String, required: [true, "Ảnh chính là bắt buộc"], trim: true },
     srcImages: [{ type: String, trim: true }],
 
-    // ── Giá & tồn kho (cho sản phẩm không có biến thể) ──────
     price: {
       type: Number,
-      required: function () {
-        return !this.hasVariants;
-      },
+      required: function () { return !this.hasVariants; },
       min: [0, "Giá sản phẩm không được âm"],
     },
-    // countInStock alias → stock (controller comment dùng countInStock, model dùng stock)
     stock: {
       type: Number,
-      required: function () {
-        return !this.hasVariants;
-      },
+      required: function () { return !this.hasVariants; },
       min: [0, "Số lượng tồn kho không được âm"],
       default: 0,
     },
-    sold: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-    // Controller sort theo "soldCount" — giữ alias để query không lỗi
-    soldCount: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-    rating: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 5,
-    },
-    reviewCount: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
+    sold:        { type: Number, default: 0, min: 0 },
+    soldCount:   { type: Number, default: 0, min: 0 },
+    rating:      { type: Number, default: 0, min: 0, max: 5 },
+    reviewCount: { type: Number, default: 0, min: 0 },
 
-    // ── Biến thể ─────────────────────────────────────────────
     hasVariants: { type: Boolean, default: false },
-    attributes: [{ type: String, trim: true }], // ["Size", "Color"]
-    variants: [variantSchema],
+    attributes:  [{ type: String, trim: true }],
+    variants:    [variantSchema],
+    saleRules:   { type: [saleRuleSchema], default: [] },
 
-    // ── Phân loại sản phẩm (controller filter) ───────────────
-    // Controller dùng: gender, style — phải có trong model
     gender: {
       type: String,
       enum: ["nam", "nữ", "unisex", "trẻ em"],
       default: "unisex",
       index: true,
     },
-    style: {
-      // running | lifestyle | basketball | football | training | ...
-      type: String,
-      trim: true,
-      index: true,
-    },
-    tags: [{ type: String, trim: true, lowercase: true }],
+    style:  { type: String, trim: true, index: true },
+    tags:   [{ type: String, trim: true, lowercase: true }],
 
-    // ── Trạng thái ───────────────────────────────────────────
     status: {
       type: String,
       enum: ["draft", "active", "inactive", "discontinued"],
       default: "active",
       index: true,
     },
-    isActive: { type: Boolean, default: true, index: true },
-
-    // Controller dùng "isVisible" (toggleVisible) — cần field này
-    isVisible: { type: Boolean, default: true, index: true },
-
+    isActive:   { type: Boolean, default: true,  index: true },
+    isVisible:  { type: Boolean, default: true,  index: true },
     isFeatured: { type: Boolean, default: false, index: true },
+    isDeleted:  { type: Boolean, default: false, index: true },
+    deletedAt:  { type: Date,    default: null,  index: true },
+    deletedBy:  { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
-    // Soft delete — controller dùng cả "isDeleted" và "deletedAt"
-    isDeleted: { type: Boolean, default: false, index: true },
-    deletedAt: { type: Date, default: null, index: true },
-    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-
-    // ── SEO ──────────────────────────────────────────────────
-    metaTitle: { type: String, trim: true },
+    metaTitle:       { type: String, trim: true },
     metaDescription: { type: String, trim: true },
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true },
+    toJSON:   { virtuals: true },
     toObject: { virtuals: true },
   },
 );
 
-// ── Compound indexes ───────────────────────────────────────────
+// ── Indexes ────────────────────────────────────────────────────
 productSchema.index({ name: "text", description: "text", tags: "text" });
 productSchema.index({ brandId: 1, categoryId: 1 });
 productSchema.index({ status: 1, isActive: 1, isDeleted: 1 });
@@ -215,8 +184,8 @@ productSchema.virtual("priceRange").get(function () {
   return { min: this.price, max: this.price };
 });
 
-// ── Pre-save: tạo slug từ tên ──────────────────────────────────
-productSchema.pre("save", function (next) {
+// ── Pre-save: tạo slug ─────────────────────────────────────────
+productSchema.pre("save", function () {
   if (this.isModified("name") || this.isNew) {
     const base = this.name
       .toLowerCase()
@@ -228,69 +197,67 @@ productSchema.pre("save", function (next) {
       .replace(/\s+/g, "-");
     this.slug = this.isNew ? `${base}-${Date.now()}` : base;
   }
-  next();
+  return Promise.resolve();
 });
 
 // ── Pre-validate: kiểm tra biến thể ───────────────────────────
-productSchema.pre("validate", function (next) {
+productSchema.pre("validate", function () {
   if (!this.hasVariants) {
-    if (!this.price || this.price <= 0)
-      return next(new Error("Sản phẩm không có biến thể phải có giá > 0."));
+    if (this.price === undefined || this.price === null || Number(this.price) < 0)
+      throw new Error("Sản phẩm không có biến thể phải có giá hợp lệ.");
     if (this.stock < 0)
-      return next(new Error("Số lượng tồn kho không được âm."));
-    return next();
+      throw new Error("Số lượng tồn kho không được âm.");
+    return;
   }
 
-  if (!this.variants?.length)
-    return next(new Error("Sản phẩm có biến thể phải có ít nhất 1 biến thể."));
+  if (!this.variants || !this.variants.length)
+    throw new Error("Sản phẩm có biến thể phải có ít nhất 1 biến thể.");
 
   const expectedAttrs = this.attributes || [];
 
   for (const v of this.variants) {
-    // Giá
     if (!v.price || v.price <= 0)
-      return next(new Error("Tất cả biến thể phải có giá > 0."));
+      throw new Error("Tất cả biến thể phải có giá > 0.");
 
-    // Thuộc tính
-    const keys = v.attributes ? Array.from(v.attributes.keys()) : [];
-    if (
-      keys.length !== expectedAttrs.length ||
-      !expectedAttrs.every((k) => keys.includes(k))
-    )
-      return next(
-        new Error(
-          `Biến thể phải có đầy đủ thuộc tính: [${expectedAttrs.join(", ")}]`,
-        ),
-      );
+    if (expectedAttrs.length > 0) {
+      const keys = v.attributes ? Array.from(v.attributes.keys()) : [];
+      if (
+        keys.length !== expectedAttrs.length ||
+        !expectedAttrs.every((k) => keys.includes(k))
+      )
+        throw new Error(
+          `Biến thể phải có đầy đủ thuộc tính: [${expectedAttrs.join(", ")}]`
+        );
 
-    // Giá trị rỗng
-    if (Array.from(v.attributes.values()).some((val) => !val?.trim()))
-      return next(
-        new Error("Không được để giá trị thuộc tính biến thể trống."),
-      );
+      if (Array.from(v.attributes.values()).some((val) => !val?.trim()))
+        throw new Error("Không được để giá trị thuộc tính biến thể trống.");
+    }
   }
 
-  // SKU trùng trong cùng sản phẩm
   const skus = this.variants.map((v) => v.sku);
-  const dup = skus.find((s, i) => skus.indexOf(s) !== i);
-  if (dup) return next(new Error(`SKU "${dup}" bị trùng trong cùng sản phẩm.`));
+  const dup  = skus.find((s, i) => skus.indexOf(s) !== i);
+  if (dup) throw new Error(`SKU "${dup}" bị trùng trong cùng sản phẩm.`);
 
-  next();
+  if (Array.isArray(this.saleRules) && this.saleRules.length > 0) {
+    for (const rule of this.saleRules) {
+      if (rule.endAt && rule.startAt && new Date(rule.endAt) < new Date(rule.startAt)) {
+        throw new Error("Thời gian kết thúc sale phải lớn hơn thời gian bắt đầu.");
+      }
+      if (rule.scope === "variant" && !rule.variantSku) {
+        throw new Error("Sale theo biến thể bắt buộc có variantSku.");
+      }
+    }
+  }
 });
 
-// ── Static helpers ─────────────────────────────────────────────
+// ── Statics ────────────────────────────────────────────────────
 productSchema.statics.findLowStock = function () {
   return this.find({
     isDeleted: { $ne: true },
     isActive: true,
     $or: [
       { hasVariants: false, $expr: { $lte: ["$stock", 10] } },
-      {
-        hasVariants: true,
-        variants: {
-          $elemMatch: { isActive: true, $expr: { $lte: ["$stock", 10] } },
-        },
-      },
+      { hasVariants: true, variants: { $elemMatch: { isActive: true, $expr: { $lte: ["$stock", 10] } } } },
     ],
   });
 };
@@ -301,12 +268,7 @@ productSchema.statics.findOutOfStock = function () {
     isActive: true,
     $or: [
       { hasVariants: false, stock: 0 },
-      {
-        hasVariants: true,
-        variants: {
-          $not: { $elemMatch: { isActive: true, stock: { $gt: 0 } } },
-        },
-      },
+      { hasVariants: true, variants: { $not: { $elemMatch: { isActive: true, stock: { $gt: 0 } } } } },
     ],
   });
 };

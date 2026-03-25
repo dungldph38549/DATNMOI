@@ -1,10 +1,14 @@
 import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  useLocation,
+  Navigate,
+} from "react-router-dom";
+import { useSelector } from "react-redux";
 
-import "./assets/css/bootstrap.min.css";
-import "./assets/css/main.css";
-import "./assets/css/blue.css";
-import "./assets/css/font-awesome.css";
+
 
 import HeaderComponent from "./components/HeaderComponent/HeaderComponent";
 import FooterComponent from "./components/FooterComponent/FooterComponent";
@@ -20,58 +24,126 @@ import ContactPage from "./pages/ContactPage/ContactPage";
 import CheckOut from "./pages/CheckOut/CheckOut";
 import CategoryPage from "./pages/Category/CategoryPage";
 import SearchPage from "./pages/SearchPage/SearchPage";
+import ProfilePage from "./pages/Profile/ProfilePage";
 /* eslint-disable no-unused-vars -- used in Routes below */
 import OrderHistoryPage from "./pages/OrderHistoryPage/OrderHistoryPage";
 import OrderDetailPage from "./pages/OrderDetailPage/OrderDetailPage";
 import PaymentReturnPage from "./pages/PaymentReturnPage/PaymentReturnPage";
+import WishlistPage from "./pages/Wishlist/WishlistPage";
+import SalePage from "./pages/SalePage/SalePage";
+import VoucherPage from "./pages/VoucherPage/VoucherPage";
 
 //  IMPORT TRANG ADMIN USERS
 import User from "./pages/User";
 import AdminPage from "./Admin/AdminPage";
 
+function RequireAuth({ children }) {
+  const user = useSelector((state) => state.user);
+  const isLoggedIn = !!(user?.login && user?.token);
+  const location = useLocation();
+
+  if (!isLoggedIn) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  return children;
+}
+
+function AppContent() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin");
+
+  return (
+    <div className="app min-h-screen flex flex-col bg-gray-50">
+      {/* Ẩn header site khi vào toàn bộ admin (/admin/*) */}
+      {!isAdminRoute && <HeaderComponent />}
+
+      <div className="content flex-1">
+        <Routes>
+          {/* CLIENT ROUTES */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/product" element={<ProductPage />} />
+          <Route path="/sale" element={<SalePage />} />
+          <Route path="/voucher" element={<VoucherPage />} />
+          <Route path="/product/:id" element={<ProductDetail />} />
+          <Route path="/category" element={<CategoryPage />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/wishlist" element={<WishlistPage />} />
+          <Route
+            path="/profile"
+            element={(
+              <RequireAuth>
+                <ProfilePage />
+              </RequireAuth>
+            )}
+          />
+          <Route
+            path="/cart"
+            element={(
+              <RequireAuth>
+                <ShoppingCartPage />
+              </RequireAuth>
+            )}
+          />
+          <Route
+            path="/checkout"
+            element={(
+              <RequireAuth>
+                <CheckOut />
+              </RequireAuth>
+            )}
+          />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/terms" element={<TermsConditionsPage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route
+            path="/orders"
+            element={(
+              <RequireAuth>
+                <OrderHistoryPage />
+              </RequireAuth>
+            )}
+          />
+          <Route
+            path="/orders/:id"
+            element={(
+              <RequireAuth>
+                <OrderDetailPage />
+              </RequireAuth>
+            )}
+          />
+          <Route
+            path="/payment/return"
+            element={<PaymentReturnPage />}
+          />
+
+          {/* ADMIN ROUTE */}
+          <Route path="/admin/users" element={<User />} />
+          <Route path="/admin" element={<AdminPage />} />
+
+          {/* 404 - Đã sửa thành <Route> */}
+          <Route
+            path="*"
+            element={
+              <div className="py-5 text-center">
+                <h1>404</h1>
+                <p>Trang không tồn tại.</p>
+              </div>
+            }
+          />
+        </Routes>
+      </div>
+
+      <FooterComponent />
+    </div>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
-      <div className="app">
-        <HeaderComponent />
-
-        <div className="content">
-          <Routes>
-            {/* CLIENT ROUTES */}
-            <Route path="/" element={<HomePage />} />
-            <Route path="/product" element={<ProductPage />} />
-            <Route path="/product/:id" element={<ProductDetail />} />
-            <Route path="/category" element={<CategoryPage />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/cart" element={<ShoppingCartPage />} />
-            <Route path="/checkout" element={<CheckOut />} />
-            <Route path="/contact" element={<ContactPage />} />
-            <Route path="/terms" element={<TermsConditionsPage />} />
-            <Route path="/search" element={<SearchPage />} />
-            <Route path="/orders" element={<OrderHistoryPage />} />
-            <Route path="/orders/:id" element={<OrderDetailPage />} />
-            <Route path="/payment/return" element={<PaymentReturnPage />} />
-
-            {/* ADMIN ROUTE */}
-            <Route path="/admin/users" element={<User />} />
-            <Route path="/admin" element={<AdminPage />} />
-
-            {/* 404 - Đã sửa thành <Route> */}
-            <Route
-              path="*"
-              element={
-                <div className="py-5 text-center">
-                  <h1>404</h1>
-                  <p>Trang không tồn tại.</p>
-                </div>
-              }
-            />
-          </Routes>
-        </div>
-
-        <FooterComponent />
-      </div>
+      <AppContent />
     </BrowserRouter>
   );
 }

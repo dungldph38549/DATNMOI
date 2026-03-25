@@ -1,136 +1,56 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { useDispatch } from "react-redux";
-import { addToCart } from "../../redux/cartSlice";
+import { FaArrowRight } from "react-icons/fa";
 
+const PLACEHOLDER_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='28' font-family='Plus Jakarta Sans'>No Image</text></svg>";
 
-const PLACEHOLDER_IMG = "https://via.placeholder.com/300x300/f0f0f0/999?text=No+Image"
 const getProductImageUrl = (p) => {
-  if (!p?.image || typeof p.image !== "string") return PLACEHOLDER_IMG
-  if (p.image.startsWith("http://") || p.image.startsWith("https://")) return p.image
-  return `http://localhost:3001/uploads/${p.image}`
-}
+  const candidate = (typeof p?.image === "string" && p.image.trim()) || (Array.isArray(p?.srcImages) && typeof p.srcImages[0] === "string" ? p.srcImages[0].trim() : "");
+  if (!candidate) return PLACEHOLDER_IMG;
+  if (candidate.startsWith("http")) return candidate;
+  return `http://localhost:3002/uploads/${candidate.startsWith("/") ? candidate.slice(1) : candidate}`;
+};
+
+const getDisplayPrice = (p) => {
+  const singlePrice = Number(p?.price);
+  return Number.isFinite(singlePrice) ? `${singlePrice.toLocaleString("vi-VN")}đ` : "Liên hệ";
+};
 
 const Product = ({ product }) => {
+  const p = product;
+  const isHot = p.soldCount > 50;
 
-const dispatch = useDispatch();
+  return (
+    <Link to={`/product/${p._id}`} className="group relative rounded-3xl bg-surface overflow-hidden hover:shadow-2xl hover:shadow-primary/20 transition-all duration-500 border border-slate-100 flex flex-col h-[400px]">
+      <div className="relative aspect-[4/5] overflow-hidden bg-slate-50 flex items-center justify-center flex-shrink-0">
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10"></div>
+        <img
+          src={getProductImageUrl(p)}
+          alt={p.name}
+          onError={(e) => { e.target.onerror = null; e.target.src = PLACEHOLDER_IMG; }}
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+        />
+        <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
+          {isHot && <span className="bg-secondary text-white text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider backdrop-blur-md shadow-lg shadow-secondary/30">Hot Drop</span>}
+          {p.isNew && <span className="bg-primary text-white text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider backdrop-blur-md shadow-lg shadow-primary/30">New</span>}
+        </div>
+      </div>
 
-const sale = Math.floor(Math.random() * 30) + 10;
-const sold = Math.floor(Math.random() * 500);
-const oldPrice = Math.floor(product.price + (product.price * sale) / 100);
-const imageUrl = getProductImageUrl(product)
-const onImgError = (e) => { e.target.onerror = null; e.target.src = PLACEHOLDER_IMG }
+      <div className="p-6 flex flex-col flex-1 bg-surface z-20">
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{p.brandId?.name || "Premium"}</p>
+        <h3 className="font-display font-bold text-lg text-slate-800 leading-snug line-clamp-2 mb-4 group-hover:text-primary transition-colors">{p.name}</h3>
 
-return (
-
-<div className="bg-white rounded-2xl shadow-sm hover:shadow-2xl transition-all duration-300 overflow-hidden group relative hover:-translate-y-2">
-
-{/* SALE BADGE */}
-<span className="absolute top-3 left-3 bg-gradient-to-r from-red-500 to-orange-500 text-white text-xs px-2 py-1 rounded-full font-semibold z-10 shadow">
--{sale}%
-</span>
-
-{/* IMAGE */}
-<Link to={`/product/${product._id}`}>
-
-<div className="h-72 bg-gray-100 flex items-center justify-center overflow-hidden relative">
-
-<img
-src={imageUrl}
-alt={product.name}
-className="w-full h-[260px] object-cover rounded-lg"
-onError={onImgError}
-/>
-
-{/* OVERLAY */}
-<div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition"/>
-
-</div>
-
-</Link>
-
-{/* HOVER ACTION */}
-<div className="absolute bottom-16 left-0 w-full flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition">
-
-<button
-onClick={() =>
-dispatch(
-addToCart({
-productId: product._id,
-name: product.name,
-image: product.image,
-price: product.price,
-qty: 1,
-})
-)
-}
-className="bg-black text-white text-xs px-4 py-2 rounded-full hover:bg-red-500 transition shadow"
->
-Add Cart
-</button>
-
-<Link
-to={`/product/${product._id}`}
-className="bg-white text-xs px-3 py-2 rounded-full shadow hover:bg-gray-100 transition"
->
-View
-</Link>
-
-</div>
-
-{/* CONTENT */}
-<div className="p-4">
-
-{/* NAME */}
-<h3 className="font-semibold text-sm line-clamp-2 min-h-[36px]">
-{product.name}
-</h3>
-
-{/* RATING */}
-<div className="flex items-center text-yellow-400 text-xs mt-1">
-
-★★★★★
-<span className="text-gray-400 ml-2">(120)</span>
-
-</div>
-
-{/* PRICE */}
-<div className="flex items-center gap-2 mt-2">
-
-<p className="text-red-500 font-bold text-base">
-${product.price}
-</p>
-
-<p className="text-gray-400 line-through text-xs">
-${oldPrice}
-</p>
-
-</div>
-
-{/* SOLD BAR */}
-<div className="mt-2">
-
-<div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-
-<div
-className="bg-gradient-to-r from-red-500 via-orange-400 to-yellow-400 h-full"
-style={{ width: `${Math.min(sold / 5, 100)}%` }}
-/>
-
-</div>
-
-<p className="text-xs text-gray-400 mt-1">
-🔥 {sold} sold
-</p>
-
-</div>
-
-</div>
-
-</div>
-
-);
-
+        <div className="mt-auto flex items-end justify-between">
+          <div>
+            <p className="text-secondary font-black text-xl">{getDisplayPrice(p)}</p>
+          </div>
+          <button className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-primary group-hover:text-white transition-all duration-300">
+            <FaArrowRight size={14} className="-rotate-45 group-hover:rotate-0 transition-transform duration-300" />
+          </button>
+        </div>
+      </div>
+    </Link>
+  );
 };
 
 export default Product;

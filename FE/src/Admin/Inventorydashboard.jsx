@@ -1,148 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-
-// ── Mock data ─────────────────────────────────────────────────
-const MOCK_WAREHOUSES = [
-  { _id: "wh1", name: "Kho Hà Nội", code: "HN", location: { city: "Hà Nội" } },
-  { _id: "wh2", name: "Kho TP.HCM", code: "HCM", location: { city: "TP.HCM" } },
-  {
-    _id: "wh3",
-    name: "Kho Đà Nẵng",
-    code: "DN",
-    location: { city: "Đà Nẵng" },
-  },
-];
-
-let _inv = [
-  {
-    _id: "i1",
-    sku: "SHIRT-RED-M",
-    productName: "Áo thun đỏ M",
-    totalQuantity: 120,
-    totalReserved: 10,
-    lowStockThreshold: 20,
-    status: "in_stock",
-    warehouses: [
-      { warehouseId: "wh1", quantity: 80 },
-      { warehouseId: "wh2", quantity: 40 },
-    ],
-    auditLogs: [],
-  },
-  {
-    _id: "i2",
-    sku: "PANTS-BLU-L",
-    productName: "Quần xanh L",
-    totalQuantity: 8,
-    totalReserved: 2,
-    lowStockThreshold: 15,
-    status: "low_stock",
-    warehouses: [{ warehouseId: "wh1", quantity: 8 }],
-    auditLogs: [],
-  },
-  {
-    _id: "i3",
-    sku: "SHOES-WHT-42",
-    productName: "Giày trắng 42",
-    totalQuantity: 0,
-    totalReserved: 0,
-    lowStockThreshold: 10,
-    status: "out_of_stock",
-    warehouses: [],
-    auditLogs: [],
-  },
-  {
-    _id: "i4",
-    sku: "HAT-BLK-ONE",
-    productName: "Mũ đen onesize",
-    totalQuantity: 55,
-    totalReserved: 5,
-    lowStockThreshold: 10,
-    status: "in_stock",
-    warehouses: [
-      { warehouseId: "wh2", quantity: 30 },
-      { warehouseId: "wh3", quantity: 25 },
-    ],
-    auditLogs: [],
-  },
-  {
-    _id: "i5",
-    sku: "JACKET-GRN-S",
-    productName: "Áo khoác xanh S",
-    totalQuantity: 12,
-    totalReserved: 0,
-    lowStockThreshold: 15,
-    status: "low_stock",
-    warehouses: [{ warehouseId: "wh3", quantity: 12 }],
-    auditLogs: [],
-  },
-];
-let _logId = 1;
-
-const delay = (ms = 300) => new Promise((r) => setTimeout(r, ms));
-
-const api = {
-  list: async (f = {}) => {
-    await delay();
-    let d = [..._inv];
-    if (f.status) d = d.filter((i) => i.status === f.status);
-    if (f.q)
-      d = d.filter(
-        (i) =>
-          i.sku.toLowerCase().includes(f.q.toLowerCase()) ||
-          i.productName.toLowerCase().includes(f.q.toLowerCase()),
-      );
-    return d;
-  },
-  import: async (id, qty, warehouseId, note) => {
-    await delay(500);
-    const inv = _inv.find((i) => i._id === id);
-    if (!inv) throw new Error("Not found");
-    inv.totalQuantity += qty;
-    const wh = inv.warehouses.find((w) => w.warehouseId === warehouseId);
-    if (wh) wh.quantity += qty;
-    else inv.warehouses.push({ warehouseId, quantity: qty });
-    inv.auditLogs.push({
-      _id: `log${_logId++}`,
-      type: "import",
-      quantity: qty,
-      beforeQty: inv.totalQuantity - qty,
-      afterQty: inv.totalQuantity,
-      createdAt: new Date().toISOString(),
-      note,
-    });
-    recalc(inv);
-    return inv;
-  },
-  adjust: async (id, newQty, note) => {
-    await delay(400);
-    const inv = _inv.find((i) => i._id === id);
-    if (!inv) throw new Error("Not found");
-    const before = inv.totalQuantity;
-    inv.totalQuantity = newQty;
-    inv.auditLogs.push({
-      _id: `log${_logId++}`,
-      type: "adjust",
-      quantity: newQty - before,
-      beforeQty: before,
-      afterQty: newQty,
-      createdAt: new Date().toISOString(),
-      note,
-    });
-    recalc(inv);
-    return inv;
-  },
-  getLogs: async (id) => {
-    await delay();
-    const inv = _inv.find((i) => i._id === id);
-    return [...(inv?.auditLogs || [])].reverse();
-  },
-};
-
-const recalc = (inv) => {
-  const avail = inv.totalQuantity - inv.totalReserved;
-  if (avail <= 0) inv.status = "out_of_stock";
-  else if (avail <= inv.lowStockThreshold) inv.status = "low_stock";
-  else inv.status = "in_stock";
-};
+import {
+  getInventoryList,
+  getWarehouses,
+  getInventoryLogs,
+  importInventoryStock,
+  adjustInventoryStock,
+  transferInventoryStock,
+  createInventory,
+  getAllProducts,
+} from "../api";
 
 // ── Components ────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -374,10 +240,14 @@ const ImportModal = ({ inv, warehouses, onClose, onDone }) => {
     if (!form.qty || !form.warehouseId) return;
     setLoading(true);
     try {
-      await api.import(inv._id, Number(form.qty), form.warehouseId, form.note);
+      await importInventoryStock(inv._id, {
+        qty: Number(form.qty),
+        warehouseId: form.warehouseId,
+        note: form.note || undefined,
+      });
       onDone("Nhập kho thành công!");
     } catch (e) {
-      onDone(e.message, "error");
+      onDone(e?.response?.data?.message || e?.message || "Lỗi nhập kho", "error");
     }
     setLoading(false);
     onClose();
@@ -437,10 +307,13 @@ const AdjustModal = ({ inv, onClose, onDone }) => {
   const submit = async () => {
     setLoading(true);
     try {
-      await api.adjust(inv._id, Number(form.newQty), form.note);
+      await adjustInventoryStock(inv._id, {
+        newQty: Number(form.newQty),
+        note: form.note || undefined,
+      });
       onDone("Điều chỉnh thành công!");
     } catch (e) {
-      onDone(e.message, "error");
+      onDone(e?.response?.data?.message || e?.message || "Lỗi điều chỉnh", "error");
     }
     setLoading(false);
     onClose();
@@ -493,16 +366,388 @@ const AdjustModal = ({ inv, onClose, onDone }) => {
   );
 };
 
+// ── Export Modal ──────────────────────────────────────────────
+const ExportModal = ({ inv, warehouses, onClose, onDone }) => {
+  const [form, setForm] = useState({
+    qty: "",
+    warehouseId:
+      inv.warehouses.find((w) => Number(w.quantity || 0) > 0)?.warehouseId?._id ||
+      inv.warehouses.find((w) => Number(w.quantity || 0) > 0)?.warehouseId ||
+      warehouses[0]?._id ||
+      "",
+    note: "",
+  });
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    if (!form.qty || !form.warehouseId) return;
+    const qtyNum = Number(form.qty);
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+      onDone("Số lượng xuất kho không hợp lệ", "error");
+      return;
+    }
+    setLoading(true);
+    try {
+      await adjustInventoryStock(inv._id, {
+        newQty: Math.max(0, Number(inv.totalQuantity || 0) - qtyNum),
+        warehouseId: form.warehouseId,
+        note: form.note || `Xuất kho ${qtyNum} cho SKU ${inv.sku}`,
+      });
+      onDone("Xuất kho thành công!");
+    } catch (e) {
+      onDone(
+        e?.response?.data?.message || e?.message || "Lỗi xuất kho",
+        "error",
+      );
+    }
+    setLoading(false);
+    onClose();
+  };
+
+  return (
+    <Modal title={`📤 Xuất kho — ${inv.sku}`} onClose={onClose}>
+      <Input
+        label="Số lượng xuất *"
+        type="number"
+        min="1"
+        value={form.qty}
+        onChange={(e) => setForm((f) => ({ ...f, qty: e.target.value }))}
+        placeholder="VD: 5"
+      />
+      <Select
+        label="Kho xuất *"
+        value={form.warehouseId}
+        onChange={(e) =>
+          setForm((f) => ({ ...f, warehouseId: e.target.value }))
+        }
+      >
+        {warehouses.map((w) => (
+          <option key={w._id} value={w._id}>
+            {w.name} ({w.code})
+          </option>
+        ))}
+      </Select>
+      <Input
+        label="Ghi chú"
+        value={form.note}
+        onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+        placeholder="VD: Xuất hàng cho đơn bán lẻ"
+      />
+      <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+        <Btn
+          variant="danger"
+          loading={loading}
+          onClick={submit}
+          style={{ flex: 1 }}
+        >
+          Xác nhận xuất
+        </Btn>
+        <Btn variant="secondary" onClick={onClose}>
+          Huỷ
+        </Btn>
+      </div>
+    </Modal>
+  );
+};
+
+// ── Transfer Modal ─────────────────────────────────────────────
+const TransferModal = ({ inv, warehouses, onClose, onDone }) => {
+  const firstWarehouse = inv.warehouses[0]?.warehouseId;
+  const firstWarehouseId =
+    typeof firstWarehouse === "object" ? firstWarehouse?._id : firstWarehouse;
+  const secondWarehouseId =
+    warehouses.find((w) => String(w._id) !== String(firstWarehouseId))?._id || "";
+
+  const [form, setForm] = useState({
+    qty: "",
+    fromWarehouseId: firstWarehouseId || "",
+    toWarehouseId: secondWarehouseId || "",
+    note: "",
+  });
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    if (!form.qty || !form.fromWarehouseId || !form.toWarehouseId) return;
+    if (String(form.fromWarehouseId) === String(form.toWarehouseId)) {
+      onDone("Kho nguồn và kho đích phải khác nhau", "error");
+      return;
+    }
+    const qtyNum = Number(form.qty);
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+      onDone("Số lượng chuyển kho không hợp lệ", "error");
+      return;
+    }
+    setLoading(true);
+    try {
+      await transferInventoryStock(inv._id, {
+        qty: qtyNum,
+        fromWarehouseId: form.fromWarehouseId,
+        toWarehouseId: form.toWarehouseId,
+        note: form.note || undefined,
+      });
+      onDone("Chuyển kho thành công!");
+    } catch (e) {
+      onDone(
+        e?.response?.data?.message || e?.message || "Lỗi chuyển kho",
+        "error",
+      );
+    }
+    setLoading(false);
+    onClose();
+  };
+
+  return (
+    <Modal title={`⇄ Chuyển kho — ${inv.sku}`} onClose={onClose}>
+      <Input
+        label="Số lượng chuyển *"
+        type="number"
+        min="1"
+        value={form.qty}
+        onChange={(e) => setForm((f) => ({ ...f, qty: e.target.value }))}
+        placeholder="VD: 10"
+      />
+      <Select
+        label="Kho nguồn *"
+        value={form.fromWarehouseId}
+        onChange={(e) =>
+          setForm((f) => ({ ...f, fromWarehouseId: e.target.value }))
+        }
+      >
+        {warehouses.map((w) => (
+          <option key={w._id} value={w._id}>
+            {w.name} ({w.code})
+          </option>
+        ))}
+      </Select>
+      <Select
+        label="Kho đích *"
+        value={form.toWarehouseId}
+        onChange={(e) =>
+          setForm((f) => ({ ...f, toWarehouseId: e.target.value }))
+        }
+      >
+        {warehouses.map((w) => (
+          <option key={w._id} value={w._id}>
+            {w.name} ({w.code})
+          </option>
+        ))}
+      </Select>
+      <Input
+        label="Ghi chú"
+        value={form.note}
+        onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+        placeholder="VD: Cân bằng tồn kho giữa 2 kho"
+      />
+      <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+        <Btn
+          variant="primary"
+          loading={loading}
+          onClick={submit}
+          style={{ flex: 1 }}
+        >
+          Xác nhận chuyển
+        </Btn>
+        <Btn variant="secondary" onClick={onClose}>
+          Huỷ
+        </Btn>
+      </div>
+    </Modal>
+  );
+};
+
+// ── Create SKU Modal ───────────────────────────────────────────
+const CreateInventoryModal = ({ onClose, onDone }) => {
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  const [form, setForm] = useState({
+    productId: "",
+    variantId: "",
+    sku: "",
+    lowStockThreshold: 10,
+  });
+
+  const selectedProduct = products.find((p) => p._id === form.productId);
+  const hasVariants =
+    !!selectedProduct?.hasVariants &&
+    Array.isArray(selectedProduct?.variants) &&
+    selectedProduct.variants.length > 0;
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadProducts = async () => {
+      setLoadingProducts(true);
+      try {
+        const res = await getAllProducts({
+          page: 0,
+          limit: 50,
+          isListProductRemoved: false,
+          filter: {},
+        });
+        const list = Array.isArray(res?.data) ? res.data : [];
+        if (!cancelled) setProducts(list);
+      } catch {
+        if (!cancelled) setProducts([]);
+      } finally {
+        if (!cancelled) setLoadingProducts(false);
+      }
+    };
+    loadProducts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const submit = async () => {
+    if (!form.productId || !form.sku.trim()) return;
+    if (hasVariants && !form.variantId) return;
+    setLoading(true);
+    try {
+      await createInventory({
+        productId: form.productId,
+        variantId: hasVariants ? form.variantId : undefined,
+        sku: form.sku.trim().toUpperCase(),
+        lowStockThreshold: Number(form.lowStockThreshold) || 10,
+      });
+      onDone("Tạo tồn kho/SKU thành công!", "success");
+      onClose();
+    } catch (e) {
+      onDone(
+        e?.response?.data?.message ||
+          e?.response?.data?.error ||
+          e?.message ||
+          "Lỗi tạo tồn kho",
+        "error",
+      );
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal title="➕ Tạo tồn kho (SKU)" onClose={onClose}>
+      {loadingProducts ? (
+        <div style={{ textAlign: "center", color: "#9CA3AF", padding: 40 }}>
+          Đang tải sản phẩm...
+        </div>
+      ) : (
+        <>
+          <Select
+            label="Sản phẩm *"
+            value={form.productId}
+            onChange={(e) => {
+              const productId = e.target.value;
+              const product = products.find((p) => p._id === productId);
+              const firstVariant =
+                product?.hasVariants && Array.isArray(product?.variants)
+                  ? product.variants[0]
+                  : null;
+              setForm((f) => ({
+                ...f,
+                productId,
+                variantId: firstVariant?._id || "",
+                sku: firstVariant?.sku || "",
+              }));
+            }}
+          >
+            <option value="" disabled>
+              Chọn sản phẩm
+            </option>
+            {products.map((p) => (
+              <option key={p._id} value={p._id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+
+          {hasVariants && (
+            <Select
+              label="Biến thể *"
+              value={form.variantId}
+              onChange={(e) => {
+                const variantId = e.target.value;
+                const variant = selectedProduct?.variants?.find(
+                  (v) => v._id === variantId,
+                );
+                setForm((f) => ({
+                  ...f,
+                  variantId,
+                  sku: variant?.sku || "",
+                }));
+              }}
+            >
+              <option value="" disabled>
+                Chọn biến thể
+              </option>
+              {selectedProduct?.variants?.map((v) => {
+                const attrs = v?.attributes
+                  ? Object.entries(v.attributes)
+                      .map(([k, val]) => `${k}: ${val}`)
+                      .join(" · ")
+                  : "";
+                return (
+                  <option key={v._id} value={v._id}>
+                    {v.sku} {attrs ? `(${attrs})` : ""}
+                  </option>
+                );
+              })}
+            </Select>
+          )}
+
+          <Input
+            label="SKU *"
+            type="text"
+            value={form.sku}
+            onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
+            placeholder="VD: NIKE-RED-42"
+            disabled={hasVariants}
+          />
+
+          <Input
+            label="Cảnh báo sắp hết (lowStockThreshold)"
+            type="number"
+            min="0"
+            value={form.lowStockThreshold}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                lowStockThreshold: e.target.value,
+              }))
+            }
+          />
+
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <Btn
+              variant="primary"
+              loading={loading}
+              onClick={submit}
+              style={{ flex: 1 }}
+            >
+              Tạo tồn kho
+            </Btn>
+            <Btn variant="secondary" onClick={onClose} disabled={loading}>
+              Huỷ
+            </Btn>
+          </div>
+        </>
+      )}
+    </Modal>
+  );
+};
+
 // ── Logs Modal ────────────────────────────────────────────────
 const LogsModal = ({ inv, onClose }) => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getLogs(inv._id).then((l) => {
-      setLogs(l);
-      setLoading(false);
-    });
+    getInventoryLogs(inv._id)
+      .then((res) => {
+        setLogs(Array.isArray(res?.items) ? res.items : res || []);
+      })
+      .catch(() => setLogs([]))
+      .finally(() => setLoading(false));
   }, [inv._id]);
 
   const TYPE_COLOR = {
@@ -624,9 +869,12 @@ const LogsModal = ({ inv, onClose }) => {
 // ── Main Dashboard ────────────────────────────────────────────
 export default function InventoryDashboard() {
   const [inventory, setInventory] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 15;
   const [modal, setModal] = useState(null); // { type, inv }
   const [toast, setToast] = useState(null);
 
@@ -637,28 +885,104 @@ export default function InventoryDashboard() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const data = await api.list({ status: filterStatus, q: search });
-    setInventory(data);
-    setLoading(false);
+    try {
+      const [listRes, whRes] = await Promise.all([
+        getInventoryList({ status: filterStatus || undefined, q: search || undefined }),
+        getWarehouses(),
+      ]);
+      setInventory(Array.isArray(listRes) ? listRes : []);
+      setWarehouses(Array.isArray(whRes) ? whRes : []);
+    } catch (e) {
+      setInventory([]);
+      setWarehouses([]);
+      notify(e?.response?.data?.message || e?.message || "Không tải được dữ liệu", "error");
+    } finally {
+      setLoading(false);
+    }
   }, [filterStatus, search]);
 
   useEffect(() => {
     load();
   }, [load]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [filterStatus, search]);
+
   const closeModal = () => {
     setModal(null);
     load();
   };
 
-  const stats = {
-    total: _inv.length,
-    in_stock: _inv.filter((i) => i.status === "in_stock").length,
-    low_stock: _inv.filter((i) => i.status === "low_stock").length,
-    out: _inv.filter((i) => i.status === "out_of_stock").length,
+  const totalPages = Math.max(1, Math.ceil(inventory.length / pageSize));
+  const paginatedInventory = inventory.slice(
+    (page - 1) * pageSize,
+    page * pageSize,
+  );
+
+  const toCsvCell = (value) => {
+    const s = String(value ?? "");
+    if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
   };
 
-  const whName = (id) => MOCK_WAREHOUSES.find((w) => w._id === id)?.name || id;
+  const exportInventoryCsv = () => {
+    const rows = [
+      [
+        "SKU",
+        "San pham",
+        "Ton kho",
+        "Da giu",
+        "Kha dung",
+        "Trang thai",
+        "Theo kho",
+      ],
+      ...inventory.map((inv) => {
+        const warehouseText = (inv.warehouses || [])
+          .map((w) => `${whName(w.warehouseId)}:${w.quantity}`)
+          .join(" | ");
+        return [
+          inv.sku,
+          inv.productId?.name ?? inv.productName ?? "",
+          inv.totalQuantity ?? 0,
+          inv.totalReserved ?? 0,
+          (inv.totalQuantity ?? 0) - (inv.totalReserved ?? 0),
+          inv.status ?? "",
+          warehouseText,
+        ];
+      }),
+    ];
+    const csv = rows.map((r) => r.map(toCsvCell).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const date = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `inventory-${date}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    notify("Đã xuất file CSV tồn kho");
+  };
+
+  const stats = {
+    total: inventory.length,
+    in_stock: inventory.filter((i) => i.status === "in_stock").length,
+    low_stock: inventory.filter((i) => i.status === "low_stock").length,
+    out: inventory.filter((i) => i.status === "out_of_stock").length,
+  };
+
+  const whName = (id) => {
+    if (!id) return "—";
+    const _id = typeof id === "object" ? id?._id : id;
+    const w = warehouses.find((w) => w._id === _id);
+    if (w) return w.name;
+    if (typeof id === "object" && id?.name) return id.name;
+    return _id || "—";
+  };
 
   return (
     <div
@@ -823,6 +1147,9 @@ export default function InventoryDashboard() {
             <option value="low_stock">Sắp hết</option>
             <option value="out_of_stock">Hết hàng</option>
           </select>
+          <Btn variant="secondary" onClick={exportInventoryCsv}>
+            ⭳ Xuất CSV
+          </Btn>
         </div>
 
         {/* Table */}
@@ -896,11 +1223,20 @@ export default function InventoryDashboard() {
                       color: "#9CA3AF",
                     }}
                   >
-                    Không tìm thấy dữ liệu
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
+                      <div>Không tìm thấy dữ liệu</div>
+                      <Btn
+                        variant="primary"
+                        onClick={() => setModal({ type: "create-inventory" })}
+                        style={{ padding: "9px 18px", borderRadius: 10 }}
+                      >
+                        Tạo tồn kho (SKU)
+                      </Btn>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                inventory.map((inv) => {
+                paginatedInventory.map((inv) => {
                   const available = inv.totalQuantity - inv.totalReserved;
                   return (
                     <tr
@@ -920,7 +1256,7 @@ export default function InventoryDashboard() {
                         {inv.sku}
                       </td>
                       <td style={{ padding: "14px 16px", fontWeight: 500 }}>
-                        {inv.productName}
+                        {inv.productId?.name ?? inv.productName ?? "—"}
                       </td>
                       <td style={{ padding: "14px 16px", fontWeight: 700 }}>
                         {inv.totalQuantity}
@@ -986,6 +1322,20 @@ export default function InventoryDashboard() {
                             ⊕ Sửa
                           </Btn>
                           <Btn
+                            variant="danger"
+                            onClick={() => setModal({ type: "export", inv })}
+                            style={{ padding: "5px 12px", fontSize: 12 }}
+                          >
+                            ↓ Xuất
+                          </Btn>
+                          <Btn
+                            variant="secondary"
+                            onClick={() => setModal({ type: "transfer", inv })}
+                            style={{ padding: "5px 12px", fontSize: 12 }}
+                          >
+                            ⇄ Kho
+                          </Btn>
+                          <Btn
                             variant="secondary"
                             onClick={() => setModal({ type: "logs", inv })}
                             style={{ padding: "5px 12px", fontSize: 12 }}
@@ -1001,6 +1351,51 @@ export default function InventoryDashboard() {
             </tbody>
           </table>
         </div>
+
+        {inventory.length > 0 && (
+          <div
+            style={{
+              marginTop: 14,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <div style={{ fontSize: 12, color: "#6B7280" }}>
+              Hiển thị {(page - 1) * pageSize + 1}-
+              {Math.min(page * pageSize, inventory.length)} / {inventory.length}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <Btn
+                variant="secondary"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                ← Trước
+              </Btn>
+              <div
+                style={{
+                  minWidth: 90,
+                  textAlign: "center",
+                  alignSelf: "center",
+                  fontSize: 12,
+                  color: "#374151",
+                  fontWeight: 700,
+                }}
+              >
+                Trang {page}/{totalPages}
+              </div>
+              <Btn
+                variant="secondary"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Sau →
+              </Btn>
+            </div>
+          </div>
+        )}
 
         {/* Low stock warning banner */}
         {stats.low_stock + stats.out > 0 && (
@@ -1030,7 +1425,7 @@ export default function InventoryDashboard() {
       {modal?.type === "import" && (
         <ImportModal
           inv={modal.inv}
-          warehouses={MOCK_WAREHOUSES}
+          warehouses={warehouses}
           onClose={closeModal}
           onDone={(msg, type) => {
             notify(msg, type);
@@ -1046,8 +1441,35 @@ export default function InventoryDashboard() {
           }}
         />
       )}
+      {modal?.type === "export" && (
+        <ExportModal
+          inv={modal.inv}
+          warehouses={warehouses}
+          onClose={closeModal}
+          onDone={(msg, type) => {
+            notify(msg, type);
+          }}
+        />
+      )}
+      {modal?.type === "transfer" && (
+        <TransferModal
+          inv={modal.inv}
+          warehouses={warehouses}
+          onClose={closeModal}
+          onDone={(msg, type) => {
+            notify(msg, type);
+          }}
+        />
+      )}
       {modal?.type === "logs" && (
         <LogsModal inv={modal.inv} onClose={closeModal} />
+      )}
+
+      {modal?.type === "create-inventory" && (
+        <CreateInventoryModal
+          onClose={closeModal}
+          onDone={(msg, type) => notify(msg, type)}
+        />
       )}
 
       {toast && <Toast msg={toast.msg} type={toast.type} />}

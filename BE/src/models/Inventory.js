@@ -148,13 +148,32 @@ inventorySchema.methods.exportStock = function (
     throw new Error(`Không đủ hàng — khả dụng: ${this.available}`);
   const before = this.totalQuantity;
   this.totalQuantity -= qty;
-  this._syncWarehouseQty(warehouseId, -qty);
+
+  // Nếu không truyền warehouseId (ví dụ: xuất theo đơn mà FE chưa chọn kho),
+  // thì phân bổ xuất từ các kho hiện có để dashboard theo kho vẫn khớp số lượng.
+  if (warehouseId) {
+    this._syncWarehouseQty(warehouseId, -qty);
+  } else if (Array.isArray(this.warehouses) && this.warehouses.length > 0) {
+    let remaining = qty;
+    for (const wh of this.warehouses) {
+      if (remaining <= 0) break;
+      const take = Math.min(wh.quantity, remaining);
+      wh.quantity = Math.max(0, wh.quantity - take);
+      wh.lastSyncAt = new Date();
+      remaining -= take;
+    }
+
+    if (remaining > 0) {
+      throw new Error(`Không đủ hàng trong kho để xuất (thiếu: ${remaining})`);
+    }
+  }
+
   this._pushLog({
     type: "export",
     quantity: -qty,
     beforeQty: before,
     afterQty: this.totalQuantity,
-    warehouseId,
+    warehouseId: warehouseId ?? null,
     orderId,
     performedBy,
     note,

@@ -54,9 +54,18 @@ const getReplies = async (req, res) => {
 //  USER (cần đăng nhập)
 // ══════════════════════════════════════════════════════════════
 
+const getMyReview = async (req, res) => {
+  try {
+    const data = await reviewService.getMyReview(req.query, req.user);
+    return res.status(200).json({ status: "OK", data });
+  } catch (e) {
+    return handleError(res, e);
+  }
+};
+
 const createReview = async (req, res) => {
   try {
-    const data = await reviewService.createReview(req.body, req.user._id);
+    const data = await reviewService.createReview(req.body, req.user);
     return res.status(201).json({ status: "OK", data });
   } catch (e) {
     return handleError(res, e);
@@ -174,6 +183,7 @@ module.exports = {
   getReviews,
   getReviewById,
   getReplies,
+  getMyReview,
   createReview,
   updateReview,
   deleteReview,

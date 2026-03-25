@@ -54,8 +54,6 @@ const warehouseSchema = new mongoose.Schema(
 // ================================================================
 // INDEXES
 // ================================================================
-warehouseSchema.index({ code: 1 });
-warehouseSchema.index({ isActive: 1 });
 warehouseSchema.index({ externalId: 1 });
 
 // ================================================================

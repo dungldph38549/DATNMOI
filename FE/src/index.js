@@ -10,17 +10,7 @@ import { Provider } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import "antd/dist/reset.css";
-import "bootstrap/dist/css/bootstrap.min.css";
-import "./assets/css/bootstrap.min.css";
-import "./assets/css/font-awesome.css";
-import "./assets/css/animate.min.css";
-import "./assets/css/owl.carousel.css";
-import "./assets/css/owl.transitions.css";
-import "./assets/css/bootstrap-select.min.css";
-import "./assets/css/lightbox.css";
-import "./assets/css/rateit.css";
-import "./assets/css/blue.css";
-import "./assets/css/main.css";
+
 
 // 2. Khởi tạo instance của QueryClient
 const queryClient = new QueryClient();

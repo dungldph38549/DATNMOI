@@ -6,6 +6,7 @@ import {
   createVoucher,
   updateVoucher,
   deleteVoucher,
+  getAllProducts,
 } from "../api/index";
 import dayjs from "dayjs";
 
@@ -19,8 +20,21 @@ export default function Vouchers() {
     queryKey: ["admin-vouchers"],
     queryFn: getAllVouchers,
   });
+  const { data: productData } = useQuery({
+    queryKey: ["admin-voucher-products"],
+    queryFn: () => getAllProducts({ page: 0, limit: 500 }),
+  });
 
   const list = data?.data ?? (Array.isArray(data) ? data : []);
+  const productList = Array.isArray(productData?.data)
+    ? productData.data
+    : Array.isArray(productData?.data?.data)
+      ? productData.data.data
+      : [];
+  const productOptions = productList.map((p) => ({
+    value: p?._id,
+    label: p?.name || p?._id,
+  }));
 
   const createMutation = useMutation({
     mutationFn: createVoucher,
@@ -70,6 +84,10 @@ export default function Vouchers() {
       startDate: values.startDate?.toDate?.() || values.startDate,
       endDate: values.endDate?.toDate?.() || values.endDate,
       usageLimit: values.usageLimit || 0,
+      status: values.status || "active",
+      applicableProductIds: Array.isArray(values.applicableProductIds)
+        ? values.applicableProductIds
+        : [],
     };
     if (editingId) {
       updateMutation.mutate({ id: editingId, payload });
@@ -89,6 +107,10 @@ export default function Vouchers() {
       startDate: record.startDate ? dayjs(record.startDate) : null,
       endDate: record.endDate ? dayjs(record.endDate) : null,
       usageLimit: record.usageLimit || 0,
+      status: record.status || "active",
+      applicableProductIds: Array.isArray(record.applicableProductIds)
+        ? record.applicableProductIds.map((id) => String(id))
+        : [],
     });
     setModalOpen(true);
   };
@@ -110,6 +132,15 @@ export default function Vouchers() {
         r.discountType === "percent"
           ? `${r.discountValue}%`
           : `${Number(r.discountValue).toLocaleString()}đ`,
+    },
+    {
+      title: "Phạm vi",
+      key: "scope",
+      width: 140,
+      render: (_, r) =>
+        Array.isArray(r.applicableProductIds) && r.applicableProductIds.length > 0
+          ? `${r.applicableProductIds.length} sản phẩm`
+          : "Toàn bộ sản phẩm",
     },
     {
       title: "Đơn tối thiểu",
@@ -186,20 +217,69 @@ export default function Vouchers() {
           <Form.Item name="discountType" label="Loại giảm" initialValue="percent">
             <Select options={[{ value: "percent", label: "Phần trăm" }, { value: "fixed", label: "Số tiền cố định" }]} />
           </Form.Item>
-          <Form.Item name="discountValue" label="Giá trị giảm" rules={[{ required: true }]}>
+          <Form.Item
+            name="discountValue"
+            label="Giá trị giảm"
+            rules={[
+              { required: true, message: "Nhập giá trị giảm" },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (value == null) return Promise.resolve();
+                  if (Number(value) < 0) return Promise.reject(new Error("Giá trị giảm phải >= 0"));
+                  if (getFieldValue("discountType") === "percent" && Number(value) > 100) {
+                    return Promise.reject(new Error("Giảm theo % không được > 100"));
+                  }
+                  return Promise.resolve();
+                },
+              }),
+            ]}
+          >
             <InputNumber min={0} style={{ width: "100%" }} />
           </Form.Item>
           <Form.Item name="minOrderValue" label="Đơn tối thiểu (đ)">
             <InputNumber min={0} style={{ width: "100%" }} />
           </Form.Item>
-          <Form.Item name="startDate" label="Từ ngày" rules={[{ required: true }]}>
-            <DatePicker style={{ width: "100%" }} />
+          <Form.Item name="startDate" label="Từ ngày" rules={[{ required: true, message: "Chọn ngày bắt đầu" }]}>
+            <DatePicker showTime style={{ width: "100%" }} format="DD/MM/YYYY HH:mm" />
           </Form.Item>
-          <Form.Item name="endDate" label="Đến ngày" rules={[{ required: true }]}>
-            <DatePicker style={{ width: "100%" }} />
+          <Form.Item
+            name="endDate"
+            label="Đến ngày"
+            dependencies={["startDate"]}
+            rules={[
+              { required: true, message: "Chọn ngày kết thúc" },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  const start = getFieldValue("startDate");
+                  if (!value || !start) return Promise.resolve();
+                  if (dayjs(value).isBefore(dayjs(start))) {
+                    return Promise.reject(new Error("Ngày kết thúc phải >= ngày bắt đầu"));
+                  }
+                  return Promise.resolve();
+                },
+              }),
+            ]}
+          >
+            <DatePicker showTime style={{ width: "100%" }} format="DD/MM/YYYY HH:mm" />
           </Form.Item>
           <Form.Item name="usageLimit" label="Số lần dùng (0 = không giới hạn)">
             <InputNumber min={0} style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item
+            name="applicableProductIds"
+            label="Áp dụng cho sản phẩm"
+            extra="Để trống: áp dụng cho toàn bộ sản phẩm."
+          >
+            <Select
+              mode="multiple"
+              options={productOptions}
+              placeholder="Chọn sản phẩm áp dụng voucher"
+              allowClear
+              optionFilterProp="label"
+            />
+          </Form.Item>
+          <Form.Item name="status" label="Trạng thái" initialValue="active">
+            <Select options={[{ value: "active", label: "Hoạt động" }, { value: "inactive", label: "Tạm tắt" }]} />
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={createMutation.isPending || updateMutation.isPending}>

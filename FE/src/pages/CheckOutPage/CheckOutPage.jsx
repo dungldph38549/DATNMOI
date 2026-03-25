@@ -1,57 +1,149 @@
-import { useState } from "react";
-import { useSelector } from "react-redux";
-import { createOrder } from "../../services/OrderService";
+import { useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { createOrder, createVnpayUrl, updateCustomerById } from "../../api";
+import { clearCart } from "../../redux/cart/cartSlice";
 
 function CheckOutPage() {
 
-  const cartItems = useSelector((state) => state.cart.cartItems);
-  const user = useSelector((state) => state.user?.user);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const cartItems = useSelector((state) => state.cart.items || []);
+  const user = useSelector((state) => state.user);
 
   const [paymentMethod, setPaymentMethod] = useState("COD");
+  const [shippingMethod] = useState("fast"); // map về backend: fast/standard
 
   const [name, setName] = useState("");
+  const [email, setEmail] = useState(user?.email || "");
   const [address, setAddress] = useState("");
-  const [city, setCity] = useState("");
   const [phone, setPhone] = useState("");
+  const [note, setNote] = useState("");
 
-  const totalPrice = cartItems.reduce(
-    (total, item) => total + item.price * item.amount,
-    0
-  );
+  const shippingFee = 30000;
+
+  const subtotal = useMemo(() => {
+    return cartItems.reduce((sum, item) => {
+      const price = Number(item.price || 0);
+      const qty = Number(item.qty || 0);
+      return sum + price * qty;
+    }, 0);
+  }, [cartItems]);
+
+  const totalPrice = subtotal + shippingFee;
 
   const handleOrder = async () => {
     try {
-      const order = {
-        orderItems: cartItems,
-
-        shippingAddress: {
-          fullName: name,
-          address: address,
-          city: city,
-          country: "Viet Nam",
-          phone: phone,
-        },
-
-        paymentMethod: paymentMethod,
-
-        itemsPrice: totalPrice,
-        shippingPrice: 30000,
-        taxPrice: 0,
-        totalPrice: totalPrice + 30000,
-
-        user: user?._id,
-      };
-
-      console.log(order);
-
-      const res = await createOrder(order);
-
-      if (res?.status === "OK") {
-        alert("Đặt hàng thành công");
+      if (!cartItems.length) {
+        alert("Giỏ hàng trống");
+        return;
       }
 
+      if (!name.trim()) {
+        alert("Vui lòng nhập họ tên");
+        return;
+      }
+      if (!email.trim()) {
+        alert("Vui lòng nhập email");
+        return;
+      }
+      if (!phone.trim()) {
+        alert("Vui lòng nhập số điện thoại");
+        return;
+      }
+      if (!address.trim()) {
+        alert("Vui lòng nhập địa chỉ");
+        return;
+      }
+
+      const isLoggedIn = !!user?.login;
+      const userIdCandidate = user?._id || user?.id;
+      const userId = isLoggedIn && userIdCandidate ? userIdCandidate : null;
+      const guestId = !isLoggedIn ? String(user?.id || "") : null;
+
+      const products = cartItems.map((item) => ({
+        productId: item.productId || item._id,
+        quantity: item.qty || 1,
+        sku: item.sku == null ? null : String(item.sku).trim().toUpperCase(),
+      }));
+
+      const baseUrl = window.location.origin;
+      const orderPayload = {
+        ...(userId ? { userId } : {}),
+        ...(guestId ? { guestId } : {}),
+        fullName: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        note: note || undefined,
+        paymentMethod: paymentMethod === "ONLINE" ? "vnpay" : "cod",
+        shippingMethod: shippingMethod === "fast" ? "fast" : "standard",
+        products,
+        voucherCode: null,
+        discount: 0,
+        shippingFee,
+        totalAmount: totalPrice,
+        ...(paymentMethod === "ONLINE"
+          ? {
+              vnpReturnUrl: `${baseUrl}/payment/return`,
+              vnpCancelUrl: `${baseUrl}/checkoutpage`,
+            }
+          : {}),
+      };
+
+      const order = await createOrder(orderPayload);
+
+      if (order?.paymentMethod === "vnpay" && order?._id) {
+        let payUrl = order.vnpayPaymentUrl;
+        if (!payUrl) {
+          const { url } = await createVnpayUrl(
+            order._id,
+            `${baseUrl}/payment/return`,
+            `${baseUrl}/checkoutpage`,
+          );
+          payUrl = url;
+        }
+        if (payUrl) {
+          dispatch(clearCart());
+          window.location.href = payUrl;
+          return;
+        }
+        if (order.vnpayBuildError) {
+          alert(order.vnpayBuildError);
+          return;
+        }
+        alert(
+          "Không nhận được link thanh toán VNPay. Kiểm tra backend và .env (BE_URL, VNP_TMN_CODE).",
+        );
+        return;
+      }
+
+      // Best-effort update profile
+      if (isLoggedIn && user?.id) {
+        try {
+          await updateCustomerById({
+            id: user.id,
+            name: name.trim(),
+            email: email.trim(),
+            phone: phone.trim(),
+            address: address.trim(),
+          });
+        } catch {
+          // ignore
+        }
+      }
+
+      dispatch(clearCart());
+      alert("Đặt hàng thành công!");
+      navigate("/orders");
     } catch (error) {
-      console.log(error);
+      const msg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Có lỗi xảy ra khi đặt hàng";
+      alert(msg);
+      console.error(error);
     }
   };
 
@@ -69,6 +161,14 @@ function CheckOutPage() {
       <br /><br />
 
       <input
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+
+      <br /><br />
+
+      <input
         placeholder="Địa chỉ"
         value={address}
         onChange={(e) => setAddress(e.target.value)}
@@ -77,17 +177,19 @@ function CheckOutPage() {
       <br /><br />
 
       <input
-        placeholder="Thành phố"
-        value={city}
-        onChange={(e) => setCity(e.target.value)}
+        placeholder="Số điện thoại"
+        value={phone}
+        onChange={(e) => setPhone(e.target.value)}
       />
 
       <br /><br />
 
-      <input
-        placeholder="Số điện thoại"
-        value={phone}
-        onChange={(e) => setPhone(e.target.value)}
+      <textarea
+        placeholder="Ghi chú (tuỳ chọn)"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        rows={3}
+        style={{ width: "100%", maxWidth: 520 }}
       />
 
       <br /><br />
@@ -113,12 +215,12 @@ function CheckOutPage() {
           checked={paymentMethod === "ONLINE"}
           onChange={(e) => setPaymentMethod(e.target.value)}
         />
-        Thanh toán Online
+        Thanh toán Online (VNPay)
       </label>
 
       <br /><br />
 
-      <h3>Tổng tiền: {totalPrice + 30000} VNĐ</h3>
+      <h3>Tổng tiền: {totalPrice} VNĐ</h3>
 
       <button onClick={handleOrder}>
         Đặt hàng

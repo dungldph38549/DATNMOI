@@ -5,16 +5,18 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: "#f49d25",
-        "background-light": "#f8f7f5",
-        "background-dark": "#221a10",
+        primary: "#4F46E5", // Elegant Indigo
+        secondary: "#EC4899", // Vibrant Pink for youthfulness
+        "background-light": "#F8FAFC",
+        "background-dark": "#0F172A",
+        surface: "#ffffff",
       },
       fontFamily: {
-        display: ["Lexend", "sans-serif"],
+        display: ["Outfit", "sans-serif"],
+        body: ["Plus Jakarta Sans", "sans-serif"],
       },
-      borderRadius: {
-        lg: "2rem",
-        xl: "3rem",
+      boxShadow: {
+        'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
       },
     },
   },

@@ -93,7 +93,7 @@
 //           width: "100%",
 //           maxWidth: 420,
 //           padding: "28px 28px 24px",
-//           fontFamily: "'Lexend', sans-serif",
+//           fontFamily: "'Plus Jakarta Sans', sans-serif",
 //           animation: "slideUp 0.2s ease",
 //         }}
 //       >
@@ -164,7 +164,7 @@
 //           width: "100%",
 //           maxWidth: 360,
 //           padding: 28,
-//           fontFamily: "'Lexend', sans-serif",
+//           fontFamily: "'Plus Jakarta Sans', sans-serif",
 //           animation: "slideUp 0.15s ease",
 //           textAlign: "center",
 //         }}
@@ -223,7 +223,7 @@
 //               fontWeight: 600,
 //               fontSize: 13,
 //               cursor: "pointer",
-//               fontFamily: "'Lexend',sans-serif",
+//               fontFamily: "'Plus Jakarta Sans',sans-serif",
 //             }}
 //           >
 //             Huỷ
@@ -241,7 +241,7 @@
 //               fontWeight: 700,
 //               fontSize: 13,
 //               cursor: "pointer",
-//               fontFamily: "'Lexend',sans-serif",
+//               fontFamily: "'Plus Jakarta Sans',sans-serif",
 //               opacity: loading ? 0.7 : 1,
 //             }}
 //           >
@@ -268,7 +268,7 @@
 //     border: `1.5px solid ${T.border}`,
 //     outline: "none",
 //     fontSize: 13,
-//     fontFamily: "'Lexend',sans-serif",
+//     fontFamily: "'Plus Jakarta Sans',sans-serif",
 //     background: "#F8FAFC",
 //     boxSizing: "border-box",
 //     color: T.text,
@@ -400,7 +400,7 @@
 //           fontWeight: 700,
 //           fontSize: 13,
 //           cursor: "pointer",
-//           fontFamily: "'Lexend',sans-serif",
+//           fontFamily: "'Plus Jakarta Sans',sans-serif",
 //           boxShadow: "0 4px 14px rgba(244,157,37,0.28)",
 //           opacity: loading ? 0.7 : 1,
 //           marginTop: 4,
@@ -526,7 +526,7 @@
 //           justifyContent: "center",
 //           height: 300,
 //           gap: 12,
-//           fontFamily: "'Lexend',sans-serif",
+//           fontFamily: "'Plus Jakarta Sans',sans-serif",
 //         }}
 //       >
 //         <div
@@ -556,7 +556,7 @@
 //           height: 240,
 //           gap: 8,
 //           color: T.textMuted,
-//           fontFamily: "'Lexend',sans-serif",
+//           fontFamily: "'Plus Jakarta Sans',sans-serif",
 //         }}
 //       >
 //         <span
@@ -575,7 +575,6 @@
 //   return (
 //     <>
 //       <style>{`
-//         @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
 //         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
 //         .material-symbols-outlined{font-family:'Material Symbols Outlined';font-style:normal;line-height:1;display:inline-block;white-space:nowrap;}
 //         @keyframes spin    { to{transform:rotate(360deg)} }
@@ -589,7 +588,7 @@
 //       <div
 //         style={{
 //           padding: 28,
-//           fontFamily: "'Lexend',sans-serif",
+//           fontFamily: "'Plus Jakarta Sans',sans-serif",
 //           background: T.bg,
 //           minHeight: "100vh",
 //         }}
@@ -669,7 +668,7 @@
 //               fontWeight: 700,
 //               fontSize: 13,
 //               cursor: "pointer",
-//               fontFamily: "'Lexend',sans-serif",
+//               fontFamily: "'Plus Jakarta Sans',sans-serif",
 //               boxShadow: "0 4px 16px rgba(244,157,37,0.30)",
 //             }}
 //           >
@@ -724,7 +723,7 @@
 //                 background: "#F1F5F9",
 //                 fontSize: 13,
 //                 color: T.text,
-//                 fontFamily: "'Lexend',sans-serif",
+//                 fontFamily: "'Plus Jakarta Sans',sans-serif",
 //                 boxSizing: "border-box",
 //               }}
 //             />
@@ -746,7 +745,7 @@
 //                   fontSize: 13,
 //                   fontWeight: 500,
 //                   cursor: "pointer",
-//                   fontFamily: "'Lexend',sans-serif",
+//                   fontFamily: "'Plus Jakarta Sans',sans-serif",
 //                   whiteSpace: "nowrap",
 //                 }}
 //               >
@@ -1098,6 +1097,14 @@ import {
   uploadImage,
 } from "../api/index";
 
+// Backend đang chạy tại 3002. Ép base URL đúng port để ảnh luôn load được (tránh dính 3001 -> ERR_CONNECTION_REFUSED).
+const BACKEND_BASE_URL = (
+  process.env.REACT_APP_API_URL_BACKEND || "http://localhost:3002/api"
+)
+  .replace(/\/api\/?$/, "")
+  .replace(/localhost:\d+/, "localhost:3002")
+  .replace(/127\.0\.0\.1:\d+/, "127.0.0.1:3002");
+
 // ── Design tokens ──────────────────────────────────────────────
 const T = {
   primary: "#f49d25",
@@ -1183,7 +1190,7 @@ const SHModal = ({ open, title, onClose, children }) => {
           width: "100%",
           maxWidth: 420,
           padding: "28px 28px 24px",
-          fontFamily: "'Lexend', sans-serif",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
           animation: "slideUp 0.2s ease",
         }}
       >
@@ -1230,122 +1237,6 @@ const SHModal = ({ open, title, onClose, children }) => {
   );
 };
 
-// ── Confirm delete modal ───────────────────────────────────────
-const ConfirmModal = ({ open, name, loading, onConfirm, onCancel }) => {
-  if (!open) return null;
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1100,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "rgba(15,23,42,0.40)",
-        backdropFilter: "blur(3px)",
-      }}
-    >
-      <div
-        style={{
-          background: T.card,
-          borderRadius: 20,
-          border: `1px solid ${T.border}`,
-          boxShadow: "0 24px 64px rgba(0,0,0,0.18)",
-          width: "100%",
-          maxWidth: 360,
-          padding: 28,
-          fontFamily: "'Lexend', sans-serif",
-          animation: "slideUp 0.15s ease",
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            width: 52,
-            height: 52,
-            borderRadius: "50%",
-            background: T.redBg,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            margin: "0 auto 16px",
-          }}
-        >
-          <span
-            className="material-symbols-outlined"
-            style={{ fontSize: 24, color: T.red }}
-          >
-            delete_forever
-          </span>
-        </div>
-        <h3
-          style={{
-            margin: "0 0 8px",
-            fontSize: 15,
-            fontWeight: 800,
-            color: T.text,
-          }}
-        >
-          Xác nhận xoá?
-        </h3>
-        <p
-          style={{
-            margin: "0 0 24px",
-            fontSize: 13,
-            color: T.textMuted,
-            lineHeight: 1.6,
-          }}
-        >
-          Bạn có chắc muốn xoá danh mục{" "}
-          <b style={{ color: T.text }}>"{name}"</b>?<br />
-          Danh mục sẽ bị ngừng hoạt động.
-        </p>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button
-            onClick={onCancel}
-            type="button"
-            style={{
-              flex: 1,
-              padding: "10px",
-              borderRadius: 999,
-              border: `1.5px solid ${T.border}`,
-              background: "#fff",
-              color: T.textMid,
-              fontWeight: 600,
-              fontSize: 13,
-              cursor: "pointer",
-              fontFamily: "'Lexend',sans-serif",
-            }}
-          >
-            Huỷ
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={loading}
-            type="button"
-            style={{
-              flex: 1,
-              padding: "10px",
-              borderRadius: 999,
-              border: "none",
-              background: T.red,
-              color: "#fff",
-              fontWeight: 700,
-              fontSize: 13,
-              cursor: "pointer",
-              fontFamily: "'Lexend',sans-serif",
-              opacity: loading ? 0.7 : 1,
-            }}
-          >
-            {loading ? "Đang xoá..." : "Xoá"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // ── Category form body ─────────────────────────────────────────
 const CategoryFormBody = ({
   form,
@@ -1361,7 +1252,7 @@ const CategoryFormBody = ({
     border: `1.5px solid ${T.border}`,
     outline: "none",
     fontSize: 13,
-    fontFamily: "'Lexend',sans-serif",
+    fontFamily: "'Plus Jakarta Sans',sans-serif",
     background: "#F8FAFC",
     boxSizing: "border-box",
     color: T.text,
@@ -1439,7 +1330,7 @@ const CategoryFormBody = ({
           {imgPreview ? (
             <>
               <img
-                src={`${process.env.REACT_APP_API_URL_BACKEND}/image/${imgPreview}`}
+                src={`${BACKEND_BASE_URL}/uploads/${imgPreview}`}
                 alt="preview"
                 style={{
                   width: 72,
@@ -1493,7 +1384,7 @@ const CategoryFormBody = ({
           fontWeight: 700,
           fontSize: 13,
           cursor: "pointer",
-          fontFamily: "'Lexend',sans-serif",
+          fontFamily: "'Plus Jakarta Sans',sans-serif",
           boxShadow: "0 4px 14px rgba(244,157,37,0.28)",
           opacity: loading ? 0.7 : 1,
           marginTop: 4,
@@ -1515,7 +1406,6 @@ export default function Categories() {
   const [selected, setSelected] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState(null);
   const [editPreview, setEditPreview] = useState("");
   const [createPreview, setCreatePreview] = useState("");
   const [search, setSearch] = useState("");
@@ -1563,17 +1453,6 @@ export default function Categories() {
       showToast(err?.response?.data?.message || "Lỗi khi tạo mới", "error"),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: ({ id }) => updateCategory({ id, status: "inactive" }),
-    onSuccess: () => {
-      showToast("Đã xoá danh mục");
-      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
-      setDeleteTarget(null);
-    },
-    onError: (err) =>
-      showToast(err?.response?.data?.message || "Lỗi khi xoá", "error"),
-  });
-
   // ── Upload image ───────────────────────────────────────────
   const handleUpload = async (e, targetForm, setPreview) => {
     const file = e.target.files[0];
@@ -1616,7 +1495,6 @@ export default function Categories() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
         .material-symbols-outlined{font-family:'Material Symbols Outlined';font-style:normal;line-height:1;display:inline-block;white-space:nowrap;}
         @keyframes spin    { to{transform:rotate(360deg)} }
@@ -1630,7 +1508,7 @@ export default function Categories() {
       <div
         style={{
           padding: 28,
-          fontFamily: "'Lexend',sans-serif",
+          fontFamily: "'Plus Jakarta Sans',sans-serif",
           background: T.bg,
           minHeight: "100vh",
         }}
@@ -1711,7 +1589,7 @@ export default function Categories() {
               fontWeight: 700,
               fontSize: 13,
               cursor: "pointer",
-              fontFamily: "'Lexend',sans-serif",
+              fontFamily: "'Plus Jakarta Sans',sans-serif",
               boxShadow: "0 4px 16px rgba(244,157,37,0.30)",
             }}
           >
@@ -1766,7 +1644,7 @@ export default function Categories() {
                 background: "#F1F5F9",
                 fontSize: 13,
                 color: T.text,
-                fontFamily: "'Lexend',sans-serif",
+                fontFamily: "'Plus Jakarta Sans',sans-serif",
                 boxSizing: "border-box",
               }}
             />
@@ -1789,7 +1667,7 @@ export default function Categories() {
                   fontSize: 13,
                   fontWeight: 500,
                   cursor: "pointer",
-                  fontFamily: "'Lexend',sans-serif",
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
                   whiteSpace: "nowrap",
                 }}
               >
@@ -1967,7 +1845,7 @@ export default function Categories() {
                           >
                             {record.image ? (
                               <img
-                                src={`${process.env.REACT_APP_API_URL_BACKEND}/image/${record.image}`}
+                                src={`${BACKEND_BASE_URL}/uploads/${record.image}`}
                                 alt={record.name}
                                 style={{
                                   width: "100%",
@@ -2065,40 +1943,6 @@ export default function Categories() {
                               edit
                             </span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteTarget(record)}
-                            style={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: "50%",
-                              border: `1.5px solid ${T.border}`,
-                              background: "#fff",
-                              color: T.textMuted,
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              transition: "all 0.15s",
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.borderColor = T.red;
-                              e.currentTarget.style.color = T.red;
-                              e.currentTarget.style.background = T.redBg;
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.borderColor = T.border;
-                              e.currentTarget.style.color = T.textMuted;
-                              e.currentTarget.style.background = "#fff";
-                            }}
-                          >
-                            <span
-                              className="material-symbols-outlined"
-                              style={{ fontSize: 17 }}
-                            >
-                              delete
-                            </span>
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -2174,14 +2018,6 @@ export default function Categories() {
         </Form>
       </SHModal>
 
-      {/* Confirm delete */}
-      <ConfirmModal
-        open={!!deleteTarget}
-        name={deleteTarget?.name}
-        loading={deleteMutation.isPending}
-        onConfirm={() => deleteMutation.mutate({ id: deleteTarget._id })}
-        onCancel={() => setDeleteTarget(null)}
-      />
     </>
   );
 }

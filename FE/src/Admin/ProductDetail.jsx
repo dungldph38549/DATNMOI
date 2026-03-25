@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Form, InputNumber, Select } from "antd";
+import { Form, InputNumber, Select, Input } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import Swal from "sweetalert2";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,7 +11,17 @@ import {
   uploadImages,
   getAllBrands,
   getAllCategories,
+  getAllSizes,
 } from "./../api/index";
+
+// Backend đang chạy tại 3002. Nếu build/ENV bị lệch (vẫn còn 3001), ảnh sẽ request sai port và lỗi ERR_CONNECTION_REFUSED.
+// Ép URL base về đúng port để admin luôn load được ảnh.
+const BACKEND_BASE_URL = (
+  process.env.REACT_APP_API_URL_BACKEND || "http://localhost:3002/api"
+)
+  .replace(/\/api\/?$/, "")
+  .replace(/localhost:\d+/, "localhost:3002")
+  .replace(/127\.0\.0\.1:\d+/, "127.0.0.1:3002");
 
 // ── Toggle Switch ───────────────────────────────────────────────
 const Toggle = ({ checked, onChange, label, sub }) => (
@@ -118,11 +128,18 @@ const inputStyle = {
   border: "1.5px solid #E2E8F0",
   outline: "none",
   fontSize: 14,
-  fontFamily: "'Lexend', sans-serif",
+  fontFamily: "'Plus Jakarta Sans', sans-serif",
   background: "transparent",
   transition: "border-color 0.15s",
   boxSizing: "border-box",
 };
+
+const normalizeAttr = (v) =>
+  String(v || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 
 // ================================================================
 // ProductDetail — Card only (no Sidebar / header / layout wrapper)
@@ -133,6 +150,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
   const [visible, setVisible] = useState(true);
   const [featured, setFeatured] = useState(false);
   const [hasVar, setHasVar] = useState(false);
+  const [saleEnabled, setSaleEnabled] = useState(false);
 
   const { data: productData } = useQuery({
     queryKey: ["admin-product-detail", productId],
@@ -150,6 +168,11 @@ const ProductDetail = ({ productId = null, onClose }) => {
     queryFn: () => getAllCategories("all"),
     keepPreviousData: true,
   });
+  const { data: sizes } = useQuery({
+    queryKey: ["admin-sizes"],
+    queryFn: getAllSizes,
+    keepPreviousData: true,
+  });
 
   const mutation = useMutation({
     mutationFn: productId !== "create" ? updateProduct : createProduct,
@@ -163,22 +186,72 @@ const ProductDetail = ({ productId = null, onClose }) => {
       onClose();
     },
     onError: (err) => {
-      if (err.response?.data?.message)
-        Swal.fire("Thất bại", err.response.data.message, "warning");
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.response?.data?.errors?.[0]?.msg ||
+        err?.message ||
+        "Không thể lưu sản phẩm";
+
+      // Hiển thị thêm body lỗi để bắt đúng field/sai payload
+      const raw = err?.response?.data;
+      const detail = raw
+        ? `\n\nChi tiết:\n${JSON.stringify(raw, null, 2)}`
+        : "";
+
+      const status = err?.response?.status;
+      const url = err?.config?.url;
+      const baseURL = err?.config?.baseURL;
+      const where =
+        status || url
+          ? `\n\nEndpoint: ${baseURL ? baseURL : ""}${url ? url : ""}${
+              status ? ` (status ${status})` : ""
+            }`
+          : "";
+
+      Swal.fire("Thất bại", msg + detail + where, "warning");
+      // eslint-disable-next-line no-console
+      console.error("[ProductDetail] save product failed:", err);
     },
   });
 
   useEffect(() => {
     if (productData) {
+      // Backend ProductModel dùng `stock` còn FE form đang dùng `countInStock` (alias ở UI).
+      // Khi edit sản phẩm, nếu không map lại thì payload gửi lên có thể thiếu `countInStock`
+      // và backend sẽ fail validation.
+      const isHasVariants = !!productData.hasVariants;
       form.setFieldsValue({
         ...productData,
+        categoryId: productData?.categoryId?._id || productData?.categoryId || undefined,
+        brandId: productData?.brandId?._id || productData?.brandId || undefined,
         countInStock: productData.stock ?? productData.countInStock,
         attributes: productData.attributes || [],
         variants: productData.variants || [],
+        ...(isHasVariants
+          ? {}
+          : {
+              countInStock:
+                productData.stock ??
+                productData.countInStock ??
+                form.getFieldValue("countInStock") ??
+                0,
+            }),
       });
       setHasVar(!!productData.hasVariants);
       setVisible(productData.isVisible ?? true);
       setFeatured(productData.isFeatured ?? false);
+      const activeSale = Array.isArray(productData.saleRules)
+        ? productData.saleRules.find((r) => r?.status === "active") || productData.saleRules[0]
+        : null;
+      setSaleEnabled(!!activeSale);
+      form.setFieldsValue({
+        saleType: activeSale?.discountType || "percent",
+        saleValue: activeSale?.discountValue ?? null,
+        saleStartAt: activeSale?.startAt ? String(activeSale.startAt).slice(0, 16) : "",
+        saleEndAt: activeSale?.endAt ? String(activeSale.endAt).slice(0, 16) : "",
+        salePriority: activeSale?.priority ?? 0,
+      });
     }
   }, [productData, form]);
 
@@ -207,16 +280,70 @@ const ProductDetail = ({ productId = null, onClose }) => {
   };
 
   const onFinish = (values) => {
-    mutation.mutate({
-      id: productId !== "create" ? productId : undefined,
-      payload: {
-        ...values,
-        hasVariants: hasVar,
-        isVisible: visible,
-        isFeatured: featured,
-        srcImages: form.getFieldValue("srcImages"),
-      },
-    });
+    const payload = {
+      ...values,
+      hasVariants: hasVar,
+      isVisible: visible,
+      isFeatured: featured,
+      srcImages: form.getFieldValue("srcImages"),
+    };
+    payload.saleRules = saleEnabled && Number(values.saleValue) > 0
+      ? [
+          {
+            name: "Sale sản phẩm",
+            scope: "product",
+            discountType: values.saleType || "percent",
+            discountValue: Number(values.saleValue || 0),
+            startAt: values.saleStartAt ? new Date(values.saleStartAt).toISOString() : null,
+            endAt: values.saleEndAt ? new Date(values.saleEndAt).toISOString() : null,
+            priority: Number(values.salePriority || 0),
+            status: "active",
+          },
+        ]
+      : [];
+
+    // Normalize attributes/variants để tránh lỗi validate khi FE bị trùng tag/whitespace.
+    if (hasVar) {
+      const normalizedAttrs = (payload.attributes || [])
+        .map((a) => `${a}`.trim())
+        .filter(Boolean);
+      const uniqueAttrs = Array.from(new Set(normalizedAttrs));
+
+      payload.attributes = uniqueAttrs;
+      if (Array.isArray(payload.variants)) {
+        payload.variants = payload.variants.map((v) => {
+          const attrsObj = v?.attributes || {};
+          const remapped = {};
+          Object.entries(attrsObj).forEach(([k, val]) => {
+            const nk = `${k}`.trim();
+            if (!nk) return;
+            remapped[nk] = val;
+          });
+          return { ...v, attributes: remapped };
+        });
+      }
+    }
+
+    // createProduct expects `payload` directly
+    // updateProduct expects `{ id, payload }`
+    if (productId !== "create") {
+      mutation.mutate({ id: productId, payload });
+    } else {
+      mutation.mutate(payload);
+    }
+  };
+
+  const onFinishFailed = ({ errorFields }) => {
+    if (!errorFields?.length) return;
+    const missing = errorFields
+      .map((f) => (Array.isArray(f.name) ? f.name.join(" > ") : `${f.name}`))
+      .slice(0, 6)
+      .join("\n- ");
+    Swal.fire(
+      "Thiếu thông tin",
+      `Bạn cần nhập/điền các trường bắt buộc:\n- ${missing}`,
+      "warning",
+    );
   };
 
   const isEdit = productId !== "create";
@@ -224,7 +351,6 @@ const ProductDetail = ({ productId = null, onClose }) => {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
         .material-symbols-outlined { font-family:'Material Symbols Outlined'; font-style:normal; line-height:1; text-transform:none; display:inline-block; white-space:nowrap; }
         .sneaker-input:focus { border-color:#f49d25 !important; box-shadow:0 0 0 3px rgba(244,157,37,0.12); }
@@ -237,7 +363,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
 
       <div
         style={{
-          fontFamily: "'Lexend', sans-serif",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
           background: "#F8F7F5",
           padding: 28,
         }}
@@ -284,7 +410,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                 fontWeight: 600,
                 fontSize: 13,
                 cursor: "pointer",
-                fontFamily: "'Lexend', sans-serif",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
               }}
             >
               Hủy bỏ
@@ -301,7 +427,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                 fontWeight: 700,
                 fontSize: 13,
                 cursor: "pointer",
-                fontFamily: "'Lexend', sans-serif",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
                 boxShadow: "0 4px 14px rgba(244,157,37,0.30)",
                 opacity: mutation.isLoading ? 0.7 : 1,
                 display: "flex",
@@ -343,6 +469,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
           form={form}
           layout="vertical"
           onFinish={onFinish}
+          onFinishFailed={onFinishFailed}
           initialValues={{ hasVariants: false, variants: [], attributes: [] }}
         >
           <div
@@ -366,23 +493,19 @@ const ProductDetail = ({ productId = null, onClose }) => {
                 <div
                   style={{ display: "flex", flexDirection: "column", gap: 18 }}
                 >
-                  <Form.Item
-                    name="name"
-                    rules={[{ required: true, message: "Vui lòng nhập tên" }]}
-                  >
-                    <div>
-                      <FieldLabel>Tên sản phẩm</FieldLabel>
-                      <input
+                  <div>
+                    <FieldLabel>Tên sản phẩm</FieldLabel>
+                    <Form.Item
+                      name="name"
+                      rules={[{ required: true, message: "Vui lòng nhập tên" }]}
+                    >
+                      <Input
                         className="sneaker-input"
                         style={inputStyle}
                         placeholder="VD: Nike Air Jordan 1 Retro High"
-                        onChange={(e) =>
-                          form.setFieldValue("name", e.target.value)
-                        }
-                        defaultValue={form.getFieldValue("name") || ""}
                       />
-                    </div>
-                  </Form.Item>
+                    </Form.Item>
+                  </div>
 
                   <div
                     style={{
@@ -391,9 +514,9 @@ const ProductDetail = ({ productId = null, onClose }) => {
                       gap: 16,
                     }}
                   >
-                    <Form.Item name="categoryId" rules={[{ required: true }]}>
-                      <div>
-                        <FieldLabel>Danh mục</FieldLabel>
+                    <div>
+                      <FieldLabel>Danh mục</FieldLabel>
+                      <Form.Item name="categoryId" rules={[{ required: true }]}>
                         <Select
                           placeholder="Chọn danh mục"
                           style={{ width: "100%" }}
@@ -401,13 +524,12 @@ const ProductDetail = ({ productId = null, onClose }) => {
                             label: c.name,
                             value: c._id,
                           }))}
-                          onChange={(v) => form.setFieldValue("categoryId", v)}
                         />
-                      </div>
-                    </Form.Item>
-                    <Form.Item name="brandId" rules={[{ required: true }]}>
-                      <div>
-                        <FieldLabel>Thương hiệu</FieldLabel>
+                      </Form.Item>
+                    </div>
+                    <div>
+                      <FieldLabel>Thương hiệu</FieldLabel>
+                      <Form.Item name="brandId" rules={[{ required: true }]}>
                         <Select
                           placeholder="Chọn thương hiệu"
                           style={{ width: "100%" }}
@@ -415,16 +537,15 @@ const ProductDetail = ({ productId = null, onClose }) => {
                             label: b.name,
                             value: b._id,
                           }))}
-                          onChange={(v) => form.setFieldValue("brandId", v)}
                         />
-                      </div>
-                    </Form.Item>
+                      </Form.Item>
+                    </div>
                   </div>
 
-                  <Form.Item name="description" rules={[{ required: true }]}>
-                    <div>
-                      <FieldLabel>Mô tả sản phẩm</FieldLabel>
-                      <textarea
+                  <div>
+                    <FieldLabel>Mô tả sản phẩm</FieldLabel>
+                    <Form.Item name="description" rules={[{ required: true }]}>
+                      <Input.TextArea
                         className="sneaker-input"
                         style={{
                           ...inputStyle,
@@ -433,12 +554,9 @@ const ProductDetail = ({ productId = null, onClose }) => {
                         }}
                         placeholder="Nhập mô tả chi tiết về chất liệu, thiết kế..."
                         rows={4}
-                        onChange={(e) =>
-                          form.setFieldValue("description", e.target.value)
-                        }
                       />
-                    </div>
-                  </Form.Item>
+                    </Form.Item>
+                  </div>
 
                   {!hasVar && (
                     <div
@@ -448,41 +566,50 @@ const ProductDetail = ({ productId = null, onClose }) => {
                         gap: 16,
                       }}
                     >
-                      <Form.Item
-                        name="price"
-                        rules={[{ required: true, type: "number", min: 0 }]}
-                      >
-                        <div>
-                          <FieldLabel>Giá (₫)</FieldLabel>
+                      <div>
+                        <FieldLabel>Giá (₫)</FieldLabel>
+                        <Form.Item
+                          name="price"
+                          // Backend validate: price phải > 0 (không cho phép 0)
+                          rules={[{ required: true, type: "number", min: 1 }]}
+                        >
                           <InputNumber
                             formatter={(v) =>
                               `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
                             }
+                            parser={(v) => {
+                              const n = Number(String(v || "").replace(/,/g, ""));
+                              return Number.isFinite(n) ? n : undefined;
+                            }}
                             placeholder="3,500,000"
                             style={{
                               width: "100%",
                               borderRadius: 12,
-                              fontFamily: "'Lexend', sans-serif",
+                              fontFamily: "'Plus Jakarta Sans', sans-serif",
                             }}
                           />
-                        </div>
-                      </Form.Item>
-                      <Form.Item
-                        name="countInStock"
-                        rules={[{ required: true, type: "number", min: 0 }]}
-                      >
-                        <div>
-                          <FieldLabel>Số lượng tồn kho</FieldLabel>
+                        </Form.Item>
+                      </div>
+                      <div>
+                        <FieldLabel>Số lượng tồn kho</FieldLabel>
+                        <Form.Item
+                          name="countInStock"
+                          rules={[{ required: true, type: "number", min: 0 }]}
+                        >
                           <InputNumber
+                            parser={(v) => {
+                              const n = Number(String(v || "").replace(/,/g, ""));
+                              return Number.isFinite(n) ? n : undefined;
+                            }}
                             placeholder="0"
                             style={{
                               width: "100%",
                               borderRadius: 12,
-                              fontFamily: "'Lexend', sans-serif",
+                              fontFamily: "'Plus Jakarta Sans', sans-serif",
                             }}
                           />
-                        </div>
-                      </Form.Item>
+                        </Form.Item>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -511,6 +638,17 @@ const ProductDetail = ({ productId = null, onClose }) => {
                           mode="tags"
                           placeholder="VD: Color, Size"
                           style={{ width: "100%" }}
+                          tokenSeparators={[","]}
+                          onChange={(vals) => {
+                            const normalized = (vals || [])
+                              .flatMap((v) => String(v).split(","))
+                              .map((v) => v.trim())
+                              .filter(Boolean);
+                            form.setFieldValue(
+                              "attributes",
+                              Array.from(new Set(normalized)),
+                            );
+                          }}
                         />
                       </Form.Item>
                     </div>
@@ -520,6 +658,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                     >
                       {({ getFieldValue }) => {
                         const attributes = getFieldValue("attributes") || [];
+                        const sizeOptions = sizes?.data || [];
                         return (
                           <Form.List name="variants">
                             {(fields, { add, remove }) => (
@@ -670,16 +809,37 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                                 ]}
                                                 rules={[{ required: true }]}
                                               >
-                                                <input
-                                                  className="sneaker-input"
-                                                  style={{
-                                                    ...inputStyle,
-                                                    padding: "6px 10px",
-                                                    fontSize: 12,
-                                                    width: 90,
-                                                  }}
-                                                  placeholder={attr}
-                                                />
+                                                {[
+                                                  "size",
+                                                  "kich thuoc",
+                                                  "kích thước",
+                                                ].some((k) =>
+                                                  normalizeAttr(attr).includes(
+                                                    normalizeAttr(k),
+                                                  ),
+                                                ) ? (
+                                                  <Select
+                                                    placeholder="Chọn size"
+                                                    style={{ width: 120 }}
+                                                    options={sizeOptions.map(
+                                                      (s) => ({
+                                                        value: s.name,
+                                                        label: s.name,
+                                                      }),
+                                                    )}
+                                                  />
+                                                ) : (
+                                                  <input
+                                                    className="sneaker-input"
+                                                    style={{
+                                                      ...inputStyle,
+                                                      padding: "6px 10px",
+                                                      fontSize: 12,
+                                                      width: 90,
+                                                    }}
+                                                    placeholder={attr}
+                                                  />
+                                                )}
                                               </Form.Item>
                                             </td>
                                           ))}
@@ -734,7 +894,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                     fontWeight: 700,
                                     fontSize: 13,
                                     cursor: "pointer",
-                                    fontFamily: "'Lexend', sans-serif",
+                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
@@ -823,7 +983,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                   {({ getFieldValue }) =>
                     getFieldValue("image") ? (
                       <img
-                        src={`${process.env.REACT_APP_API_URL_BACKEND}/image/${getFieldValue("image")}`}
+                        src={`${BACKEND_BASE_URL}/uploads/${getFieldValue("image")}`}
                         alt="Preview"
                         style={{
                           width: "100%",
@@ -870,7 +1030,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                               }}
                             >
                               <img
-                                src={`${process.env.REACT_APP_API_URL_BACKEND}/image/${imgPath}`}
+                                src={`${BACKEND_BASE_URL}/uploads/${imgPath}`}
                                 alt={`Ảnh phụ ${idx + 1}`}
                                 style={{
                                   width: "100%",
@@ -996,6 +1156,60 @@ const ProductDetail = ({ productId = null, onClose }) => {
                     label="Sản phẩm nổi bật"
                     sub="Đưa vào danh sách đầu trang"
                   />
+                </div>
+              </SectionCard>
+
+              <SectionCard icon="local_offer" title="Cấu hình Sale">
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <Toggle
+                    checked={saleEnabled}
+                    onChange={setSaleEnabled}
+                    label="Bật sale cho sản phẩm"
+                    sub="Áp dụng trước voucher tại checkout"
+                  />
+                  {saleEnabled && (
+                    <>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div>
+                          <FieldLabel>Loại giảm</FieldLabel>
+                          <Form.Item name="saleType" initialValue="percent">
+                            <Select
+                              options={[
+                                { label: "Phần trăm (%)", value: "percent" },
+                                { label: "Giảm cố định (đ)", value: "fixed" },
+                              ]}
+                            />
+                          </Form.Item>
+                        </div>
+                        <div>
+                          <FieldLabel>Giá trị giảm</FieldLabel>
+                          <Form.Item name="saleValue" rules={[{ required: saleEnabled, type: "number", min: 0 }]}>
+                            <InputNumber style={{ width: "100%", borderRadius: 12 }} placeholder="Nhập giá trị giảm" />
+                          </Form.Item>
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div>
+                          <FieldLabel>Bắt đầu</FieldLabel>
+                          <Form.Item name="saleStartAt">
+                            <Input type="datetime-local" className="sneaker-input" style={inputStyle} />
+                          </Form.Item>
+                        </div>
+                        <div>
+                          <FieldLabel>Kết thúc</FieldLabel>
+                          <Form.Item name="saleEndAt">
+                            <Input type="datetime-local" className="sneaker-input" style={inputStyle} />
+                          </Form.Item>
+                        </div>
+                      </div>
+                      <div>
+                        <FieldLabel>Độ ưu tiên</FieldLabel>
+                        <Form.Item name="salePriority" initialValue={0}>
+                          <InputNumber style={{ width: "100%", borderRadius: 12 }} min={0} placeholder="0" />
+                        </Form.Item>
+                      </div>
+                    </>
+                  )}
                 </div>
               </SectionCard>
             </div>

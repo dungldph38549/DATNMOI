@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const CartController = require("../controller/CartController");
+const CartController = require("../controllers/CartController");
 
 // Lấy giỏ hàng theo userId
 router.get("/:userId", CartController.getCart);
@@ -18,4 +18,3 @@ router.delete("/:userId/items/:productId", CartController.removeItem);
 router.delete("/:userId", CartController.clearCart);
 
 module.exports = router;
-
