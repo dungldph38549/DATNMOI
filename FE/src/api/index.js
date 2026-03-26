@@ -556,6 +556,25 @@ export const deleteSize = async (id) => {
   return res.data;
 };
 
+// ================== Chat API ==================
+
+// GET /api/chat/history?customerId=...
+// Backend chưa chắc đã triển khai, FE sẽ handle lỗi nếu endpoint không tồn tại.
+export const getChatHistory = async ({ customerId } = {}) => {
+  if (!customerId) return [];
+  const res = await axiosInstance.get("/chat/history", {
+    params: { customerId },
+  });
+  // Tùy backend có bọc {data: ...} hay không
+  return res?.data?.data ?? res?.data ?? [];
+};
+
+// GET /api/chat/inbox (admin only)
+export const getChatInbox = async () => {
+  const res = await axiosInstance.get("/chat/inbox");
+  return res?.data?.data ?? res?.data ?? [];
+};
+
 // ================== Review API (Customer) ==================
 /**
  * GET /api/reviews

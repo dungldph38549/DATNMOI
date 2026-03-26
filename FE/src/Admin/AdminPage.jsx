@@ -10,6 +10,7 @@ import Vouchers from "./Vouchers";
 import Sizes from "./Sizes";
 import InventoryDashboard from "./Inventorydashboard";
 import Reviews from "./Reviews";
+import ChatAdmin from "./ChatAdmin";
 // import OrderReturn from "./OrderReturn";
 // import Comments from "./Comments";
 // import StaffManagement from "./StaffManagement";
@@ -86,6 +87,12 @@ const MENU = [
     icon: "straighten",
     label: "Size",
     desc: "Danh sách size cho biến thể",
+  },
+  {
+    key: "chat",
+    icon: "chat",
+    label: "Chat",
+    desc: "Hỗ trợ khách hàng realtime",
   },
   {
     key: "categories",
@@ -265,6 +272,8 @@ const AdminPage = () => {
         return <Vouchers />;
       case "sizes":
         return <Sizes />;
+      case "chat":
+        return <ChatAdmin />;
       case "brands":
         return <Brands />;
       case "categories":
