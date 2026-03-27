@@ -185,6 +185,25 @@ export const relationProduct = async (brandId, categoryId, id) => {
   return res.data;
 };
 
+export const getProductRecommendations = async (productId, limit = 4) => {
+  if (!productId) return [];
+  const res = await axiosInstance.get(
+    `/product/${productId}/recommendations?limit=${limit}`,
+  );
+  return res?.data?.data ?? res?.data ?? [];
+};
+
+export const getHomeRecommendations = async (limit = 8) => {
+  const res = await axiosInstance.get(`/product/recommendations/home?limit=${limit}`);
+  return res?.data?.data ?? res?.data ?? [];
+};
+
+export const trackViewedProduct = async (productId) => {
+  if (!productId) return;
+  const res = await axiosInstance.post(`/product/${productId}/view`);
+  return res.data;
+};
+
 /**
  * Kiểm tra tồn kho (gọi trước khi thêm vào giỏ hàng)
  * POST /api/product/get-stock

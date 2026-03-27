@@ -21,11 +21,11 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
 
-if (String(process.env.OPENAI_API_KEY || "").trim()) {
-  console.log("[Chat AI] OPENAI_API_KEY đã được nạp.");
+if (String(process.env.GEMINI_API_KEY || "").trim()) {
+  console.log("[Chat AI] GEMINI_API_KEY đã được nạp.");
 } else {
   console.warn(
-    "[Chat AI] Chưa có OPENAI_API_KEY — dán key sk-... vào DATN/BE/.env rồi restart server.",
+    "[Chat AI] Chưa có GEMINI_API_KEY — dán key vào DATN/BE/.env rồi restart server.",
   );
 }
 
