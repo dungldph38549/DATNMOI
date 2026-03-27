@@ -161,6 +161,16 @@ const userSchema = new mongoose.Schema(
       min: [0, "voucherUsageLimit không được âm"],
       default: null,
     },
+    viewedProducts: [
+      {
+        productId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: true,
+        },
+        viewedAt: { type: Date, default: Date.now },
+      },
+    ],
 
     deletedAt: { type: Date, default: null, index: true },
     deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

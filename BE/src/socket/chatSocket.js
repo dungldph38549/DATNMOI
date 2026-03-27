@@ -176,7 +176,9 @@ const initChatSocket = (io) => {
             .lean();
           recent.reverse();
 
-          const { text: aiText } = await getAiReplyFromHistory(recent);
+          const { text: aiText } = await getAiReplyFromHistory(recent, {
+            customerId: cid,
+          });
 
           const aiDoc = await Chat.create({
             senderId: AI_SENDER_OBJECT_ID,

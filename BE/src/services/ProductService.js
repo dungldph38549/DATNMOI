@@ -36,6 +36,51 @@ const normalizeVariants = (variants) =>
 const normalizeSaleRulesInput = (saleRules) =>
   normalizeSaleRules(Array.isArray(saleRules) ? saleRules : []);
 
+const baseProductQuery = {
+  isDeleted: { $ne: true },
+  isActive: true,
+  isVisible: true,
+  status: { $ne: "inactive" },
+};
+
+const getComparablePrice = (product) => {
+  if (!product) return 0;
+  if (product.hasVariants && Array.isArray(product.variants)) {
+    const activePrices = product.variants
+      .filter((v) => v?.isActive !== false && Number(v?.price) > 0)
+      .map((v) => Number(v.price));
+    if (activePrices.length) return Math.min(...activePrices);
+  }
+  return Number(product.price || 0);
+};
+
+const computeSimilarityScore = (base, candidate) => {
+  if (!base || !candidate) return 0;
+  const CATEGORY_WEIGHT = 0.6;
+  const BRAND_WEIGHT = 0.25;
+  const PRICE_WEIGHT = 0.15;
+
+  let score = 0;
+
+  if (String(base.categoryId) === String(candidate.categoryId)) {
+    score += CATEGORY_WEIGHT;
+  }
+  if (String(base.brandId) === String(candidate.brandId)) {
+    score += BRAND_WEIGHT;
+  }
+
+  const basePrice = getComparablePrice(base);
+  const candidatePrice = getComparablePrice(candidate);
+  if (basePrice > 0 && candidatePrice > 0) {
+    const diffRatio = Math.abs(candidatePrice - basePrice) / basePrice;
+    if (diffRatio <= 0.2) {
+      score += PRICE_WEIGHT * (1 - diffRatio / 0.2);
+    }
+  }
+
+  return Number(score.toFixed(4));
+};
+
 // ================================================================
 // GET ALL — Admin (phân trang + filter + soft delete)
 // ================================================================
@@ -377,6 +422,188 @@ const relationProduct = async (categoryId, brandId, excludeId) => {
 };
 
 // ================================================================
+// RECOMMENDATIONS — Content-based Filtering
+// ================================================================
+const getRecommendations = async (productId, limit = 4) => {
+  if (!productId || !mongoose.Types.ObjectId.isValid(productId)) return [];
+
+  const baseProduct = await Product.findOne({
+    ...baseProductQuery,
+    _id: productId,
+  })
+    .select("_id name categoryId brandId price hasVariants variants createdAt soldCount")
+    .lean();
+  if (!baseProduct) return [];
+
+  const candidates = await Product.find({
+    ...baseProductQuery,
+    _id: { $ne: productId },
+    $or: [
+      { categoryId: baseProduct.categoryId },
+      { brandId: baseProduct.brandId },
+    ],
+  })
+    .populate("brandId", "name logo")
+    .populate("categoryId", "name")
+    .limit(120)
+    .lean();
+
+  const ranked = candidates
+    .map((item) => ({
+      ...item,
+      _similarityScore: computeSimilarityScore(baseProduct, item),
+    }))
+    .filter((item) => item._similarityScore > 0)
+    .sort(
+      (a, b) =>
+        b._similarityScore - a._similarityScore ||
+        Number(b.soldCount || 0) - Number(a.soldCount || 0) ||
+        new Date(b.createdAt) - new Date(a.createdAt),
+    )
+    .slice(0, Math.max(1, Number(limit) || 4))
+    .map((item) => {
+      const { _similarityScore, ...rest } = item;
+      return enrichProductPricing(rest);
+    });
+
+  if (ranked.length >= limit) return ranked;
+
+  const fallback = await Product.find({
+    ...baseProductQuery,
+    _id: { $ne: productId, $nin: ranked.map((p) => p._id) },
+    categoryId: baseProduct.categoryId,
+  })
+    .populate("brandId", "name logo")
+    .populate("categoryId", "name")
+    .sort({ soldCount: -1, createdAt: -1 })
+    .limit(limit - ranked.length)
+    .lean();
+
+  return [...ranked, ...fallback.map((item) => enrichProductPricing(item))].slice(
+    0,
+    limit,
+  );
+};
+
+const recordViewedProduct = async (userId, productId) => {
+  if (
+    !userId ||
+    !productId ||
+    !mongoose.Types.ObjectId.isValid(userId) ||
+    !mongoose.Types.ObjectId.isValid(productId)
+  ) {
+    return false;
+  }
+  const User = require("../models/UserModel");
+  await User.updateOne(
+    { _id: userId },
+    { $pull: { viewedProducts: { productId } } },
+  );
+  await User.updateOne(
+    { _id: userId },
+    {
+      $push: {
+        viewedProducts: {
+          $each: [{ productId, viewedAt: new Date() }],
+          $slice: -30,
+        },
+      },
+    },
+  );
+  return true;
+};
+
+const getHomeRecommendations = async ({ userId, limit = 8 } = {}) => {
+  const safeLimit = Math.max(1, Number(limit) || 8);
+  const fallbackQuery = Product.find(baseProductQuery)
+    .populate("brandId", "name logo")
+    .populate("categoryId", "name")
+    .sort({ soldCount: -1, createdAt: -1 })
+    .limit(safeLimit)
+    .lean();
+
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+    const fallback = await fallbackQuery;
+    return fallback.map((item) => enrichProductPricing(item));
+  }
+
+  const User = require("../models/UserModel");
+  const user = await User.findById(userId).select("viewedProducts").lean();
+  const viewedItems = Array.isArray(user?.viewedProducts) ? user.viewedProducts : [];
+  if (!viewedItems.length) {
+    const fallback = await fallbackQuery;
+    return fallback.map((item) => enrichProductPricing(item));
+  }
+
+  const viewedIds = viewedItems
+    .map((v) => String(v?.productId || ""))
+    .filter(Boolean);
+  const viewedProducts = await Product.find({
+    ...baseProductQuery,
+    _id: { $in: viewedIds },
+  })
+    .select("_id categoryId brandId price hasVariants variants")
+    .lean();
+
+  if (!viewedProducts.length) {
+    const fallback = await fallbackQuery;
+    return fallback.map((item) => enrichProductPricing(item));
+  }
+
+  const categoryIds = [...new Set(viewedProducts.map((p) => String(p.categoryId)))];
+  const brandIds = [...new Set(viewedProducts.map((p) => String(p.brandId)))];
+
+  const candidates = await Product.find({
+    ...baseProductQuery,
+    _id: { $nin: viewedIds },
+    $or: [
+      { categoryId: { $in: categoryIds } },
+      { brandId: { $in: brandIds } },
+    ],
+  })
+    .populate("brandId", "name logo")
+    .populate("categoryId", "name")
+    .limit(180)
+    .lean();
+
+  const ranked = candidates
+    .map((item) => {
+      const score = viewedProducts.reduce(
+        (max, base) => Math.max(max, computeSimilarityScore(base, item)),
+        0,
+      );
+      return { ...item, _similarityScore: score };
+    })
+    .filter((item) => item._similarityScore > 0)
+    .sort(
+      (a, b) =>
+        b._similarityScore - a._similarityScore ||
+        Number(b.soldCount || 0) - Number(a.soldCount || 0) ||
+        new Date(b.createdAt) - new Date(a.createdAt),
+    )
+    .slice(0, safeLimit)
+    .map((item) => enrichProductPricing(item));
+
+  if (ranked.length >= safeLimit) return ranked.slice(0, safeLimit);
+
+  const rankedIds = ranked.map((p) => p._id);
+  const fallback = await Product.find({
+    ...baseProductQuery,
+    _id: { $nin: [...viewedIds, ...rankedIds] },
+  })
+    .populate("brandId", "name logo")
+    .populate("categoryId", "name")
+    .sort({ soldCount: -1, createdAt: -1 })
+    .limit(safeLimit - ranked.length)
+    .lean();
+
+  return [...ranked, ...fallback.map((item) => enrichProductPricing(item))].slice(
+    0,
+    safeLimit,
+  );
+};
+
+// ================================================================
 // EXPORTS
 // ================================================================
 module.exports = {
@@ -390,4 +617,7 @@ module.exports = {
   getProducts,
   getProductsByCategory,
   relationProduct,
+  getRecommendations,
+  getHomeRecommendations,
+  recordViewedProduct,
 };
