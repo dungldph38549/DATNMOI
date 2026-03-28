@@ -1,11 +1,22 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Product from "../../components/Product/Product";
-import { fetchProducts, getReviewStatsByProduct, getVoucherByCode } from "../../api";
+import { fetchProducts, getAllCategories, getReviewStatsByProduct, getVoucherByCode } from "../../api";
 import { FaFilter, FaTimes } from "react-icons/fa";
 import BackButton from "../../components/Common/BackButton";
 
 const PAGE_SIZE = 30;
+
+/** Khớp logic slug ở BE (CategoryController) để ?category=phu-kien khớp "Phụ kiện" */
+const categoryNameToSlug = (str = "") =>
+  str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
 
 const ProductPage = () => {
   const location = useLocation();
@@ -19,21 +30,53 @@ const ProductPage = () => {
   const [price, setPrice] = useState("");
   const [rating, setRating] = useState("");
   const [page, setPage] = useState(1);
+  const [categoryLabel, setCategoryLabel] = useState(null);
+
+  const categorySlug = useMemo(() => {
+    const raw = new URLSearchParams(location.search).get("category");
+    return raw ? raw.trim().toLowerCase() : "";
+  }, [location.search]);
 
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
-        const res = await fetchProducts({ limit: 200, page: 0 });
+        const payload = { limit: 200, page: 0 };
+
+        if (categorySlug) {
+          const catRes = await getAllCategories("active");
+          const categories = Array.isArray(catRes?.data) ? catRes.data : [];
+          const match = categories.find((c) => {
+            const slugFromDb = c.slug != null && String(c.slug).trim() !== ""
+              ? String(c.slug).trim().toLowerCase()
+              : null;
+            if (slugFromDb && slugFromDb === categorySlug) return true;
+            return categoryNameToSlug(c.name || "") === categorySlug;
+          });
+
+          if (match?._id) {
+            payload.categoryId = match._id;
+            setCategoryLabel(match.name || null);
+          } else {
+            setCategoryLabel(null);
+            setProducts([]);
+            return;
+          }
+        } else {
+          setCategoryLabel(null);
+        }
+
+        const res = await fetchProducts(payload);
         setProducts(res?.data ?? res ?? []);
       } catch (err) {
         console.error(err);
         setProducts([]);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     load();
-  }, []);
+  }, [location.search, categorySlug]);
 
   useEffect(() => {
     const voucherCode = new URLSearchParams(location.search).get("voucher");
@@ -142,7 +185,7 @@ const ProductPage = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [price, rating, sort, voucherScope]);
+  }, [price, rating, sort, voucherScope, categorySlug]);
 
   const totalPage = Math.ceil(filteredProducts.length / PAGE_SIZE);
   const showProducts = filteredProducts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -168,10 +211,12 @@ const ProductPage = () => {
         <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 z-0"></div>
         <div className="container mx-auto px-4 max-w-7xl relative z-10 py-16 text-center">
           <h1 className="text-4xl md:text-6xl font-display font-black text-white tracking-tight mb-4">
-            The Collection.
+            {categoryLabel || "The Collection."}
           </h1>
           <p className="text-slate-400 max-w-2xl mx-auto text-lg">
-            Khám phá những thiết kế tinh tế và độc đáo nhất dành riêng cho phong cách của bạn.
+            {categoryLabel
+              ? `Sản phẩm thuộc danh mục «${categoryLabel}».`
+              : "Khám phá những thiết kế tinh tế và độc đáo nhất dành riêng cho phong cách của bạn."}
           </p>
         </div>
       </div>
