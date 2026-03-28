@@ -32,10 +32,12 @@ import PaymentReturnPage from "./pages/PaymentReturnPage/PaymentReturnPage";
 import WishlistPage from "./pages/Wishlist/WishlistPage";
 import SalePage from "./pages/SalePage/SalePage";
 import VoucherPage from "./pages/VoucherPage/VoucherPage";
+import ChatPage from "./pages/Chat/ChatPage";
 
 //  IMPORT TRANG ADMIN USERS
 import User from "./pages/User";
 import AdminPage from "./Admin/AdminPage";
+import ChatWidget from "./components/Chat/ChatWidget";
 
 function RequireAuth({ children }) {
   const user = useSelector((state) => state.user);
@@ -59,6 +61,8 @@ function AppContent() {
       {!isAdminRoute && <HeaderComponent />}
 
       <div className="content flex-1">
+        {/* Chat widget (customer) - cố định góc dưới phải */}
+        {!isAdminRoute && <ChatWidget />}
         <Routes>
           {/* CLIENT ROUTES */}
           <Route path="/" element={<HomePage />} />
@@ -121,6 +125,9 @@ function AppContent() {
           {/* ADMIN ROUTE */}
           <Route path="/admin/users" element={<User />} />
           <Route path="/admin" element={<AdminPage />} />
+
+          {/* Chat */}
+          <Route path="/chat" element={<ChatPage />} />
 
           {/* 404 - Đã sửa thành <Route> */}
           <Route

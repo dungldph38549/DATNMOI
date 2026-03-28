@@ -141,6 +141,35 @@ const normalizeAttr = (v) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
+const toAsciiAlnumUpper = (s) =>
+  String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/gi, "d")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toUpperCase();
+
+/** Tiền tố SKU từ tên SP (tối đa 4 ký tự), ví dụ "Dây giày" → DAYG */
+const skuPrefixFromProductName = (name) => {
+  const raw = toAsciiAlnumUpper(name);
+  if (!raw) return "SKU";
+  return raw.length <= 4 ? raw : raw.slice(0, 4);
+};
+
+/** SKU dạng PREFIX01, PREFIX02… tránh trùng với các mã PREFIX## đã có */
+const generateNextVariantSku = (productName, existingSkus = []) => {
+  const prefix = skuPrefixFromProductName(productName);
+  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^${escaped}(\\d+)$`, "i");
+  let max = 0;
+  for (const sku of existingSkus) {
+    const m = String(sku || "").trim().match(re);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  const next = max + 1;
+  return `${prefix}${String(next).padStart(2, "0")}`;
+};
+
 // ================================================================
 // ProductDetail — Card only (no Sidebar / header / layout wrapper)
 // ================================================================
@@ -661,7 +690,28 @@ const ProductDetail = ({ productId = null, onClose }) => {
                         const sizeOptions = sizes?.data || [];
                         return (
                           <Form.List name="variants">
-                            {(fields, { add, remove }) => (
+                            {(fields, { add, remove }) => {
+                              const handleAddVariant = () => {
+                                const name = form.getFieldValue("name");
+                                const current = form.getFieldValue("variants") || [];
+                                const existingSkus = current.map((v) => v?.sku);
+                                const sku = generateNextVariantSku(name, existingSkus);
+                                const attrObj = {};
+                                attributes.forEach((a) => {
+                                  attrObj[a] = undefined;
+                                });
+                                const basePrice = form.getFieldValue("price");
+                                add({
+                                  sku,
+                                  price:
+                                    typeof basePrice === "number" && basePrice > 0
+                                      ? basePrice
+                                      : undefined,
+                                  stock: 0,
+                                  attributes: attrObj,
+                                });
+                              };
+                              return (
                               <>
                                 <div
                                   style={{
@@ -685,7 +735,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                         }}
                                       >
                                         {[
-                                          "SKU",
+                                          "SKU (tự sinh)",
                                           "Giá (₫)",
                                           "Tồn kho",
                                           ...attributes,
@@ -748,7 +798,8 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                                   fontFamily: "monospace",
                                                   width: 110,
                                                 }}
-                                                placeholder="AJ1-RED-40"
+                                                placeholder="Tự sinh"
+                                                title="Mã gợi ý khi thêm biến thể; có thể sửa tay"
                                               />
                                             </Form.Item>
                                           </td>
@@ -882,7 +933,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                 </div>
                                 <button
                                   type="button"
-                                  onClick={() => add()}
+                                  onClick={handleAddVariant}
                                   style={{
                                     marginTop: 12,
                                     width: "100%",
@@ -904,7 +955,8 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                   <PlusOutlined /> Thêm biến thể mới
                                 </button>
                               </>
-                            )}
+                              );
+                            }}
                           </Form.List>
                         );
                       }}

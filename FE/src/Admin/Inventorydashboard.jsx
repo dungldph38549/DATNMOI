@@ -999,18 +999,55 @@ export default function InventoryDashboard() {
         @keyframes slideUp  { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
         @keyframes fadeIn   { from{opacity:0} to{opacity:1} }
         .inv-row { animation: fadeIn 0.3s ease; }
-        .inv-row:hover { background: #FAFAF8 !important; }
-        button:hover { opacity: 0.85; }
+        .inv-row:hover { background: #FCFCFB !important; }
+        .inv-card {
+          background: #ffffff;
+          border: 1px solid #F0EFED;
+          border-radius: 16px;
+          box-shadow: 0 8px 24px rgba(28, 25, 23, 0.04);
+        }
+        .inv-stat {
+          border-radius: 14px;
+          padding: 18px 20px;
+          border-width: 1px;
+          border-style: solid;
+          transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .inv-stat:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 22px rgba(28, 25, 23, 0.08);
+        }
+        .inv-input, .inv-select {
+          border: 1.5px solid #E5E7EB;
+          border-radius: 12px;
+          padding: 10px 14px;
+          font-size: 14px;
+          font-family: inherit;
+          outline: none;
+          transition: border-color 0.16s ease, box-shadow 0.16s ease;
+        }
+        .inv-input:focus, .inv-select:focus {
+          border-color: #D6D3D1;
+          box-shadow: 0 0 0 3px rgba(120, 113, 108, 0.12);
+        }
+        .inv-table-wrap {
+          background: #fff;
+          border-radius: 18px;
+          border: 1px solid #F0EFED;
+          overflow: hidden;
+          box-shadow: 0 10px 30px rgba(28, 25, 23, 0.05);
+        }
       `}</style>
 
       {/* Header */}
       <div
         style={{
-          background: "#1C1917",
-          padding: "18px 32px",
+          background: "linear-gradient(120deg, #1C1917 0%, #292524 100%)",
+          padding: "18px 32px 20px",
           display: "flex",
           alignItems: "center",
           gap: 16,
+          boxShadow: "0 10px 30px rgba(28,25,23,0.28)",
         }}
       >
         <span style={{ fontSize: 22, color: "#FCD34D" }}>⬡</span>
@@ -1018,7 +1055,7 @@ export default function InventoryDashboard() {
           style={{
             margin: 0,
             color: "#FAFAF8",
-            fontSize: 18,
+            fontSize: 19,
             fontWeight: 700,
             letterSpacing: "-0.3px",
           }}
@@ -1042,12 +1079,22 @@ export default function InventoryDashboard() {
         </span>
       </div>
 
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 20px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "30px 20px" }}>
+        <div
+          style={{
+            marginBottom: 16,
+            color: "#57534E",
+            fontSize: 13,
+            fontWeight: 500,
+          }}
+        >
+          Theo dõi tồn kho, trạng thái SKU và xử lý nhập/xuất/chuyển kho trong một màn hình.
+        </div>
         {/* Stats */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
             gap: 16,
             marginBottom: 28,
           }}
@@ -1080,10 +1127,9 @@ export default function InventoryDashboard() {
           ].map((s) => (
             <div
               key={s.label}
+              className="inv-stat"
               style={{
                 background: s.bg,
-                borderRadius: 14,
-                padding: "18px 20px",
                 border: `1px solid ${s.color}20`,
               }}
             >
@@ -1106,38 +1152,30 @@ export default function InventoryDashboard() {
 
         {/* Toolbar */}
         <div
+          className="inv-card"
           style={{
             display: "flex",
             gap: 12,
-            marginBottom: 20,
+            marginBottom: 22,
             flexWrap: "wrap",
+            padding: 14,
           }}
         >
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="🔍 Tìm SKU hoặc tên sản phẩm..."
+            className="inv-input"
             style={{
               flex: 1,
               minWidth: 220,
-              border: "1.5px solid #E5E7EB",
-              borderRadius: 10,
-              padding: "9px 14px",
-              fontSize: 14,
-              fontFamily: "inherit",
-              outline: "none",
             }}
           />
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
+            className="inv-select"
             style={{
-              border: "1.5px solid #E5E7EB",
-              borderRadius: 10,
-              padding: "9px 14px",
-              fontSize: 14,
-              fontFamily: "inherit",
-              outline: "none",
               background: "#fff",
               minWidth: 150,
             }}
@@ -1154,12 +1192,7 @@ export default function InventoryDashboard() {
 
         {/* Table */}
         <div
-          style={{
-            background: "#fff",
-            borderRadius: 16,
-            border: "1px solid #F0EFED",
-            overflow: "hidden",
-          }}
+          className="inv-table-wrap"
         >
           <table
             style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}

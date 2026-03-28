@@ -6,6 +6,7 @@ const {
   authMiddleware,
   authAdminMiddleware,
   authStaffMiddleware,
+  optionalAuthMiddleware,
 } = require("../middlewares/authMiddleware");
 
 // Dev mode: bỏ qua auth nếu ALLOW_GUEST_ADMIN=true trong .env
@@ -28,12 +29,15 @@ router.get("/search", PC.searchProducts);
 router.get("/filter", PC.getByBrandAndCategory);
 router.get("/category/:categoryId", PC.getProductsByCategory);
 router.get("/brand/:brandId", PC.getByBrand);
+router.get("/recommendations/home", optionalAuthMiddleware, PC.getHomeRecommendations);
 
 router.post("/get-stock", PC.getStock);
 router.post("/relation", PC.relationProduct);
 router.post("/get-products", PC.getProducts);
 router.get("/admin/sale-report", adminGuard, PC.getSaleReport);
 router.get("/admin/get-all", adminGuard, PC.getAllProducts);
+router.post("/:id/view", authMiddleware, PC.trackViewedProduct);
+router.get("/:id/recommendations", PC.getRecommendations);
 
 // /:id phải đặt sau các route tĩnh
 router.get("/:id", PC.getProductById);

@@ -309,10 +309,10 @@ inventorySchema.statics.getLowStock = function () {
 
 // ================================================================
 // PRE-SAVE HOOK
+// Mongoose 9: tham số đầu vào là save options, không còn callback `next`.
 // ================================================================
-inventorySchema.pre("save", function (next) {
+inventorySchema.pre("save", function () {
   this._recalcStatus();
-  next();
 });
 
 module.exports = mongoose.model("Inventory", inventorySchema);

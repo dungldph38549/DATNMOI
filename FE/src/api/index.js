@@ -185,6 +185,25 @@ export const relationProduct = async (brandId, categoryId, id) => {
   return res.data;
 };
 
+export const getProductRecommendations = async (productId, limit = 4) => {
+  if (!productId) return [];
+  const res = await axiosInstance.get(
+    `/product/${productId}/recommendations?limit=${limit}`,
+  );
+  return res?.data?.data ?? res?.data ?? [];
+};
+
+export const getHomeRecommendations = async (limit = 8) => {
+  const res = await axiosInstance.get(`/product/recommendations/home?limit=${limit}`);
+  return res?.data?.data ?? res?.data ?? [];
+};
+
+export const trackViewedProduct = async (productId) => {
+  if (!productId) return;
+  const res = await axiosInstance.post(`/product/${productId}/view`);
+  return res.data;
+};
+
 /**
  * Kiểm tra tồn kho (gọi trước khi thêm vào giỏ hàng)
  * POST /api/product/get-stock
@@ -554,6 +573,25 @@ export const updateSize = async (id, payload) => {
 export const deleteSize = async (id) => {
   const res = await axiosInstance.delete(`/size/delete/${id}`);
   return res.data;
+};
+
+// ================== Chat API ==================
+
+// GET /api/chat/history?customerId=...
+// Backend chưa chắc đã triển khai, FE sẽ handle lỗi nếu endpoint không tồn tại.
+export const getChatHistory = async ({ customerId } = {}) => {
+  if (!customerId) return [];
+  const res = await axiosInstance.get("/chat/history", {
+    params: { customerId },
+  });
+  // Tùy backend có bọc {data: ...} hay không
+  return res?.data?.data ?? res?.data ?? [];
+};
+
+// GET /api/chat/inbox (admin only)
+export const getChatInbox = async () => {
+  const res = await axiosInstance.get("/chat/inbox");
+  return res?.data?.data ?? res?.data ?? [];
 };
 
 // ================== Review API (Customer) ==================
