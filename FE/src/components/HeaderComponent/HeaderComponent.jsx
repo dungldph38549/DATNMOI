@@ -169,13 +169,13 @@ const Header = () => {
         <div className="container mx-auto px-4 max-w-7xl mt-4 hidden md:block">
           <ul className="flex items-center gap-8 text-sm font-bold text-slate-600 uppercase tracking-widest whitespace-nowrap overflow-x-auto no-scrollbar pb-1">
             <li><Link to="/" className="text-slate-900 hover:text-primary transition-colors">Trang chủ</Link></li>
-            <li><Link to="/product" className="hover:text-primary transition-colors">Tất cả sản phẩm</Link></li>
+            <li><Link to="/product?segment=products" className="hover:text-primary transition-colors">sản phẩm</Link></li>
             <li><Link to="/product?category=phu-kien" className="hover:text-primary transition-colors">Phụ kiện</Link></li>
             <li><Link to="/voucher" className="hover:text-primary transition-colors">Voucher</Link></li>
             <li>
               <Link to="/sale" className="text-secondary hover:text-pink-600 transition-colors cursor-pointer flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-ping"></span>
-                Sale up to 50%
+                Sale
               </Link>
             </li>
           </ul>

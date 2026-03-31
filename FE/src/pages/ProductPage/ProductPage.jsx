@@ -36,16 +36,27 @@ const ProductPage = () => {
     const raw = new URLSearchParams(location.search).get("category");
     return raw ? raw.trim().toLowerCase() : "";
   }, [location.search]);
+  const segment = useMemo(() => {
+    const raw = new URLSearchParams(location.search).get("segment");
+    return raw ? raw.trim().toLowerCase() : "";
+  }, [location.search]);
 
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
         const payload = { limit: 200, page: 0 };
+        const catRes = await getAllCategories("active");
+        const categories = Array.isArray(catRes?.data) ? catRes.data : [];
+        const accessoryCategory = categories.find((c) => {
+          const slugFromDb = c.slug != null && String(c.slug).trim() !== ""
+            ? String(c.slug).trim().toLowerCase()
+            : null;
+          if (slugFromDb && slugFromDb === "phu-kien") return true;
+          return categoryNameToSlug(c.name || "") === "phu-kien";
+        });
 
         if (categorySlug) {
-          const catRes = await getAllCategories("active");
-          const categories = Array.isArray(catRes?.data) ? catRes.data : [];
           const match = categories.find((c) => {
             const slugFromDb = c.slug != null && String(c.slug).trim() !== ""
               ? String(c.slug).trim().toLowerCase()
@@ -67,7 +78,14 @@ const ProductPage = () => {
         }
 
         const res = await fetchProducts(payload);
-        setProducts(res?.data ?? res ?? []);
+        let nextProducts = res?.data ?? res ?? [];
+        if (!categorySlug && segment === "products" && accessoryCategory?._id) {
+          nextProducts = nextProducts.filter(
+            (p) => String(p?.categoryId?._id ?? p?.categoryId ?? "") !== String(accessoryCategory._id),
+          );
+          setCategoryLabel("Sản phẩm");
+        }
+        setProducts(nextProducts);
       } catch (err) {
         console.error(err);
         setProducts([]);
@@ -76,7 +94,7 @@ const ProductPage = () => {
       }
     };
     load();
-  }, [location.search, categorySlug]);
+  }, [location.search, categorySlug, segment]);
 
   useEffect(() => {
     const voucherCode = new URLSearchParams(location.search).get("voucher");
