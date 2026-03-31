@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { createOrder, createVnpayUrl, updateCustomerById } from "../../api";
+import { createOrder, createVnpayUrl, updateCustomerById, getWalletBalance } from "../../api";
 import { clearCart } from "../../redux/cart/cartSlice";
+import notify from "../../utils/notify";
 
 function CheckOutPage() {
 
@@ -14,6 +15,31 @@ function CheckOutPage() {
 
   const [paymentMethod, setPaymentMethod] = useState("COD");
   const [shippingMethod] = useState("fast"); // map về backend: fast/standard
+  const [walletBalance, setWalletBalance] = useState(null);
+  const isLoggedIn = !!user?.login;
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setWalletBalance(null);
+      return;
+    }
+    let cancelled = false;
+    getWalletBalance()
+      .then((d) => {
+        if (!cancelled)
+          setWalletBalance(
+            typeof d?.balance === "number"
+              ? d.balance
+              : Number(d?.balance) || 0,
+          );
+      })
+      .catch(() => {
+        if (!cancelled) setWalletBalance(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, user?.id]);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState(user?.email || "");
@@ -36,24 +62,24 @@ function CheckOutPage() {
   const handleOrder = async () => {
     try {
       if (!cartItems.length) {
-        alert("Giỏ hàng trống");
+        notify.warning("Gio hang trong.");
         return;
       }
 
       if (!name.trim()) {
-        alert("Vui lòng nhập họ tên");
+        notify.warning("Vui long nhap ho ten.");
         return;
       }
       if (!email.trim()) {
-        alert("Vui lòng nhập email");
+        notify.warning("Vui long nhap email.");
         return;
       }
       if (!phone.trim()) {
-        alert("Vui lòng nhập số điện thoại");
+        notify.warning("Vui long nhap so dien thoai.");
         return;
       }
       if (!address.trim()) {
-        alert("Vui lòng nhập địa chỉ");
+        notify.warning("Vui long nhap dia chi.");
         return;
       }
 
@@ -69,6 +95,17 @@ function CheckOutPage() {
       }));
 
       const baseUrl = window.location.origin;
+      if (paymentMethod === "WALLET") {
+        if (!userId) {
+          notify.warning("Dang nhap de thanh toan bang vi.");
+          return;
+        }
+        if (totalPrice > 0 && (walletBalance ?? 0) < totalPrice) {
+          notify.warning("So du vi khong du.");
+          return;
+        }
+      }
+
       const orderPayload = {
         ...(userId ? { userId } : {}),
         ...(guestId ? { guestId } : {}),
@@ -77,7 +114,12 @@ function CheckOutPage() {
         phone: phone.trim(),
         address: address.trim(),
         note: note || undefined,
-        paymentMethod: paymentMethod === "ONLINE" ? "vnpay" : "cod",
+        paymentMethod:
+          paymentMethod === "ONLINE"
+            ? "vnpay"
+            : paymentMethod === "WALLET"
+              ? "wallet"
+              : "cod",
         shippingMethod: shippingMethod === "fast" ? "fast" : "standard",
         products,
         voucherCode: null,
@@ -110,10 +152,10 @@ function CheckOutPage() {
           return;
         }
         if (order.vnpayBuildError) {
-          alert(order.vnpayBuildError);
+          notify.error(order.vnpayBuildError);
           return;
         }
-        alert(
+        notify.error(
           "Không nhận được link thanh toán VNPay. Kiểm tra backend và .env (BE_URL, VNP_TMN_CODE).",
         );
         return;
@@ -135,14 +177,14 @@ function CheckOutPage() {
       }
 
       dispatch(clearCart());
-      alert("Đặt hàng thành công!");
+      notify.success("Dat hang thanh cong!");
       navigate("/orders");
     } catch (error) {
       const msg =
         error?.response?.data?.message ||
         error?.message ||
         "Có lỗi xảy ra khi đặt hàng";
-      alert(msg);
+      notify.error(msg);
       console.error(error);
     }
   };
@@ -216,6 +258,24 @@ function CheckOutPage() {
           onChange={(e) => setPaymentMethod(e.target.value)}
         />
         Thanh toán Online (VNPay)
+      </label>
+
+      <br />
+
+      <label style={{ opacity: isLoggedIn && (totalPrice <= 0 || (walletBalance ?? 0) >= totalPrice) ? 1 : 0.5 }}>
+        <input
+          type="radio"
+          value="WALLET"
+          checked={paymentMethod === "WALLET"}
+          disabled={!isLoggedIn || (totalPrice > 0 && (walletBalance ?? 0) < totalPrice)}
+          onChange={(e) => setPaymentMethod(e.target.value)}
+        />
+        Ví tài khoản
+        {isLoggedIn && walletBalance != null && (
+          <span style={{ marginLeft: 8, fontSize: 12 }}>
+            (Số dư: {walletBalance.toLocaleString("vi-VN")}đ)
+          </span>
+        )}
       </label>
 
       <br /><br />

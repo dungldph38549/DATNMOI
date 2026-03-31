@@ -9,6 +9,7 @@ import {
   updateCartVariant,
 } from "../../redux/cart/cartSlice";
 import { FaTrashAlt, FaChevronDown, FaArrowRight } from "react-icons/fa";
+import notify from "../../utils/notify";
 
 const ShoppingCartPage = () => {
   const allCartItems = useSelector((state) => state.cart.items);
@@ -93,7 +94,7 @@ const ShoppingCartPage = () => {
   };
 
   const goCheckoutWithSelected = () => {
-    if (selectedItemKeys.length === 0) { alert("Vui lòng chọn ít nhất 1 sản phẩm để thanh toán."); return; }
+    if (selectedItemKeys.length === 0) { notify.warning("Vui long chon it nhat 1 san pham de thanh toan."); return; }
     navigate("/checkout", { state: { selectedItemKeys } });
   };
 

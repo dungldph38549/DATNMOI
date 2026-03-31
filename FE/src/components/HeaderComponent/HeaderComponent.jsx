@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { FaShoppingCart, FaSearch, FaUser, FaChevronDown, FaHeart, FaBoxOpen } from "react-icons/fa";
 import { useSelector, useDispatch } from "react-redux";
 import { clearUser } from "../../redux/user";
+import notify from "../../utils/notify";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -19,7 +20,7 @@ const Header = () => {
 
   const goCart = () => {
     if (!isLoggedIn) {
-      alert("Vui lòng đăng nhập để xem giỏ hàng.");
+      notify.warning("Vui long dang nhap de xem gio hang.");
       navigate("/login", { state: { from: "/cart" } });
       return;
     }
@@ -28,7 +29,7 @@ const Header = () => {
 
   const goOrders = () => {
     if (!isLoggedIn) {
-      alert("Vui lòng đăng nhập để xem đơn hàng.");
+      notify.warning("Vui long dang nhap de xem don hang.");
       navigate("/login", { state: { from: "/orders" } });
       return;
     }

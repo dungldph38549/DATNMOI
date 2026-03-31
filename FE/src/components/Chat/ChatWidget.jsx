@@ -64,8 +64,8 @@ export default function ChatWidget({ disabled = false }) {
           fontSize: 22,
           fontWeight: 900,
         }}
-        aria-label="Mở chat"
-        title="Chat với trợ lý AI"
+        aria-label="Mở chat hỗ trợ"
+        title="Chat với admin — SneakerHouse"
       >
         💬
       </button>

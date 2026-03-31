@@ -28,7 +28,7 @@ const orderSchema = new mongoose.Schema(
     paymentMethod: {
       type: String,
       required: true,
-      enum: ["cod", "vnpay"],
+      enum: ["cod", "vnpay", "wallet"],
     },
     shippingMethod: {
       type: String,
@@ -111,6 +111,33 @@ const orderSchema = new mongoose.Schema(
         "rejected",
       ],
       default: "pending",
+    },
+    /** Giao dịch hoàn tiền vào ví (sau khi admin chấp nhận hoàn hàng) */
+    walletRefundTransactionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "WalletTransaction",
+      default: null,
+    },
+    walletRefundAmount: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+    walletRefundedAt: {
+      type: Date,
+      default: null,
+    },
+    /** Ghi có trừ ví khi đặt hàng (paymentMethod = wallet) */
+    walletPaymentTransactionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "WalletTransaction",
+      default: null,
+    },
+    /** Hoàn ví khi hủy đơn đã trừ ví */
+    walletCancelRefundTransactionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "WalletTransaction",
+      default: null,
     },
   },
   { timestamps: true },

@@ -11,6 +11,7 @@ import { FaStar, FaShoppingCart, FaCheckCircle, FaShippingFast, FaShieldAlt, FaH
 import { getProductPriceInfo } from "../../utils/pricing";
 import BackButton from "../../components/Common/BackButton";
 import RelatedProducts from "../../components/RelatedProducts/RelatedProducts";
+import notify from "../../utils/notify";
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -216,8 +217,8 @@ const ProductDetail = () => {
     const sizeToSave = hasVariants ? selectedSizeValue : null;
     const skuToSave = hasVariants ? selectedSku : null;
 
-    if (hasVariants && !skuToSave) { alert("Vui lòng chọn size!"); return false; }
-    if (stockInfo?.available === false) { alert("Sản phẩm hiện đã hết hàng theo size đã chọn."); return false; }
+    if (hasVariants && !skuToSave) { notify.warning("Vui long chon size!"); return false; }
+    if (stockInfo?.available === false) { notify.warning("San pham da het hang voi size da chon."); return false; }
 
     const qtySafe = (() => {
       if (!stockInfo?.available) return quantity;
@@ -257,11 +258,11 @@ const ProductDetail = () => {
     const skuToSave = hasVariants ? selectedSku : null;
 
     if (hasVariants && !skuToSave) {
-      alert("Vui lòng chọn size!");
+      notify.warning("Vui long chon size!");
       return;
     }
     if (stockInfo?.available === false) {
-      alert("Sản phẩm hiện đã hết hàng theo size đã chọn.");
+      notify.warning("San pham da het hang voi size da chon.");
       return;
     }
 

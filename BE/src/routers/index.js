@@ -8,16 +8,13 @@ const SizeRouter = require("./SizeRouter");
 const ColorRouter = require("./ColorRouter");
 const UserRouter = require("./UserRouter");
 const OrderRouter = require("./OrderRouter");
-const inventoryRouter = require("./inventoryRoutes");
-const warehouseRoutes = require("./warehouseRoutes");
 const CartRouter = require("./CartRouter");
 const ChatRouter = require("./ChatRouter");
+const WalletRouter = require("./WalletRouter");
 
 const routes = (app) => {
   app.use("/api/product", ProductRouter);
   app.use("/api/user", UserRouter);
-  app.use("/api/inventory", inventoryRouter);
-  app.use("/api/warehouses", warehouseRoutes);
   app.use("/api/category", CategoryRouter);
   app.use("/api/brand", BrandRouter);
   app.use("/api/voucher", VoucherRouter);
@@ -28,6 +25,7 @@ const routes = (app) => {
   app.use("/api/order", OrderRouter);
   app.use("/api/cart", CartRouter);
   app.use("/api/chat", ChatRouter);
+  app.use("/api/wallet", WalletRouter);
 };
 
 module.exports = routes;

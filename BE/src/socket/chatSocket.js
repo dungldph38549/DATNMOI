@@ -1,11 +1,6 @@
 const jwt = require("jsonwebtoken");
-const mongoose = require("mongoose");
 const Chat = require("../models/ChatModel");
 const User = require("../models/UserModel");
-const {
-  AI_SENDER_OBJECT_ID,
-  getAiReplyFromHistory,
-} = require("../services/aiChatService");
 
 const getJwtSecret = () =>
   process.env.ACCESS_TOKEN ||
@@ -159,80 +154,6 @@ const initChatSocket = (io) => {
           lastTimestamp: chatDoc.timestamp,
           senderRole: chatDoc.senderRole,
         });
-      }
-
-      // Khách nhắn → trợ lý AI tự trả lời (admin vẫn có thể nhắn tay như trước)
-      if (senderRole === "user") {
-        io.to(roomID).emit("chat:aiTyping", {
-          customerId: cid,
-          typing: true,
-        });
-
-        try {
-          const recent = await Chat.find({ roomID })
-            .sort({ timestamp: -1 })
-            .limit(40)
-            .select("senderRole message")
-            .lean();
-          recent.reverse();
-
-          const { text: aiText } = await getAiReplyFromHistory(recent, {
-            customerId: cid,
-          });
-
-          const aiDoc = await Chat.create({
-            senderId: AI_SENDER_OBJECT_ID,
-            receiverId: null,
-            senderRole: "ai",
-            message: aiText,
-            timestamp: new Date(),
-            roomID,
-            customerId: cid,
-          });
-
-          io.to(roomID).emit("chat:newMessage", {
-            _id: aiDoc._id,
-            message: aiDoc.message,
-            senderId: aiDoc.senderId,
-            senderRole: aiDoc.senderRole,
-            timestamp: aiDoc.timestamp,
-            roomID: aiDoc.roomID,
-            customerId: aiDoc.customerId,
-          });
-
-          io.to("admin:inbox").emit("chat:inbox:newMessage", {
-            customerId: aiDoc.customerId,
-            lastMessage: aiDoc.message,
-            lastTimestamp: aiDoc.timestamp,
-            senderRole: aiDoc.senderRole,
-          });
-        } catch (e) {
-          console.error("[chatSocket] AI reply failed", e);
-          const fallback = await Chat.create({
-            senderId: AI_SENDER_OBJECT_ID,
-            receiverId: null,
-            senderRole: "ai",
-            message:
-              "Đã xảy ra lỗi khi gọi trợ lý AI. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.",
-            timestamp: new Date(),
-            roomID,
-            customerId: cid,
-          });
-          io.to(roomID).emit("chat:newMessage", {
-            _id: fallback._id,
-            message: fallback.message,
-            senderId: fallback.senderId,
-            senderRole: fallback.senderRole,
-            timestamp: fallback.timestamp,
-            roomID: fallback.roomID,
-            customerId: fallback.customerId,
-          });
-        } finally {
-          io.to(roomID).emit("chat:aiTyping", {
-            customerId: cid,
-            typing: false,
-          });
-        }
       }
     });
 

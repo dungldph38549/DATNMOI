@@ -8,9 +8,9 @@ import Dashboard from "./Dashboard";
 import Users from "./Users";
 import Vouchers from "./Vouchers";
 import Sizes from "./Sizes";
-import InventoryDashboard from "./Inventorydashboard";
 import Reviews from "./Reviews";
 import ChatAdmin from "./ChatAdmin";
+import WalletTopups from "./WalletTopups";
 // import OrderReturn from "./OrderReturn";
 // import Comments from "./Comments";
 // import StaffManagement from "./StaffManagement";
@@ -83,6 +83,12 @@ const MENU = [
     desc: "Mã giảm giá & khuyến mãi",
   },
   {
+    key: "wallet-topups",
+    icon: "account_balance_wallet",
+    label: "Nạp ví (CK)",
+    desc: "Xác nhận chuyển khoản nạp ví",
+  },
+  {
     key: "sizes",
     icon: "straighten",
     label: "Size",
@@ -117,12 +123,6 @@ const MENU = [
     icon: "star",
     label: "Đánh giá",
     desc: "Phản hồi & xếp hạng",
-  },
-  {
-    key: "inventory",
-    icon: "warehouse",
-    label: "Kho hàng",
-    desc: "Nhập kho & tồn kho",
   },
   {
     key: "staff",
@@ -270,6 +270,8 @@ const AdminPage = () => {
         return <Users />;
       case "vouchers":
         return <Vouchers />;
+      case "wallet-topups":
+        return <WalletTopups />;
       case "sizes":
         return <Sizes />;
       case "chat":
@@ -282,8 +284,6 @@ const AdminPage = () => {
         return <Order mode="returns" />;
       case "comments":
         return <Reviews />;
-      case "inventory":
-        return <InventoryDashboard />;
       case "staff":
         return <Users />;
       default:
