@@ -202,7 +202,7 @@ export default function ChatAdmin() {
         <div>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0F172A" }}>Chat Inbox</h2>
           <p style={{ margin: "6px 0 0", color: "#94A3B8", fontSize: 13 }}>
-            Theo dõi hội thoại khách ↔ AI (admin vẫn có thể nhắn tay)
+            Tin nhắn từ khách — trả lời trực tiếp qua chat (không dùng AI tự động)
           </p>
         </div>
         <Button type="primary" onClick={loadInbox} loading={inboxLoading}>
@@ -296,6 +296,11 @@ export default function ChatAdmin() {
                       ...bubbleStyle[bubbleKey],
                     }}
                   >
+                    {m.senderRole === "ai" && (
+                      <div style={{ fontSize: 10, fontWeight: 800, opacity: 0.75, marginBottom: 4 }}>
+                        Tin tự động (lưu trong lịch sử)
+                      </div>
+                    )}
                     {m.message}
                     <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4 }}>
                       {fmtTime(m.timestamp)}

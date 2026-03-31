@@ -8,7 +8,6 @@ import {
   restoreProductById,
   getAllCategories,
   getAllBrands,
-  getInventoryList,
 } from "./../api/index";
 
 // ── Design tokens ──────────────────────────────────────────────
@@ -254,16 +253,12 @@ const getAdminDisplayPrice = (record) => {
   return "—";
 };
 
-const getAdminStockCount = (record, inventoryByProductId = {}) => {
+const getAdminStockCount = (record) => {
   if (Array.isArray(record?.variants) && record.variants.length > 0) {
-    const inventoryStock = Number(inventoryByProductId?.[record?._id]);
-    if (Number.isFinite(inventoryStock)) return inventoryStock;
-
-    const totalVariantStock = record.variants.reduce((sum, v) => {
+    return record.variants.reduce((sum, v) => {
       const n = Number(v?.stock);
       return sum + (Number.isFinite(n) ? n : 0);
     }, 0);
-    return totalVariantStock;
   }
 
   const singleStock = Number(record?.countInStock ?? record?.stock);
@@ -420,12 +415,6 @@ export default function Products() {
       getAllProducts({ page: page - 1, limit, isListProductRemoved, filter }),
     keepPreviousData: true,
   });
-  const { data: inventoryList } = useQuery({
-    queryKey: ["admin-inventory-list"],
-    queryFn: () => getInventoryList({}),
-    keepPreviousData: true,
-  });
-
   // ── Handlers ───────────────────────────────────────────────
   const handleList = () => {
     setIsListProductRemoved((prev) => (prev === 1 ? 0 : 1));
@@ -476,16 +465,6 @@ export default function Products() {
     if (!search.trim()) return true;
     return p.name?.toLowerCase().includes(search.toLowerCase());
   });
-  const inventoryByProductId = (inventoryList || []).reduce((acc, inv) => {
-    const productId =
-      typeof inv?.productId === "object" ? inv?.productId?._id : inv?.productId;
-    if (!productId) return acc;
-    const available = Number(inv?.available);
-    if (!Number.isFinite(available)) return acc;
-    acc[productId] = Number(acc[productId] || 0) + available;
-    return acc;
-  }, {});
-
   // ── ProductDetail view ─────────────────────────────────────
   if (productSelected) {
     return (
@@ -939,10 +918,7 @@ export default function Products() {
                   ) : (
                     products.map((record) => {
                       const isExpanded = expandedRow === record._id;
-                      const stockCount = getAdminStockCount(
-                        record,
-                        inventoryByProductId,
-                      );
+                      const stockCount = getAdminStockCount(record);
                       return (
                         <React.Fragment key={record._id}>
                           <tr

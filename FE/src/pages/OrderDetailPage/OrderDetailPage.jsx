@@ -12,6 +12,7 @@ import {
   getMyReviewByProduct,
 } from "../../api";
 import { FaBoxOpen, FaCheckCircle, FaTruck, FaMapMarkerAlt, FaTimesCircle, FaChevronLeft, FaUndoAlt, FaCreditCard, FaMoneyBillWave, FaShieldAlt, FaTimes, FaStar } from "react-icons/fa";
+import notify from "../../utils/notify";
 
 const STATUS_LABELS = {
   pending: "Chờ xử lý", confirmed: "Đã xác nhận", shipped: "Đang giao", delivered: "Đã giao",
@@ -139,13 +140,13 @@ const OrderDetailPage = () => {
       setOrder((o) =>
         o ? { ...o, status: "received", paymentStatus: "paid" } : o,
       );
-      alert(
+      notify.success(
         wasPaid
           ? "Cảm ơn bạn đã xác nhận đã nhận hàng."
           : "Đã xác nhận nhận hàng.",
       );
     } catch (err) {
-      alert(err?.response?.data?.message || "Có lỗi.");
+      notify.error(err?.response?.data?.message || "Co loi.");
     }
   };
 
@@ -163,7 +164,7 @@ const OrderDetailPage = () => {
   const submitReturnRequest = async () => {
     const reason = returnReason.trim();
     if (reason.length < 5) {
-      alert("Vui lòng nhập lý do hoàn hàng (tối thiểu 5 ký tự).");
+      notify.warning("Vui long nhap ly do hoan hang (toi thieu 5 ky tu).");
       return;
     }
     setReturnSubmitting(true);
@@ -172,9 +173,9 @@ const OrderDetailPage = () => {
       setOrder((o) => (o ? { ...o, status: "return-request" } : o));
       setReturnModalOpen(false);
       setReturnReason("");
-      alert("Đã gửi yêu cầu hoàn hàng.");
+      notify.success("Da gui yeu cau hoan hang.");
     } catch (err) {
-      alert(err?.response?.data?.message || "Có lỗi.");
+      notify.error(err?.response?.data?.message || "Co loi.");
     } finally {
       setReturnSubmitting(false);
     }
@@ -185,8 +186,8 @@ const OrderDetailPage = () => {
       const baseUrl = window.location.origin;
       const res = await createVnpayUrl(id, `${baseUrl}/payment/return`, `${baseUrl}/orders/${id}`);
       if (res?.url) window.location.href = res.url;
-      else alert("Không tạo được link thanh toán VNPay.");
-    } catch (err) { alert(err?.response?.data?.message || "Không thể tạo thanh toán VNPay."); }
+      else notify.error("Khong tao duoc link thanh toan VNPay.");
+    } catch (err) { notify.error(err?.response?.data?.message || "Khong the tao thanh toan VNPay."); }
   };
 
   const handleCancelOrder = async () => {
@@ -194,8 +195,8 @@ const OrderDetailPage = () => {
     try {
       await cancelOrderByUser(id);
       setOrder((o) => (o ? { ...o, status: "canceled" } : o));
-      alert("Đã hủy đơn hàng.");
-    } catch (err) { alert(err?.response?.data?.message || "Không thể hủy đơn hàng."); }
+      notify.success("Da huy don hang.");
+    } catch (err) { notify.error(err?.response?.data?.message || "Khong the huy don hang."); }
   };
 
   const openReviewModal = (item) => {
@@ -263,7 +264,7 @@ const OrderDetailPage = () => {
           },
         }));
       }
-      alert("Đã gửi đánh giá. Đánh giá sẽ hiển thị sau khi được duyệt.");
+      notify.success("Da gui danh gia. Danh gia se hien thi sau khi duoc duyet.");
       closeReviewModal();
     } catch (err) {
       setReviewError(err?.response?.data?.message || "Không thể gửi đánh giá.");
@@ -525,8 +526,18 @@ const OrderDetailPage = () => {
 
                 <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100 mb-6">
                   <div className="flex items-center gap-2 font-bold text-slate-700">
-                    {order.paymentMethod === "vnpay" ? <FaCreditCard className="text-blue-500" /> : <FaMoneyBillWave className="text-green-500" />}
-                    {order.paymentMethod === "vnpay" ? "Ví VNPay" : "Tiền mặt (COD)"}
+                    {order.paymentMethod === "vnpay" ? (
+                      <FaCreditCard className="text-blue-500" />
+                    ) : order.paymentMethod === "wallet" ? (
+                      <FaCreditCard className="text-emerald-500" />
+                    ) : (
+                      <FaMoneyBillWave className="text-green-500" />
+                    )}
+                    {order.paymentMethod === "vnpay"
+                      ? "VNPay"
+                      : order.paymentMethod === "wallet"
+                        ? "Ví tài khoản"
+                        : "Tiền mặt (COD)"}
                   </div>
                   <span className={`text-xs font-bold px-2 py-1 rounded border ${order.paymentStatus === "paid" ? "bg-green-100 text-green-700 border-green-200" : "bg-orange-100 text-orange-700 border-orange-200"}`}>
                     {order.paymentStatus === "paid" ? "Đã Thanh Toán" : "Chưa Thanh Toán"}
@@ -544,6 +555,17 @@ const OrderDetailPage = () => {
                   <span className="font-bold text-slate-700">Tổng cộng</span>
                   <span className="text-3xl font-black text-secondary">{formatMoney(order.totalAmount)}</span>
                 </div>
+
+                {Number(order.walletRefundAmount) > 0 && (
+                  <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-bold">
+                    Đã hoàn {formatMoney(order.walletRefundAmount)} vào ví tài khoản của bạn.
+                    {order.walletRefundedAt && (
+                      <span className="block text-xs font-semibold text-emerald-700 mt-1">
+                        {new Date(order.walletRefundedAt).toLocaleString("vi-VN")}
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* ACTIONS */}
                 <div className="space-y-3">

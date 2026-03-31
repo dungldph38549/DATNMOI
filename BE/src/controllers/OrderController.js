@@ -5,7 +5,6 @@ const Voucher = require("../models/VoucherModel.js");
 const OrderStatusHistory = require("../models/orderStatusHistory.js");
 const { successResponse, errorResponse } = require("../utils/response.js");
 const User = require("../models/UserModel.js");
-const inventoryService = require("../services/inventoryService");
 const {
   VNPay,
   IpnSuccess,
@@ -16,6 +15,12 @@ const {
   IpnUnknownError,
 } = require("vnpay");
 const { pickBestActiveRule, calculateEffectivePrice } = require("../utils/salePricing");
+const { restoreVariantStockBySku } = require("../utils/stockRestore");
+const {
+  buildWalletRefundPatchForReturn,
+  debitWalletForUserOrder,
+  buildWalletCancelRefundPatch,
+} = require("../services/walletService.js");
 
 const ROLE_VOUCHER_USAGE_LIMIT = {
   customer: 3,
@@ -76,34 +81,6 @@ const buildVnpayPaymentUrlForOrder = (req, order, returnUrl, cancelUrl) => {
   });
 };
 
-/** * Đặt hàng có thể trừ stock trên Product.variant mà không có bản ghi Inventory (createOrder fallback). 
- */
-const isInventorySkuMissingError = (err) => {
-  const code = err?.status ?? err?.statusCode;
-  if (code !== 404) return false;
-  const msg = String(err?.message || "");
-  return msg.includes("SKU") && msg.includes("không tồn tại");
-};
-
-const restoreVariantStockBySku = async (item, qty, session = null) => {
-  const pid = item.productId?._id || item.productId;
-  if (!pid) return;
-  
-  // Đảm bảo Product đã được require ở đầu file
-  let q = Product.findById(pid);
-  if (session) q = q.session(session);
-  
-  const productDoc = await q;
-  if (!productDoc?.hasVariants) return;
-  
-  const variant = productDoc.variants?.find((v) => v.sku === item.sku);
-  if (!variant) return;
-  
-  variant.stock = Number(variant.stock || 0) + Number(qty || 0);
-  
-  if (session) await productDoc.save({ session });
-  else await productDoc.save();
-};
 // ================================================================
 // Tạo đơn hàng
 // ================================================================
@@ -137,6 +114,14 @@ exports.createOrder = async (req, res) => {
       return res
         .status(403)
         .json({ message: "Quản trị viên không thể đặt hàng" });
+    }
+
+    if (paymentMethod === "wallet" && !userId) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(422).json({
+        message: "Vui lòng đăng nhập để thanh toán bằng ví",
+      });
     }
 
     if (!(userId || guestId)) {
@@ -270,7 +255,7 @@ exports.createOrder = async (req, res) => {
       }
     }
 
-    // Sau khi đã đảm bảo dữ liệu hợp lệ, tiến hành reserve tồn kho cho các SKU có Inventory
+    // Trừ tồn biến thể trực tiếp trên Product (đã xóa module Inventory)
     const subtotal = mappedProducts.reduce(
       (sum, item) =>
         sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
@@ -390,45 +375,24 @@ exports.createOrder = async (req, res) => {
 
     for (const item of mappedProducts) {
       if (!item.sku) continue;
-      try {
-        await inventoryService.reserveBySku(
-          item.sku,
-          item.quantity,
-          null,
-          userId || guestId || null,
-        );
-      } catch (err) {
-        // Fallback demo: nếu hệ thống Inventory chưa tạo record cho SKU này
-        // thì trừ trực tiếp stock trên Product biến thể để vẫn cho đặt hàng.
-        const msg = err?.message || "";
-        const isSkuNotFound =
-          err?.status === 404 ||
-          msg.includes(`SKU "${item.sku}"`) ||
-          msg.includes("SKU không tồn tại");
-
-        if (!isSkuNotFound) throw err;
-
-        const productForStock = await Product.findById(item.productId).session(
-          session,
-        );
-        if (!productForStock) {
-          throw err;
-        }
-
-        const variant = productForStock.variants?.find(
-          (v) => v.sku === item.sku,
-        );
-        const available = variant?.stock ?? 0;
-        if (!variant || available < item.quantity) {
-          throw new Error(
-            `Không đủ hàng cho SKU ${item.sku} (khả dụng: ${available})`,
-          );
-        }
-
-        variant.stock = available - item.quantity;
-        await productForStock.save({ session });
+      const productForStock = await Product.findById(item.productId).session(
+        session,
+      );
+      if (!productForStock) {
+        throw new Error("Không tìm thấy sản phẩm");
       }
+      const variant = productForStock.variants?.find((v) => v.sku === item.sku);
+      const available = Number(variant?.stock ?? 0);
+      if (!variant || available < item.quantity) {
+        throw new Error(
+          `Không đủ hàng cho SKU ${item.sku} (khả dụng: ${available})`,
+        );
+      }
+      variant.stock = available - item.quantity;
+      await productForStock.save({ session });
     }
+
+    const finalTotal = Math.max(0, subtotal - discountAmount + shippingFee);
 
     const newOrder = new Order({
       userId,
@@ -443,10 +407,49 @@ exports.createOrder = async (req, res) => {
       discount: discountAmount,
       voucherCode: normalizedVoucherCode,
       shippingFee,
-      totalAmount: Math.max(0, subtotal - discountAmount + shippingFee),
+      totalAmount: finalTotal,
+      paymentStatus: "unpaid",
     });
 
     const savedOrder = await newOrder.save({ session });
+
+    if (paymentMethod === "wallet") {
+      if (finalTotal <= 0) {
+        await Order.findByIdAndUpdate(
+          savedOrder._id,
+          { paymentStatus: "paid" },
+          { session },
+        );
+      } else {
+        try {
+          const { walletPaymentTransactionId } = await debitWalletForUserOrder(
+            userId,
+            savedOrder._id,
+            finalTotal,
+            session,
+          );
+          await Order.findByIdAndUpdate(
+            savedOrder._id,
+            {
+              paymentStatus: "paid",
+              walletPaymentTransactionId,
+            },
+            { session },
+          );
+        } catch (debitErr) {
+          await session.abortTransaction();
+          session.endSession();
+          if (debitErr.statusCode === 422) {
+            return res.status(422).json({
+              message: debitErr.message,
+              balance: debitErr.balance,
+              required: debitErr.required,
+            });
+          }
+          throw debitErr;
+        }
+      }
+    }
 
     if (voucherDoc) {
       await Voucher.findOneAndUpdate(
@@ -464,15 +467,19 @@ exports.createOrder = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
+    const orderOut = await Order.findById(savedOrder._id).populate(
+      "products.productId",
+    );
+
     if (paymentMethod === "vnpay") {
       const orderJson =
-        typeof savedOrder.toObject === "function"
-          ? savedOrder.toObject()
-          : savedOrder;
+        typeof orderOut.toObject === "function"
+          ? orderOut.toObject()
+          : orderOut;
       try {
         const vnpayPaymentUrl = buildVnpayPaymentUrlForOrder(
           req,
-          savedOrder,
+          orderOut,
           vnpReturnUrl,
           vnpCancelUrl,
         );
@@ -486,24 +493,8 @@ exports.createOrder = async (req, res) => {
       }
     }
 
-    return res.status(201).json(savedOrder);
+    return res.status(201).json(orderOut);
   } catch (err) {
-    // Nếu tạo đơn thất bại, cố gắng giải phóng phần hàng đã reserve (nếu có)
-    try {
-      if (Array.isArray(req.body?.products)) {
-        for (const item of req.body.products) {
-          if (!item.sku || !item.quantity) continue;
-          await inventoryService.releaseBySku(
-            item.sku,
-            item.quantity,
-            null,
-            req.body.userId || req.body.guestId || null,
-          );
-        }
-      }
-    } catch (_) {
-      // bỏ qua lỗi release trong khối catch
-    }
     await session.abortTransaction();
     session.endSession();
     return res.status(500).json({
@@ -774,6 +765,14 @@ exports.updateOrder = async (req, res) => {
       if (address) updateFields.address = address;
     }
 
+    if (status === "canceled" && order.status !== "canceled") {
+      const walletCancelPatch = await buildWalletCancelRefundPatch(
+        order,
+        session,
+      );
+      Object.assign(updateFields, walletCancelPatch);
+    }
+
     if (Object.keys(updateFields).length === 0) {
       await session.abortTransaction();
       session.endSession();
@@ -788,24 +787,13 @@ exports.updateOrder = async (req, res) => {
       { new: true, session },
     ).populate("products.productId");
 
-    // Đồng bộ tồn kho Inventory theo vòng đời đơn hàng
+    // Hoàn tồn Product khi hủy đơn (tồn đã trừ lúc tạo đơn)
     if (status && status !== order.status) {
-      // Nếu đơn bị hủy từ trạng thái có thể đang giữ hàng, release reserve
       if (status === "canceled") {
         for (const item of order.products) {
           if (!item?.quantity) continue;
           if (item.sku) {
-            try {
-              await inventoryService.releaseBySku(
-                item.sku,
-                item.quantity,
-                order._id,
-                null,
-              );
-            } catch (err) {
-              if (!isInventorySkuMissingError(err)) throw err;
-              await restoreVariantStockBySku(item, item.quantity, session);
-            }
+            await restoreVariantStockBySku(item, item.quantity, session);
             continue;
           }
 
@@ -816,35 +804,6 @@ exports.updateOrder = async (req, res) => {
             productDoc.stock =
               Number(productDoc.stock || 0) + Number(item.quantity || 0);
             await productDoc.save({ session });
-          }
-        }
-      }
-
-      // Khi chuyển sang shipped: xuất kho thực tế, đồng thời giải phóng phần đã giữ
-      if (status === "shipped") {
-        for (const item of order.products) {
-          if (!item.sku || !item.quantity) continue;
-          try {
-            await inventoryService.releaseBySku(
-              item.sku,
-              item.quantity,
-              order._id,
-              null,
-            );
-          } catch (err) {
-            if (!isInventorySkuMissingError(err)) throw err;
-          }
-          try {
-            await inventoryService.exportBySku(
-              item.sku,
-              item.quantity,
-              order._id,
-              null,
-              null,
-              `Xuất kho theo đơn hàng #${order._id}`,
-            );
-          } catch (err) {
-            if (!isInventorySkuMissingError(err)) throw err;
           }
         }
       }
@@ -898,52 +857,75 @@ exports.updateOrderById = async (req, res) => {
       });
     }
 
+    if (status === "canceled" && order.status !== "canceled") {
+      const session = await mongoose.startSession();
+      session.startTransaction();
+      try {
+        const o = await Order.findById(id).session(session);
+        if (!o) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+        }
+
+        if (fullName) o.fullName = fullName;
+        if (email) o.email = email;
+        if (phone) o.phone = phone;
+        if (address) o.address = address;
+
+        const oldStatus = o.status;
+        o.status = "canceled";
+
+        for (const item of o.products || []) {
+          if (!item?.quantity) continue;
+
+          if (item.sku) {
+            await restoreVariantStockBySku(item, item.quantity, session);
+            continue;
+          }
+
+          const productDoc = await Product.findById(item.productId).session(
+            session,
+          );
+          if (productDoc && !productDoc.hasVariants) {
+            productDoc.stock =
+              Number(productDoc.stock || 0) + Number(item.quantity || 0);
+            await productDoc.save({ session });
+          }
+        }
+
+        const walletPatch = await buildWalletCancelRefundPatch(o, session);
+        Object.assign(o, walletPatch);
+        await o.save({ session });
+
+        await OrderStatusHistory.create(
+          [
+            {
+              oldStatus,
+              newStatus: "canceled",
+              orderId: o._id,
+              note: "Khách hàng hủy đơn hàng",
+            },
+          ],
+          { session },
+        );
+
+        await session.commitTransaction();
+        session.endSession();
+      } catch (innerErr) {
+        await session.abortTransaction();
+        session.endSession();
+        throw innerErr;
+      }
+
+      const updated = await Order.findById(id).populate("products.productId");
+      return res.status(200).json(updated);
+    }
+
     if (fullName) order.fullName = fullName;
     if (email) order.email = email;
     if (phone) order.phone = phone;
     if (address) order.address = address;
-
-    if (status === "canceled" && order.status !== "canceled") {
-      const oldStatus = order.status;
-      order.status = "canceled";
-
-      for (const item of order.products || []) {
-        if (!item?.quantity) continue;
-
-        if (item.sku) {
-          try {
-            await inventoryService.releaseBySku(
-              item.sku,
-              item.quantity,
-              order._id,
-              order.userId || order.guestId || null,
-            );
-          } catch (err) {
-            if (isInventorySkuMissingError(err))
-              await restoreVariantStockBySku(item, item.quantity, null);
-          }
-          continue;
-        }
-
-        try {
-          const productDoc = await Product.findById(item.productId);
-          if (productDoc && !productDoc.hasVariants) {
-            productDoc.stock =
-              Number(productDoc.stock || 0) + Number(item.quantity || 0);
-            await productDoc.save();
-          }
-        } catch (_) {
-          // ignore non-variant stock restore errors in user-cancel flow
-        }
-      }
-
-      await OrderStatusHistory.create({
-        oldStatus,
-        newStatus: "canceled",
-        orderId: order._id,
-        note: "Khách hàng hủy đơn hàng",
-      });
-    }
 
     const updated = await order.save();
     res.status(200).json(updated);
@@ -1381,20 +1363,15 @@ const cancelUnpaidVnpayOrder = async (orderId) => {
   if (order.paymentStatus === "paid") return;
   if (order.status === "canceled") return;
 
-  // Trả lại tồn đã reserve khi thanh toán VNPay thất bại/hủy.
+  // Trả lại tồn Product khi thanh toán VNPay thất bại/hủy.
   for (const item of order.products || []) {
     if (!item?.quantity) continue;
 
     if (item.sku) {
       try {
-        await inventoryService.releaseBySku(
-          item.sku,
-          item.quantity,
-          order._id,
-          order.userId || order.guestId || null,
-        );
+        await restoreVariantStockBySku(item, item.quantity, null);
       } catch (_) {
-        // Bỏ qua lỗi release để không block luồng cập nhật trạng thái đơn.
+        // Bỏ qua lỗi hoàn tồn để không block luồng hủy đơn VNPay.
       }
       continue;
     }
@@ -1544,34 +1521,12 @@ exports.acceptOrRejectReturn = async (req, res) => {
         .json({ message: "Đơn hàng không ở trạng thái yêu cầu hoàn hàng" });
     }
 
-    const updated = await Order.findByIdAndUpdate(
-      id,
-      { status: action },
-      { new: true, session },
-    ).populate("products.productId");
-
-    // Nếu chấp nhận hoàn hàng: nhập hàng lại kho.
+    let walletPatch = {};
+    // Nếu chấp nhận hoàn hàng: cộng lại tồn + hoàn tiền vào ví (nếu đủ điều kiện).
     if (action === "accepted") {
       for (const item of order.products || []) {
         const qty = Number(item?.quantity || 0);
         if (qty <= 0) continue;
-
-        if (item.sku) {
-          try {
-            await inventoryService.importStock(
-              (await inventoryService.getBySku(item.sku))._id,
-              {
-                qty,
-                warehouseId: null,
-                note: `Nhập lại do hoàn hàng đơn #${order._id}`,
-              },
-              null,
-            );
-            continue;
-          } catch (err) {
-            // fallback ở dưới
-          }
-        }
 
         const productDoc = item.productId;
         if (!productDoc) continue;
@@ -1586,14 +1541,26 @@ exports.acceptOrRejectReturn = async (req, res) => {
           await productDoc.save({ session });
         }
       }
+      walletPatch = await buildWalletRefundPatchForReturn(order, session);
     }
 
-    await OrderStatusHistory.create({
-      oldStatus: "return-request",
-      newStatus: action,
-      orderId: order._id,
-      note: req.body?.note || "",
-    });
+    const updated = await Order.findByIdAndUpdate(
+      id,
+      { status: action, ...walletPatch },
+      { new: true, session },
+    ).populate("products.productId");
+
+    await OrderStatusHistory.create(
+      [
+        {
+          oldStatus: "return-request",
+          newStatus: action,
+          orderId: order._id,
+          note: req.body?.note || "",
+        },
+      ],
+      { session },
+    );
     await session.commitTransaction();
     session.endSession();
     res.status(200).json(updated);

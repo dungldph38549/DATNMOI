@@ -137,8 +137,6 @@ const userSchema = new mongoose.Schema(
           "manage_customers",
           "view_reports",
           "manage_reports",
-          "view_inventory",
-          "manage_inventory",
           "view_staff",
           "manage_staff",
         ],
@@ -171,6 +169,13 @@ const userSchema = new mongoose.Schema(
         viewedAt: { type: Date, default: Date.now },
       },
     ],
+
+    /** Số dư ví (VND) — hoàn hàng, nạp tiền (nếu có) */
+    walletBalance: {
+      type: Number,
+      default: 0,
+      min: [0, "Số dư ví không được âm"],
+    },
 
     deletedAt: { type: Date, default: null, index: true },
     deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

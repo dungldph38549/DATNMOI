@@ -12,22 +12,12 @@ const { Server } = require("socket.io");
 
 // 1. Import Routes và Cấu hình hệ thống
 const routes = require("./src/routers");
-const { initSocket } = require("./src/socket/inventorySocket");
 const { initChatSocket } = require("./src/socket/chatSocket");
-const { scheduleLowStockScan } = require("./src/jobs/alertJob");
 const { cleanupUnpaidVnpayOrders } = require("./src/services/vnpayCleanupService");
 
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
-
-if (String(process.env.GEMINI_API_KEY || "").trim()) {
-  console.log("[Chat AI] GEMINI_API_KEY đã được nạp.");
-} else {
-  console.warn(
-    "[Chat AI] Chưa có GEMINI_API_KEY — dán key vào DATN/BE/.env rồi restart server.",
-  );
-}
 
 // 2. Cấu hình Socket.io
 const io = new Server(server, {
@@ -138,9 +128,7 @@ app.use((err, req, res, next) => {
 });
 
 // 8. Khởi chạy Socket & Jobs
-initSocket(io);
 initChatSocket(io);
-scheduleLowStockScan();
 setInterval(async () => {
   try {
     const result = await cleanupUnpaidVnpayOrders();

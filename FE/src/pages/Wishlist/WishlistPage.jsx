@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { FaHeart, FaShoppingCart, FaTrash, FaArrowRight, FaShoppingBag } from "react-icons/fa";
 import { removeFromWishlist, clearWishlist } from "../../redux/wishlist/wishlistSlice";
 import { addToCart } from "../../redux/cart/cartSlice";
+import notify from "../../utils/notify";
 
 const WishlistPage = () => {
     const navigate = useNavigate();
@@ -49,7 +50,7 @@ const WishlistPage = () => {
 
     const handleMoveToCart = (product) => {
         if (!isLoggedIn) {
-            alert("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.");
+            notify.warning("Vui long dang nhap de them san pham vao gio hang.");
             navigate("/login");
             return;
         }
@@ -69,7 +70,7 @@ const WishlistPage = () => {
         }));
         // Optional: remove from wishlist after moving to cart
         // dispatch(removeFromWishlist(product._id));
-        alert("Đã thêm vào giỏ hàng!");
+        notify.success("Da them vao gio hang!");
     };
 
     return (

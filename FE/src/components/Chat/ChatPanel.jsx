@@ -3,7 +3,10 @@ import { io } from "socket.io-client";
 import { useSelector } from "react-redux";
 import { getChatHistory } from "../../api";
 
-const SOCKET_URL = "http://localhost:3002";
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3002";
+
+const zaloUrl = String(import.meta.env.VITE_CONTACT_ZALO_URL || "").trim();
+const messengerUrl = String(import.meta.env.VITE_CONTACT_MESSENGER_URL || "").trim();
 
 const bubbleStyle = {
   user: {
@@ -50,7 +53,7 @@ const normalizeMessage = (m, customerId) => {
 
   const senderRole =
     m?.senderRole ??
-    (senderId && String(senderId) === String(customerId) ? "user" : "ai");
+    (senderId && String(senderId) === String(customerId) ? "user" : "admin");
 
   return {
     _id: m?._id ?? m?.id ?? `${timestamp}-${Math.random().toString(16).slice(2)}`,
@@ -75,7 +78,6 @@ export default function ChatPanel({ onClose, compact = false }) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [errorHistory, setErrorHistory] = useState("");
   const [text, setText] = useState("");
-  const [aiTyping, setAiTyping] = useState(false);
   const socketRef = useRef(null);
 
   useEffect(() => {
@@ -115,11 +117,6 @@ export default function ChatPanel({ onClose, compact = false }) {
       // nhưng vẫn hỗ trợ trường hợp payload chỉ là string.
       const incoming = normalizeMessage(payload, customerId);
       setMessages((prev) => [...prev, incoming]);
-    });
-
-    socket.on("chat:aiTyping", (payload) => {
-      if (String(payload?.customerId) !== String(customerId)) return;
-      setAiTyping(Boolean(payload?.typing));
     });
 
     return () => {
@@ -166,7 +163,7 @@ export default function ChatPanel({ onClose, compact = false }) {
         }}
       >
         <div style={{ fontWeight: 800 }}>
-          {compact ? "Trợ lý AI" : "Chat với trợ lý AI"}
+          {compact ? "Hỗ trợ" : "Chat với SneakerHouse"}
         </div>
         {onClose && (
           <button
@@ -186,6 +183,60 @@ export default function ChatPanel({ onClose, compact = false }) {
         )}
       </div>
 
+      {(zaloUrl || messengerUrl) && (
+        <div
+          style={{
+            padding: "10px 14px",
+            background: "#FFFBF5",
+            borderBottom: "1px solid #F1F5F9",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
+            alignItems: "center",
+          }}
+        >
+          <span style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>
+            Liên hệ nhanh:
+          </span>
+          {zaloUrl && (
+            <a
+              href={zaloUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                padding: "6px 12px",
+                borderRadius: 8,
+                background: "#0068FF",
+                color: "#fff",
+                textDecoration: "none",
+              }}
+            >
+              Zalo
+            </a>
+          )}
+          {messengerUrl && (
+            <a
+              href={messengerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                padding: "6px 12px",
+                borderRadius: 8,
+                background: "#0084FF",
+                color: "#fff",
+                textDecoration: "none",
+              }}
+            >
+              Messenger
+            </a>
+          )}
+        </div>
+      )}
+
       <div
         style={{
           flex: 1,
@@ -202,8 +253,23 @@ export default function ChatPanel({ onClose, compact = false }) {
         )}
 
         {messages.length === 0 && !loadingHistory && (
-          <div style={{ color: "#9CA3AF", fontSize: 13, textAlign: "center", marginTop: 20 }}>
-            Chưa có tin nhắn. Hãy gửi một lời chào!
+          <div
+            style={{
+              color: "#64748B",
+              fontSize: 13,
+              textAlign: "center",
+              marginTop: 20,
+              lineHeight: 1.5,
+              padding: "0 8px",
+            }}
+          >
+            Gửi tin nhắn để được đội ngũ admin trả lời trực tiếp.
+            {zaloUrl || messengerUrl ? (
+              <>
+                <br />
+                Hoặc dùng Zalo / Messenger phía trên nếu bạn tiện hơn.
+              </>
+            ) : null}
           </div>
         )}
 
@@ -230,6 +296,11 @@ export default function ChatPanel({ onClose, compact = false }) {
                   ...bubbleStyle[bubbleKey],
                 }}
               >
+                {m.senderRole === "ai" && (
+                  <div style={{ fontSize: 10, fontWeight: 800, opacity: 0.75, marginBottom: 4 }}>
+                    Tin cũ (tự động)
+                  </div>
+                )}
                 {m.message}
                 <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4 }}>
                   {fmtTime(m.timestamp)}
@@ -238,11 +309,6 @@ export default function ChatPanel({ onClose, compact = false }) {
             </div>
           );
         })}
-        {aiTyping && (
-          <div style={{ color: "#6366F1", fontSize: 12, fontStyle: "italic", marginBottom: 8 }}>
-            Trợ lý AI đang soạn tin…
-          </div>
-        )}
       </div>
 
       <div
@@ -258,7 +324,7 @@ export default function ChatPanel({ onClose, compact = false }) {
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Nhập tin nhắn..."
+          placeholder="Nhập tin nhắn cho admin…"
           onKeyDown={(e) => {
             if (e.key === "Enter") send();
           }}

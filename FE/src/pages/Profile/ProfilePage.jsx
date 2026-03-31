@@ -2,8 +2,17 @@ import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaUser, FaLock, FaShoppingBag, FaCamera, FaChevronRight, FaSignOutAlt, FaWallet, FaArrowUp, FaArrowDown } from "react-icons/fa";
-import { updateCustomerById, getOrdersByUser } from "../../api";
+import {
+    updateCustomerById,
+    getOrdersByUser,
+    getWalletBalance,
+    getWalletTransactions,
+    createWalletVnpayTopupUrl,
+    createWalletBankTopupRequest,
+    markWalletBankTopupSent,
+} from "../../api";
 import { updateUserInfo, clearUser } from "../../redux/user";
+import notify from "../../utils/notify";
 
 const ProfilePage = () => {
     const user = useSelector((state) => state.user);
@@ -23,6 +32,13 @@ const ProfilePage = () => {
     });
 
     const [message, setMessage] = useState({ type: "", text: "" });
+    const [walletBalance, setWalletBalance] = useState(null);
+    const [walletTx, setWalletTx] = useState([]);
+    const [walletLoading, setWalletLoading] = useState(false);
+    const [topupAmountVnpay, setTopupAmountVnpay] = useState("100000");
+    const [topupAmountBank, setTopupAmountBank] = useState("100000");
+    const [bankTopupResult, setBankTopupResult] = useState(null);
+    const [topupSubmitting, setTopupSubmitting] = useState(false);
 
     // Handle tab switching from query params
     useEffect(() => {
@@ -50,6 +66,117 @@ const ProfilePage = () => {
         };
         fetchOrders();
     }, [user, navigate]);
+
+    useEffect(() => {
+        if (!user?.login || activeTab !== "wallet") return;
+        let cancelled = false;
+        (async () => {
+            setWalletLoading(true);
+            try {
+                const [bal, txRes] = await Promise.all([
+                    getWalletBalance(),
+                    getWalletTransactions(1, 30),
+                ]);
+                if (!cancelled) {
+                    setWalletBalance(
+                        typeof bal?.balance === "number"
+                            ? bal.balance
+                            : Number(bal?.balance) || 0,
+                    );
+                    setWalletTx(Array.isArray(txRes?.data) ? txRes.data : []);
+                }
+            } catch {
+                if (!cancelled) {
+                    setWalletBalance(0);
+                    setWalletTx([]);
+                }
+            } finally {
+                if (!cancelled) setWalletLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [user?.login, activeTab]);
+
+    useEffect(() => {
+        if (activeTab !== "wallet") return;
+        const params = new URLSearchParams(location.search);
+        if (params.get("topup") === "1") {
+            const amt = params.get("amount");
+            notify.success(
+                amt
+                    ? `Nạp ví thành công: ${Number(amt).toLocaleString("vi-VN")}đ`
+                    : "Nạp ví thành công.",
+            );
+            navigate("/profile?tab=wallet", { replace: true });
+        }
+    }, [activeTab, location.search, navigate]);
+
+    const handleVnpayTopup = async () => {
+        const n = Number(String(topupAmountVnpay).replace(/\D/g, ""));
+        if (!Number.isFinite(n) || n < 10000) {
+            notify.warning("So tien toi thieu 10.000d.");
+            return;
+        }
+        setTopupSubmitting(true);
+        try {
+            const base = window.location.origin;
+            const data = await createWalletVnpayTopupUrl({
+                amount: n,
+                returnUrl: `${base}/profile?tab=wallet`,
+                cancelUrl: `${base}/profile?tab=wallet`,
+            });
+            if (data?.paymentUrl) window.location.href = data.paymentUrl;
+            else notify.error("Khong nhan duoc link thanh toan.");
+        } catch (err) {
+            notify.error(err?.response?.data?.message || "Khong tao duoc link VNPay.");
+        } finally {
+            setTopupSubmitting(false);
+        }
+    };
+
+    const handleBankTopupRequest = async () => {
+        const n = Number(String(topupAmountBank).replace(/\D/g, ""));
+        if (!Number.isFinite(n) || n < 10000) {
+            notify.warning("So tien toi thieu 10.000d.");
+            return;
+        }
+        setTopupSubmitting(true);
+        try {
+            const data = await createWalletBankTopupRequest(n);
+            setBankTopupResult(data);
+        } catch (err) {
+            notify.error(err?.response?.data?.message || "Khong tao yeu cau.");
+        } finally {
+            setTopupSubmitting(false);
+        }
+    };
+
+    const handleMarkBankSent = async () => {
+        const id = bankTopupResult?.topUp?._id;
+        if (!id) return;
+        setTopupSubmitting(true);
+        try {
+            await markWalletBankTopupSent(id);
+            notify.success("Da ghi nhan. Shop se cong vi sau khi doi soat.");
+            setBankTopupResult(null);
+            const [bal, txRes] = await Promise.all([
+                getWalletBalance(),
+                getWalletTransactions(1, 30),
+            ]);
+            setWalletBalance(
+                typeof bal?.balance === "number"
+                    ? bal.balance
+                    : Number(bal?.balance) || 0,
+            );
+            setWalletTx(Array.isArray(txRes?.data) ? txRes.data : []);
+        } catch (err) {
+            notify.error(err?.response?.data?.message || "Cap nhat that bai.");
+        } finally {
+            setTopupSubmitting(false);
+        }
+    };
 
     const handleInfoUpdate = async (e) => {
         e.preventDefault();
@@ -253,14 +380,121 @@ const ProfilePage = () => {
                                         <div className="flex justify-between items-start mb-12">
                                             <div>
                                                 <p className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Số dư hiện tại</p>
-                                                <h3 className="text-4xl md:text-5xl font-display font-black text-white">{(user?.balance || 2500000).toLocaleString()}₫</h3>
+                                                <h3 className="text-4xl md:text-5xl font-display font-black text-white">
+                                                    {walletLoading && walletBalance === null ? "…" : (walletBalance ?? 0).toLocaleString("vi-VN")}₫
+                                                </h3>
                                             </div>
                                             <div className="w-16 h-10 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 flex items-center justify-center text-white/40 italic font-black">VISA</div>
                                         </div>
-                                        <div className="flex flex-wrap gap-4">
-                                            <button className="bg-white text-slate-900 font-black px-8 py-4 rounded-2xl shadow-lg hover:scale-105 active:scale-95 transition-all text-sm uppercase tracking-widest">Nạp tiền</button>
-                                            <button className="bg-white/10 backdrop-blur-md text-white border border-white/20 font-black px-8 py-4 rounded-2xl hover:bg-white/20 transition-all text-sm uppercase tracking-widest">Chuyển khoản</button>
+                                        <p className="text-slate-400 text-sm font-medium max-w-md">
+                                            Nạp qua VNPay hoặc chuyển khoản; hoàn hàng / hoàn hủy đơn cũng được cộng vào ví.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 md:p-8">
+                                        <h4 className="font-black text-slate-900 mb-2 flex items-center gap-2">
+                                            <span className="text-primary">●</span> Nạp qua VNPay
+                                        </h4>
+                                        <p className="text-xs text-slate-500 mb-4">Chuyển hướng sang cổng thanh toán; tiền vào ví khi giao dịch thành công.</p>
+                                        <div className="flex flex-wrap gap-3 items-end">
+                                            <div className="flex-1 min-w-[140px]">
+                                                <label className="text-xs font-bold text-slate-400 uppercase">Số tiền (đ)</label>
+                                                <input
+                                                    type="number"
+                                                    min={10000}
+                                                    step={1000}
+                                                    value={topupAmountVnpay}
+                                                    onChange={(e) => setTopupAmountVnpay(e.target.value)}
+                                                    className="w-full mt-1 px-4 py-3 rounded-xl border border-slate-200 font-bold text-slate-800"
+                                                />
+                                            </div>
+                                            <button
+                                                type="button"
+                                                disabled={topupSubmitting}
+                                                onClick={handleVnpayTopup}
+                                                className="px-6 py-3 rounded-xl bg-slate-900 text-white font-black text-sm hover:bg-primary transition-colors disabled:opacity-50"
+                                            >
+                                                {topupSubmitting ? "…" : "Thanh toán VNPay"}
+                                            </button>
                                         </div>
+                                    </div>
+                                    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 md:p-8">
+                                        <h4 className="font-black text-slate-900 mb-2 flex items-center gap-2">
+                                            <span className="text-emerald-600">●</span> Chuyển khoản ngân hàng
+                                        </h4>
+                                        <p className="text-xs text-slate-500 mb-4">Tạo mã nội dung, chuyển đúng số tiền; shop xác nhận và cộng ví.</p>
+                                        {!bankTopupResult ? (
+                                            <div className="flex flex-wrap gap-3 items-end">
+                                                <div className="flex-1 min-w-[140px]">
+                                                    <label className="text-xs font-bold text-slate-400 uppercase">Số tiền (đ)</label>
+                                                    <input
+                                                        type="number"
+                                                        min={10000}
+                                                        step={1000}
+                                                        value={topupAmountBank}
+                                                        onChange={(e) => setTopupAmountBank(e.target.value)}
+                                                        className="w-full mt-1 px-4 py-3 rounded-xl border border-slate-200 font-bold text-slate-800"
+                                                    />
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    disabled={topupSubmitting}
+                                                    onClick={handleBankTopupRequest}
+                                                    className="px-6 py-3 rounded-xl border-2 border-emerald-600 text-emerald-700 font-black text-sm hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                                                >
+                                                    {topupSubmitting ? "…" : "Tạo mã CK"}
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3 text-sm">
+                                                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+                                                    <p><span className="font-bold text-slate-500">Ngân hàng:</span> {bankTopupResult.bank?.bankName || "—"}</p>
+                                                    <p><span className="font-bold text-slate-500">Số TK:</span> {bankTopupResult.bank?.accountNumber || "—"}</p>
+                                                    <p><span className="font-bold text-slate-500">Chủ TK:</span> {bankTopupResult.bank?.accountOwner || "—"}</p>
+                                                    {bankTopupResult.bank?.branch && (
+                                                        <p><span className="font-bold text-slate-500">Chi nhánh:</span> {bankTopupResult.bank.branch}</p>
+                                                    )}
+                                                    <p className="font-black text-primary text-lg">
+                                                        {Number(bankTopupResult.topUp?.amount || 0).toLocaleString("vi-VN")}đ
+                                                    </p>
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="font-bold text-slate-500">Nội dung:</span>
+                                                        <code className="bg-white px-2 py-1 rounded border text-primary font-mono text-xs">
+                                                            {bankTopupResult.topUp?.referenceCode}
+                                                        </code>
+                                                        <button
+                                                            type="button"
+                                                            className="text-xs font-bold text-primary underline"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(bankTopupResult.topUp?.referenceCode || "");
+                                                            }}
+                                                        >
+                                                            Sao chép
+                                                        </button>
+                                                    </div>
+                                                    {bankTopupResult.bank?.note && (
+                                                        <p className="text-xs text-amber-700">{bankTopupResult.bank.note}</p>
+                                                    )}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    disabled={topupSubmitting}
+                                                    onClick={handleMarkBankSent}
+                                                    className="w-full py-3 rounded-xl bg-emerald-600 text-white font-black text-sm hover:bg-emerald-700 disabled:opacity-50"
+                                                >
+                                                    Tôi đã chuyển khoản
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="w-full py-2 text-slate-500 text-sm font-bold"
+                                                    onClick={() => setBankTopupResult(null)}
+                                                >
+                                                    Đóng
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -270,27 +504,57 @@ const ProfilePage = () => {
                                         <p className="text-slate-400 text-sm">Theo dõi các hoạt động nạp tiền và thanh toán gần đây.</p>
                                     </div>
                                     <div className="space-y-1">
-                                        {[
-                                            { id: 1, title: 'Thanh toán đơn hàng #8291', date: 'Hôm nay, 14:20', amount: -1250000, status: 'Thành công' },
-                                            { id: 2, title: 'Nạp tiền từ VNPay', date: '22 Th03, 2024', amount: 3000000, status: 'Thành công' },
-                                            { id: 3, title: 'Thanh toán đơn hàng #7102', date: '20 Th03, 2024', amount: -450000, status: 'Thành công' },
-                                        ].map(tx => (
-                                            <div key={tx.id} className="flex items-center justify-between p-5 hover:bg-slate-50 rounded-2xl transition-colors group">
-                                                <div className="flex items-center gap-5">
-                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${tx.amount > 0 ? 'bg-green-50 text-green-500' : 'bg-red-50 text-red-500'}`}>
-                                                        {tx.amount > 0 ? <FaArrowUp /> : <FaArrowDown />}
+                                        {walletLoading && walletTx.length === 0 ? (
+                                            <p className="text-center py-8 text-slate-400 font-bold text-sm">Đang tải...</p>
+                                        ) : walletTx.length === 0 ? (
+                                            <p className="text-center py-8 text-slate-400 font-bold text-sm italic">Chưa có giao dịch</p>
+                                        ) : (
+                                            walletTx.map((tx) => {
+                                                const oid = tx.orderId?._id || tx.orderId;
+                                                const shortId = oid ? String(oid).slice(-6).toUpperCase() : "";
+                                                const title =
+                                                    tx.type === "return_refund"
+                                                        ? `Hoàn tiền hoàn hàng${shortId ? ` · #${shortId}` : ""}`
+                                                        : tx.type === "order_payment"
+                                                          ? `Thanh toán đơn bằng ví${shortId ? ` · #${shortId}` : ""}`
+                                                          : tx.type === "order_cancel_refund"
+                                                            ? `Hoàn ví (hủy đơn)${shortId ? ` · #${shortId}` : ""}`
+                                                            : tx.type === "topup_vnpay"
+                                                              ? "Nạp tiền VNPay"
+                                                              : tx.type === "topup_bank"
+                                                                ? "Nạp tiền chuyển khoản"
+                                                                : (tx.note || "Giao dịch ví");
+                                                const amt = Number(tx.amount) || 0;
+                                                const when = tx.createdAt
+                                                    ? new Date(tx.createdAt).toLocaleString("vi-VN")
+                                                    : "";
+                                                const credit =
+                                                    tx.type === "return_refund" ||
+                                                    tx.type === "order_cancel_refund" ||
+                                                    tx.type === "topup_vnpay" ||
+                                                    tx.type === "topup_bank";
+                                                return (
+                                                    <div key={tx._id} className="flex items-center justify-between p-5 hover:bg-slate-50 rounded-2xl transition-colors group">
+                                                        <div className="flex items-center gap-5">
+                                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${credit ? "bg-green-50 text-green-500" : "bg-red-50 text-red-500"}`}>
+                                                                {credit ? <FaArrowUp /> : <FaArrowDown />}
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-bold text-slate-800 text-sm group-hover:text-primary transition-colors">{title}</p>
+                                                                <p className="text-xs text-slate-400 font-medium">{when}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className={`font-black text-sm ${credit ? "text-green-600" : "text-slate-900"}`}>
+                                                                {credit ? "+" : "−"}
+                                                                {amt.toLocaleString("vi-VN")}₫
+                                                            </p>
+                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Thành công</p>
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <p className="font-bold text-slate-800 text-sm group-hover:text-primary transition-colors">{tx.title}</p>
-                                                        <p className="text-xs text-slate-400 font-medium">{tx.date}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className={`font-black text-sm ${tx.amount > 0 ? 'text-green-500' : 'text-slate-900'}`}>{tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString()}₫</p>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{tx.status}</p>
-                                                </div>
-                                            </div>
-                                        ))}
+                                                );
+                                            })
+                                        )}
                                     </div>
                                 </div>
                             </div>
