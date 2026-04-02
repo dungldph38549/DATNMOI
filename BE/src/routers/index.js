@@ -5,6 +5,7 @@ const CategoryRouter = require("./CategoryRouter");
 const ReviewRouter = require("./ReviewRouter");
 const AdminReviewRouter = require("./adminReviewRoutes");
 const SizeRouter = require("./SizeRouter");
+const ShoelaceSizeRouter = require("./ShoelaceSizeRouter");
 const ColorRouter = require("./ColorRouter");
 const UserRouter = require("./UserRouter");
 const OrderRouter = require("./OrderRouter");
@@ -21,6 +22,7 @@ const routes = (app) => {
   app.use("/api/reviews", ReviewRouter);
   app.use("/api/admin", AdminReviewRouter);
   app.use("/api/size", SizeRouter);
+  app.use("/api/shoelace-size", ShoelaceSizeRouter);
   app.use("/api/color", ColorRouter);
   app.use("/api/order", OrderRouter);
   app.use("/api/cart", CartRouter);
