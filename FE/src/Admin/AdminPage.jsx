@@ -8,6 +8,7 @@ import Dashboard from "./Dashboard";
 import Users from "./Users";
 import Vouchers from "./Vouchers";
 import Sizes from "./Sizes";
+import ShoelaceSizes from "./ShoelaceSizes";
 import Colors from "./Colors";
 import Reviews from "./Reviews";
 import ChatAdmin from "./ChatAdmin";
@@ -94,6 +95,12 @@ const MENU = [
     icon: "straighten",
     label: "Size",
     desc: "Danh sách size cho biến thể",
+  },
+  {
+    key: "shoelace-sizes",
+    icon: "sprint",
+    label: "PK — dây giày",
+    desc: "Kích thước dây (phụ kiện, không phải SP)",
   },
   {
     key: "colors",
@@ -286,6 +293,8 @@ const AdminPage = () => {
         return <WalletTopups />;
       case "sizes":
         return <Sizes />;
+      case "shoelace-sizes":
+        return <ShoelaceSizes />;
       case "colors":
         return <Colors />;
       case "chat":

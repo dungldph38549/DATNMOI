@@ -585,6 +585,28 @@ export const deleteSize = async (id) => {
   return res.data;
 };
 
+// ================== Kích thước dây giày (riêng, không dùng chung Size giày) ==================
+
+export const getAllShoelaceSizes = async () => {
+  const res = await axiosInstance.get("/shoelace-size/get-all");
+  return res.data;
+};
+
+export const createShoelaceSize = async (payload) => {
+  const res = await axiosInstance.post("/shoelace-size/create", payload);
+  return res.data;
+};
+
+export const updateShoelaceSize = async (id, payload) => {
+  const res = await axiosInstance.put(`/shoelace-size/update/${id}`, payload);
+  return res.data;
+};
+
+export const deleteShoelaceSize = async (id) => {
+  const res = await axiosInstance.delete(`/shoelace-size/delete/${id}`);
+  return res.data;
+};
+
 // ================== Color API ==================
 
 export const getAllColors = async () => {
