@@ -1,6 +1,19 @@
 import { createSlice } from "@reduxjs/toolkit";
+import { clearUser } from "../user";
 
 const STORAGE_KEY = "cart_v1";
+
+/** Khớp logic `redux/user` — chỉ user đã đăng nhập mới có giỏ lưu trong localStorage */
+const isCustomerLoggedIn = () => {
+  try {
+    const raw = localStorage.getItem("user");
+    if (!raw) return false;
+    const u = JSON.parse(raw);
+    return !!(u?.token && (u?.name || u?.email)) || !!u?.login;
+  } catch {
+    return false;
+  }
+};
 
 const buildCartKey = ({ productId, sku, size }) => {
   const variantKey =
@@ -12,13 +25,13 @@ const buildCartKey = ({ productId, sku, size }) => {
   return `${String(productId)}::${variantKey}`;
 };
 
-const loadCart = () => {
+const parseStoredCartItems = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { items: [] };
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.items)) return { items: [] };
-    const normalized = parsed.items.map((i) => ({
+    if (!parsed || !Array.isArray(parsed.items)) return [];
+    return parsed.items.map((i) => ({
       ...i,
       qty: i.qty ?? i.quantity ?? 1,
       price: Number(i.price ?? 0),
@@ -35,13 +48,25 @@ const loadCart = () => {
           size: i.size,
         }),
     }));
-    return { items: normalized };
   } catch {
-    return { items: [] };
+    return [];
   }
 };
 
+const loadCart = () => {
+  if (!isCustomerLoggedIn()) return { items: [] };
+  return { items: parseStoredCartItems() };
+};
+
 const saveCart = (state) => {
+  if (!isCustomerLoggedIn()) {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ items: state.items }));
   } catch {
@@ -54,6 +79,7 @@ const cartSlice = createSlice({
   initialState: loadCart(),
   reducers: {
     addToCart: (state, action) => {
+      if (!isCustomerLoggedIn()) return;
       const payload = action.payload || {};
       const productId = payload.productId || payload._id || payload.id;
       if (!productId) return;
@@ -204,6 +230,24 @@ const cartSlice = createSlice({
       });
       saveCart(state);
     },
+    /** Gọi sau khi đăng nhập thành công (không reload trang) để nạp lại giỏ từ localStorage */
+    rehydrateCartFromStorage: (state) => {
+      if (!isCustomerLoggedIn()) {
+        state.items = [];
+        return;
+      }
+      state.items = parseStoredCartItems();
+    },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(clearUser, (state) => {
+      state.items = [];
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+    });
   },
 });
 
@@ -215,6 +259,7 @@ export const {
   removeManyFromCart,
   updateCartVariant,
   removeBuyNowItems,
+  rehydrateCartFromStorage,
 } =
   cartSlice.actions;
 

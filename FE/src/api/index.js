@@ -585,6 +585,28 @@ export const deleteSize = async (id) => {
   return res.data;
 };
 
+// ================== Color API ==================
+
+export const getAllColors = async () => {
+  const res = await axiosInstance.get("/color/get-all");
+  return res.data;
+};
+
+export const createColor = async (payload) => {
+  const res = await axiosInstance.post("/color/create", payload);
+  return res.data;
+};
+
+export const updateColor = async (id, payload) => {
+  const res = await axiosInstance.put(`/color/update/${id}`, payload);
+  return res.data;
+};
+
+export const deleteColor = async (id) => {
+  const res = await axiosInstance.delete(`/color/delete/${id}`);
+  return res.data;
+};
+
 // ================== Chat API ==================
 
 // GET /api/chat/history?customerId=...

@@ -8,6 +8,7 @@ import Dashboard from "./Dashboard";
 import Users from "./Users";
 import Vouchers from "./Vouchers";
 import Sizes from "./Sizes";
+import Colors from "./Colors";
 import Reviews from "./Reviews";
 import ChatAdmin from "./ChatAdmin";
 import WalletTopups from "./WalletTopups";
@@ -93,6 +94,12 @@ const MENU = [
     icon: "straighten",
     label: "Size",
     desc: "Danh sách size cho biến thể",
+  },
+  {
+    key: "colors",
+    icon: "palette",
+    label: "Màu",
+    desc: "Danh sách màu cho biến thể",
   },
   {
     key: "chat",
@@ -265,7 +272,12 @@ const AdminPage = () => {
       case "products":
         return <Products />;
       case "orders":
-        return <Order mode="all" />;
+        return (
+          <Order
+            mode="all"
+            onGoReturns={() => setSelectedMenu("order-returns")}
+          />
+        );
       case "users":
         return <Users />;
       case "vouchers":
@@ -274,6 +286,8 @@ const AdminPage = () => {
         return <WalletTopups />;
       case "sizes":
         return <Sizes />;
+      case "colors":
+        return <Colors />;
       case "chat":
         return <ChatAdmin />;
       case "brands":
