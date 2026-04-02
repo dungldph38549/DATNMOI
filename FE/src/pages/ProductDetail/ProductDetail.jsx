@@ -24,6 +24,7 @@ const ProductDetail = () => {
   const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState(null);
+  const [selectedColor, setSelectedColor] = useState(null);
   const [activeTab, setActiveTab] = useState("desc");
   const [mainImage, setMainImage] = useState("");
   const [showSizeGuide, setShowSizeGuide] = useState(false);
@@ -82,6 +83,24 @@ const ProductDetail = () => {
     return val != null ? String(val) : variant?.sku ?? "";
   }, [getVariantSizeValue]);
 
+  const getVariantColorValue = useCallback((variant) => {
+    const attrs = variant?.attributes;
+    if (!attrs) return null;
+    if (typeof attrs.get === "function") return attrs.get("Color") ?? attrs.get("color") ?? attrs.get("COLOR") ?? null;
+    if (typeof attrs === "object") {
+      if (attrs.Color != null) return attrs.Color;
+      if (attrs.color != null) return attrs.color;
+      const foundKey = Object.keys(attrs).find((k) => String(k).toLowerCase() === "color");
+      if (foundKey) return attrs[foundKey];
+    }
+    return null;
+  }, []);
+
+  const getVariantColorLabel = useCallback((variant) => {
+    const val = getVariantColorValue(variant);
+    return val != null ? String(val) : "";
+  }, [getVariantColorValue]);
+
   const hasVariants = Array.isArray(product?.variants) && product.variants.length > 0;
 
   useEffect(() => {
@@ -107,11 +126,19 @@ const ProductDetail = () => {
 
   const selectedVariant = useMemo(() => {
     if (!hasVariants || !selectedSize || !Array.isArray(product?.variants)) return null;
-    return product.variants.find((v) => {
+    const withSize = product.variants.filter((v) => {
       const label = getVariantSizeLabel(v);
       return label != null && String(label) === String(selectedSize);
-    }) ?? null;
-  }, [product, selectedSize, hasVariants, getVariantSizeLabel]);
+    });
+    if (!withSize.length) return null;
+    const hasColorInThisSize = withSize.some((v) => (getVariantColorLabel(v) ?? "").trim() !== "");
+    if (!hasColorInThisSize) return withSize[0] ?? null;
+    if (selectedColor) {
+      const exact = withSize.find((v) => String(getVariantColorLabel(v) ?? "") === String(selectedColor));
+      if (exact) return exact;
+    }
+    return withSize.find((v) => (v?.stock ?? 0) > 0) ?? withSize[0] ?? null;
+  }, [product, selectedSize, selectedColor, hasVariants, getVariantSizeLabel, getVariantColorLabel]);
 
   const selectedSku = selectedVariant?.sku ?? null;
   const selectedSizeValue = getVariantSizeValue(selectedVariant) ?? null;
@@ -145,6 +172,33 @@ const ProductDetail = () => {
     const nextSize = firstInStock ? String(getVariantSizeLabel(firstInStock)) : availableSizes[0];
     setSelectedSize(nextSize);
   }, [product, availableSizes, selectedSize, hasVariants, getVariantSizeLabel]);
+
+  const availableColors = useMemo(() => {
+    if (!hasVariants || !selectedSize || !Array.isArray(product?.variants)) return [];
+    const colors = product.variants
+      .filter((v) => String(getVariantSizeLabel(v) ?? "") === String(selectedSize))
+      .map((v) => getVariantColorLabel(v))
+      .filter((c) => c != null && String(c).trim() !== "");
+    return Array.from(new Set(colors.map((c) => String(c))));
+  }, [product, hasVariants, selectedSize, getVariantSizeLabel, getVariantColorLabel]);
+
+  useEffect(() => {
+    if (!hasVariants || !selectedSize) return;
+    if (!Array.isArray(product?.variants) || !product.variants.length) return;
+    if (!availableColors.length) {
+      if (selectedColor) setSelectedColor(null);
+      return;
+    }
+    const isCurrentValid = availableColors.some((c) => String(c) === String(selectedColor));
+    if (isCurrentValid) return;
+    const matched = product.variants.find(
+      (v) =>
+        String(getVariantSizeLabel(v) ?? "") === String(selectedSize) &&
+        (getVariantColorLabel(v) ?? "").trim() !== "" &&
+        (v?.stock ?? 0) > 0,
+    );
+    setSelectedColor(String(getVariantColorLabel(matched) || availableColors[0]));
+  }, [product, hasVariants, selectedSize, selectedColor, availableColors, getVariantSizeLabel, getVariantColorLabel]);
 
   useEffect(() => {
     const run = async () => {
@@ -214,6 +268,11 @@ const ProductDetail = () => {
 
   const handleAddToCart = async () => {
     if (!product) return false;
+    if (!user?.login || !user?.token) {
+      notify.warning("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.");
+      navigate("/login", { state: { from: `/product/${product._id}` } });
+      return false;
+    }
     const sizeToSave = hasVariants ? selectedSizeValue : null;
     const skuToSave = hasVariants ? selectedSku : null;
 
@@ -254,6 +313,11 @@ const ProductDetail = () => {
 
   const handleBuyNow = async () => {
     if (!product) return;
+    if (!user?.login || !user?.token) {
+      notify.warning("Vui lòng đăng nhập để mua hàng.");
+      navigate("/login", { state: { from: `/product/${product._id}` } });
+      return;
+    }
     const sizeToSave = hasVariants ? selectedSizeValue : null;
     const skuToSave = hasVariants ? selectedSku : null;
 
@@ -501,6 +565,42 @@ const ProductDetail = () => {
                           }`}
                       >
                         {size}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {hasVariants && availableColors.length > 0 && (
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-slate-800 font-bold text-lg uppercase tracking-wider">Màu sắc</span>
+                  <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
+                    Đã chọn: {selectedColor || availableColors[0]}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {availableColors.map((color) => {
+                    const variantByColor = product.variants?.find(
+                      (vv) =>
+                        String(getVariantSizeLabel(vv) ?? "") === String(selectedSize) &&
+                        String(getVariantColorLabel(vv) ?? "") === String(color),
+                    );
+                    const isDisabled = (variantByColor?.stock ?? 0) <= 0;
+                    const isSelected = String(selectedColor || "") === String(color);
+                    return (
+                      <button
+                        key={color}
+                        onClick={() => !isDisabled && setSelectedColor(String(color))}
+                        disabled={isDisabled}
+                        className={`h-12 px-4 rounded-xl font-bold transition-all border-2 inline-flex items-center gap-2 ${isSelected ? "bg-slate-900 border-slate-900 text-white shadow-xl scale-95" :
+                          isDisabled ? "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed" :
+                            "bg-white border-slate-100 text-slate-600 hover:border-slate-900 hover:text-slate-900"
+                          }`}
+                      >
+                        <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? "bg-white" : "bg-slate-400"}`}></span>
+                        {color}
                       </button>
                     );
                   })}

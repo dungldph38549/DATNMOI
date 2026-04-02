@@ -13,6 +13,12 @@ const colorSchema = new mongoose.Schema(
             required: true,
             trim: true,
         },
+        /** Ví dụ: rgb(255, 0, 0) — bổ sung cho hiển thị / tham chiếu */
+        rgb: {
+            type: String,
+            trim: true,
+            default: "",
+        },
     },
     {
         timestamps: true,

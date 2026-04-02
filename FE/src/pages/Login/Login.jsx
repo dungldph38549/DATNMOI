@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import Swal from "sweetalert2";
 import { useDispatch } from "react-redux";
 import { clearUser, updateUserInfo } from "../../redux/user/index";
+import { rehydrateCartFromStorage } from "../../redux/cart/cartSlice";
 import { loginUser } from "../../api";
 import { FaEye, FaEyeSlash, FaGoogle, FaFacebookF } from "react-icons/fa";
 
@@ -59,8 +60,9 @@ const Login = () => {
           navigate("/admin", { replace: true });
         } else {
           localStorage.removeItem("admin_v1"); localStorage.removeItem("admin");
-          dispatch(updateUserInfo(authInfo));
           localStorage.setItem("user", JSON.stringify(authInfo));
+          dispatch(updateUserInfo(authInfo));
+          dispatch(rehydrateCartFromStorage());
           Swal.fire({ title: "Thành công", text: "Chào mừng bạn trở lại", icon: "success", confirmButtonColor: "#0f172a" });
           navigate("/", { replace: true });
         }

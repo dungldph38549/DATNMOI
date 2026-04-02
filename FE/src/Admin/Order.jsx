@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Table, Select, Button, message, Input } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import {
   getAllOrders,
   updateOrderStatus,
@@ -77,7 +78,7 @@ const StatusBadge = ({ status, label }) => {
   );
 };
 
-export default function Order({ mode = "all" }) {
+export default function Order({ mode = "all", onGoReturns }) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [limit] = useState(10);
@@ -301,6 +302,22 @@ export default function Order({ mode = "all" }) {
       key: "return",
       width: 140,
       render: (_, record) => {
+        if (mode === "all") {
+          if (!["return-request", "accepted", "rejected"].includes(record.status)) {
+            return null;
+          }
+          return (
+            <Button
+              size="small"
+              onClick={() => {
+                if (typeof onGoReturns === "function") onGoReturns();
+              }}
+            >
+              Xem
+            </Button>
+          );
+        }
+
         if (record.status !== "return-request") return null;
         return (
           <div style={{ display: "flex", gap: 4 }}>
@@ -323,6 +340,16 @@ export default function Order({ mode = "all" }) {
           </div>
         );
       },
+    },
+    {
+      title: "Chi tiết",
+      key: "detail",
+      width: 110,
+      render: (_, record) => (
+        <Link to={`/admin/orders/${record?._id || ""}`}>
+          <Button size="small">Xem</Button>
+        </Link>
+      ),
     },
   ];
 

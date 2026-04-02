@@ -37,6 +37,7 @@ import ChatPage from "./pages/Chat/ChatPage";
 //  IMPORT TRANG ADMIN USERS
 import User from "./pages/User";
 import AdminPage from "./Admin/AdminPage";
+import AdminOrderDetail from "./Admin/AdminOrderDetailModern";
 import ChatWidget from "./components/Chat/ChatWidget";
 
 function RequireAuth({ children }) {
@@ -125,6 +126,7 @@ function AppContent() {
           {/* ADMIN ROUTE */}
           <Route path="/admin/users" element={<User />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
 
           {/* Chat */}
           <Route path="/chat" element={<ChatPage />} />

@@ -7,6 +7,7 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3002";
 
 const zaloUrl = String(import.meta.env.VITE_CONTACT_ZALO_URL || "").trim();
 const messengerUrl = String(import.meta.env.VITE_CONTACT_MESSENGER_URL || "").trim();
+const facebookUrl = String(import.meta.env.VITE_CONTACT_FACEBOOK_URL || "").trim();
 
 const bubbleStyle = {
   user: {
@@ -183,7 +184,7 @@ export default function ChatPanel({ onClose, compact = false }) {
         )}
       </div>
 
-      {(zaloUrl || messengerUrl) && (
+      {(zaloUrl || messengerUrl || facebookUrl) && (
         <div
           style={{
             padding: "10px 14px",
@@ -198,22 +199,52 @@ export default function ChatPanel({ onClose, compact = false }) {
           <span style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>
             Liên hệ nhanh:
           </span>
+          {facebookUrl && (
+            <a
+              href={facebookUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 999,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#1877F2",
+                color: "#fff",
+                textDecoration: "none",
+                fontWeight: 900,
+                fontSize: 13,
+              }}
+              aria-label="Liên hệ Facebook"
+              title="Facebook"
+            >
+              f
+            </a>
+          )}
           {zaloUrl && (
             <a
               href={zaloUrl}
               target="_blank"
               rel="noopener noreferrer"
               style={{
-                fontSize: 12,
-                fontWeight: 700,
-                padding: "6px 12px",
-                borderRadius: 8,
+                width: 34,
+                height: 34,
+                borderRadius: 999,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
                 background: "#0068FF",
                 color: "#fff",
                 textDecoration: "none",
+                fontWeight: 900,
+                fontSize: 13,
               }}
+              aria-label="Liên hệ Zalo"
+              title="Zalo"
             >
-              Zalo
+              Z
             </a>
           )}
           {messengerUrl && (
@@ -222,16 +253,22 @@ export default function ChatPanel({ onClose, compact = false }) {
               target="_blank"
               rel="noopener noreferrer"
               style={{
-                fontSize: 12,
-                fontWeight: 700,
-                padding: "6px 12px",
-                borderRadius: 8,
+                width: 34,
+                height: 34,
+                borderRadius: 999,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
                 background: "#0084FF",
                 color: "#fff",
                 textDecoration: "none",
+                fontWeight: 900,
+                fontSize: 13,
               }}
+              aria-label="Liên hệ Messenger"
+              title="Messenger"
             >
-              Messenger
+              M
             </a>
           )}
         </div>
