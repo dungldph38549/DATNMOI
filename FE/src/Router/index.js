@@ -14,7 +14,6 @@ import AdminOrderDetailPage from "../admin/AdminOrderDetail.jsx";
 import ReturnPayment from "../pages/ReturnPayment/ReturnPayment.jsx";
 import CustommerPage from "../pages/CustommerPage/CustommerPage.jsx";
 import OrderHistoryPage from "../pages/OrderHistoryPage/OrderHistoryPage.jsx";
-import InventoryDashboard from "../Admin/Inventorydashboard.jsx";
 import User from "../pages/User/index.jsx";
 export const routers = [
   {
@@ -101,12 +100,6 @@ export const routers = [
   {
     path: "*",
     page: NotFoundPage,
-    isShowHeader: false,
-  },
-
-  {
-    path: "/InventoryDashboard",
-    page: InventoryDashboard,
     isShowHeader: false,
   },
 ];

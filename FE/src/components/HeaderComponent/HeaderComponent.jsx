@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { FaShoppingCart, FaSearch, FaUser, FaChevronDown, FaHeart, FaBoxOpen } from "react-icons/fa";
 import { useSelector, useDispatch } from "react-redux";
 import { clearUser } from "../../redux/user";
+import notify from "../../utils/notify";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ const Header = () => {
   const wishlist = useSelector((state) => state.wishlist.items || []);
   const user = useSelector((state) => state.user);
   const isLoggedIn = !!(user?.login && user?.token);
+  const cartLineCount = isLoggedIn ? cart.length : 0;
 
   const [keyword, setKeyword] = useState("");
 
@@ -19,7 +21,7 @@ const Header = () => {
 
   const goCart = () => {
     if (!isLoggedIn) {
-      alert("Vui lòng đăng nhập để xem giỏ hàng.");
+      notify.warning("Vui long dang nhap de xem gio hang.");
       navigate("/login", { state: { from: "/cart" } });
       return;
     }
@@ -28,7 +30,7 @@ const Header = () => {
 
   const goOrders = () => {
     if (!isLoggedIn) {
-      alert("Vui lòng đăng nhập để xem đơn hàng.");
+      notify.warning("Vui long dang nhap de xem don hang.");
       navigate("/login", { state: { from: "/orders" } });
       return;
     }
@@ -117,9 +119,9 @@ const Header = () => {
             {/* CART BUTTON */}
             <div onClick={goCart} className="flex items-center gap-2 cursor-pointer group px-3 md:px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors relative">
               <FaShoppingCart size={20} className="text-slate-700 group-hover:text-primary transition-colors" />
-              {cart.length > 0 && (
+              {cartLineCount > 0 && (
                 <span className="absolute top-1 left-6 min-w-[18px] h-[18px] bg-primary text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
-                  {cart.length}
+                  {cartLineCount}
                 </span>
               )}
               <span className="hidden lg:block text-sm font-bold text-slate-700 group-hover:text-primary transition-colors ml-1">Giỏ hàng</span>
@@ -168,13 +170,13 @@ const Header = () => {
         <div className="container mx-auto px-4 max-w-7xl mt-4 hidden md:block">
           <ul className="flex items-center gap-8 text-sm font-bold text-slate-600 uppercase tracking-widest whitespace-nowrap overflow-x-auto no-scrollbar pb-1">
             <li><Link to="/" className="text-slate-900 hover:text-primary transition-colors">Trang chủ</Link></li>
-            <li><Link to="/product" className="hover:text-primary transition-colors">Tất cả sản phẩm</Link></li>
+            <li><Link to="/product?segment=products" className="hover:text-primary transition-colors">sản phẩm</Link></li>
             <li><Link to="/product?category=phu-kien" className="hover:text-primary transition-colors">Phụ kiện</Link></li>
             <li><Link to="/voucher" className="hover:text-primary transition-colors">Voucher</Link></li>
             <li>
               <Link to="/sale" className="text-secondary hover:text-pink-600 transition-colors cursor-pointer flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-ping"></span>
-                Sale up to 50%
+                Sale
               </Link>
             </li>
           </ul>

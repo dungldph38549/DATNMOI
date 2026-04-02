@@ -4,6 +4,7 @@ import { useSelector } from "react-redux";
 import { getOrdersByUserOrGuest, confirmDelivery, returnOrderRequest, cancelOrderByUser } from "../../api";
 import { FaBoxOpen, FaCheckCircle, FaTruck, FaMapMarkerAlt, FaTimesCircle, FaChevronRight, FaUndoAlt, FaTimes } from "react-icons/fa";
 import BackButton from "../../components/Common/BackButton";
+import notify from "../../utils/notify";
 
 const STATUS_LABELS = {
   pending: "Chờ xử lý", confirmed: "Đã xác nhận", shipped: "Đang giao", delivered: "Đã giao",
@@ -91,13 +92,13 @@ const OrderHistoryPage = () => {
             : o,
         ),
       );
-      alert(
+      notify.success(
         wasPaid
           ? "Cảm ơn bạn đã xác nhận đã nhận hàng."
           : "Đã xác nhận nhận hàng.",
       );
     } catch (err) {
-      alert(err?.response?.data?.message || "Có lỗi xảy ra.");
+      notify.error(err?.response?.data?.message || "Co loi xay ra.");
     }
   };
 
@@ -115,7 +116,7 @@ const OrderHistoryPage = () => {
   const submitReturnRequest = async () => {
     const reason = returnReason.trim();
     if (reason.length < 5) {
-      alert("Vui lòng nhập lý do hoàn hàng (tối thiểu 5 ký tự).");
+      notify.warning("Vui long nhap ly do hoan hang (toi thieu 5 ky tu).");
       return;
     }
     if (!returnModalOrderId) return;
@@ -130,9 +131,9 @@ const OrderHistoryPage = () => {
       );
       setReturnModalOrderId(null);
       setReturnReason("");
-      alert("Đã gửi yêu cầu hoàn hàng.");
+      notify.success("Da gui yeu cau hoan hang.");
     } catch (err) {
-      alert(err?.response?.data?.message || "Có lỗi xảy ra.");
+      notify.error(err?.response?.data?.message || "Co loi xay ra.");
     } finally {
       setReturnSubmitting(false);
     }
@@ -143,8 +144,8 @@ const OrderHistoryPage = () => {
     try {
       await cancelOrderByUser(orderId);
       setOrders((prev) => prev.map((o) => (o._id === orderId ? { ...o, status: "canceled" } : o)));
-      alert("Đã hủy đơn hàng.");
-    } catch (err) { alert(err?.response?.data?.message || "Không thể hủy đơn hàng."); }
+      notify.success("Da huy don hang.");
+    } catch (err) { notify.error(err?.response?.data?.message || "Khong the huy don hang."); }
   };
 
   if (!userId && !guestId) return null;

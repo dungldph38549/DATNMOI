@@ -2,7 +2,7 @@ const Order = require("../models/OrderModel");
 const Voucher = require("../models/VoucherModel");
 const OrderStatusHistory = require("../models/orderStatusHistory");
 const Product = require("../models/ProductModel");
-const inventoryService = require("./inventoryService");
+const { restoreVariantStockBySku } = require("../utils/stockRestore");
 
 const cleanupUnpaidVnpayOrders = async ({
   expireMinutes = Number(process.env.VNPAY_EXPIRE_MINUTES || 10),
@@ -25,21 +25,14 @@ const cleanupUnpaidVnpayOrders = async ({
 
   for (const order of staleOrders) {
     try {
-      // Variant items: release reserved inventory.
-      // Non-variant items: restore Product.stock.
       for (const item of order.products || []) {
         if (!item?.quantity) continue;
 
         if (item.sku) {
           try {
-            await inventoryService.releaseBySku(
-              item.sku,
-              item.quantity,
-              order._id,
-              order.userId || order.guestId || null,
-            );
+            await restoreVariantStockBySku(item, item.quantity);
           } catch {
-            // Ignore release errors to keep cleanup resilient.
+            // Ignore restore errors to keep cleanup resilient.
           }
           continue;
         }

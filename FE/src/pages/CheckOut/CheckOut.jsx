@@ -13,9 +13,11 @@ import {
   getVoucherByCode,
   getProductById,
   updateCustomerById,
+  getWalletBalance,
 } from "../../api";
-import { FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaCreditCard, FaTruck, FaMoneyBillWave, FaShieldAlt } from "react-icons/fa";
+import { FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaCreditCard, FaTruck, FaMoneyBillWave, FaShieldAlt, FaWallet } from "react-icons/fa";
 import BackButton from "../../components/Common/BackButton";
+import notify from "../../utils/notify";
 
 const VIETNAM_LOCATION_API = "https://provinces.open-api.vn/api";
 
@@ -115,6 +117,33 @@ const CheckOut = () => {
   const [voucherError, setVoucherError] = useState("");
   const [appliedVoucher, setAppliedVoucher] = useState(null);
   const [collectedVoucherCodes, setCollectedVoucherCodes] = useState([]);
+  const [walletBalance, setWalletBalance] = useState(null);
+
+  const isLoggedIn = !!user?.login;
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setWalletBalance(null);
+      return;
+    }
+    let cancelled = false;
+    getWalletBalance()
+      .then((d) => {
+        if (!cancelled) {
+          setWalletBalance(
+            typeof d?.balance === "number"
+              ? d.balance
+              : Number(d?.balance) || 0,
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setWalletBalance(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, user?.id]);
 
   const [form, setForm] = useState({
     fullName: lastCheckout?.fullName ?? "",
@@ -397,11 +426,23 @@ const CheckOut = () => {
     const userId = isLoggedIn && isProbablyObjectId(userIdCandidate) ? userIdCandidate : null;
     const guestId = !isLoggedIn ? String(user?.id || "") : null;
 
-    if (!userId && (!guestId || guestId.length < 6)) { alert("Không xác định được tài khoản. Vui lòng đăng nhập lại."); return; }
-    if (checkoutItems.length === 0) { alert("Giỏ hàng trống"); return; }
-    if (!form.email?.trim()) { alert("Vui lòng nhập email"); return; }
+    if (!userId && (!guestId || guestId.length < 6)) { notify.error("Khong xac dinh duoc tai khoan. Vui long dang nhap lai."); return; }
+    if (paymentMethod === "wallet") {
+      if (!userId) {
+        notify.warning("Vui long dang nhap de thanh toan bang vi.");
+        return;
+      }
+      if (total > 0 && (walletBalance ?? 0) < total) {
+        notify.warning(
+          `Số dư ví không đủ. Cần ${total.toLocaleString("vi-VN")}đ, hiện có ${(walletBalance ?? 0).toLocaleString("vi-VN")}đ.`,
+        );
+        return;
+      }
+    }
+    if (checkoutItems.length === 0) { notify.warning("Gio hang trong."); return; }
+    if (!form.email?.trim()) { notify.warning("Vui long nhap email."); return; }
     if (!selectedProvinceCode || !selectedDistrictCode || !selectedWardCode || !streetAddress.trim()) {
-      alert("Vui lòng chọn đầy đủ Tỉnh/Thành, Quận/Huyện, Phường/Xã và nhập số nhà, tên đường.");
+      notify.warning("Vui long chon day du Tinh/Thanh, Quan/Huyen, Phuong/Xa va nhap so nha, ten duong.");
       return;
     }
 
@@ -418,7 +459,12 @@ const CheckOut = () => {
         ...(userId ? { userId } : {}),
         ...(guestId ? { guestId } : {}),
         fullName: form.fullName, email: form.email, phone: form.phone, address: fullAddress,
-        paymentMethod: paymentMethod === "vnpay" ? "vnpay" : "cod",
+        paymentMethod:
+          paymentMethod === "vnpay"
+            ? "vnpay"
+            : paymentMethod === "wallet"
+              ? "wallet"
+              : "cod",
         shippingMethod: shippingMethod === "fast" ? "fast" : "standard",
         products,
         discount,
@@ -475,10 +521,10 @@ const CheckOut = () => {
           window.location.href = payUrl; return;
         }
         if (order.vnpayBuildError) {
-          alert(order.vnpayBuildError);
+          notify.error(order.vnpayBuildError);
           return;
         }
-        alert(
+        notify.error(
           "Không nhận được link thanh toán VNPay. Kiểm tra backend (log lỗi), biến BE_URL / VNP_TMN_CODE trong .env.",
         );
         return;
@@ -489,7 +535,7 @@ const CheckOut = () => {
       persistCheckoutInfo();
       await updateProfileIfLoggedIn();
 
-      alert("Đặt hàng thành công!");
+      notify.success("Dat hang thanh cong!");
       navigate("/orders");
     } catch (error) {
       console.error(error);
@@ -535,14 +581,14 @@ const CheckOut = () => {
 
         try {
           const fixed = await attemptAutoFix();
-          if (fixed) { alert(`${msg}\nMình đã tự cập nhật SKU theo size (${cartItem?.size}). Bấm OK để thử checkout lại.`); return; }
+          if (fixed) { notify.warning(`${msg}\nDa tu cap nhat SKU theo size (${cartItem?.size}). Thu checkout lai.`); return; }
         } catch { }
 
-        alert(`${msg}\n${data?.invalidSku ? `SKU đang gửi: ${data.invalidSku}\n` : ""}Các SKU hợp lệ: ${availableSkus.join(", ")}`);
+        notify.error(`${msg}\n${data?.invalidSku ? `SKU dang gui: ${data.invalidSku}\n` : ""}Cac SKU hop le: ${availableSkus.join(", ")}`);
         if (productId) dispatch(removeFromCart(productId));
         return;
       }
-      alert(data?.stack && String(msg).includes("next") ? `${msg}\n\n${data.stack}` : msg);
+      notify.error(data?.stack && String(msg).includes("next") ? `${msg}\n\n${data.stack}` : msg);
     } finally {
       setLoading(false);
     }
@@ -752,6 +798,71 @@ const CheckOut = () => {
                         <div className={`px-2 py-0.5 rounded text-xs font-bold border ${paymentMethod === "vnpay" ? "border-primary text-primary" : "border-slate-200 text-slate-400"}`}>VNPAY</div>
                         <input type="radio" className="hidden" value="vnpay" checked={paymentMethod === "vnpay"} onChange={() => setPaymentMethod("vnpay")} />
                       </label>
+
+                      {(() => {
+                        const walletOk =
+                          isLoggedIn &&
+                          (total <= 0 ||
+                            (walletBalance !== null &&
+                              walletBalance >= total));
+                        return (
+                          <label
+                            className={`block flex flex-col gap-2 p-4 rounded-2xl border-2 transition-all ${
+                              !isLoggedIn || !walletOk
+                                ? "border-slate-100 bg-slate-50 opacity-70 cursor-not-allowed"
+                                : paymentMethod === "wallet"
+                                  ? "border-primary bg-primary/5 shadow-sm cursor-pointer"
+                                  : "border-slate-100 bg-white hover:border-slate-200 cursor-pointer"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                                    paymentMethod === "wallet" ? "border-primary" : "border-slate-300"
+                                  }`}
+                                >
+                                  <div
+                                    className={`w-2.5 h-2.5 rounded-full bg-primary transition-transform ${
+                                      paymentMethod === "wallet" ? "scale-100" : "scale-0"
+                                    }`}
+                                  ></div>
+                                </div>
+                                <span className="font-bold text-slate-800">
+                                  Ví SNEAKERHOUSE
+                                </span>
+                              </div>
+                              <FaWallet
+                                className={
+                                  paymentMethod === "wallet"
+                                    ? "text-primary text-xl"
+                                    : "text-slate-300 text-xl"
+                                }
+                              />
+                              <input
+                                type="radio"
+                                className="hidden"
+                                value="wallet"
+                                checked={paymentMethod === "wallet"}
+                                disabled={!isLoggedIn || !walletOk}
+                                onChange={() => {
+                                  if (isLoggedIn && walletOk)
+                                    setPaymentMethod("wallet");
+                                }}
+                              />
+                            </div>
+                            <p className="text-xs font-semibold text-slate-500 pl-8">
+                              {!isLoggedIn
+                                ? "Đăng nhập để thanh toán bằng số dư ví."
+                                : walletBalance === null
+                                  ? "Đang tải số dư ví..."
+                                  : total > 0 && walletBalance < total
+                                    ? `Không đủ số dư (còn ${walletBalance.toLocaleString("vi-VN")}đ, cần ${total.toLocaleString("vi-VN")}đ).`
+                                    : `Số dư: ${walletBalance.toLocaleString("vi-VN")}đ`}
+                            </p>
+                          </label>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -892,7 +1003,13 @@ const CheckOut = () => {
                     className="w-full h-14 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-primary/20 flex items-center justify-center gap-2"
                   >
                     {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <FaShieldAlt />}
-                    {loading ? "Đang Xử Lý..." : paymentMethod === "vnpay" ? "Thanh Toán VNPay" : "Xác Nhận Đặt Hàng"}
+                    {loading
+                      ? "Đang Xử Lý..."
+                      : paymentMethod === "vnpay"
+                        ? "Thanh Toán VNPay"
+                        : paymentMethod === "wallet"
+                          ? "Thanh Toán Bằng Ví"
+                          : "Xác Nhận Đặt Hàng"}
                   </button>
                   <Link to="/cart" className="w-full h-12 flex items-center justify-center font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-xl transition-colors">
                     Quay lại giỏ hàng

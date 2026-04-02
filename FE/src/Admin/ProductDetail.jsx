@@ -11,6 +11,7 @@ import {
   uploadImages,
   getAllBrands,
   getAllCategories,
+  getAllSizes,
 } from "./../api/index";
 
 // Backend đang chạy tại 3002. Nếu build/ENV bị lệch (vẫn còn 3001), ảnh sẽ request sai port và lỗi ERR_CONNECTION_REFUSED.
@@ -133,6 +134,42 @@ const inputStyle = {
   boxSizing: "border-box",
 };
 
+const normalizeAttr = (v) =>
+  String(v || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+const toAsciiAlnumUpper = (s) =>
+  String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/gi, "d")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toUpperCase();
+
+/** Tiền tố SKU từ tên SP (tối đa 4 ký tự), ví dụ "Dây giày" → DAYG */
+const skuPrefixFromProductName = (name) => {
+  const raw = toAsciiAlnumUpper(name);
+  if (!raw) return "SKU";
+  return raw.length <= 4 ? raw : raw.slice(0, 4);
+};
+
+/** SKU dạng PREFIX01, PREFIX02… tránh trùng với các mã PREFIX## đã có */
+const generateNextVariantSku = (productName, existingSkus = []) => {
+  const prefix = skuPrefixFromProductName(productName);
+  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^${escaped}(\\d+)$`, "i");
+  let max = 0;
+  for (const sku of existingSkus) {
+    const m = String(sku || "").trim().match(re);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  const next = max + 1;
+  return `${prefix}${String(next).padStart(2, "0")}`;
+};
+
 // ================================================================
 // ProductDetail — Card only (no Sidebar / header / layout wrapper)
 // ================================================================
@@ -158,6 +195,11 @@ const ProductDetail = ({ productId = null, onClose }) => {
   const { data: categories } = useQuery({
     queryKey: ["admin-categories"],
     queryFn: () => getAllCategories("all"),
+    keepPreviousData: true,
+  });
+  const { data: sizes } = useQuery({
+    queryKey: ["admin-sizes"],
+    queryFn: getAllSizes,
     keepPreviousData: true,
   });
 
@@ -625,6 +667,17 @@ const ProductDetail = ({ productId = null, onClose }) => {
                           mode="tags"
                           placeholder="VD: Color, Size"
                           style={{ width: "100%" }}
+                          tokenSeparators={[","]}
+                          onChange={(vals) => {
+                            const normalized = (vals || [])
+                              .flatMap((v) => String(v).split(","))
+                              .map((v) => v.trim())
+                              .filter(Boolean);
+                            form.setFieldValue(
+                              "attributes",
+                              Array.from(new Set(normalized)),
+                            );
+                          }}
                         />
                       </Form.Item>
                     </div>
@@ -634,9 +687,31 @@ const ProductDetail = ({ productId = null, onClose }) => {
                     >
                       {({ getFieldValue }) => {
                         const attributes = getFieldValue("attributes") || [];
+                        const sizeOptions = sizes?.data || [];
                         return (
                           <Form.List name="variants">
-                            {(fields, { add, remove }) => (
+                            {(fields, { add, remove }) => {
+                              const handleAddVariant = () => {
+                                const name = form.getFieldValue("name");
+                                const current = form.getFieldValue("variants") || [];
+                                const existingSkus = current.map((v) => v?.sku);
+                                const sku = generateNextVariantSku(name, existingSkus);
+                                const attrObj = {};
+                                attributes.forEach((a) => {
+                                  attrObj[a] = undefined;
+                                });
+                                const basePrice = form.getFieldValue("price");
+                                add({
+                                  sku,
+                                  price:
+                                    typeof basePrice === "number" && basePrice > 0
+                                      ? basePrice
+                                      : undefined,
+                                  stock: 0,
+                                  attributes: attrObj,
+                                });
+                              };
+                              return (
                               <>
                                 <div
                                   style={{
@@ -660,7 +735,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                         }}
                                       >
                                         {[
-                                          "SKU",
+                                          "SKU (tự sinh)",
                                           "Giá (₫)",
                                           "Tồn kho",
                                           ...attributes,
@@ -723,7 +798,8 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                                   fontFamily: "monospace",
                                                   width: 110,
                                                 }}
-                                                placeholder="AJ1-RED-40"
+                                                placeholder="Tự sinh"
+                                                title="Mã gợi ý khi thêm biến thể; có thể sửa tay"
                                               />
                                             </Form.Item>
                                           </td>
@@ -784,16 +860,37 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                                 ]}
                                                 rules={[{ required: true }]}
                                               >
-                                                <input
-                                                  className="sneaker-input"
-                                                  style={{
-                                                    ...inputStyle,
-                                                    padding: "6px 10px",
-                                                    fontSize: 12,
-                                                    width: 90,
-                                                  }}
-                                                  placeholder={attr}
-                                                />
+                                                {[
+                                                  "size",
+                                                  "kich thuoc",
+                                                  "kích thước",
+                                                ].some((k) =>
+                                                  normalizeAttr(attr).includes(
+                                                    normalizeAttr(k),
+                                                  ),
+                                                ) ? (
+                                                  <Select
+                                                    placeholder="Chọn size"
+                                                    style={{ width: 120 }}
+                                                    options={sizeOptions.map(
+                                                      (s) => ({
+                                                        value: s.name,
+                                                        label: s.name,
+                                                      }),
+                                                    )}
+                                                  />
+                                                ) : (
+                                                  <input
+                                                    className="sneaker-input"
+                                                    style={{
+                                                      ...inputStyle,
+                                                      padding: "6px 10px",
+                                                      fontSize: 12,
+                                                      width: 90,
+                                                    }}
+                                                    placeholder={attr}
+                                                  />
+                                                )}
                                               </Form.Item>
                                             </td>
                                           ))}
@@ -836,7 +933,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                 </div>
                                 <button
                                   type="button"
-                                  onClick={() => add()}
+                                  onClick={handleAddVariant}
                                   style={{
                                     marginTop: 12,
                                     width: "100%",
@@ -858,7 +955,8 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                   <PlusOutlined /> Thêm biến thể mới
                                 </button>
                               </>
-                            )}
+                              );
+                            }}
                           </Form.List>
                         );
                       }}

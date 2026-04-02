@@ -7,8 +7,11 @@ import Brands from "./Brands";
 import Dashboard from "./Dashboard";
 import Users from "./Users";
 import Vouchers from "./Vouchers";
-import InventoryDashboard from "./Inventorydashboard";
+import Sizes from "./Sizes";
+import Colors from "./Colors";
 import Reviews from "./Reviews";
+import ChatAdmin from "./ChatAdmin";
+import WalletTopups from "./WalletTopups";
 // import OrderReturn from "./OrderReturn";
 // import Comments from "./Comments";
 // import StaffManagement from "./StaffManagement";
@@ -17,7 +20,8 @@ import { clearUser } from "../redux/user";
 
 const getAdminSession = () => {
   try {
-    const raw = localStorage.getItem("admin_v1") || localStorage.getItem("admin");
+    const raw =
+      localStorage.getItem("admin_v1") || localStorage.getItem("admin");
     if (!raw) return null;
     return JSON.parse(raw);
   } catch {
@@ -80,6 +84,30 @@ const MENU = [
     desc: "Mã giảm giá & khuyến mãi",
   },
   {
+    key: "wallet-topups",
+    icon: "account_balance_wallet",
+    label: "Nạp ví (CK)",
+    desc: "Xác nhận chuyển khoản nạp ví",
+  },
+  {
+    key: "sizes",
+    icon: "straighten",
+    label: "Size",
+    desc: "Danh sách size cho biến thể",
+  },
+  {
+    key: "colors",
+    icon: "palette",
+    label: "Màu",
+    desc: "Danh sách màu cho biến thể",
+  },
+  {
+    key: "chat",
+    icon: "chat",
+    label: "Chat",
+    desc: "Hỗ trợ khách hàng realtime",
+  },
+  {
     key: "categories",
     icon: "category",
     label: "Danh mục",
@@ -102,12 +130,6 @@ const MENU = [
     icon: "star",
     label: "Đánh giá",
     desc: "Phản hồi & xếp hạng",
-  },
-  {
-    key: "inventory",
-    icon: "warehouse",
-    label: "Kho hàng",
-    desc: "Nhập kho & tồn kho",
   },
   {
     key: "staff",
@@ -250,11 +272,24 @@ const AdminPage = () => {
       case "products":
         return <Products />;
       case "orders":
-        return <Order mode="all" />;
+        return (
+          <Order
+            mode="all"
+            onGoReturns={() => setSelectedMenu("order-returns")}
+          />
+        );
       case "users":
         return <Users />;
       case "vouchers":
         return <Vouchers />;
+      case "wallet-topups":
+        return <WalletTopups />;
+      case "sizes":
+        return <Sizes />;
+      case "colors":
+        return <Colors />;
+      case "chat":
+        return <ChatAdmin />;
       case "brands":
         return <Brands />;
       case "categories":
@@ -263,8 +298,6 @@ const AdminPage = () => {
         return <Order mode="returns" />;
       case "comments":
         return <Reviews />;
-      case "inventory":
-        return <InventoryDashboard />;
       case "staff":
         return <Users />;
       default:

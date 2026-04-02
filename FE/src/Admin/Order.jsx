@@ -1,6 +1,7 @@
-import React, { useState } from "react";
-import { Table, Select, Button, message } from "antd";
+import React, { useMemo, useState } from "react";
+import { Table, Select, Button, message, Input } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import {
   getAllOrders,
   updateOrderStatus,
@@ -32,6 +33,19 @@ const TRANSITIONS = {
   rejected: [],
 };
 
+const STATUS_STYLE = {
+  pending: { bg: "#FFF7E6", color: "#D46B08", border: "#FFD591" },
+  confirmed: { bg: "#E6F7FF", color: "#096DD9", border: "#91D5FF" },
+  shipped: { bg: "#F9F0FF", color: "#722ED1", border: "#D3ADF7" },
+  delivered: { bg: "#F6FFED", color: "#389E0D", border: "#B7EB8F" },
+  canceled: { bg: "#FFF1F0", color: "#CF1322", border: "#FFA39E" },
+  "return-request": { bg: "#FFFBE6", color: "#D48806", border: "#FFE58F" },
+  accepted: { bg: "#F6FFED", color: "#237804", border: "#95DE64" },
+  rejected: { bg: "#FFF1F0", color: "#A8071A", border: "#FFA39E" },
+  paid: { bg: "#F6FFED", color: "#389E0D", border: "#B7EB8F" },
+  unpaid: { bg: "#FFF7E6", color: "#D46B08", border: "#FFD591" },
+};
+
 /** Nhãn bước tiếp theo trong Select (giữ nguyên value gửi API). */
 const labelForNextStatus = (fromNormalized, toValue) => {
   if (fromNormalized === "delivered" && toValue === "return-request") {
@@ -40,10 +54,38 @@ const labelForNextStatus = (fromNormalized, toValue) => {
   return STATUS_OPTIONS.find((o) => o.value === toValue)?.label || toValue;
 };
 
-export default function Order({ mode = "all" }) {
+const StatusBadge = ({ status, label }) => {
+  const s = STATUS_STYLE[status] || {
+    bg: "#F5F5F5",
+    color: "#595959",
+    border: "#D9D9D9",
+  };
+  return (
+    <span
+      style={{
+        padding: "3px 10px",
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 600,
+        background: s.bg,
+        color: s.color,
+        border: `1px solid ${s.border}`,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </span>
+  );
+};
+
+export default function Order({ mode = "all", onGoReturns }) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [limit] = useState(10);
+  const [keyword, setKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [methodFilter, setMethodFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-orders", page, limit],
@@ -94,8 +136,31 @@ export default function Order({ mode = "all" }) {
           ["return-request", "accepted", "rejected"].includes(o.status),
         )
       : rawOrders;
-  const total = data?.total || 0;
+  const filteredOrders = useMemo(() => {
+    const keywordNormalized = keyword.trim().toLowerCase();
+    return orders.filter((o) => {
+      const paymentStatus = String(o?.paymentStatus || "").trim().toLowerCase();
+      const orderStatus = String(o?.status || "").trim().toLowerCase();
+      const paymentMethod = String(o?.paymentMethod || "").trim().toLowerCase();
+      const shortId = String(o?._id || "").slice(-8).toLowerCase();
+      const fullName = String(o?.fullName || o?.userId?.name || "").toLowerCase();
+      const email = String(o?.email || "").toLowerCase();
+      const phone = String(o?.phone || "").toLowerCase();
 
+      const byKeyword =
+        !keywordNormalized ||
+        shortId.includes(keywordNormalized) ||
+        fullName.includes(keywordNormalized) ||
+        email.includes(keywordNormalized) ||
+        phone.includes(keywordNormalized);
+      const byPaymentStatus =
+        paymentFilter === "all" || paymentStatus === paymentFilter;
+      const byStatus = statusFilter === "all" || orderStatus === statusFilter;
+      const byMethod = methodFilter === "all" || paymentMethod === methodFilter;
+
+      return byKeyword && byPaymentStatus && byStatus && byMethod;
+    });
+  }, [orders, keyword, paymentFilter, statusFilter, methodFilter]);
   const allowedNext = (current) => TRANSITIONS[current] || [];
 
   const columns = [
@@ -104,27 +169,63 @@ export default function Order({ mode = "all" }) {
       dataIndex: "_id",
       key: "_id",
       width: 120,
-      render: (id) => (id ? `#${String(id).slice(-8).toUpperCase()}` : "-"),
+      render: (id) => (
+        <span style={{ fontWeight: 700, color: "#1F2937" }}>
+          {id ? `#${String(id).slice(-8).toUpperCase()}` : "-"}
+        </span>
+      ),
     },
     {
       title: "Khách hàng",
       key: "customer",
-      render: (_, record) =>
-        record.fullName || record.userId?.name || record.email || "-",
+      render: (_, record) => {
+        const name = record.fullName || record.userId?.name || "-";
+        const email = record.email || "";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontWeight: 600, color: "#111827" }}>{name}</span>
+            {email ? (
+              <span style={{ fontSize: 12, color: "#6B7280" }}>{email}</span>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       title: "Tổng tiền",
       dataIndex: "totalAmount",
       key: "totalAmount",
       width: 120,
-      render: (v) => (v != null ? `${Number(v).toLocaleString()}đ` : "-"),
+      render: (v) => (
+        <span style={{ fontWeight: 700, color: "#0F766E" }}>
+          {v != null ? `${Number(v).toLocaleString()}đ` : "-"}
+        </span>
+      ),
     },
     {
       title: "Thanh toán",
       key: "payment",
       width: 100,
-      render: (_, record) =>
-        record.paymentMethod === "vnpay" ? "VNPay" : "COD",
+      render: (_, record) => (
+        <StatusBadge
+          status={record.paymentMethod === "vnpay" ? "confirmed" : "pending"}
+          label={record.paymentMethod === "vnpay" ? "VNPay" : "COD"}
+        />
+      ),
+    },
+    {
+      title: "Trạng thái TT",
+      dataIndex: "paymentStatus",
+      key: "paymentStatus",
+      width: 140,
+      render: (paymentStatus) => {
+        const normalized =
+          typeof paymentStatus === "string"
+            ? paymentStatus.trim().toLowerCase()
+            : "";
+        const isPaid = normalized === "paid";
+        return <StatusBadge status={isPaid ? "paid" : "unpaid"} label={isPaid ? "Đã trả tiền" : "Chưa trả tiền"} />;
+      },
     },
     {
       title: "Trạng thái",
@@ -137,17 +238,13 @@ export default function Order({ mode = "all" }) {
         const next = allowedNext(normalized);
         if (next.length === 0) {
           return (
-            <span
-              style={{
-                padding: "2px 8px",
-                borderRadius: 4,
-                fontSize: 12,
-                background: "#f0f0f0",
-              }}
-            >
-              {STATUS_OPTIONS.find((o) => o.value === normalized)?.label ||
-                status}
-            </span>
+            <StatusBadge
+              status={normalized}
+              label={
+                STATUS_OPTIONS.find((o) => o.value === normalized)?.label ||
+                status
+              }
+            />
           );
         }
         return (
@@ -205,6 +302,22 @@ export default function Order({ mode = "all" }) {
       key: "return",
       width: 140,
       render: (_, record) => {
+        if (mode === "all") {
+          if (!["return-request", "accepted", "rejected"].includes(record.status)) {
+            return null;
+          }
+          return (
+            <Button
+              size="small"
+              onClick={() => {
+                if (typeof onGoReturns === "function") onGoReturns();
+              }}
+            >
+              Xem
+            </Button>
+          );
+        }
+
         if (record.status !== "return-request") return null;
         return (
           <div style={{ display: "flex", gap: 4 }}>
@@ -228,26 +341,131 @@ export default function Order({ mode = "all" }) {
         );
       },
     },
+    {
+      title: "Chi tiết",
+      key: "detail",
+      width: 110,
+      render: (_, record) => (
+        <Link to={`/admin/orders/${record?._id || ""}`}>
+          <Button size="small">Xem</Button>
+        </Link>
+      ),
+    },
   ];
 
   return (
     <div style={{ padding: 24 }}>
+      <style>{`
+        .admin-order-table .ant-table {
+          border: 1px solid #F0F2F5;
+          border-radius: 14px;
+          overflow: hidden;
+        }
+        .admin-order-table .ant-table-thead > tr > th {
+          background: #FAFAFA !important;
+          font-weight: 700;
+          color: #374151;
+          font-size: 12px;
+          text-transform: uppercase;
+          letter-spacing: .02em;
+        }
+        .admin-order-table .ant-table-tbody > tr > td {
+          padding-top: 12px;
+          padding-bottom: 12px;
+        }
+        .admin-order-table .ant-table-tbody > tr:hover > td {
+          background: #FFFDF7 !important;
+        }
+      `}</style>
       <h2 style={{ marginBottom: 16 }}>Quản lý đơn hàng</h2>
+      <div
+        style={{
+          marginBottom: 12,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+          background: "#fff",
+          padding: 12,
+          borderRadius: 10,
+          border: "1px solid #f0f0f0",
+          boxShadow: "0 2px 8px rgba(15,23,42,0.04)",
+        }}
+      >
+        <Input
+          allowClear
+          placeholder="Tìm mã đơn / khách hàng / email / SĐT"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          style={{ width: 280 }}
+        />
+        <Select
+          size="small"
+          value={statusFilter}
+          style={{ width: 180 }}
+          options={[
+            { value: "all", label: "Tất cả trạng thái đơn" },
+            ...STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label })),
+          ]}
+          onChange={setStatusFilter}
+        />
+        <Select
+          size="small"
+          value={methodFilter}
+          style={{ width: 170 }}
+          options={[
+            { value: "all", label: "Tất cả phương thức" },
+            { value: "vnpay", label: "VNPay" },
+            { value: "cod", label: "COD" },
+          ]}
+          onChange={setMethodFilter}
+        />
+        <Select
+          size="small"
+          value={paymentFilter}
+          style={{ width: 170 }}
+          options={[
+            { value: "all", label: "Tất cả TT" },
+            { value: "paid", label: "Đã trả tiền" },
+            { value: "unpaid", label: "Chưa trả tiền" },
+          ]}
+          onChange={setPaymentFilter}
+        />
+        <Button
+          size="small"
+          onClick={() => {
+            setKeyword("");
+            setStatusFilter("all");
+            setMethodFilter("all");
+            setPaymentFilter("all");
+          }}
+        >
+          Xóa bộ lọc
+        </Button>
+        <span style={{ fontSize: 12, color: "#999" }}>
+          Hiển thị: {filteredOrders.length} đơn
+        </span>
+      </div>
       {mode === "returns" && (
         <p style={{ marginBottom: 16, color: "#666" }}>
           Đang hiển thị các đơn liên quan hoàn hàng.
         </p>
       )}
       <Table
+        className="admin-order-table"
         rowKey="_id"
         loading={isLoading}
-        dataSource={orders}
+        dataSource={filteredOrders}
         columns={columns}
+        scroll={{ x: 1180 }}
+        size="middle"
         pagination={{
           current: page + 1,
-          total,
+          total: filteredOrders.length,
           pageSize: limit,
           onChange: (p) => setPage(p - 1),
+          showSizeChanger: false,
+          showTotal: (t, range) => `${range[0]}-${range[1]} / ${t} đơn`,
         }}
       />
     </div>

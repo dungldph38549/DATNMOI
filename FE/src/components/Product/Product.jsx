@@ -11,6 +11,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 import { getProductPriceInfo } from "../../utils/pricing";
+import notify from "../../utils/notify";
 
 const Product = ({ product }) => {
   const dispatch = useDispatch();
@@ -88,7 +89,7 @@ const Product = ({ product }) => {
   // ADD CART
   const handleAddCart = () => {
     if (!isLoggedIn) {
-      alert("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.");
+      notify.warning("Vui long dang nhap de them san pham vao gio hang.");
       navigate("/login", { state: { from: `/product/${product?._id || ""}` } });
       return;
     }

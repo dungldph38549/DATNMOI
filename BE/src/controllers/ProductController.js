@@ -282,6 +282,54 @@ exports.relationProduct = async (req, res) => {
 };
 
 // ================================================================
+// RECOMMENDATIONS — Product detail
+// GET /api/product/:id/recommendations?limit=4
+// ================================================================
+exports.getRecommendations = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const limit = Number(req.query.limit) || 4;
+    const items = await ProductService.getRecommendations(id, limit);
+    res.status(200).json({ data: items });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ================================================================
+// RECOMMENDATIONS — Home
+// GET /api/product/recommendations/home?limit=8
+// Nếu chưa login -> fallback best sellers/newest
+// ================================================================
+exports.getHomeRecommendations = async (req, res) => {
+  try {
+    const limit = Number(req.query.limit) || 8;
+    const userId = req.user?.id || null;
+    const items = await ProductService.getHomeRecommendations({ userId, limit });
+    res.status(200).json({ data: items });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ================================================================
+// TRACK VIEW — Lưu lịch sử xem cho user đã login
+// POST /api/product/:id/view
+// ================================================================
+exports.trackViewedProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!req.user?.id) {
+      return res.status(401).json({ message: "Vui lòng đăng nhập để lưu lịch sử xem" });
+    }
+    await ProductService.recordViewedProduct(req.user.id, id);
+    res.status(200).json({ status: "OK" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ================================================================
 // GET BY CATEGORY — Lấy giày theo danh mục
 // GET /api/product/category/:categoryId
 // VD: Giày chạy bộ, Giày bóng rổ, Giày lifestyle...

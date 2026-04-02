@@ -5,6 +5,7 @@ import cartReducer from "./cart/cartSlice";
 import userReducer from "./user/index";
 import generalReducer from "./genaral/index";
 import wishlistReducer from "./wishlist/wishlistSlice";
+import actionNotificationMiddleware from "./middleware/actionNotificationMiddleware";
 
 export const store = configureStore({
   reducer: {
@@ -15,6 +16,8 @@ export const store = configureStore({
     general: generalReducer,
     wishlist: wishlistReducer,
   },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().concat(actionNotificationMiddleware),
 });
 
 store.subscribe(() => {

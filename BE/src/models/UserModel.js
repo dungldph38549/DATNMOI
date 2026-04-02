@@ -137,8 +137,6 @@ const userSchema = new mongoose.Schema(
           "manage_customers",
           "view_reports",
           "manage_reports",
-          "view_inventory",
-          "manage_inventory",
           "view_staff",
           "manage_staff",
         ],
@@ -160,6 +158,23 @@ const userSchema = new mongoose.Schema(
       type: Number,
       min: [0, "voucherUsageLimit không được âm"],
       default: null,
+    },
+    viewedProducts: [
+      {
+        productId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: true,
+        },
+        viewedAt: { type: Date, default: Date.now },
+      },
+    ],
+
+    /** Số dư ví (VND) — hoàn hàng, nạp tiền (nếu có) */
+    walletBalance: {
+      type: Number,
+      default: 0,
+      min: [0, "Số dư ví không được âm"],
     },
 
     deletedAt: { type: Date, default: null, index: true },

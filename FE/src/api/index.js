@@ -51,6 +51,72 @@ export const getUserById = async (id) => {
   return res.data;
 };
 
+/** Số dư ví (yêu cầu đăng nhập) */
+export const getWalletBalance = async () => {
+  const res = await axiosInstance.get("/wallet");
+  return res.data;
+};
+
+/** Lịch sử giao dịch ví */
+export const getWalletTransactions = async (page = 1, limit = 20) => {
+  const res = await axiosInstance.get(
+    `/wallet/transactions?page=${page}&limit=${limit}`,
+  );
+  return res.data;
+};
+
+/** Tạo link thanh toán VNPay để nạp ví */
+export const createWalletVnpayTopupUrl = async ({
+  amount,
+  returnUrl,
+  cancelUrl,
+}) => {
+  const res = await axiosInstance.post("/wallet/topup/vnpay/create-url", {
+    amount,
+    returnUrl,
+    cancelUrl,
+  });
+  return res.data;
+};
+
+/** Thông tin tài khoản nhận CK (từ cấu hình server) */
+export const getWalletBankInfo = async () => {
+  const res = await axiosInstance.get("/wallet/bank-info");
+  return res.data;
+};
+
+/** Tạo yêu cầu nạp bằng chuyển khoản (nhận mã nội dung + STK) */
+export const createWalletBankTopupRequest = async (amount) => {
+  const res = await axiosInstance.post("/wallet/topup/bank/request", { amount });
+  return res.data;
+};
+
+export const markWalletBankTopupSent = async (id) => {
+  const res = await axiosInstance.post(`/wallet/topup/bank/${id}/mark-sent`);
+  return res.data;
+};
+
+/** Admin: danh sách nạp CK chờ xác nhận */
+export const adminListBankPendingTopups = async () => {
+  const res = await axiosInstance.get("/wallet/admin/topups/bank-pending");
+  return res.data;
+};
+
+export const adminConfirmBankTopup = async (id) => {
+  const res = await axiosInstance.post(
+    `/wallet/admin/topups/${id}/confirm-bank`,
+  );
+  return res.data;
+};
+
+export const adminRejectBankTopup = async (id, note = "") => {
+  const res = await axiosInstance.post(
+    `/wallet/admin/topups/${id}/reject-bank`,
+    { note },
+  );
+  return res.data;
+};
+
 export const updateUserById = async (id, payload) => {
   // Backend admin update: PUT /api/user/admin/:id
   const res = await axiosInstance.put(`/user/admin/${id}`, payload);
@@ -182,6 +248,25 @@ export const relationProduct = async (brandId, categoryId, id) => {
     categoryId,
     id,
   });
+  return res.data;
+};
+
+export const getProductRecommendations = async (productId, limit = 4) => {
+  if (!productId) return [];
+  const res = await axiosInstance.get(
+    `/product/${productId}/recommendations?limit=${limit}`,
+  );
+  return res?.data?.data ?? res?.data ?? [];
+};
+
+export const getHomeRecommendations = async (limit = 8) => {
+  const res = await axiosInstance.get(`/product/recommendations/home?limit=${limit}`);
+  return res?.data?.data ?? res?.data ?? [];
+};
+
+export const trackViewedProduct = async (productId) => {
+  if (!productId) return;
+  const res = await axiosInstance.post(`/product/${productId}/view`);
   return res.data;
 };
 
@@ -348,62 +433,6 @@ export const deleteCategories = async (ids) => {
   return res.data;
 };
 
-// ================== Inventory API (Admin) ==================
-
-const inventoryData = (res) => res?.data?.data ?? res?.data;
-
-/** GET /api/inventory/admin/list?status=&q= */
-export const getInventoryList = async (params = {}) => {
-  const res = await axiosInstance.get("/inventory/admin/list", { params });
-  return inventoryData(res);
-};
-
-/** GET /api/inventory/:id */
-export const getInventoryById = async (id) => {
-  const res = await axiosInstance.get(`/inventory/${id}`);
-  return inventoryData(res);
-};
-
-/** GET /api/inventory/:id/logs?page=&limit=&type= */
-export const getInventoryLogs = async (id, params = {}) => {
-  const res = await axiosInstance.get(`/inventory/${id}/logs`, { params });
-  return inventoryData(res);
-};
-
-/** POST /api/inventory/:id/import — body: { qty, warehouseId, note } */
-export const importInventoryStock = async (id, body) => {
-  const res = await axiosInstance.post(`/inventory/${id}/import`, body);
-  return inventoryData(res);
-};
-
-/** POST /api/inventory — create inventory by SKU
- * Body: { productId, variantId?, sku, lowStockThreshold? }
- */
-export const createInventory = async (payload) => {
-  const res = await axiosInstance.post("/inventory", payload);
-  return inventoryData(res);
-};
-
-/** PATCH /api/inventory/:id/adjust — body: { newQty, warehouseId?, note } */
-export const adjustInventoryStock = async (id, body) => {
-  const res = await axiosInstance.patch(`/inventory/${id}/adjust`, body);
-  return inventoryData(res);
-};
-
-/** POST /api/inventory/:id/transfer — body: { qty, fromWarehouseId, toWarehouseId, note } */
-export const transferInventoryStock = async (id, body) => {
-  const res = await axiosInstance.post(`/inventory/${id}/transfer`, body);
-  return inventoryData(res);
-};
-
-// ================== Warehouse API ==================
-
-/** GET /api/warehouses */
-export const getWarehouses = async (params = {}) => {
-  const res = await axiosInstance.get("/warehouses", { params });
-  return res?.data?.data ?? res?.data ?? [];
-};
-
 // ================== Order API ==================
 
 export const createOrder = async (payload) => {
@@ -532,6 +561,69 @@ export const getVoucherByCode = async (code) => {
     if (err?.response?.status === 404) return null;
     throw err;
   }
+};
+
+// ================== Size API ==================
+
+export const getAllSizes = async () => {
+  const res = await axiosInstance.get("/size/get-all");
+  return res.data;
+};
+
+export const createSize = async (payload) => {
+  const res = await axiosInstance.post("/size/create", payload);
+  return res.data;
+};
+
+export const updateSize = async (id, payload) => {
+  const res = await axiosInstance.put(`/size/update/${id}`, payload);
+  return res.data;
+};
+
+export const deleteSize = async (id) => {
+  const res = await axiosInstance.delete(`/size/delete/${id}`);
+  return res.data;
+};
+
+// ================== Color API ==================
+
+export const getAllColors = async () => {
+  const res = await axiosInstance.get("/color/get-all");
+  return res.data;
+};
+
+export const createColor = async (payload) => {
+  const res = await axiosInstance.post("/color/create", payload);
+  return res.data;
+};
+
+export const updateColor = async (id, payload) => {
+  const res = await axiosInstance.put(`/color/update/${id}`, payload);
+  return res.data;
+};
+
+export const deleteColor = async (id) => {
+  const res = await axiosInstance.delete(`/color/delete/${id}`);
+  return res.data;
+};
+
+// ================== Chat API ==================
+
+// GET /api/chat/history?customerId=...
+// Backend chưa chắc đã triển khai, FE sẽ handle lỗi nếu endpoint không tồn tại.
+export const getChatHistory = async ({ customerId } = {}) => {
+  if (!customerId) return [];
+  const res = await axiosInstance.get("/chat/history", {
+    params: { customerId },
+  });
+  // Tùy backend có bọc {data: ...} hay không
+  return res?.data?.data ?? res?.data ?? [];
+};
+
+// GET /api/chat/inbox (admin only)
+export const getChatInbox = async () => {
+  const res = await axiosInstance.get("/chat/inbox");
+  return res?.data?.data ?? res?.data ?? [];
 };
 
 // ================== Review API (Customer) ==================

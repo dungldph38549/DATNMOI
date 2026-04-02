@@ -1,8 +1,10 @@
-require("dotenv").config();
+const path = require("path");
+// Luôn đọc .env cạnh index.js (tránh lỗi khi chạy node từ thư mục khác trên Windows)
+require("dotenv").config({ path: path.join(__dirname, ".env") });
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const path = require("path");
 const fs = require("fs");
 const http = require("http");
 const multer = require("multer");
@@ -10,8 +12,7 @@ const { Server } = require("socket.io");
 
 // 1. Import Routes và Cấu hình hệ thống
 const routes = require("./src/routers");
-const { initSocket } = require("./src/socket/inventorySocket");
-const { scheduleLowStockScan } = require("./src/jobs/alertJob");
+const { initChatSocket } = require("./src/socket/chatSocket");
 const { cleanupUnpaidVnpayOrders } = require("./src/services/vnpayCleanupService");
 
 const app = express();
@@ -127,8 +128,7 @@ app.use((err, req, res, next) => {
 });
 
 // 8. Khởi chạy Socket & Jobs
-initSocket(io);
-scheduleLowStockScan();
+initChatSocket(io);
 setInterval(async () => {
   try {
     const result = await cleanupUnpaidVnpayOrders();

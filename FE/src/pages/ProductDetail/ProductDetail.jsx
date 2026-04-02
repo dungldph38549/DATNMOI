@@ -4,12 +4,14 @@ import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
 import {
   addToCartAPI, createReview, getMyReviewByProduct, getOrdersByUser, getProductById,
-  getProductReviews, getStocks, relationProduct, uploadImages
+  getProductRecommendations, getProductReviews, getStocks, trackViewedProduct, uploadImages
 } from "../../api";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
-import { FaStar, FaShoppingCart, FaCheckCircle, FaShippingFast, FaShieldAlt, FaHeart, FaRegHeart } from "react-icons/fa";
+import { FaStar, FaShoppingCart, FaCheckCircle, FaShippingFast, FaShieldAlt, FaHeart, FaRegHeart, FaRulerCombined, FaTimes } from "react-icons/fa";
 import { getProductPriceInfo } from "../../utils/pricing";
 import BackButton from "../../components/Common/BackButton";
+import RelatedProducts from "../../components/RelatedProducts/RelatedProducts";
+import notify from "../../utils/notify";
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -22,8 +24,11 @@ const ProductDetail = () => {
   const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState(null);
+  const [selectedColor, setSelectedColor] = useState(null);
   const [activeTab, setActiveTab] = useState("desc");
   const [mainImage, setMainImage] = useState("");
+  const [showSizeGuide, setShowSizeGuide] = useState(false);
+  const [footLength, setFootLength] = useState("");
 
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
@@ -78,6 +83,24 @@ const ProductDetail = () => {
     return val != null ? String(val) : variant?.sku ?? "";
   }, [getVariantSizeValue]);
 
+  const getVariantColorValue = useCallback((variant) => {
+    const attrs = variant?.attributes;
+    if (!attrs) return null;
+    if (typeof attrs.get === "function") return attrs.get("Color") ?? attrs.get("color") ?? attrs.get("COLOR") ?? null;
+    if (typeof attrs === "object") {
+      if (attrs.Color != null) return attrs.Color;
+      if (attrs.color != null) return attrs.color;
+      const foundKey = Object.keys(attrs).find((k) => String(k).toLowerCase() === "color");
+      if (foundKey) return attrs[foundKey];
+    }
+    return null;
+  }, []);
+
+  const getVariantColorLabel = useCallback((variant) => {
+    const val = getVariantColorValue(variant);
+    return val != null ? String(val) : "";
+  }, [getVariantColorValue]);
+
   const hasVariants = Array.isArray(product?.variants) && product.variants.length > 0;
 
   useEffect(() => {
@@ -103,11 +126,19 @@ const ProductDetail = () => {
 
   const selectedVariant = useMemo(() => {
     if (!hasVariants || !selectedSize || !Array.isArray(product?.variants)) return null;
-    return product.variants.find((v) => {
+    const withSize = product.variants.filter((v) => {
       const label = getVariantSizeLabel(v);
       return label != null && String(label) === String(selectedSize);
-    }) ?? null;
-  }, [product, selectedSize, hasVariants, getVariantSizeLabel]);
+    });
+    if (!withSize.length) return null;
+    const hasColorInThisSize = withSize.some((v) => (getVariantColorLabel(v) ?? "").trim() !== "");
+    if (!hasColorInThisSize) return withSize[0] ?? null;
+    if (selectedColor) {
+      const exact = withSize.find((v) => String(getVariantColorLabel(v) ?? "") === String(selectedColor));
+      if (exact) return exact;
+    }
+    return withSize.find((v) => (v?.stock ?? 0) > 0) ?? withSize[0] ?? null;
+  }, [product, selectedSize, selectedColor, hasVariants, getVariantSizeLabel, getVariantColorLabel]);
 
   const selectedSku = selectedVariant?.sku ?? null;
   const selectedSizeValue = getVariantSizeValue(selectedVariant) ?? null;
@@ -141,6 +172,33 @@ const ProductDetail = () => {
     const nextSize = firstInStock ? String(getVariantSizeLabel(firstInStock)) : availableSizes[0];
     setSelectedSize(nextSize);
   }, [product, availableSizes, selectedSize, hasVariants, getVariantSizeLabel]);
+
+  const availableColors = useMemo(() => {
+    if (!hasVariants || !selectedSize || !Array.isArray(product?.variants)) return [];
+    const colors = product.variants
+      .filter((v) => String(getVariantSizeLabel(v) ?? "") === String(selectedSize))
+      .map((v) => getVariantColorLabel(v))
+      .filter((c) => c != null && String(c).trim() !== "");
+    return Array.from(new Set(colors.map((c) => String(c))));
+  }, [product, hasVariants, selectedSize, getVariantSizeLabel, getVariantColorLabel]);
+
+  useEffect(() => {
+    if (!hasVariants || !selectedSize) return;
+    if (!Array.isArray(product?.variants) || !product.variants.length) return;
+    if (!availableColors.length) {
+      if (selectedColor) setSelectedColor(null);
+      return;
+    }
+    const isCurrentValid = availableColors.some((c) => String(c) === String(selectedColor));
+    if (isCurrentValid) return;
+    const matched = product.variants.find(
+      (v) =>
+        String(getVariantSizeLabel(v) ?? "") === String(selectedSize) &&
+        (getVariantColorLabel(v) ?? "").trim() !== "" &&
+        (v?.stock ?? 0) > 0,
+    );
+    setSelectedColor(String(getVariantColorLabel(matched) || availableColors[0]));
+  }, [product, hasVariants, selectedSize, selectedColor, availableColors, getVariantSizeLabel, getVariantColorLabel]);
 
   useEffect(() => {
     const run = async () => {
@@ -177,9 +235,13 @@ const ProductDetail = () => {
       if (!product) return;
       setRelatedLoading(true);
       try {
-        const rel = await relationProduct(product.brandId?._id ?? product.brandId, product.categoryId?._id ?? product.categoryId, product._id);
-        setRelatedProducts(Array.isArray(rel) ? rel : rel?.data ?? []);
+        const rel = await getProductRecommendations(product._id, 4);
+        setRelatedProducts(Array.isArray(rel) ? rel : []);
       } catch (err) { setRelatedProducts([]); } finally { setRelatedLoading(false); }
+
+      if (user?.login) {
+        trackViewedProduct(product._id).catch(() => {});
+      }
 
       setReviewsLoading(true);
       try {
@@ -206,11 +268,16 @@ const ProductDetail = () => {
 
   const handleAddToCart = async () => {
     if (!product) return false;
+    if (!user?.login || !user?.token) {
+      notify.warning("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.");
+      navigate("/login", { state: { from: `/product/${product._id}` } });
+      return false;
+    }
     const sizeToSave = hasVariants ? selectedSizeValue : null;
     const skuToSave = hasVariants ? selectedSku : null;
 
-    if (hasVariants && !skuToSave) { alert("Vui lòng chọn size!"); return false; }
-    if (stockInfo?.available === false) { alert("Sản phẩm hiện đã hết hàng theo size đã chọn."); return false; }
+    if (hasVariants && !skuToSave) { notify.warning("Vui long chon size!"); return false; }
+    if (stockInfo?.available === false) { notify.warning("San pham da het hang voi size da chon."); return false; }
 
     const qtySafe = (() => {
       if (!stockInfo?.available) return quantity;
@@ -246,15 +313,20 @@ const ProductDetail = () => {
 
   const handleBuyNow = async () => {
     if (!product) return;
+    if (!user?.login || !user?.token) {
+      notify.warning("Vui lòng đăng nhập để mua hàng.");
+      navigate("/login", { state: { from: `/product/${product._id}` } });
+      return;
+    }
     const sizeToSave = hasVariants ? selectedSizeValue : null;
     const skuToSave = hasVariants ? selectedSku : null;
 
     if (hasVariants && !skuToSave) {
-      alert("Vui lòng chọn size!");
+      notify.warning("Vui long chon size!");
       return;
     }
     if (stockInfo?.available === false) {
-      alert("Sản phẩm hiện đã hết hàng theo size đã chọn.");
+      notify.warning("San pham da het hang voi size da chon.");
       return;
     }
 
@@ -339,6 +411,44 @@ const ProductDetail = () => {
   const maxSelectableQty = Math.max(0, Number(stockCountDisplay || 0));
   const canIncreaseQty = maxSelectableQty <= 0 ? false : quantity < maxSelectableQty;
   const isOutOfStock = maxSelectableQty <= 0 || stockInfo?.available === false;
+  const sizeGuideRows = useMemo(
+    () => [
+      { eu: "36", footMin: 22.0, footMax: 22.5 },
+      { eu: "37", footMin: 22.6, footMax: 23.0 },
+      { eu: "38", footMin: 23.1, footMax: 23.5 },
+      { eu: "39", footMin: 23.6, footMax: 24.0 },
+      { eu: "40", footMin: 24.1, footMax: 24.5 },
+      { eu: "41", footMin: 24.6, footMax: 25.0 },
+      { eu: "42", footMin: 25.1, footMax: 25.5 },
+      { eu: "43", footMin: 25.6, footMax: 26.0 },
+      { eu: "44", footMin: 26.1, footMax: 26.5 },
+      { eu: "45", footMin: 26.6, footMax: 27.0 },
+    ],
+    [],
+  );
+  const recommendedSize = useMemo(() => {
+    const len = Number(footLength);
+    if (!Number.isFinite(len) || len <= 0) return null;
+    const found =
+      sizeGuideRows.find((r) => len >= r.footMin && len <= r.footMax) ||
+      sizeGuideRows.find((r) => len <= r.footMax) ||
+      sizeGuideRows[sizeGuideRows.length - 1];
+    return found?.eu ?? null;
+  }, [footLength, sizeGuideRows]);
+
+  useEffect(() => {
+    if (!showSizeGuide) return undefined;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setShowSizeGuide(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [showSizeGuide]);
 
   useEffect(() => {
     if (isOutOfStock || quantity < maxSelectableQty) setQtyNotice("");
@@ -430,7 +540,13 @@ const ProductDetail = () => {
               <div className="mb-8">
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-slate-800 font-bold text-lg uppercase tracking-wider">Kích Cỡ</span>
-                  <button className="text-slate-400 text-sm font-medium hover:text-primary transition-colors underline underline-offset-4 decoration-2">Hướng dẫn chọn size</button>
+                  <button
+                    onClick={() => setShowSizeGuide(true)}
+                    className="inline-flex items-center gap-2 text-slate-700 text-sm font-bold bg-slate-100 hover:bg-slate-900 hover:text-white px-3.5 py-2 rounded-xl transition-all border border-slate-200"
+                  >
+                    <FaRulerCombined />
+                    Hướng dẫn chọn size
+                  </button>
                 </div>
                 <div className="flex flex-wrap gap-3">
                   {availableSizes.map((size) => {
@@ -449,6 +565,42 @@ const ProductDetail = () => {
                           }`}
                       >
                         {size}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {hasVariants && availableColors.length > 0 && (
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-slate-800 font-bold text-lg uppercase tracking-wider">Màu sắc</span>
+                  <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
+                    Đã chọn: {selectedColor || availableColors[0]}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {availableColors.map((color) => {
+                    const variantByColor = product.variants?.find(
+                      (vv) =>
+                        String(getVariantSizeLabel(vv) ?? "") === String(selectedSize) &&
+                        String(getVariantColorLabel(vv) ?? "") === String(color),
+                    );
+                    const isDisabled = (variantByColor?.stock ?? 0) <= 0;
+                    const isSelected = String(selectedColor || "") === String(color);
+                    return (
+                      <button
+                        key={color}
+                        onClick={() => !isDisabled && setSelectedColor(String(color))}
+                        disabled={isDisabled}
+                        className={`h-12 px-4 rounded-xl font-bold transition-all border-2 inline-flex items-center gap-2 ${isSelected ? "bg-slate-900 border-slate-900 text-white shadow-xl scale-95" :
+                          isDisabled ? "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed" :
+                            "bg-white border-slate-100 text-slate-600 hover:border-slate-900 hover:text-slate-900"
+                          }`}
+                      >
+                        <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? "bg-white" : "bg-slate-400"}`}></span>
+                        {color}
                       </button>
                     );
                   })}
@@ -632,44 +784,97 @@ const ProductDetail = () => {
           </div>
         </div>
 
-        {/* RELATED PRODUCTS */}
-        <div className="mb-20">
-          <h2 className="text-3xl font-display font-black text-slate-900 mb-8 flex items-center gap-4">
-            Sản Phẩm Cùng Bộ Sưu Tập
-            <div className="flex-1 h-px bg-slate-200"></div>
-          </h2>
-          {relatedLoading ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-64 bg-slate-100 rounded-3xl animate-pulse"></div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {relatedProducts?.slice(0, 4)?.map((p) => {
-                const img = p?.image || p?.srcImages?.[0] || "";
-                const priceInfo = getProductPriceInfo(p);
-                return (
-                  <Link key={p._id} to={`/product/${p._id}`} className="group bg-white rounded-3xl border border-slate-100 p-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                    <div className="aspect-square bg-slate-50 rounded-2xl mb-4 overflow-hidden flex items-center justify-center p-2 relative">
-                      <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity z-10"></div>
-                      <img src={getImage(img)} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-800 line-clamp-1 group-hover:text-primary transition-colors mb-2">{p.name}</h3>
-                      <div>
-                        {priceInfo.hasSale && <p className="text-xs text-slate-400 line-through">{Number(priceInfo.originalPrice).toLocaleString("vi-VN")}₫</p>}
-                        <p className="font-black text-secondary">{Number(priceInfo.effectivePrice).toLocaleString("vi-VN")}₫</p>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <RelatedProducts
+          title="Sản phẩm gợi ý cho bạn"
+          products={relatedProducts}
+          loading={relatedLoading}
+        />
 
       </div>
+
+      {showSizeGuide && (
+        <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-[2px] flex items-center justify-center p-4" onClick={() => setShowSizeGuide(false)}>
+          <div
+            className="relative w-full max-w-2xl bg-white rounded-3xl border border-slate-200 shadow-2xl p-6 md:p-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              aria-label="Đóng hướng dẫn chọn size"
+              onClick={() => setShowSizeGuide(false)}
+              className="absolute top-16 right-6 md:top-16 md:right-8 w-10 h-10 rounded-full border border-slate-300 bg-white text-slate-700 hover:text-white hover:bg-slate-900 hover:border-slate-900 shadow-sm transition-all duration-200 flex items-center justify-center"
+            >
+              <FaTimes size={14} />
+            </button>
+            <div className="mb-5 pr-14">
+              <div>
+                <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-black text-primary bg-primary/10 px-3 py-1 rounded-full mb-2">
+                  <FaRulerCombined />
+                  Size Guide
+                </span>
+                <h3 className="text-xl md:text-2xl font-display font-black text-slate-900">Hướng dẫn chọn size</h3>
+                <p className="text-slate-500 text-sm mt-1">Đo chiều dài bàn chân (cm) từ gót đến ngón dài nhất để chọn size gần đúng.</p>
+              </div>
+            </div>
+
+            <div className="mb-5 bg-gradient-to-r from-slate-50 to-white border border-slate-200 rounded-2xl p-4">
+              <label className="block text-sm font-bold text-slate-700 mb-2">Nhập chiều dài chân của bạn (cm)</label>
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="18"
+                  max="35"
+                  value={footLength}
+                  onChange={(e) => setFootLength(e.target.value)}
+                  placeholder="VD: 25.2"
+                  className="w-full sm:w-48 rounded-xl border border-slate-300 px-4 py-2.5 font-semibold text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                />
+                <div className="text-sm font-semibold text-slate-600">
+                  {recommendedSize ? (
+                    <span className="inline-flex items-center gap-2">
+                      Gợi ý size:
+                      <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary text-white font-black text-sm shadow-lg shadow-primary/30">
+                        EU {recommendedSize}
+                      </span>
+                    </span>
+                  ) : (
+                    <span>Nhập chiều dài để nhận gợi ý nhanh.</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-auto rounded-2xl border border-slate-100">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-900 text-slate-100">
+                    <th className="text-left px-4 py-3 font-bold">Size EU</th>
+                    <th className="text-left px-4 py-3 font-bold">Chiều dài chân (cm)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sizeGuideRows.map((row) => (
+                    <tr
+                      key={row.eu}
+                      className={`border-t border-slate-100 ${String(recommendedSize) === String(row.eu) ? "bg-primary/5" : "hover:bg-slate-50"}`}
+                    >
+                      <td className="px-4 py-3 font-bold text-slate-800">EU {row.eu}</td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {row.footMin.toFixed(1)} - {row.footMax.toFixed(1)} cm
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <p className="text-xs text-slate-400 mt-4">
+              Mẹo: nếu số đo nằm giữa 2 size và bạn thích đi thoải mái, hãy chọn size lớn hơn 0.5 - 1.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

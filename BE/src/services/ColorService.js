@@ -3,7 +3,7 @@ const Color = require("../models/ColorModel");
 
 const createColor = async (newColor) => {
   try {
-    const { name, code } = newColor;
+    const { name, code, rgb } = newColor;
     if (!name || !code) {
       return {
         status: "ERR",
@@ -20,6 +20,9 @@ const createColor = async (newColor) => {
     const createdColor = await Color.create({
       name: name.trim(),
       code: code.trim(),
+      ...(rgb != null && String(rgb).trim() !== ""
+        ? { rgb: String(rgb).trim() }
+        : {}),
     });
     if (createdColor) {
       return {

@@ -7,6 +7,7 @@ import {
   getFeaturedProducts,
   getBestSellers,
   getNewArrivals,
+  getHomeRecommendations,
   fetchProducts,
   getAllCategories,
 } from "../../api";
@@ -17,6 +18,7 @@ const HomePage = () => {
   const [products, setProducts] = useState([]);
   const [hotProducts, setHotProducts] = useState([]);
   const [newProducts, setNewProducts] = useState([]);
+  const [recommendedProducts, setRecommendedProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [sort, setSort] = useState("new");
@@ -36,10 +38,11 @@ const HomePage = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [featuredRes, bestRes, newRes] = await Promise.all([
+        const [featuredRes, bestRes, newRes, recommendationRes] = await Promise.all([
           getFeaturedProducts(8),
           getBestSellers(8),
           getNewArrivals(8),
+          getHomeRecommendations(8).catch(() => []),
         ]);
         const categoryRes = await getAllCategories("all");
         setCategories(Array.isArray(categoryRes?.data) ? categoryRes.data : []);
@@ -49,6 +52,7 @@ const HomePage = () => {
 
         setHotProducts(best.length > 0 ? best : featured.length > 0 ? featured : newArr);
         setNewProducts(newArr.length > 0 ? newArr : featured.length > 0 ? featured : best);
+        setRecommendedProducts(Array.isArray(recommendationRes) ? recommendationRes : []);
 
         if (featured.length > 0 || best.length > 0 || newArr.length > 0) {
           setProducts([...new Set([...best, ...featured, ...newArr].map((p) => p._id))].map((id) => {
@@ -190,6 +194,30 @@ const HomePage = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
               {newDisplay.map((p) => (
+                <Product key={p._id} product={p} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* PERSONALIZED RECOMMENDATIONS */}
+        {!isFiltering && recommendedProducts.length > 0 && (
+          <div>
+            <div className="flex items-end justify-between mb-10">
+              <div>
+                <span className="text-primary font-bold tracking-widest uppercase text-sm mb-2 block flex items-center gap-2">
+                  <FaGem /> For You
+                </span>
+                <h2 className="text-4xl md:text-5xl font-display font-black text-slate-800 tracking-tight">
+                  Gợi ý dành cho bạn.
+                </h2>
+              </div>
+              <Link to="/product" className="hidden md:flex items-center gap-2 font-bold text-slate-400 hover:text-primary transition-colors">
+                View All <FaArrowRight />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+              {recommendedProducts.slice(0, 8).map((p) => (
                 <Product key={p._id} product={p} />
               ))}
             </div>
