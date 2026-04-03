@@ -260,8 +260,7 @@ export const {
   updateCartVariant,
   removeBuyNowItems,
   rehydrateCartFromStorage,
-} =
-  cartSlice.actions;
+} = cartSlice.actions;
 
 export const selectCartCount = (state) =>
   state.cart.items.reduce((sum, i) => sum + (i.qty || 0), 0);

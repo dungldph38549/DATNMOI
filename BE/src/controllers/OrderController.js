@@ -289,7 +289,21 @@ exports.createOrder = async (req, res) => {
         ? new Date(voucherDoc.startDate)
         : null;
       const end = voucherDoc.endDate ? new Date(voucherDoc.endDate) : null;
-      if ((start && now < start) || (end && now > end)) {
+      if (start && now < start) {
+        await session.abortTransaction();
+        session.endSession();
+        const fromStr = start.toLocaleString("vi-VN", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        return res.status(422).json({
+          message: `Voucher chưa có hiệu lực. Có thể sử dụng từ ${fromStr}.`,
+        });
+      }
+      if (end && now > end) {
         await session.abortTransaction();
         session.endSession();
         return res.status(422).json({ message: "Voucher đã hết hạn" });

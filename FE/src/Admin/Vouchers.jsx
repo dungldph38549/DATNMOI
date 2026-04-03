@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Table, Button, Modal, Form, Input, InputNumber, DatePicker, Select, message } from "antd";
+import React, { useState, useMemo } from "react";
+import { Table, Button, Modal, Form, Input, InputNumber, DatePicker, Select, message, Space, Row, Col, Checkbox } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getAllVouchers,
@@ -15,6 +15,7 @@ export default function Vouchers() {
   const [form] = Form.useForm();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [productSearch, setProductSearch] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-vouchers"],
@@ -35,6 +36,12 @@ export default function Vouchers() {
     value: p?._id,
     label: p?.name || p?._id,
   }));
+
+  const filteredProducts = useMemo(() => {
+    const q = productSearch.trim().toLowerCase();
+    if (!q) return productList;
+    return productList.filter((p) => String(p?.name || "").toLowerCase().includes(q));
+  }, [productList, productSearch]);
 
   const createMutation = useMutation({
     mutationFn: createVoucher,
@@ -112,12 +119,14 @@ export default function Vouchers() {
         ? record.applicableProductIds.map((id) => String(id))
         : [],
     });
+    setProductSearch("");
     setModalOpen(true);
   };
 
   const openCreate = () => {
     setEditingId(null);
     form.resetFields();
+    setProductSearch("");
     setModalOpen(true);
   };
 
@@ -204,7 +213,13 @@ export default function Vouchers() {
       <Modal
         title={editingId ? "Sửa voucher" : "Thêm voucher"}
         open={modalOpen}
-        onCancel={() => { setModalOpen(false); setEditingId(null); form.resetFields(); }}
+        width={900}
+        onCancel={() => {
+          setModalOpen(false);
+          setEditingId(null);
+          form.resetFields();
+          setProductSearch("");
+        }}
         footer={null}
       >
         <Form form={form} layout="vertical" onFinish={onFinish}>
@@ -266,17 +281,81 @@ export default function Vouchers() {
             <InputNumber min={0} style={{ width: "100%" }} />
           </Form.Item>
           <Form.Item
-            name="applicableProductIds"
             label="Áp dụng cho sản phẩm"
-            extra="Để trống: áp dụng cho toàn bộ sản phẩm."
+            extra="Để trống hoặc bấm «Sử dụng tất cả các SP»: áp dụng cho toàn bộ sản phẩm. Cột bên phải: chọn nhanh nhiều SP bằng ô tick."
           >
-            <Select
-              mode="multiple"
-              options={productOptions}
-              placeholder="Chọn sản phẩm áp dụng voucher"
-              allowClear
-              optionFilterProp="label"
-            />
+            <Row gutter={[16, 16]}>
+              <Col xs={24} lg={12}>
+                <Space direction="vertical" style={{ width: "100%" }} size="small">
+                  <Form.Item name="applicableProductIds" noStyle>
+                    <Select
+                      mode="multiple"
+                      options={productOptions}
+                      placeholder="Chọn sản phẩm áp dụng voucher"
+                      allowClear
+                      optionFilterProp="label"
+                      style={{ width: "100%" }}
+                    />
+                  </Form.Item>
+                  <Button
+                    type="default"
+                    size="small"
+                    onClick={() => {
+                      form.setFieldsValue({ applicableProductIds: [] });
+                      message.success("Đã chọn áp dụng cho tất cả sản phẩm");
+                    }}
+                  >
+                    Sử dụng tất cả các SP
+                  </Button>
+                </Space>
+              </Col>
+              <Col xs={24} lg={12}>
+                <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>Chọn nhanh (nhiều sản phẩm)</div>
+                <Input.Search
+                  allowClear
+                  placeholder="Tìm theo tên sản phẩm..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  style={{ marginBottom: 8 }}
+                />
+                <div
+                  style={{
+                    maxHeight: 280,
+                    overflowY: "auto",
+                    border: "1px solid #f0f0f0",
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    background: "#fafafa",
+                  }}
+                >
+                  <Form.Item noStyle shouldUpdate={() => true}>
+                    {() => {
+                      const raw = form.getFieldValue("applicableProductIds") || [];
+                      const ids = Array.isArray(raw) ? raw.map((id) => String(id)) : [];
+                      return (
+                        <Checkbox.Group
+                          style={{ width: "100%" }}
+                          value={ids}
+                          onChange={(vals) => {
+                            form.setFieldsValue({
+                              applicableProductIds: vals.map((v) => String(v)),
+                            });
+                          }}
+                        >
+                          <Space direction="vertical" style={{ width: "100%" }} size={4}>
+                            {filteredProducts.map((p) => (
+                              <Checkbox key={String(p._id)} value={String(p._id)}>
+                                <span style={{ whiteSpace: "normal" }}>{p?.name || p?._id}</span>
+                              </Checkbox>
+                            ))}
+                          </Space>
+                        </Checkbox.Group>
+                      );
+                    }}
+                  </Form.Item>
+                </div>
+              </Col>
+            </Row>
           </Form.Item>
           <Form.Item name="status" label="Trạng thái" initialValue="active">
             <Select options={[{ value: "active", label: "Hoạt động" }, { value: "inactive", label: "Tạm tắt" }]} />

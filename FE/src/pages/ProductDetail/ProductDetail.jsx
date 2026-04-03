@@ -18,6 +18,7 @@ const ProductDetail = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const user = useSelector((state) => state.user);
+  const cartItems = useSelector((state) => state.cart.items || []);
   const wishlistItems = useSelector((state) => state.wishlist.items || []);
   const isFavorited = wishlistItems.some((item) => item._id === id);
 
@@ -277,14 +278,41 @@ const ProductDetail = () => {
     const skuToSave = hasVariants ? selectedSku : null;
 
     if (hasVariants && !skuToSave) { notify.warning("Vui long chon size!"); return false; }
-    if (stockInfo?.available === false) { notify.warning("San pham da het hang voi size da chon."); return false; }
+    if (stockInfo?.available === false) { notify.warning("Sản phẩm đã hết hàng với phân loại đã chọn."); return false; }
 
-    const qtySafe = (() => {
-      if (!stockInfo?.available) return quantity;
-      const max = Number(stockInfo?.countInStock ?? 0);
-      if (!Number.isFinite(max) || max <= 0) return quantity;
-      return Math.min(quantity, max);
-    })();
+    const maxStock = Number(stockInfo?.countInStock ?? 0);
+    if (!Number.isFinite(maxStock) || maxStock <= 0) {
+      notify.warning("Sản phẩm đã hết hàng.");
+      return false;
+    }
+
+    const targetSku =
+      skuToSave == null || String(skuToSave).trim() === ""
+        ? null
+        : String(skuToSave).trim().toUpperCase();
+    const alreadyInCart = cartItems.reduce((sum, i) => {
+      if (String(i.productId) !== String(product._id)) return sum;
+      const iSku =
+        i.sku == null || String(i.sku).trim() === ""
+          ? null
+          : String(i.sku).trim().toUpperCase();
+      if (targetSku == null && iSku == null) return sum + Number(i.qty || 0);
+      if (targetSku != null && iSku === targetSku) return sum + Number(i.qty || 0);
+      return sum;
+    }, 0);
+
+    const remaining = Math.max(0, maxStock - alreadyInCart);
+    if (remaining <= 0) {
+      notify.warning("Đã đạt số lượng tối đa trong kho cho sản phẩm này (đã có trong giỏ).");
+      return false;
+    }
+
+    const qtySafe = Math.min(quantity, remaining);
+    if (qtySafe < quantity) {
+      notify.warning(
+        `Chỉ còn ${remaining} sản phẩm trong kho (đã có ${alreadyInCart} trong giỏ).`,
+      );
+    }
 
     dispatch(addToCart({
       productId: product._id, name: product.name, image: product.image,
@@ -326,16 +354,43 @@ const ProductDetail = () => {
       return;
     }
     if (stockInfo?.available === false) {
-      notify.warning("San pham da het hang voi size da chon.");
+      notify.warning("Sản phẩm đã hết hàng với phân loại đã chọn.");
       return;
     }
 
-    const qtySafe = (() => {
-      if (!stockInfo?.available) return quantity;
-      const max = Number(stockInfo?.countInStock ?? 0);
-      if (!Number.isFinite(max) || max <= 0) return quantity;
-      return Math.min(quantity, max);
-    })();
+    const maxStock = Number(stockInfo?.countInStock ?? 0);
+    if (!Number.isFinite(maxStock) || maxStock <= 0) {
+      notify.warning("Sản phẩm đã hết hàng.");
+      return;
+    }
+
+    const targetSku =
+      skuToSave == null || String(skuToSave).trim() === ""
+        ? null
+        : String(skuToSave).trim().toUpperCase();
+    const alreadyInCart = cartItems.reduce((sum, i) => {
+      if (String(i.productId) !== String(product._id)) return sum;
+      const iSku =
+        i.sku == null || String(i.sku).trim() === ""
+          ? null
+          : String(i.sku).trim().toUpperCase();
+      if (targetSku == null && iSku == null) return sum + Number(i.qty || 0);
+      if (targetSku != null && iSku === targetSku) return sum + Number(i.qty || 0);
+      return sum;
+    }, 0);
+
+    const remaining = Math.max(0, maxStock - alreadyInCart);
+    if (remaining <= 0) {
+      notify.warning("Đã đạt số lượng tối đa trong kho cho sản phẩm này (đã có trong giỏ).");
+      return;
+    }
+
+    const qtySafe = Math.min(quantity, remaining);
+    if (qtySafe < quantity) {
+      notify.warning(
+        `Chỉ còn ${remaining} sản phẩm trong kho (đã có ${alreadyInCart} trong giỏ).`,
+      );
+    }
 
     const buyNowCartKey = buildBuyNowCartKey();
     const buyNowItem = {

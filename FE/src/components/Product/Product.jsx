@@ -12,11 +12,13 @@ import { addToCart } from "../../redux/cart/cartSlice";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 import { getProductPriceInfo } from "../../utils/pricing";
 import notify from "../../utils/notify";
+import { getStocks } from "../../api";
 
 const Product = ({ product }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const user = useSelector((state) => state.user);
+  const cartItems = useSelector((state) => state.cart.items || []);
   const wishlistItems = useSelector((state) => state.wishlist.items || []);
   const isLoggedIn = !!(user?.login && user?.token);
 
@@ -87,16 +89,41 @@ const Product = ({ product }) => {
   };
 
   // ADD CART
-  const handleAddCart = () => {
+  const handleAddCart = async () => {
     if (!isLoggedIn) {
-      notify.warning("Vui long dang nhap de them san pham vao gio hang.");
+      notify.warning("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.");
       navigate("/login", { state: { from: `/product/${product?._id || ""}` } });
       return;
     }
 
     if (hasVariants) {
-      // Có biến thể (size/SKU) thì bắt buộc chọn ở trang chi tiết.
       navigate(`/product/${product._id}`);
+      return;
+    }
+
+    let maxStock = 0;
+    try {
+      const res = await getStocks([{ productId: product._id }]);
+      const row = Array.isArray(res) ? res[0] : null;
+      maxStock = Number(row?.countInStock ?? 0);
+    } catch {
+      notify.warning("Không kiểm tra được tồn kho. Thử lại sau.");
+      return;
+    }
+
+    const alreadyInCart = cartItems.reduce((sum, i) => {
+      if (String(i.productId) !== String(product._id)) return sum;
+      const iSku =
+        i.sku == null || String(i.sku).trim() === ""
+          ? null
+          : String(i.sku).trim().toUpperCase();
+      if (iSku != null) return sum;
+      return sum + Number(i.qty || 0);
+    }, 0);
+
+    const remaining = Math.max(0, maxStock - alreadyInCart);
+    if (remaining <= 0) {
+      notify.warning("Sản phẩm đã hết hàng hoặc đã đạt số lượng tối đa trong kho.");
       return;
     }
 

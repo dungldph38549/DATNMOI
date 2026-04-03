@@ -292,14 +292,27 @@ const CheckOut = () => {
     const start = voucher.startDate ? new Date(voucher.startDate) : null;
     const end = voucher.endDate ? new Date(voucher.endDate) : null;
     const statusOk = voucher.status === "active";
-    const timeOk = (!start || now >= start) && (!end || now <= end);
     const minOk = currentSubtotal >= Number(voucher.minOrderValue ?? 0);
     const usageLimit = Number(voucher.usageLimit ?? 0);
     const usedCount = Number(voucher.usedCount ?? 0);
     const usageOk = usageLimit === 0 || usedCount < usageLimit;
 
     if (!statusOk) return { ok: false, message: "Mã không hoạt động", amount: 0 };
-    if (!timeOk) return { ok: false, message: "Mã đã hết hạn", amount: 0 };
+    if (start && now < start) {
+      const fromStr = start.toLocaleString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return {
+        ok: false,
+        message: `Voucher chưa có hiệu lực. Có thể sử dụng từ ${fromStr}.`,
+        amount: 0,
+      };
+    }
+    if (end && now > end) return { ok: false, message: "Mã đã hết hạn", amount: 0 };
     if (!minOk) {
       return {
         ok: false,
@@ -396,7 +409,7 @@ const CheckOut = () => {
     if (!result.ok) {
       setAppliedVoucher(null);
       setDiscount(0);
-      setVoucherError("Mã không còn hợp lệ với giỏ hàng hiện tại.");
+      setVoucherError(result.message || "Mã không còn hợp lệ với giỏ hàng hiện tại.");
       return;
     }
     setDiscount(result.amount);
