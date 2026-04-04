@@ -4,18 +4,117 @@
 // ================================================================
 const Review = require("../models/Review");
 const Order = require("../models/OrderModel");
+const Product = require("../models/ProductModel");
 const mongoose = require("mongoose");
+
+const attrEntries = (attrs) => {
+  if (!attrs || typeof attrs !== "object") return [];
+  return typeof attrs.entries === "function"
+    ? [...attrs.entries()]
+    : Object.entries(attrs);
+};
+
+/** Chuỗi phân loại từ dòng sản phẩm trong đơn (SKU + thuộc tính). */
+const buildVariantLabelFromLine = (line) => {
+  if (!line) return null;
+  const parts = [];
+  if (line.sku) parts.push(`SKU ${String(line.sku).trim()}`);
+  const attrs = line.attributes;
+  for (const [k, v] of attrEntries(attrs)) {
+    if (v != null && String(v).trim() !== "")
+      parts.push(`${k}: ${String(v).trim()}`);
+  }
+  return parts.length ? parts.join(" · ") : null;
+};
+
+/** Chuỗi "Key: Val · …" từ attributes (đơn hoặc biến thể SKU). */
+const buildOrderedVariantTextFromAttrs = (attrs) => {
+  if (!attrs) return null;
+  const parts = [];
+  for (const [k, v] of attrEntries(attrs)) {
+    if (v != null && String(v).trim() !== "")
+      parts.push(`${String(k).trim()}: ${String(v).trim()}`);
+  }
+  return parts.length ? parts.join(" · ") : null;
+};
+
+const buildOrderedVariantTextFromLine = (line) =>
+  buildOrderedVariantTextFromAttrs(line?.attributes);
+
+const orderedVariantFromProductSku = (prod, orderLine) => {
+  const sku = orderLine?.sku ? String(orderLine.sku).trim().toUpperCase() : "";
+  const variants = Array.isArray(prod?.variants) ? prod.variants : [];
+  if (!sku || !variants.length) return null;
+  const v = variants.find((x) => String(x?.sku || "").toUpperCase() === sku);
+  return buildOrderedVariantTextFromAttrs(v?.attributes);
+};
+
+const COLOR_KEY_RE = /^(color|colour|màu|mau)$/i;
+const SIZE_KEY_RE =
+  /^(size|sizes|kích\s*cỡ|kich\s*co|eu|length|width|độ\s*dài|do\s*dai)$/i;
+
+const extractColorFromAttrs = (attrs) => {
+  if (!attrs) return null;
+  for (const [k, v] of attrEntries(attrs)) {
+    if (COLOR_KEY_RE.test(String(k).trim()) && v != null && String(v).trim())
+      return String(v).trim();
+  }
+  return null;
+};
+
+/** Ưu tiên key gợi ý size; sau đó lấy thuộc tính đầu tiên không phải màu (thường là size trong shop giày). */
+const extractSizeFromAttrs = (attrs) => {
+  if (!attrs) return null;
+  for (const [k, v] of attrEntries(attrs)) {
+    const key = String(k).trim();
+    if (SIZE_KEY_RE.test(key) && v != null && String(v).trim())
+      return String(v).trim();
+  }
+  for (const [k, v] of attrEntries(attrs)) {
+    if (COLOR_KEY_RE.test(String(k).trim())) continue;
+    if (v != null && String(v).trim()) return String(v).trim();
+  }
+  return null;
+};
+
+/** Size / màu từ dòng đơn; bổ sung từ biến thể theo SKU nếu thiếu. */
+const resolvePurchaseSizeColor = (prod, orderLine) => {
+  const orderAttrs = orderLine?.attributes;
+  let purchaseSize = extractSizeFromAttrs(orderAttrs);
+  let purchaseColor = extractColorFromAttrs(orderAttrs);
+
+  const sku = orderLine?.sku ? String(orderLine.sku).trim().toUpperCase() : "";
+  const variants = Array.isArray(prod?.variants) ? prod.variants : [];
+  const v =
+    sku && variants.length
+      ? variants.find((x) => String(x?.sku || "").toUpperCase() === sku)
+      : null;
+
+  if (v?.attributes) {
+    const va = v.attributes;
+    if (!purchaseSize) purchaseSize = extractSizeFromAttrs(va);
+    if (!purchaseColor) purchaseColor = extractColorFromAttrs(va);
+  }
+
+  return { purchaseSize, purchaseColor };
+};
+
+const productPopulateForReview = {
+  path: "productId",
+  select:
+    "name image srcImages slug brandId categoryId price shortDescription description variants hasVariants",
+  populate: [
+    { path: "brandId", select: "name" },
+    { path: "categoryId", select: "name" },
+  ],
+};
+
+const orderPopulateForReview = { path: "orderId", select: "status" };
 
 const toId = (id) => new mongoose.Types.ObjectId(id);
 const isValid = (id) => mongoose.isValidObjectId(id);
-const REVIEW_ELIGIBLE_ORDER_STATUSES = [
-  "received",
-  "delivered",
-  "return-request",
-  "accepted",
-  "rejected",
-  "returned",
-];
+/** Mỗi lần mua (đơn đã giao / đã nhận) → một đánh giá / sản phẩm. */
+const REVIEW_ELIGIBLE_ORDER_STATUSES = ["delivered", "received"];
 
 class AppError extends Error {
   constructor(message, status = 400) {
@@ -56,6 +155,8 @@ const getReviews = async ({
       .skip((page - 1) * limit)
       .limit(+limit)
       .populate("userId", "name avatar")
+      .populate(productPopulateForReview)
+      .populate(orderPopulateForReview)
       .populate("replies.userId", "name avatar")
       .lean({ virtuals: true }),
     Review.countDocuments(filter),
@@ -90,19 +191,83 @@ const getReviewById = async (id) => {
   return review;
 };
 
-// ── GET /api/reviews/mine?productId=... ─────────────────────
-const getMyReview = async ({ productId }, userId) => {
+// ── GET /api/reviews/mine?productId=...&orderId=...&all=1 ───
+const getMyReview = async ({ productId, orderId, all }, userId) => {
   const resolvedUserId = userId?._id || userId?.id || userId;
   if (!isValid(productId)) throw new AppError("productId không hợp lệ");
   if (!isValid(resolvedUserId)) throw new AppError("userId không hợp lệ");
-  const review = await Review.findOne({
+  const base = {
     productId: toId(productId),
     userId: toId(resolvedUserId),
     isDeleted: false,
-  })
+  };
+  if (all === "1" || all === "true" || all === true) {
+    const list = await Review.find(base)
+      .sort({ createdAt: -1 })
+      .populate("userId", "name avatar")
+      .populate(productPopulateForReview)
+      .populate(orderPopulateForReview)
+      .lean({ virtuals: true });
+    return list;
+  }
+  if (orderId && isValid(orderId)) {
+    const review = await Review.findOne({
+      ...base,
+      orderId: toId(orderId),
+    })
+      .populate("userId", "name avatar")
+      .populate(productPopulateForReview)
+      .populate(orderPopulateForReview)
+      .lean({ virtuals: true });
+    return review || null;
+  }
+  const review = await Review.findOne(base)
+    .sort({ createdAt: -1 })
     .populate("userId", "name avatar")
+    .populate(productPopulateForReview)
+    .populate(orderPopulateForReview)
     .lean({ virtuals: true });
   return review || null;
+};
+
+// ── GET /api/reviews/eligible-orders?productId=... ───────────
+const getEligibleReviewOrders = async ({ productId }, user) => {
+  const userId = user?._id || user?.id || user;
+  const normalizedEmail = String(user?.email || "")
+    .trim()
+    .toLowerCase();
+  if (!isValid(productId)) throw new AppError("productId không hợp lệ");
+  if (!isValid(userId)) throw new AppError("userId không hợp lệ");
+
+  const purchaseOr = [{ userId: toId(userId) }];
+  if (normalizedEmail) {
+    const escapedEmail = String(user.email)
+      .trim()
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    purchaseOr.push({ email: { $regex: `^${escapedEmail}$`, $options: "i" } });
+  }
+  const orders = await Order.find({
+    $or: purchaseOr,
+    status: { $in: REVIEW_ELIGIBLE_ORDER_STATUSES },
+    products: { $elemMatch: { productId: toId(productId) } },
+  })
+    .sort({ createdAt: -1 })
+    .select("_id createdAt status")
+    .lean();
+
+  const eligible = [];
+  for (const o of orders) {
+    if (
+      !(await Review.hasReviewedOrder(userId, toId(productId), o._id))
+    ) {
+      eligible.push({
+        orderId: o._id,
+        createdAt: o.createdAt,
+        status: o.status,
+      });
+    }
+  }
+  return { eligible };
 };
 
 // ── POST /api/reviews ────────────────────────────────────────
@@ -118,65 +283,129 @@ const createReview = async (
   if (!isValid(userId)) throw new AppError("userId không hợp lệ");
   if (!rating || rating < 1 || rating > 5)
     throw new AppError("Rating phải từ 1 đến 5");
+  if (!orderId || !isValid(orderId))
+    throw new AppError(
+      "Vui lòng chọn lần mua (đơn đã giao / đã nhận hàng). Mỗi lần mua được đánh giá một lần cho sản phẩm.",
+      400,
+    );
 
-  await Review.checkRateLimit(userId, 5);
-
-  const purchaseOr = [{ userId: toId(userId) }];
-  if (normalizedEmail) {
-    const escapedEmail = String(user.email)
-      .trim()
-      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    purchaseOr.push({ email: { $regex: `^${escapedEmail}$`, $options: "i" } });
-  }
-  const purchaseFilter = {
-    $or: purchaseOr,
+  const matchedOrder = await Order.findOne({
+    _id: toId(orderId),
     status: { $in: REVIEW_ELIGIBLE_ORDER_STATUSES },
     products: { $elemMatch: { productId: toId(productId) } },
-  };
-  let verifiedOrderId = null;
-  if (orderId) {
-    if (!isValid(orderId)) throw new AppError("orderId không hợp lệ");
-    const matchedOrder = await Order.findOne({
-      _id: toId(orderId),
-      status: { $in: REVIEW_ELIGIBLE_ORDER_STATUSES },
-      products: { $elemMatch: { productId: toId(productId) } },
-    }).select("_id userId email");
-    if (!matchedOrder)
-      throw new AppError("Đơn hàng không hợp lệ để xác thực đánh giá", 422);
-    const orderOwnerId = matchedOrder?.userId ? String(matchedOrder.userId) : "";
-    const orderEmail = String(matchedOrder?.email || "")
-      .trim()
-      .toLowerCase();
-    const isOrderOwner =
-      (orderOwnerId && orderOwnerId === String(userId)) ||
-      (normalizedEmail && orderEmail && normalizedEmail === orderEmail);
-    if (!isOrderOwner) {
-      throw new AppError("Bạn không có quyền đánh giá từ đơn hàng này", 403);
-    }
-    verifiedOrderId = matchedOrder._id;
-  } else {
-    const hasPurchased = await Order.exists(purchaseFilter);
-    if (!hasPurchased)
-      throw new AppError("Bạn chỉ có thể đánh giá sau khi đã mua sản phẩm này", 403);
-    const latestOrder = await Order.findOne(purchaseFilter)
-      .sort({ updatedAt: -1, createdAt: -1 })
-      .select("_id");
-    verifiedOrderId = latestOrder?._id || null;
+  })
+    .select("_id userId email products")
+    .lean();
+  if (!matchedOrder)
+    throw new AppError(
+      "Lần mua không hợp lệ: cần đơn đã giao hoặc đã nhận hàng và có sản phẩm này.",
+      422,
+    );
+  const orderOwnerId = matchedOrder?.userId ? String(matchedOrder.userId) : "";
+  const orderEmail = String(matchedOrder?.email || "")
+    .trim()
+    .toLowerCase();
+  const isOrderOwner =
+    (orderOwnerId && orderOwnerId === String(userId)) ||
+    (normalizedEmail && orderEmail && normalizedEmail === orderEmail);
+  if (!isOrderOwner) {
+    throw new AppError("Bạn không có quyền đánh giá từ đơn hàng này", 403);
   }
 
-  if (await Review.hasReviewed(userId, productId))
-    throw new AppError("Bạn đã đánh giá sản phẩm này rồi", 409);
+  const verifiedOrderId = matchedOrder._id;
 
-  const review = await Review.create({
-    productId,
-    userId,
-    rating,
-    title: title?.trim() || null,
-    content: content?.trim() || null,
-    images: images || [],
-    orderId: verifiedOrderId,
-    status: "pending",
-  });
+  if (
+    await Review.hasReviewedOrder(
+      userId,
+      toId(productId),
+      verifiedOrderId,
+    )
+  )
+    throw new AppError(
+      "Bạn đã đánh giá sản phẩm này cho lần mua này rồi.",
+      409,
+    );
+
+  const orderLine = (matchedOrder.products || []).find(
+    (p) => String(p.productId) === String(productId),
+  );
+  const variantLabel = buildVariantLabelFromLine(orderLine);
+
+  let productSnapshot = null;
+  try {
+    const prod = await Product.findById(productId)
+      .select(
+        "name image srcImages brandId categoryId price shortDescription variants",
+      )
+      .populate("brandId", "name")
+      .populate("categoryId", "name")
+      .lean();
+    if (prod) {
+      const img =
+        prod.image ||
+        (Array.isArray(prod.srcImages) && prod.srcImages[0]) ||
+        null;
+      const linePrice =
+        orderLine?.price != null ? Number(orderLine.price) : null;
+      const { purchaseSize, purchaseColor } = resolvePurchaseSizeColor(
+        prod,
+        orderLine,
+      );
+      const orderedVariantText =
+        buildOrderedVariantTextFromLine(orderLine) ||
+        orderedVariantFromProductSku(prod, orderLine);
+      productSnapshot = {
+        name: prod.name ?? null,
+        image: img,
+        brandName: prod.brandId?.name ?? null,
+        categoryName: prod.categoryId?.name ?? null,
+        price:
+          linePrice != null && Number.isFinite(linePrice)
+            ? linePrice
+            : prod.price != null
+              ? Number(prod.price)
+              : null,
+        shortDescription: prod.shortDescription ?? null,
+        purchaseSize: purchaseSize ?? null,
+        purchaseColor: purchaseColor ?? null,
+        orderedVariantText: orderedVariantText ?? null,
+      };
+    }
+  } catch (_) {
+    productSnapshot = null;
+  }
+
+  let review;
+  try {
+    review = await Review.create({
+      productId,
+      userId,
+      rating,
+      title: title?.trim() || null,
+      content: content?.trim() || null,
+      images: images || [],
+      orderId: verifiedOrderId,
+      status: "pending",
+      verifiedPurchase: true,
+      variantLabel,
+      productSnapshot,
+    });
+  } catch (e) {
+    if (e?.code === 11000) {
+      const dup = String(e?.message || "");
+      if (dup.includes("productId_1_userId_1")) {
+        throw new AppError(
+          "Cơ sở dữ liệu vẫn dùng index cũ. Hãy khởi động lại backend (server sẽ tự xóa index productId_1_userId_1), sau đó thử gửi đánh giá lại.",
+          503,
+        );
+      }
+      throw new AppError(
+        "Đánh giá trùng cho lần mua này hoặc xung đột dữ liệu. Thử lại sau hoặc liên hệ hỗ trợ.",
+        409,
+      );
+    }
+    throw e;
+  }
   await review.populate("userId", "name avatar");
   return review;
 };
@@ -296,7 +525,8 @@ const adminGetReviews = async ({ page = 1, limit = 20, status, productId }) => {
       .skip((page - 1) * limit)
       .limit(+limit)
       .populate("userId", "name email avatar")
-      .populate("productId", "name")
+      .populate(productPopulateForReview)
+      .populate(orderPopulateForReview)
       .lean({ virtuals: true }),
     Review.countDocuments(filter),
   ]);
@@ -333,6 +563,7 @@ module.exports = {
   getReviews,
   getReviewById,
   getMyReview,
+  getEligibleReviewOrders,
   createReview,
   updateReview,
   deleteReview,

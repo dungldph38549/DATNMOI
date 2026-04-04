@@ -5,11 +5,13 @@ import { FaHeart, FaShoppingCart, FaTrash, FaArrowRight, FaShoppingBag } from "r
 import { removeFromWishlist, clearWishlist } from "../../redux/wishlist/wishlistSlice";
 import { addToCart } from "../../redux/cart/cartSlice";
 import notify from "../../utils/notify";
+import { getStocks } from "../../api";
 
 const WishlistPage = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const items = useSelector((state) => state.wishlist.items || []);
+    const cartItems = useSelector((state) => state.cart.items || []);
     const user = useSelector((state) => state.user);
     const isLoggedIn = !!(user?.login && user?.token);
 
@@ -48,16 +50,41 @@ const WishlistPage = () => {
         dispatch(removeFromWishlist(id));
     };
 
-    const handleMoveToCart = (product) => {
+    const handleMoveToCart = async (product) => {
         if (!isLoggedIn) {
-            notify.warning("Vui long dang nhap de them san pham vao gio hang.");
+            notify.warning("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.");
             navigate("/login");
             return;
         }
 
-        // Logic check: if product has variants, must view detail
         if (Array.isArray(product.variants) && product.variants.length > 0) {
             navigate(`/product/${product._id}`);
+            return;
+        }
+
+        let maxStock = 0;
+        try {
+            const res = await getStocks([{ productId: product._id }]);
+            const row = Array.isArray(res) ? res[0] : null;
+            maxStock = Number(row?.countInStock ?? 0);
+        } catch {
+            notify.warning("Không kiểm tra được tồn kho. Thử lại sau.");
+            return;
+        }
+
+        const alreadyInCart = cartItems.reduce((sum, i) => {
+            if (String(i.productId) !== String(product._id)) return sum;
+            const iSku =
+                i.sku == null || String(i.sku).trim() === ""
+                    ? null
+                    : String(i.sku).trim().toUpperCase();
+            if (iSku != null) return sum;
+            return sum + Number(i.qty || 0);
+        }, 0);
+
+        const remaining = Math.max(0, maxStock - alreadyInCart);
+        if (remaining <= 0) {
+            notify.warning("Sản phẩm đã hết hàng hoặc đã đạt số lượng tối đa trong kho.");
             return;
         }
 
@@ -68,9 +95,6 @@ const WishlistPage = () => {
             image: product.image,
             qty: 1
         }));
-        // Optional: remove from wishlist after moving to cart
-        // dispatch(removeFromWishlist(product._id));
-        notify.success("Da them vao gio hang!");
     };
 
     return (

@@ -79,9 +79,9 @@ const SearchPage = () => {
 
     if (price === "high") data = data.filter(p => getMinPrice(p) > 1000000);
 
-    if (rating === "4") data = data.filter(p => p.rating >= 4);
-
     if (rating === "3") data = data.filter(p => p.rating >= 3);
+
+    if (rating === "5") data = data.filter(p => p.rating >= 4.5);
 
     if (sort === "priceAsc") data.sort((a, b) => getMinPrice(a) - getMinPrice(b));
 
@@ -240,21 +240,21 @@ const SearchPage = () => {
             <label className="flex items-center gap-2 cursor-pointer rounded-xl px-3 py-2 hover:bg-slate-50 transition">
               <input
                 type="radio"
-                checked={rating === "4"}
-                onChange={() => setRating("4")}
+                checked={rating === "3"}
+                onChange={() => setRating("3")}
                 className="w-4 h-4"
               />
-              <span className="font-medium">⭐ 4 sao trở lên</span>
+              <span className="font-medium">⭐ Từ 3/5 sao trở lên</span>
             </label>
 
             <label className="flex items-center gap-2 cursor-pointer rounded-xl px-3 py-2 hover:bg-slate-50 transition">
               <input
                 type="radio"
-                checked={rating === "3"}
-                onChange={() => setRating("3")}
+                checked={rating === "5"}
+                onChange={() => setRating("5")}
                 className="w-4 h-4"
               />
-              <span className="font-medium">⭐ 3 sao trở lên</span>
+              <span className="font-medium">⭐ 5/5 sao (từ 4,5 điểm)</span>
             </label>
 
           </div>

@@ -691,21 +691,42 @@ export const createReview = async (payload) => {
   return res.data;
 };
 
-export const getMyReviewByProduct = async (productId) => {
-  const res = await axiosInstance.get("/reviews/mine", {
-    params: { productId },
-  });
+/** @param {string} productId @param {string} [orderId] — nếu có: đánh giá của user cho đơn đó */
+export const getMyReviewByProduct = async (productId, orderId) => {
+  const params = { productId };
+  if (orderId) params.orderId = orderId;
+  const res = await axiosInstance.get("/reviews/mine", { params });
   return res?.data?.data ?? null;
 };
 
-// ================== Review API (Admin) ==================
-export const getAdminReviews = async ({
-  status = "pending",
-  productId,
-} = {}) => {
-  const res = await axiosInstance.get("/admin/reviews", {
-    params: { status, productId },
+/** Tất cả đánh giá của user cho sản phẩm (nhiều đơn → nhiều bản ghi). */
+export const getMyReviewsByProduct = async (productId) => {
+  const res = await axiosInstance.get("/reviews/mine", {
+    params: { productId, all: "1" },
   });
+  const d = res?.data?.data;
+  return Array.isArray(d) ? d : [];
+};
+
+/** Đơn đã giao / đã nhận mà user chưa đánh giá sản phẩm này (mỗi đơn tối đa một lần). */
+export const getEligibleReviewOrders = async (productId) => {
+  const res = await axiosInstance.get("/reviews/eligible-orders", {
+    params: { productId },
+  });
+  return res?.data?.data ?? { eligible: [] };
+};
+
+// ================== Review API (Admin) ==================
+/** `status` bỏ hoặc `"all"` → không lọc theo trạng thái (tất cả). Không dùng default "pending" vì undefined bị gán pending nhầm. */
+export const getAdminReviews = async ({ status, productId, page, limit } = {}) => {
+  const params = {};
+  if (productId != null && productId !== "") params.productId = productId;
+  if (page != null) params.page = page;
+  if (limit != null) params.limit = limit;
+  if (status != null && status !== "" && status !== "all") {
+    params.status = status;
+  }
+  const res = await axiosInstance.get("/admin/reviews", { params });
   return res.data;
 };
 

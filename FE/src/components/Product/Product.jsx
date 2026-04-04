@@ -12,11 +12,13 @@ import { addToCart } from "../../redux/cart/cartSlice";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 import { getProductPriceInfo } from "../../utils/pricing";
 import notify from "../../utils/notify";
+import { getStocks } from "../../api";
 
-const Product = ({ product }) => {
+const Product = ({ product, ratingValue }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const user = useSelector((state) => state.user);
+  const cartItems = useSelector((state) => state.cart.items || []);
   const wishlistItems = useSelector((state) => state.wishlist.items || []);
   const isLoggedIn = !!(user?.login && user?.token);
 
@@ -60,6 +62,20 @@ const Product = ({ product }) => {
   }, [product]);
   const cardPriceInfo = useMemo(() => getProductPriceInfo(product), [product]);
 
+  const ratingOutOf5 = useMemo(() => {
+    let raw;
+    if (ratingValue !== undefined && ratingValue !== null) {
+      raw = Number(ratingValue);
+    } else {
+      raw = Number(product?.rating);
+    }
+    if (!Number.isFinite(raw)) return { value: 4, label: "4/5" };
+    const v = Math.min(5, Math.max(0, raw));
+    const label =
+      v % 1 === 0 ? `${Math.round(v)}/5` : `${v.toFixed(1)}/5`;
+    return { value: v, label };
+  }, [ratingValue, product?.rating]);
+
   if (!product) return null;
 
   const PLACEHOLDER =
@@ -87,16 +103,41 @@ const Product = ({ product }) => {
   };
 
   // ADD CART
-  const handleAddCart = () => {
+  const handleAddCart = async () => {
     if (!isLoggedIn) {
-      notify.warning("Vui long dang nhap de them san pham vao gio hang.");
+      notify.warning("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.");
       navigate("/login", { state: { from: `/product/${product?._id || ""}` } });
       return;
     }
 
     if (hasVariants) {
-      // Có biến thể (size/SKU) thì bắt buộc chọn ở trang chi tiết.
       navigate(`/product/${product._id}`);
+      return;
+    }
+
+    let maxStock = 0;
+    try {
+      const res = await getStocks([{ productId: product._id }]);
+      const row = Array.isArray(res) ? res[0] : null;
+      maxStock = Number(row?.countInStock ?? 0);
+    } catch {
+      notify.warning("Không kiểm tra được tồn kho. Thử lại sau.");
+      return;
+    }
+
+    const alreadyInCart = cartItems.reduce((sum, i) => {
+      if (String(i.productId) !== String(product._id)) return sum;
+      const iSku =
+        i.sku == null || String(i.sku).trim() === ""
+          ? null
+          : String(i.sku).trim().toUpperCase();
+      if (iSku != null) return sum;
+      return sum + Number(i.qty || 0);
+    }, 0);
+
+    const remaining = Math.max(0, maxStock - alreadyInCart);
+    if (remaining <= 0) {
+      notify.warning("Sản phẩm đã hết hàng hoặc đã đạt số lượng tối đa trong kho.");
       return;
     }
 
@@ -118,9 +159,13 @@ const Product = ({ product }) => {
 
   return (
     <>
-      <div className="group bg-white rounded-2xl shadow-sm hover:shadow-2xl transition-all duration-500 overflow-hidden relative flex flex-col h-full border border-slate-100 italic-none">
+      <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-gradient-to-b from-white to-slate-50/30 shadow-[0_2px_8px_-2px_rgba(15,23,42,0.06)] ring-1 ring-slate-100/90 transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_20px_50px_-20px_rgba(79,70,229,0.18)] hover:ring-primary/15 italic-none">
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-10 h-[3px] bg-gradient-to-r from-primary/0 via-primary/70 to-secondary/60 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+          aria-hidden
+        />
         {/* IMAGE */}
-        <Link to={`/product/${product._id}`} className="block relative aspect-square overflow-hidden bg-slate-50">
+        <Link to={`/product/${product._id}`} className="relative block aspect-square overflow-hidden bg-gradient-to-br from-slate-100 to-slate-50">
           <img
             src={image1}
             alt={product.name}
@@ -140,34 +185,41 @@ const Product = ({ product }) => {
 
           {product?.sold > 50 && (
             <div className="absolute top-3 left-3 z-10">
-              <span className="bg-orange-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-lg shadow-orange-500/30">
+              <span className="bg-orange-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide shadow-md shadow-orange-500/25">
                 🔥 Hot
               </span>
             </div>
           )}
           {cardPriceInfo.hasSale && (
             <div className="absolute top-3 left-3 z-10 translate-y-7">
-              <span className="bg-red-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-lg">
+              <span className="bg-red-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide shadow-md">
                 -{cardPriceInfo.discountPercent}%
               </span>
             </div>
           )}
 
           {/* QUICK VIEW ICON (Centered) */}
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 z-20 translate-y-4 group-hover:translate-y-0">
+          <div className="absolute inset-0 z-20 flex translate-y-4 items-center justify-center opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
             <button
-              onClick={(e) => { e.preventDefault(); setShowQuickView(true); }}
-              className="bg-white/90 backdrop-blur-md text-slate-900 p-4 rounded-full shadow-2xl hover:bg-primary hover:text-white transition-all transform hover:scale-110"
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                setShowQuickView(true);
+              }}
+              className="rounded-full bg-white/95 p-3.5 text-slate-800 shadow-xl shadow-slate-900/10 backdrop-blur-md transition-all hover:scale-105 hover:bg-primary hover:text-white"
+              aria-label="Xem nhanh"
             >
-              <FaEye size={20} />
+              <FaEye size={18} />
             </button>
           </div>
         </Link>
 
         {/* WISHLIST (Floating) */}
         <button
+          type="button"
           onClick={handleToggleWishlist}
-          className="absolute top-3 right-3 z-30 bg-white/80 backdrop-blur-sm p-2.5 rounded-full shadow-md hover:shadow-xl hover:scale-110 transition-all duration-300"
+          className="absolute right-3 top-3 z-30 rounded-full bg-white/90 p-2.5 shadow-md shadow-slate-900/5 ring-1 ring-slate-200/60 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:shadow-lg"
+          aria-label={isFavorited ? "Bỏ yêu thích" : "Yêu thích"}
         >
           {isFavorited ? (
             <FaHeart className="text-red-500" />
@@ -177,24 +229,28 @@ const Product = ({ product }) => {
         </button>
 
         {/* INFO */}
-        <div className="p-5 flex flex-col flex-1">
+        <div className="flex flex-1 flex-col p-5">
           <Link to={`/product/${product._id}`}>
-            <h3 className="text-sm font-bold text-slate-800 line-clamp-2 min-h-[40px] mb-2 group-hover:text-primary transition-colors leading-tight">
+            <h3 className="mb-2 line-clamp-2 min-h-[40px] font-display text-sm font-semibold leading-snug text-slate-800 transition-colors group-hover:text-primary">
               {product.name}
             </h3>
           </Link>
 
-          {/* RATING */}
-          <div className="flex items-center mb-3 text-yellow-400 text-[10px]">
-            <div className="flex mr-1.5">
+          {/* RATING — thang 5 sao */}
+          <div className="mb-3 flex items-center text-[11px] text-amber-400">
+            <div className="mr-1.5 flex gap-0.5">
               {[...Array(5)].map((_, i) => (
                 <FaStar
                   key={i}
-                  className={i < (product.rating || 4) ? "drop-shadow-sm" : "text-slate-200"}
+                  className={
+                    i < Math.round(ratingOutOf5.value) ? "drop-shadow-sm" : "text-slate-200"
+                  }
                 />
               ))}
             </div>
-            <span className="text-slate-400 font-bold">({product.rating || 4})</span>
+            <span className="text-slate-400 font-medium tabular-nums">
+              ({ratingOutOf5.label})
+            </span>
           </div>
 
           {/* PRICE SECTON (Flexible height to keep buttons aligned) */}
@@ -202,19 +258,19 @@ const Product = ({ product }) => {
             <div className="flex flex-wrap items-baseline gap-1.5">
               {hasVariants && minPrice !== maxPrice ? (
                 <div className="flex flex-col">
-                  <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest leading-none mb-1">Giá từ</span>
-                  <span className="text-primary font-black text-lg leading-none">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider leading-none mb-1">Giá từ</span>
+                  <span className="text-primary font-bold text-lg leading-none tabular-nums">
                     {minPrice.toLocaleString("vi-VN")}₫
                   </span>
                 </div>
               ) : (
                 <div className="flex flex-col gap-1">
                   {cardPriceInfo.hasSale && (
-                    <span className="text-slate-400 line-through text-sm font-bold leading-none">
+                    <span className="text-slate-400 line-through text-sm font-medium leading-none tabular-nums">
                       {cardPriceInfo.originalPrice.toLocaleString("vi-VN")}₫
                     </span>
                   )}
-                  <span className="text-primary font-black text-xl leading-none">
+                  <span className="text-primary font-bold text-xl leading-none tabular-nums">
                     {cardPriceInfo.effectivePrice.toLocaleString("vi-VN")}₫
                   </span>
                 </div>
@@ -224,14 +280,15 @@ const Product = ({ product }) => {
 
           {/* ADD CART BUTTON (Aligned at bottom) */}
           <button
+            type="button"
             onClick={handleAddCart}
-            className={`w-full flex items-center justify-center gap-2 text-white text-sm font-black py-3.5 rounded-xl shadow-lg transition-all duration-300 transform active:scale-95 ${added
-                ? "bg-green-500 shadow-green-500/20"
-                : "bg-slate-900 hover:bg-primary shadow-slate-900/20 hover:shadow-primary/30"
+            className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white shadow-md transition-all duration-300 active:scale-[0.98] ${added
+                ? "bg-emerald-500 shadow-emerald-500/30"
+                : "bg-gradient-to-r from-slate-900 to-slate-800 shadow-slate-900/20 hover:from-primary hover:to-indigo-600 hover:shadow-primary/25"
               }`}
           >
             {added ? <FaShoppingCart /> : null}
-            <span className="uppercase tracking-widest">
+            <span className="uppercase tracking-wide">
               {hasVariants ? "Chọn kích cỡ" : added ? "Đã thêm" : "Thêm vào giỏ"}
             </span>
           </button>
@@ -240,38 +297,48 @@ const Product = ({ product }) => {
 
       {/* QUICK VIEW MODAL */}
       {showQuickView && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-[420px] relative">
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="quick-view-title"
+        >
+          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-white/20 bg-white shadow-2xl shadow-slate-900/25 ring-1 ring-slate-200/50">
             <button
+              type="button"
               onClick={() => setShowQuickView(false)}
-              className="absolute top-3 right-3 text-gray-500 text-lg"
+              className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-md ring-1 ring-slate-200/80 transition hover:bg-slate-50 hover:text-slate-800"
+              aria-label="Đóng"
             >
               ✕
             </button>
-
-            <img
-              src={image1}
-              alt={product.name}
-              className="w-full h-[240px] object-cover rounded"
-              onError={onImageError}
-            />
-
-            <h3 className="font-bold text-lg mt-3">{product.name}</h3>
-
-            <p className="text-red-500 text-xl font-bold mt-1">
-              {hasVariants
-                ? minPrice === maxPrice
-                  ? `${minPrice.toLocaleString()}đ`
-                  : `Giá ${minPrice.toLocaleString()}đ - ${maxPrice.toLocaleString()}đ`
-                : `${cardPriceInfo.effectivePrice.toLocaleString()}đ`}
-            </p>
-
-            <button
-              onClick={handleAddCart}
-              className="mt-4 w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg"
-            >
-              {hasVariants ? "Chọn size" : "Thêm vào giỏ"}
-            </button>
+            <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100">
+              <img
+                src={image1}
+                alt={product.name}
+                className="h-full w-full object-cover"
+                onError={onImageError}
+              />
+            </div>
+            <div className="p-6">
+              <h3 id="quick-view-title" className="font-display text-lg font-bold text-slate-900">
+                {product.name}
+              </h3>
+              <p className="mt-2 font-display text-xl font-bold text-primary tabular-nums">
+                {hasVariants
+                  ? minPrice === maxPrice
+                    ? `${minPrice.toLocaleString("vi-VN")}₫`
+                    : `${minPrice.toLocaleString("vi-VN")}₫ – ${maxPrice.toLocaleString("vi-VN")}₫`
+                  : `${cardPriceInfo.effectivePrice.toLocaleString("vi-VN")}₫`}
+              </p>
+              <button
+                type="button"
+                onClick={handleAddCart}
+                className="mt-5 w-full rounded-xl bg-gradient-to-r from-primary to-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition hover:from-indigo-600 hover:to-primary"
+              >
+                {hasVariants ? "Chọn size" : "Thêm vào giỏ"}
+              </button>
+            </div>
           </div>
         </div>
       )}

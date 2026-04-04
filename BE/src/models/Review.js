@@ -77,6 +77,27 @@ const reviewSchema = new mongoose.Schema(
       ref: "Order",
       default: null,
     },
+    /** Phân loại tại thời điểm mua (SKU, thuộc tính dòng đơn) — hiển thị trên đánh giá */
+    variantLabel: {
+      type: String,
+      default: null,
+      trim: true,
+      maxLength: [500, "Nhãn phân loại tối đa 500 ký tự"],
+    },
+    /** Ảnh chụp thông tin sản phẩm tại thời điểm đánh giá (tên, giá dòng đơn, thương hiệu…) */
+    productSnapshot: {
+      name: { type: String, default: null },
+      image: { type: String, default: null },
+      brandName: { type: String, default: null },
+      categoryName: { type: String, default: null },
+      price: { type: Number, default: null },
+      shortDescription: { type: String, default: null },
+      /** Size / màu đã mua (để hiển thị đánh giá theo phân loại) */
+      purchaseSize: { type: String, default: null },
+      purchaseColor: { type: String, default: null },
+      /** Chuỗi biến thể đúng như dòng đơn (Size/Color/…), không gồm SKU */
+      orderedVariantText: { type: String, default: null, maxLength: [500, "Tối đa 500 ký tự"] },
+    },
     rating: {
       type: Number,
       required: [true, "Vui lòng đánh giá sản phẩm (1 đến 5 sao)"],
@@ -154,7 +175,8 @@ const reviewSchema = new mongoose.Schema(
 // ================================================================
 // INDEXES
 // ================================================================
-reviewSchema.index({ productId: 1, userId: 1 }, { unique: true });
+/** Mỗi lần giao thành công (orderId) được đánh giá tối đa một lần / sản phẩm; orderId null chỉ cho phép tối đa một bản ghi legacy. */
+reviewSchema.index({ userId: 1, productId: 1, orderId: 1 }, { unique: true });
 reviewSchema.index({ productId: 1, isDeleted: 1, status: 1, createdAt: -1 });
 reviewSchema.index({ productId: 1, rating: 1, isDeleted: 1 });
 reviewSchema.index({ userId: 1, createdAt: -1 });
@@ -338,17 +360,23 @@ reviewSchema.statics.hasReviewed = async function (userId, productId) {
   return !!(await this.findOne({ userId, productId, isDeleted: false }));
 };
 
-reviewSchema.statics.checkRateLimit = async function (userId, maxPerHour = 5) {
-  const since = new Date(Date.now() - 60 * 60 * 1000);
-  const count = await this.countDocuments({
-    userId,
-    createdAt: { $gte: since },
-  });
-  if (count >= maxPerHour)
-    throw new Error(
-      `Bạn đã tạo quá ${maxPerHour} đánh giá trong 1 giờ. Vui lòng thử lại sau.`,
-    );
-  return true;
+reviewSchema.statics.hasReviewedOrder = async function (userId, productId, orderId) {
+  if (!orderId || !productId || !userId) return false;
+  const uid = mongoose.isValidObjectId(userId)
+    ? new mongoose.Types.ObjectId(userId)
+    : userId;
+  const pid = mongoose.isValidObjectId(productId)
+    ? new mongoose.Types.ObjectId(productId)
+    : productId;
+  const oid = mongoose.isValidObjectId(orderId)
+    ? new mongoose.Types.ObjectId(orderId)
+    : orderId;
+  return !!(await this.findOne({
+    userId: uid,
+    productId: pid,
+    orderId: oid,
+    isDeleted: false,
+  }));
 };
 
 // ================================================================

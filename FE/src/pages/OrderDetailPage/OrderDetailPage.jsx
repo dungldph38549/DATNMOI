@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
@@ -11,7 +11,7 @@ import {
   uploadImages,
   getMyReviewByProduct,
 } from "../../api";
-import { FaBoxOpen, FaCheckCircle, FaTruck, FaMapMarkerAlt, FaTimesCircle, FaChevronLeft, FaUndoAlt, FaCreditCard, FaMoneyBillWave, FaShieldAlt, FaTimes, FaStar } from "react-icons/fa";
+import { FaBoxOpen, FaCheckCircle, FaTruck, FaMapMarkerAlt, FaTimesCircle, FaChevronLeft, FaUndoAlt, FaCreditCard, FaMoneyBillWave, FaShieldAlt, FaTimes, FaStar, FaImage, FaVideo, FaChevronDown, FaCoins } from "react-icons/fa";
 import notify from "../../utils/notify";
 
 const STATUS_LABELS = {
@@ -68,6 +68,42 @@ const getHistoryHighlightIndex = (chron, orderStatus) => {
   return idx >= 0 ? idx : chron.length - 1;
 };
 
+const RATING_LABELS = {
+  0: "",
+  1: "Rất tệ",
+  2: "Tệ",
+  3: "Bình thường",
+  4: "Tốt",
+  5: "Tuyệt vời",
+};
+
+const buildMergedReviewContent = (quality, diversity) => {
+  const q = String(quality || "").trim();
+  const d = String(diversity || "").trim();
+  const parts = [];
+  if (q) parts.push(`Chất lượng: ${q}`);
+  if (d) parts.push(`Đa dạng: ${d}`);
+  return parts.join("\n\n").slice(0, 500);
+};
+
+const getReviewProductThumb = (line) => {
+  const imgName = line?.image || line?.productId?.image;
+  if (!imgName) return "https://via.placeholder.com/80/f0f0f0/999?text=SP";
+  if (typeof imgName === "string" && imgName.startsWith("http")) return imgName;
+  return `http://localhost:3002/uploads/${String(imgName).startsWith("/") ? String(imgName).slice(1) : imgName}`;
+};
+
+const getReviewVariantLabel = (line) => {
+  if (line?.size) return String(line.size);
+  const attrs = line?.attributes;
+  if (attrs && typeof attrs === "object") {
+    const entries = Object.entries(attrs).filter(([, v]) => v != null && String(v).trim() !== "");
+    if (entries.length) return entries.map(([k, v]) => `${k}: ${v}`).join(" · ");
+  }
+  if (line?.sku) return `SKU: ${line.sku}`;
+  return "Mặc định";
+};
+
 const OrderDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -80,9 +116,9 @@ const OrderDetailPage = () => {
   const [returnSubmitting, setReturnSubmitting] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState(null);
-  const [reviewRating, setReviewRating] = useState(0);
-  const [reviewTitle, setReviewTitle] = useState("");
-  const [reviewContent, setReviewContent] = useState("");
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewQuality, setReviewQuality] = useState("");
+  const [reviewDiversity, setReviewDiversity] = useState("");
   const [reviewFiles, setReviewFiles] = useState([]);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewError, setReviewError] = useState("");
@@ -121,7 +157,7 @@ const OrderDetailPage = () => {
       const entries = await Promise.all(
         productIds.map(async (pid) => {
           try {
-            const review = await getMyReviewByProduct(pid);
+            const review = await getMyReviewByProduct(pid, id);
             return [pid, review];
           } catch (_) {
             return [pid, null];
@@ -202,8 +238,8 @@ const OrderDetailPage = () => {
   const openReviewModal = (item) => {
     setReviewTarget(item);
     setReviewRating(5);
-    setReviewTitle("");
-    setReviewContent("");
+    setReviewQuality("");
+    setReviewDiversity("");
     setReviewFiles([]);
     setReviewError("");
     setReviewModalOpen(true);
@@ -228,6 +264,10 @@ const OrderDetailPage = () => {
 
   const submitReview = async () => {
     if (!reviewTarget?.productId?._id && !reviewTarget?.productId) return;
+    if (!order?._id) {
+      setReviewError("Không xác định được đơn hàng — không thể gửi đánh giá.");
+      return;
+    }
     if (!reviewRating || reviewRating < 1 || reviewRating > 5) {
       setReviewError("Vui lòng chọn số sao từ 1 đến 5.");
       return;
@@ -244,12 +284,13 @@ const OrderDetailPage = () => {
         if (Array.isArray(paths)) images = paths.map((p) => ({ url: p }));
       }
 
+      const mergedContent = buildMergedReviewContent(reviewQuality, reviewDiversity);
       await createReview({
         productId: reviewTarget?.productId?._id || reviewTarget?.productId,
-        orderId: order?._id,
+        orderId: order._id,
         rating: reviewRating,
-        title: reviewTitle.trim() || null,
-        content: reviewContent.trim() || null,
+        title: null,
+        content: mergedContent || null,
         images,
       });
       const productIdKey = String(reviewTarget?.productId?._id || reviewTarget?.productId || "");
@@ -258,8 +299,8 @@ const OrderDetailPage = () => {
           ...prev,
           [productIdKey]: {
             rating: reviewRating,
-            title: reviewTitle.trim() || null,
-            content: reviewContent.trim() || null,
+            title: null,
+            content: mergedContent || null,
             status: "pending",
           },
         }));
@@ -278,6 +319,21 @@ const OrderDetailPage = () => {
       ? order.status.trim().toLowerCase()
       : order?.status;
   const canReviewOrder = REVIEWABLE_STATUSES.has(st);
+
+  const reviewMergedPreview = useMemo(
+    () => buildMergedReviewContent(reviewQuality, reviewDiversity),
+    [reviewQuality, reviewDiversity],
+  );
+
+  const reviewFilePreviews = useMemo(
+    () => reviewFiles.map((f) => URL.createObjectURL(f)),
+    [reviewFiles],
+  );
+  useEffect(() => {
+    return () => {
+      reviewFilePreviews.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [reviewFilePreviews]);
 
   useEffect(() => {
     if (!location?.state?.openReview) return;
@@ -696,7 +752,7 @@ const OrderDetailPage = () => {
 
       {reviewModalOpen && (
         <div
-          className="fixed inset-0 z-[210] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
+          className="fixed inset-0 z-[210] flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="review-modal-title"
@@ -705,96 +761,171 @@ const OrderDetailPage = () => {
           }}
         >
           <div
-            className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-6 md:p-8 relative"
+            className="bg-white rounded-none sm:rounded-2xl shadow-2xl border border-slate-200/80 max-w-lg w-full max-h-[92vh] overflow-y-auto custom-scrollbar"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-start gap-4 mb-5">
-              <h3 id="review-modal-title" className="text-xl font-display font-black text-slate-800 leading-tight">
-                Đánh giá sản phẩm
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-100 bg-white/95 backdrop-blur">
+              <h3 id="review-modal-title" className="text-lg font-black text-slate-900 tracking-tight">
+                Đánh Giá Sản Phẩm
               </h3>
               <button
                 type="button"
                 onClick={closeReviewModal}
                 disabled={reviewSubmitting}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors disabled:opacity-50"
                 aria-label="Đóng"
               >
                 <FaTimes size={18} />
               </button>
             </div>
-            <p className="text-sm text-slate-500 mb-4">
-              {reviewTarget?.productId?.name || reviewTarget?.name || "Sản phẩm"}
-            </p>
-            {reviewError && (
-              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
-                {reviewError}
+
+            <div className="px-4 pt-3 pb-4 space-y-4">
+              <div className="w-full flex items-center justify-between gap-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2.5 text-sm text-amber-900">
+                <span className="flex items-center gap-2 font-semibold">
+                  <FaCoins className="text-amber-600 shrink-0" />
+                  Xem hướng dẫn đánh giá để bài viết hữu ích hơn
+                </span>
+                <FaChevronDown className="text-amber-600/70 shrink-0 text-xs" aria-hidden />
               </div>
-            )}
 
-            <div className="mb-4">
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Số sao</label>
-              <div className="flex gap-2">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setReviewRating(n)}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${reviewRating >= n ? "bg-secondary text-white" : "bg-white text-slate-300 border border-slate-200 hover:border-secondary hover:text-secondary"}`}
-                  >
-                    <FaStar />
-                  </button>
-                ))}
+              {reviewTarget && (
+                <div className="flex gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <div className="w-16 h-16 rounded-lg bg-white border border-slate-200 overflow-hidden shrink-0">
+                    <img
+                      src={getReviewProductThumb(reviewTarget)}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-slate-900 leading-snug line-clamp-3">
+                      {reviewTarget?.productId?.name || reviewTarget?.name || "Sản phẩm"}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1.5">
+                      <span className="font-semibold text-slate-600">Phân loại hàng:</span>{" "}
+                      {getReviewVariantLabel(reviewTarget)}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {reviewError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700">
+                  {reviewError}
+                </div>
+              )}
+
+              <div>
+                <p className="text-sm font-bold text-slate-800 mb-2">Chất lượng sản phẩm</p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setReviewRating(n)}
+                        className="p-0.5 rounded transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
+                        aria-label={`${n} sao`}
+                      >
+                        <FaStar
+                          className={`text-2xl sm:text-[26px] ${reviewRating >= n ? "text-amber-400" : "text-slate-200"}`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  {reviewRating > 0 && (
+                    <span className="text-sm font-bold text-amber-600">
+                      {RATING_LABELS[reviewRating]}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <input
-              value={reviewTitle}
-              onChange={(e) => setReviewTitle(e.target.value)}
-              placeholder="Tiêu đề (tuỳ chọn)"
-              className="w-full border-2 border-slate-100 rounded-xl px-4 py-3 text-slate-800 font-medium placeholder:text-slate-400 focus:border-primary focus:ring-0 focus:outline-none mb-3"
-            />
-            <textarea
-              value={reviewContent}
-              onChange={(e) => setReviewContent(e.target.value)}
-              rows={4}
-              maxLength={500}
-              placeholder="Nội dung đánh giá..."
-              className="w-full border-2 border-slate-100 rounded-xl px-4 py-3 text-slate-800 font-medium placeholder:text-slate-400 focus:border-primary focus:ring-0 focus:outline-none resize-y min-h-[110px]"
-            />
-            <p className="text-xs text-slate-400 mt-1 text-right">{reviewContent.length}/500</p>
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <div className="border-b border-slate-100 px-3 py-2.5">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Chất lượng:</label>
+                  <textarea
+                    value={reviewQuality}
+                    onChange={(e) => setReviewQuality(e.target.value)}
+                    rows={2}
+                    maxLength={250}
+                    placeholder="Ví dụ: Tôi thấy chất lượng sản phẩm rất tốt và ổn định."
+                    className="w-full text-sm text-slate-800 placeholder:text-slate-400 resize-none focus:outline-none focus:ring-0 bg-transparent"
+                  />
+                </div>
+                <div className="px-3 py-2.5">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Đa dạng:</label>
+                  <textarea
+                    value={reviewDiversity}
+                    onChange={(e) => setReviewDiversity(e.target.value)}
+                    rows={2}
+                    maxLength={250}
+                    placeholder="Ví dụ: Sản phẩm phù hợp với nhu cầu sử dụng của tôi."
+                    className="w-full text-sm text-slate-800 placeholder:text-slate-400 resize-none focus:outline-none focus:ring-0 bg-transparent"
+                  />
+                </div>
+                <p className="px-3 pb-3 text-xs text-slate-400 leading-relaxed border-t border-slate-50 pt-2.5">
+                  Hãy chia sẻ những điều bạn thích về sản phẩm này với những người mua khác nhé.
+                </p>
+              </div>
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <label className="cursor-pointer bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-bold px-4 py-2.5 rounded-xl transition-colors">
-                Thêm ảnh
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
+              <p className="text-xs text-slate-400 text-right">
+                {reviewMergedPreview.length}/500 ký tự (gộp nội dung)
+              </p>
+
+              {reviewFilePreviews.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {reviewFilePreviews.map((src, i) => (
+                    <div key={i} className="w-14 h-14 rounded-lg border border-slate-200 overflow-hidden">
+                      <img src={src} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex items-center gap-2 cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors">
+                  <FaImage className="text-slate-500" />
+                  Thêm Hình ảnh
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    disabled={reviewSubmitting}
+                    onChange={handleSelectReviewFiles}
+                    className="hidden"
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled
+                  title="Video sẽ được hỗ trợ sau"
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-100 px-3 py-2 text-xs font-bold text-slate-400 cursor-not-allowed"
+                >
+                  <FaVideo />
+                  Thêm Video
+                </button>
+                <span className="text-xs font-semibold text-slate-500 ml-auto">{reviewFiles.length}/5 ảnh</span>
+              </div>
+
+              <div className="flex gap-3 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={closeReviewModal}
                   disabled={reviewSubmitting}
-                  onChange={handleSelectReviewFiles}
-                  className="hidden"
-                />
-              </label>
-              <span className="text-xs font-semibold text-slate-500">{reviewFiles.length}/5 ảnh</span>
-            </div>
-
-            <div className="flex flex-col-reverse sm:flex-row gap-3 mt-6">
-              <button
-                type="button"
-                onClick={closeReviewModal}
-                disabled={reviewSubmitting}
-                className="flex-1 py-3.5 border-2 border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={submitReview}
-                disabled={reviewSubmitting}
-                className="flex-1 py-3.5 bg-primary text-white font-bold rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-60"
-              >
-                {reviewSubmitting ? "Đang gửi..." : "Gửi đánh giá"}
-              </button>
+                  className="flex-1 py-3 text-sm font-black text-slate-600 uppercase tracking-wide hover:text-slate-900 transition-colors disabled:opacity-50"
+                >
+                  Trở lại
+                </button>
+                <button
+                  type="button"
+                  onClick={submitReview}
+                  disabled={reviewSubmitting}
+                  className="flex-[1.4] py-3 rounded-lg bg-orange-500 text-white text-sm font-black uppercase tracking-wide hover:bg-orange-600 transition-colors shadow-md shadow-orange-500/25 disabled:opacity-60"
+                >
+                  {reviewSubmitting ? "Đang gửi..." : "Hoàn thành"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

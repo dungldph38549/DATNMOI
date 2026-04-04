@@ -12,6 +12,7 @@ const { Server } = require("socket.io");
 
 // 1. Import Routes và Cấu hình hệ thống
 const routes = require("./src/routers");
+const { syncReviewIndexes } = require("./src/migrations/syncReviewIndexes");
 const { initChatSocket } = require("./src/socket/chatSocket");
 const { cleanupUnpaidVnpayOrders } = require("./src/services/vnpayCleanupService");
 
@@ -180,6 +181,14 @@ const startServer = async () => {
         await mongoose.connect(uri, mongoConnectOptions);
         connected = true;
         console.log("✅ Connected to MongoDB successfully!");
+        try {
+          await syncReviewIndexes();
+        } catch (idxErr) {
+          console.error(
+            "[reviews] Lỗi đồng bộ index (có thể cần xóa tay productId_1_userId_1 trong MongoDB):",
+            idxErr?.message || idxErr,
+          );
+        }
         break;
       } catch (err) {
         lastError = err;

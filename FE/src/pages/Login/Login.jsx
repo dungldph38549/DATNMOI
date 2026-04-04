@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import Swal from "sweetalert2";
 import { useDispatch } from "react-redux";
@@ -11,6 +11,7 @@ import { FaEye, FaEyeSlash, FaGoogle, FaFacebookF } from "react-icons/fa";
 const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [formData, setFormData] = React.useState({ email: "", password: "" });
   const [showPass, setShowPass] = React.useState(false);
@@ -64,7 +65,9 @@ const Login = () => {
           dispatch(updateUserInfo(authInfo));
           dispatch(rehydrateCartFromStorage());
           Swal.fire({ title: "Thành công", text: "Chào mừng bạn trở lại", icon: "success", confirmButtonColor: "#0f172a" });
-          navigate("/", { replace: true });
+          const from = typeof location.state?.from === "string" ? location.state.from : "";
+          const safeFrom = from && from !== "/login" ? from : "/";
+          navigate(safeFrom, { replace: true });
         }
       } else {
         Swal.fire({ title: "Lỗi", text: resData?.message || "Đăng nhập thất bại", icon: "error", confirmButtonColor: "#ef4444" });

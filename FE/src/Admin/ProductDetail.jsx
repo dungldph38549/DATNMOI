@@ -170,6 +170,15 @@ const generateNextVariantSku = (productName, existingSkus = []) => {
   return `${prefix}${String(next).padStart(2, "0")}`;
 };
 
+/** Khớp logic BE `variantAttributesSignature`: không cho hai biến thể cùng tổ hợp thuộc tính */
+const variantAttributesSignature = (attrsObj) => {
+  const entries = Object.entries(attrsObj || {})
+    .map(([k, v]) => [String(k).trim(), String(v ?? "").trim()])
+    .filter(([k]) => k)
+    .sort((a, b) => a[0].localeCompare(b[0]));
+  return JSON.stringify(entries);
+};
+
 // ================================================================
 // ProductDetail — Card only (no Sidebar / header / layout wrapper)
 // ================================================================
@@ -350,6 +359,19 @@ const ProductDetail = ({ productId = null, onClose }) => {
           });
           return { ...v, attributes: remapped };
         });
+        const sigs = payload.variants.map((v) => variantAttributesSignature(v.attributes));
+        const seen = new Set();
+        for (const s of sigs) {
+          if (seen.has(s)) {
+            Swal.fire(
+              "Trùng biến thể",
+              "Hai biến thể không được trùng hoàn toàn cùng tổ hợp thuộc tính (màu, size…). Vui lòng gộp hoặc đổi giá trị.",
+              "error",
+            );
+            return;
+          }
+          seen.add(s);
+        }
       }
     }
 
