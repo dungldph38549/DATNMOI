@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Table, Select, Button, message, Input } from "antd";
+import { Table, Select, Button, message, Input, Pagination } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
@@ -54,6 +54,20 @@ const labelForNextStatus = (fromNormalized, toValue) => {
   return STATUS_OPTIONS.find((o) => o.value === toValue)?.label || toValue;
 };
 
+/** Mô tả biến thể / phân loại một dòng đơn */
+const formatLineLabel = (p) => {
+  if (!p) return "";
+  if (p.size && String(p.size).trim() && p.size !== "Mặc định") {
+    return `Size: ${p.size}`;
+  }
+  const attrs = p.attributes;
+  if (!attrs || typeof attrs !== "object") return "";
+  const parts = Object.entries(attrs)
+    .filter(([, v]) => v != null && String(v).trim() !== "")
+    .map(([k, v]) => `${String(k).trim()}: ${String(v).trim()}`);
+  return parts.length ? parts.join(" · ") : "";
+};
+
 const StatusBadge = ({ status, label }) => {
   const s = STATUS_STYLE[status] || {
     bg: "#F5F5F5",
@@ -93,6 +107,8 @@ export default function Order({ mode = "all", onGoReturns }) {
     refetchInterval: 15000,
     refetchOnWindowFocus: true,
   });
+
+  const totalOrdersInDb = data?.total ?? 0;
 
   const updateMutation = useMutation({
     mutationFn: ({ id, body }) => updateOrderStatus(id, body),
@@ -163,24 +179,87 @@ export default function Order({ mode = "all", onGoReturns }) {
   }, [orders, keyword, paymentFilter, statusFilter, methodFilter]);
   const allowedNext = (current) => TRANSITIONS[current] || [];
 
+  /** Mỗi dòng = một sản phẩm trong đơn (tách dòng). */
+  const tableRows = useMemo(() => {
+    const rows = [];
+    filteredOrders.forEach((order) => {
+      const products = Array.isArray(order.products) ? order.products : [];
+      if (products.length === 0) {
+        rows.push({
+          key: `order-empty-${order._id}`,
+          order,
+          line: null,
+          lineIndex: 0,
+        });
+        return;
+      }
+      products.forEach((line, lineIndex) => {
+        rows.push({
+          key: `${order._id}-line-${lineIndex}-${String(line?.sku ?? "")}`,
+          order,
+          line,
+          lineIndex,
+        });
+      });
+    });
+    return rows;
+  }, [filteredOrders]);
+
+  const paymentMethodLabel = (m) => {
+    const x = String(m || "").toLowerCase();
+    if (x === "vnpay") return { status: "confirmed", label: "VNPay" };
+    if (x === "wallet") return { status: "paid", label: "Ví" };
+    return { status: "pending", label: "COD" };
+  };
+
   const columns = [
     {
       title: "Mã đơn",
-      dataIndex: "_id",
-      key: "_id",
-      width: 120,
-      render: (id) => (
-        <span style={{ fontWeight: 700, color: "#1F2937" }}>
-          {id ? `#${String(id).slice(-8).toUpperCase()}` : "-"}
-        </span>
-      ),
+      key: "orderId",
+      width: 110,
+      render: (_, record) => {
+        const id = record.order?._id;
+        return (
+          <span style={{ fontWeight: 700, color: "#1F2937" }}>
+            {id ? `#${String(id).slice(-8).toUpperCase()}` : "-"}
+          </span>
+        );
+      },
+    },
+    {
+      title: "Sản phẩm",
+      key: "product",
+      width: 280,
+      render: (_, record) => {
+        const p = record.line;
+        if (!p) {
+          return (
+            <span style={{ color: "#9CA3AF", fontSize: 12 }}>Không có dòng sản phẩm</span>
+          );
+        }
+        const name = p?.productId?.name || p?.name || "—";
+        const sub = formatLineLabel(p);
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ fontWeight: 600, color: "#111827", lineHeight: 1.35 }}>{name}</span>
+            {sub ? (
+              <span style={{ fontSize: 12, color: "#6B7280" }}>{sub}</span>
+            ) : null}
+            <span style={{ fontSize: 11, color: "#9CA3AF" }}>
+              SKU: {p?.sku || "—"} · SL: {p?.quantity ?? 0}
+            </span>
+          </div>
+        );
+      },
     },
     {
       title: "Khách hàng",
       key: "customer",
+      width: 200,
       render: (_, record) => {
-        const name = record.fullName || record.userId?.name || "-";
-        const email = record.email || "";
+        const o = record.order;
+        const name = o?.fullName || o?.userId?.name || "-";
+        const email = o?.email || "";
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <span style={{ fontWeight: 600, color: "#111827" }}>{name}</span>
@@ -192,33 +271,40 @@ export default function Order({ mode = "all", onGoReturns }) {
       },
     },
     {
-      title: "Tổng tiền",
-      dataIndex: "totalAmount",
-      key: "totalAmount",
-      width: 120,
-      render: (v) => (
-        <span style={{ fontWeight: 700, color: "#0F766E" }}>
-          {v != null ? `${Number(v).toLocaleString()}đ` : "-"}
+      title: (
+        <span title="Thành tiền từng dòng sản phẩm (đơn giá × SL), không phải tổng cả đơn">
+          Tổng đơn
         </span>
       ),
+      key: "lineTotalAsOrderSplit",
+      width: 130,
+      align: "right",
+      render: (_, record) => {
+        const p = record.line;
+        if (!p) return "—";
+        const t = Number(p.price || 0) * Number(p.quantity || 0);
+        return (
+          <span style={{ fontWeight: 700, color: "#0F766E" }}>
+            {Number(t).toLocaleString("vi-VN")}đ
+          </span>
+        );
+      },
     },
     {
       title: "Thanh toán",
       key: "payment",
-      width: 100,
-      render: (_, record) => (
-        <StatusBadge
-          status={record.paymentMethod === "vnpay" ? "confirmed" : "pending"}
-          label={record.paymentMethod === "vnpay" ? "VNPay" : "COD"}
-        />
-      ),
+      width: 88,
+      render: (_, record) => {
+        const pm = paymentMethodLabel(record.order?.paymentMethod);
+        return <StatusBadge status={pm.status} label={pm.label} />;
+      },
     },
     {
       title: "Trạng thái TT",
-      dataIndex: "paymentStatus",
       key: "paymentStatus",
-      width: 140,
-      render: (paymentStatus) => {
+      width: 130,
+      render: (_, record) => {
+        const paymentStatus = record.order?.paymentStatus;
         const normalized =
           typeof paymentStatus === "string"
             ? paymentStatus.trim().toLowerCase()
@@ -229,10 +315,11 @@ export default function Order({ mode = "all", onGoReturns }) {
     },
     {
       title: "Trạng thái",
-      dataIndex: "status",
       key: "status",
       width: 180,
-      render: (status, record) => {
+      render: (_, record) => {
+        const order = record.order;
+        const status = order?.status;
         const normalized =
           typeof status === "string" ? status.trim().toLowerCase() : status;
         const next = allowedNext(normalized);
@@ -268,7 +355,7 @@ export default function Order({ mode = "all", onGoReturns }) {
             onChange={(newStatus) => {
               if (newStatus === normalized) return;
               const orderId = String(
-                record?._id?.$oid || record?._id || record?.id || "",
+                order?._id?.$oid || order?._id || order?.id || "",
               ).trim();
               if (!orderId) {
                 message.error("Đơn hàng không hợp lệ (thiếu ID).");
@@ -279,9 +366,9 @@ export default function Order({ mode = "all", onGoReturns }) {
                 body: {
                   status: newStatus,
                   lookup: {
-                    createdAt: record?.createdAt || null,
-                    totalAmount: record?.totalAmount ?? null,
-                    fullName: record?.fullName || record?.userId?.name || "",
+                    createdAt: order?.createdAt || null,
+                    totalAmount: order?.totalAmount ?? null,
+                    fullName: order?.fullName || order?.userId?.name || "",
                   },
                 },
               });
@@ -292,18 +379,21 @@ export default function Order({ mode = "all", onGoReturns }) {
     },
     {
       title: "Ngày đặt",
-      dataIndex: "createdAt",
       key: "createdAt",
       width: 110,
-      render: (v) => (v ? new Date(v).toLocaleDateString("vi-VN") : "-"),
+      render: (_, record) => {
+        const v = record.order?.createdAt;
+        return v ? new Date(v).toLocaleDateString("vi-VN") : "-";
+      },
     },
     {
       title: "Hoàn hàng",
       key: "return",
       width: 140,
       render: (_, record) => {
+        const order = record.order;
         if (mode === "all") {
-          if (!["return-request", "accepted", "rejected"].includes(record.status)) {
+          if (!["return-request", "accepted", "rejected"].includes(order.status)) {
             return null;
           }
           return (
@@ -318,13 +408,13 @@ export default function Order({ mode = "all", onGoReturns }) {
           );
         }
 
-        if (record.status !== "return-request") return null;
+        if (order.status !== "return-request") return null;
         return (
           <div style={{ display: "flex", gap: 4 }}>
             <Button
               type="primary"
               size="small"
-              onClick={() => acceptReturnMutation.mutate(record._id)}
+              onClick={() => acceptReturnMutation.mutate(order._id)}
               loading={acceptReturnMutation.isPending}
             >
               Chấp nhận
@@ -332,7 +422,7 @@ export default function Order({ mode = "all", onGoReturns }) {
             <Button
               size="small"
               danger
-              onClick={() => rejectReturnMutation.mutate(record._id)}
+              onClick={() => rejectReturnMutation.mutate(order._id)}
               loading={rejectReturnMutation.isPending}
             >
               Từ chối
@@ -344,9 +434,9 @@ export default function Order({ mode = "all", onGoReturns }) {
     {
       title: "Chi tiết",
       key: "detail",
-      width: 110,
+      width: 100,
       render: (_, record) => (
-        <Link to={`/admin/orders/${record?._id || ""}`}>
+        <Link to={`/admin/orders/${record.order?._id || ""}`}>
           <Button size="small">Xem</Button>
         </Link>
       ),
@@ -443,7 +533,7 @@ export default function Order({ mode = "all", onGoReturns }) {
           Xóa bộ lọc
         </Button>
         <span style={{ fontSize: 12, color: "#999" }}>
-          Hiển thị: {filteredOrders.length} đơn
+          Trang: {filteredOrders.length} đơn · {tableRows.length} dòng sản phẩm
         </span>
       </div>
       {mode === "returns" && (
@@ -453,21 +543,37 @@ export default function Order({ mode = "all", onGoReturns }) {
       )}
       <Table
         className="admin-order-table"
-        rowKey="_id"
+        rowKey="key"
         loading={isLoading}
-        dataSource={filteredOrders}
+        dataSource={tableRows}
         columns={columns}
-        scroll={{ x: 1180 }}
+        scroll={{ x: 1360 }}
         size="middle"
-        pagination={{
-          current: page + 1,
-          total: filteredOrders.length,
-          pageSize: limit,
-          onChange: (p) => setPage(p - 1),
-          showSizeChanger: false,
-          showTotal: (t, range) => `${range[0]}-${range[1]} / ${t} đơn`,
-        }}
+        pagination={false}
       />
+      <div
+        style={{
+          marginTop: 16,
+          display: "flex",
+          justifyContent: "flex-end",
+          flexWrap: "wrap",
+          gap: 12,
+          alignItems: "center",
+        }}
+      >
+        <span style={{ fontSize: 12, color: "#666", marginRight: "auto" }}>
+          {tableRows.length} dòng sản phẩm trên trang này (theo{" "}
+          {filteredOrders.length} đơn đã lọc)
+        </span>
+        <Pagination
+          current={page + 1}
+          total={totalOrdersInDb}
+          pageSize={limit}
+          onChange={(p) => setPage(p - 1)}
+          showSizeChanger={false}
+          showTotal={(t) => `Tổng ${t} đơn trong hệ thống`}
+        />
+      </div>
     </div>
   );
 }

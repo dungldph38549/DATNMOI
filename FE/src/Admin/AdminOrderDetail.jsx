@@ -40,6 +40,18 @@ const getAdminSession = () => {
 
 const formatMoney = (v) => `${Number(v || 0).toLocaleString("vi-VN")}đ`;
 
+const formatLineVariant = (p) => {
+  if (p?.size && String(p.size).trim() && p.size !== "Mặc định") {
+    return `Size: ${p.size}`;
+  }
+  const attrs = p?.attributes;
+  if (!attrs || typeof attrs !== "object") return null;
+  const parts = Object.entries(attrs)
+    .filter(([, v]) => v != null && String(v).trim() !== "")
+    .map(([k, v]) => `${String(k).trim()}: ${String(v).trim()}`);
+  return parts.length ? `Phân loại: ${parts.join(" · ")}` : null;
+};
+
 export default function AdminOrderDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -146,17 +158,45 @@ export default function AdminOrderDetail() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 12 }}>
-        <div style={{ background: "#fff", borderRadius: 12, padding: 16, border: "1px solid #eee" }}>
-          <h3>San pham</h3>
-          {(order?.products || []).map((p, idx) => (
-            <div key={`${p?.productId?._id || p?.productId || idx}`} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #f3f3f3", padding: "10px 0" }}>
-              <div>
-                <div style={{ fontWeight: 600 }}>{p?.productId?.name || p?.name || "San pham"}</div>
-                <div style={{ fontSize: 12, color: "#666" }}>Size: {p?.size || "Mac dinh"} - SL: {p?.quantity || 0}</div>
-              </div>
-              <div style={{ fontWeight: 700 }}>{formatMoney((p?.price || 0) * (p?.quantity || 0))}</div>
-            </div>
-          ))}
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #eee", overflow: "hidden" }}>
+          <div style={{ padding: "14px 16px", borderBottom: "1px solid #f0f0f0" }}>
+            <h3 style={{ margin: 0 }}>Sản phẩm ({(order?.products || []).length})</h3>
+            <p style={{ margin: "6px 0 0", fontSize: 12, color: "#888" }}>Mỗi dòng một khung</p>
+          </div>
+          <div style={{ padding: 12, background: "#f5f5f5" }}>
+            {(order?.products || []).map((p, idx) => {
+              const qty = Number(p?.quantity || 0);
+              const unit = Number(p?.price || 0);
+              const v = formatLineVariant(p);
+              return (
+                <div
+                  key={`${order?._id}-${String(p?.sku ?? "")}-${idx}`}
+                  style={{
+                    marginBottom: idx < (order?.products || []).length - 1 ? 12 : 0,
+                    padding: 16,
+                    borderRadius: 10,
+                    border: "1px solid #e8e8e8",
+                    background: "#fff",
+                    boxShadow: "0 1px 4px rgba(0,0,0,.06)",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                    <div style={{ flex: 1, minWidth: 200 }}>
+                      <div style={{ fontWeight: 700 }}>{p?.productId?.name || p?.name || "Sản phẩm"}</div>
+                      {v ? <div style={{ fontSize: 12, color: "#555", marginTop: 6 }}>{v}</div> : null}
+                      <div style={{ fontSize: 12, color: "#666", marginTop: 8 }}>
+                        SKU: {p?.sku || "—"} · SL: {qty} · Đơn giá: {formatMoney(unit)}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 11, color: "#999" }}>Thành tiền dòng</div>
+                      <div style={{ fontWeight: 800, fontSize: 18 }}>{formatMoney(unit * qty)}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <div style={{ background: "#fff", borderRadius: 12, padding: 16, border: "1px solid #eee" }}>

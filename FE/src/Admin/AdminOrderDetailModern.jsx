@@ -77,6 +77,31 @@ const getImageUrl = (img) => {
   return `http://localhost:3002/uploads/${img.startsWith("/") ? img.slice(1) : img}`;
 };
 
+const formatLineVariant = (p) => {
+  if (p?.size && String(p.size).trim() && p.size !== "Mặc định") {
+    return `Size: ${p.size}`;
+  }
+  const attrs = p?.attributes;
+  if (!attrs || typeof attrs !== "object") return null;
+  const parts = Object.entries(attrs)
+    .filter(([, v]) => v != null && String(v).trim() !== "")
+    .map(([k, v]) => `${String(k).trim()}: ${String(v).trim()}`);
+  return parts.length ? `Phân loại: ${parts.join(" · ")}` : null;
+};
+
+const shippingLabel = (m) => {
+  const x = String(m || "").toLowerCase();
+  if (x === "fast") return "Giao nhanh (+ phí)";
+  return "Tiêu chuẩn";
+};
+
+const paymentMethodLabel = (m) => {
+  const x = String(m || "").toLowerCase();
+  if (x === "vnpay") return "VNPay";
+  if (x === "wallet") return "Ví";
+  return "COD";
+};
+
 export default function AdminOrderDetailModern() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -130,7 +155,7 @@ export default function AdminOrderDetailModern() {
     return map;
   }, [history]);
 
-  const flowIndex = FLOW.indexOf(currentStatus);
+  const flowIndex = Math.max(0, FLOW.indexOf(currentStatus));
   const isReturnFlow = ["return-request", "accepted", "rejected"].includes(
     currentStatus,
   );
@@ -254,48 +279,97 @@ export default function AdminOrderDetailModern() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
             <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-              <div className="px-6 py-4">
-                <h3 className="text-lg font-bold text-slate-900">Sản phẩm ({products.length})</h3>
+              <div className="border-b border-slate-100 px-6 py-4">
+                <h3 className="text-lg font-bold text-slate-900">
+                  Chi tiết đơn — {products.length} dòng sản phẩm
+                </h3>
+                <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                  <span className="font-semibold text-slate-800">Một đơn duy nhất</span>
+                  {" "}
+                  (mã #{String(order?._id || "").slice(-8).toUpperCase()}). Mỗi khung bên dưới là{" "}
+                  <span className="font-semibold">một dòng hàng</span> (size/SKU khác nhau).
+                </p>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left">
-                  <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
-                    <tr>
-                      <th className="px-6 py-3">Sản phẩm</th>
-                      <th className="px-4 py-3 text-center">SKU</th>
-                      <th className="px-4 py-3 text-center">Số lượng</th>
-                      <th className="px-4 py-3 text-right">Đơn giá</th>
-                      <th className="px-6 py-3 text-right">Tổng</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {products.map((p, idx) => (
-                      <tr key={`${p?.productId?._id || p?.productId || idx}`} className="hover:bg-slate-50/70">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={getImageUrl(p?.image || p?.productId?.image)}
-                              alt={p?.productId?.name || p?.name || "Sản phẩm"}
-                              className="h-14 w-14 rounded-xl object-cover"
-                            />
-                            <div>
-                              <p className="text-sm font-bold text-slate-900">
-                                {p?.productId?.name || p?.name || "Sản phẩm"}
-                              </p>
-                              <p className="text-xs text-slate-500">Size: {p?.size || "Mặc định"}</p>
-                            </div>
+              <div className="space-y-3 p-4" style={{ background: "#f5f5f5" }}>
+                {products.map((p, idx) => {
+                  const qty = Number(p?.quantity || 0);
+                  const unit = Number(p?.price || 0);
+                  const base = Number(p?.basePrice || 0);
+                  const lineDisc = Number(p?.lineDiscount || 0);
+                  const saleName = p?.appliedSaleName ? String(p.appliedSaleName) : "";
+                  const lineTotal = unit * qty;
+                  const variant = formatLineVariant(p);
+                  const pid = p?.productId?._id || p?.productId;
+                  const cardKey = `${order?._id}-${String(p?.sku ?? "")}-${idx}`;
+                  const showStrike = base > unit && base > 0;
+                  return (
+                    <div
+                      key={cardKey}
+                      className="rounded-xl border border-slate-200 bg-white p-4 shadow-md"
+                    >
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                        <img
+                          src={getImageUrl(p?.image || p?.productId?.image)}
+                          alt={p?.productId?.name || p?.name || "Sản phẩm"}
+                          className="h-20 w-20 shrink-0 rounded-xl border border-slate-100 object-cover"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                            Dòng {idx + 1}/{products.length}
+                          </p>
+                          <p className="text-sm font-bold text-slate-900">
+                            {p?.productId?.name || p?.name || "Sản phẩm"}
+                          </p>
+                          {variant && (
+                            <p className="mt-1 text-xs text-slate-600">{variant}</p>
+                          )}
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                            <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-semibold text-slate-600">
+                              SKU: {p?.sku || "—"}
+                            </span>
+                            <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-semibold text-slate-600">
+                              SL: {qty}
+                            </span>
+                            <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-semibold text-slate-600">
+                              Đơn giá: {formatMoney(unit)}
+                              {showStrike ? (
+                                <span className="ml-1 text-slate-400 line-through">
+                                  {formatMoney(base)}
+                                </span>
+                              ) : null}
+                            </span>
                           </div>
-                        </td>
-                        <td className="px-4 py-4 text-center text-xs font-medium text-slate-500">{p?.sku || "-"}</td>
-                        <td className="px-4 py-4 text-center text-sm font-bold text-slate-900">{p?.quantity || 0}</td>
-                        <td className="px-4 py-4 text-right text-sm text-slate-600">{formatMoney(p?.price || 0)}</td>
-                        <td className="px-6 py-4 text-right text-sm font-black text-slate-900">
-                          {formatMoney(Number(p?.price || 0) * Number(p?.quantity || 0))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          {lineDisc > 0 ? (
+                            <p className="mt-2 text-xs font-semibold text-emerald-700">
+                              Giảm dòng: −{formatMoney(lineDisc)}
+                            </p>
+                          ) : null}
+                          {saleName ? (
+                            <p className="mt-1 text-xs font-medium text-amber-800">KM: {saleName}</p>
+                          ) : null}
+                          {pid ? (
+                            <Link
+                              to={`/product/${pid}`}
+                              className="mt-3 inline-block text-xs font-bold text-[#874e00] hover:underline"
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Xem sản phẩm trên shop →
+                            </Link>
+                          ) : null}
+                        </div>
+                        <div className="shrink-0 text-right sm:min-w-[140px]">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                            Thành tiền dòng
+                          </p>
+                          <p className="text-lg font-black text-[#874e00]">
+                            {formatMoney(lineTotal)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -361,13 +435,20 @@ export default function AdminOrderDetailModern() {
             )}
 
             <div className="rounded-2xl bg-white p-6 shadow-sm">
-              <h3 className="mb-4 text-lg font-bold text-slate-900">Khách hàng</h3>
+              <h3 className="mb-4 text-lg font-bold text-slate-900">Khách & giao hàng</h3>
               <div className="space-y-3 text-sm">
                 <p><b>Tên:</b> {order?.fullName || "-"}</p>
                 <p><b>SĐT:</b> {order?.phone || "-"}</p>
                 <p><b>Email:</b> {order?.email || "-"}</p>
-                <p><b>Địa chỉ:</b> {order?.address || "-"}</p>
-                <p><b>Ghi chú:</b> {order?.note || "-"}</p>
+                <p className="leading-relaxed"><b>Địa chỉ:</b> {order?.address || "-"}</p>
+                <p><b>Hình thức giao:</b> {shippingLabel(order?.shippingMethod)}</p>
+                <p>
+                  <b>Voucher:</b>{" "}
+                  {order?.voucherCode && String(order.voucherCode).trim()
+                    ? String(order.voucherCode).trim().toUpperCase()
+                    : "—"}
+                </p>
+                <p><b>Ghi chú đơn:</b> {order?.note != null && String(order.note).trim() ? order.note : "—"}</p>
               </div>
             </div>
 
@@ -393,12 +474,14 @@ export default function AdminOrderDetailModern() {
               </div>
               <div className="mt-4 rounded-xl bg-white/10 p-3 text-xs">
                 <div className="flex items-center justify-between">
-                  <span>Thanh toán</span>
-                  <span className="font-bold">{String(order?.paymentMethod || "-").toUpperCase()}</span>
+                  <span>Phương thức</span>
+                  <span className="font-bold">{paymentMethodLabel(order?.paymentMethod)}</span>
                 </div>
                 <div className="mt-1 flex items-center justify-between">
-                  <span>Trạng thái</span>
-                  <span className="font-bold">{order?.paymentStatus || "-"}</span>
+                  <span>Trạng thái TT</span>
+                  <span className="font-bold">
+                    {order?.paymentStatus === "paid" ? "Đã thanh toán" : order?.paymentStatus === "unpaid" ? "Chưa thanh toán" : (order?.paymentStatus || "—")}
+                  </span>
                 </div>
               </div>
             </div>
