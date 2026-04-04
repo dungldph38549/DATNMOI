@@ -179,9 +179,10 @@ export default function AdminOrderDetailModern() {
 
   const onChangeStatus = async (newStatus) => {
     if (!order?._id || newStatus === currentStatus) return;
+    const prevStatus = currentStatus;
     setSaving(true);
     try {
-      await updateOrderStatus(order._id, {
+      const data = await updateOrderStatus(order._id, {
         status: newStatus,
         lookup: {
           createdAt: order?.createdAt || null,
@@ -189,8 +190,17 @@ export default function AdminOrderDetailModern() {
           fullName: order?.fullName || order?.userId?.name || "",
         },
       });
-      setOrder((prev) => ({ ...prev, status: newStatus }));
-      message.success("Cập nhật trạng thái thành công.");
+      setOrder((prev) => ({ ...prev, ...data, status: newStatus }));
+      if (newStatus === "accepted" && prevStatus === "return-request") {
+        const amt = Number(data?.walletRefundAmount);
+        message.success(
+          amt > 0
+            ? `Đã chuyển ${amt.toLocaleString("vi-VN")}đ về ví tài khoản khách hàng.`
+            : "Đã chấp nhận hoàn hàng.",
+        );
+      } else {
+        message.success("Cập nhật trạng thái thành công.");
+      }
     } catch (err) {
       message.error(err?.response?.data?.message || "Không cập nhật được trạng thái.");
     } finally {
