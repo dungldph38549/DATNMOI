@@ -9,6 +9,7 @@ router.get("/", ctrl.getReviews); // GET  /api/reviews
 
 // ── Cần đăng nhập (protect middleware) ───────────────────────
 router.get("/mine", protect, ctrl.getMyReview); // GET /api/reviews/mine?productId=...
+router.get("/eligible-orders", protect, ctrl.getEligibleReviewOrders); // GET /api/reviews/eligible-orders?productId=
 
 router.post("/", protect, ctrl.createReview); // POST   /api/reviews
 router.patch("/:id", protect, ctrl.updateReview); // PATCH  /api/reviews/:id

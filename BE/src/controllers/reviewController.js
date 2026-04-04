@@ -63,6 +63,15 @@ const getMyReview = async (req, res) => {
   }
 };
 
+const getEligibleReviewOrders = async (req, res) => {
+  try {
+    const data = await reviewService.getEligibleReviewOrders(req.query, req.user);
+    return res.status(200).json({ status: "OK", data });
+  } catch (e) {
+    return handleError(res, e);
+  }
+};
+
 const createReview = async (req, res) => {
   try {
     const data = await reviewService.createReview(req.body, req.user);
@@ -184,6 +193,7 @@ module.exports = {
   getReviewById,
   getReplies,
   getMyReview,
+  getEligibleReviewOrders,
   createReview,
   updateReview,
   deleteReview,
