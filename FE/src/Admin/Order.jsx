@@ -107,8 +107,19 @@ export default function Order({ mode = "all" }) {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, body }) => updateOrderStatus(id, body),
-    onSuccess: () => {
-      message.success("Cập nhật trạng thái thành công");
+    onSuccess: (data, variables) => {
+      const from = variables?.fromStatus;
+      const to = variables?.body?.status;
+      if (to === "accepted" && from === "return-request") {
+        const amt = Number(data?.walletRefundAmount);
+        message.success(
+          amt > 0
+            ? `Đã chuyển ${amt.toLocaleString("vi-VN")}đ về ví tài khoản khách hàng.`
+            : "Đã chấp nhận hoàn hàng.",
+        );
+      } else {
+        message.success("Cập nhật trạng thái thành công");
+      }
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
     },
     onError: (err) => {
@@ -336,6 +347,7 @@ export default function Order({ mode = "all" }) {
               }
               updateMutation.mutate({
                 id: orderId,
+                fromStatus: normalized,
                 body: {
                   status: newStatus,
                   lookup: {

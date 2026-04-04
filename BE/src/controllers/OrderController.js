@@ -81,6 +81,29 @@ const buildVnpayPaymentUrlForOrder = (req, order, returnUrl, cancelUrl) => {
   });
 };
 
+/**
+ * Hoàn tồn kho khi admin chấp nhận hoàn hàng (order đã populate products.productId).
+ */
+async function restoreStockForAcceptedReturn(order, session) {
+  for (const item of order.products || []) {
+    const qty = Number(item?.quantity || 0);
+    if (qty <= 0) continue;
+
+    const productDoc = item.productId;
+    if (!productDoc) continue;
+    if (item.sku && productDoc.hasVariants) {
+      const variant = productDoc.variants?.find((v) => v.sku === item.sku);
+      if (variant) {
+        variant.stock = Number(variant.stock || 0) + qty;
+        await productDoc.save({ session });
+      }
+    } else if (!productDoc.hasVariants) {
+      productDoc.stock = Number(productDoc.stock || 0) + qty;
+      await productDoc.save({ session });
+    }
+  }
+}
+
 // ================================================================
 // Tạo đơn hàng
 // ================================================================
@@ -785,6 +808,20 @@ exports.updateOrder = async (req, res) => {
         session,
       );
       Object.assign(updateFields, walletCancelPatch);
+    }
+
+    // Admin UI dùng PUT /order/:id (updateOrder) để chuyển return-request → accepted,
+    // không gọi accept-return — cần cùng logic hoàn tồn + hoàn ví như acceptOrRejectReturn.
+    if (status === "accepted" && order.status === "return-request") {
+      const orderPop = await Order.findById(order._id)
+        .populate("products.productId")
+        .session(session);
+      await restoreStockForAcceptedReturn(orderPop, session);
+      const walletReturnPatch = await buildWalletRefundPatchForReturn(
+        orderPop,
+        session,
+      );
+      Object.assign(updateFields, walletReturnPatch);
     }
 
     if (Object.keys(updateFields).length === 0) {
@@ -1538,23 +1575,7 @@ exports.acceptOrRejectReturn = async (req, res) => {
     let walletPatch = {};
     // Nếu chấp nhận hoàn hàng: cộng lại tồn + hoàn tiền vào ví (nếu đủ điều kiện).
     if (action === "accepted") {
-      for (const item of order.products || []) {
-        const qty = Number(item?.quantity || 0);
-        if (qty <= 0) continue;
-
-        const productDoc = item.productId;
-        if (!productDoc) continue;
-        if (item.sku && productDoc.hasVariants) {
-          const variant = productDoc.variants?.find((v) => v.sku === item.sku);
-          if (variant) {
-            variant.stock = Number(variant.stock || 0) + qty;
-            await productDoc.save({ session });
-          }
-        } else if (!productDoc.hasVariants) {
-          productDoc.stock = Number(productDoc.stock || 0) + qty;
-          await productDoc.save({ session });
-        }
-      }
+      await restoreStockForAcceptedReturn(order, session);
       walletPatch = await buildWalletRefundPatchForReturn(order, session);
     }
 
