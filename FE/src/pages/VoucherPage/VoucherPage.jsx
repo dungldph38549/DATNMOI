@@ -1,11 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
+import { Modal } from "antd";
 import { getAllVouchers } from "../../api";
 import BackButton from "../../components/Common/BackButton";
 
 const VoucherPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const user = useSelector((state) => state.user);
+  const isLoggedIn = !!(user?.login && user?.token);
   const [loading, setLoading] = useState(false);
   const [vouchers, setVouchers] = useState([]);
   const [collectedCodes, setCollectedCodes] = useState([]);
@@ -26,8 +30,12 @@ const VoucherPage = () => {
   };
 
   useEffect(() => {
+    if (!isLoggedIn) {
+      setCollectedCodes([]);
+      return;
+    }
     setCollectedCodes(loadCollectedCodes());
-  }, [storageKey]);
+  }, [storageKey, isLoggedIn]);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,6 +100,20 @@ const VoucherPage = () => {
   };
 
   const collectVoucher = (code) => {
+    if (!isLoggedIn) {
+      Modal.confirm({
+        title: "Cần đăng nhập",
+        content: "Vui lòng đăng nhập để thu thập voucher.",
+        centered: true,
+        okText: "Đăng nhập",
+        cancelText: "Quay lại",
+        width: 400,
+        onOk: () => {
+          navigate("/login", { state: { from: location.pathname || "/voucher" } });
+        },
+      });
+      return;
+    }
     const normalizedCode = String(code || "").trim().toUpperCase();
     if (!normalizedCode) return;
     const next = Array.from(new Set([...collectedCodes, normalizedCode]));

@@ -1,5 +1,21 @@
 const mongoose = require("mongoose");
 
+/** Chuỗi ổn định để so sánh hai biến thể có cùng tổ hợp thuộc tính hay không */
+const variantAttributesSignature = (attrs) => {
+  if (!attrs) return "[]";
+  const entries =
+    attrs instanceof Map
+      ? Array.from(attrs.entries())
+      : typeof attrs === "object"
+        ? Object.entries(attrs)
+        : [];
+  const normalized = entries
+    .map(([k, val]) => [String(k).trim(), String(val ?? "").trim()])
+    .filter(([k]) => k)
+    .sort((a, b) => a[0].localeCompare(b[0]));
+  return JSON.stringify(normalized);
+};
+
 // ── Variant schema ─────────────────────────────────────────────
 const variantSchema = new mongoose.Schema({
   sku: {
@@ -237,6 +253,14 @@ productSchema.pre("validate", function () {
   const skus = this.variants.map((v) => v.sku);
   const dup  = skus.find((s, i) => skus.indexOf(s) !== i);
   if (dup) throw new Error(`SKU "${dup}" bị trùng trong cùng sản phẩm.`);
+
+  const attrSigs = this.variants.map((v) => variantAttributesSignature(v.attributes));
+  const dupAttr = attrSigs.find((s, i) => attrSigs.indexOf(s) !== i);
+  if (dupAttr !== undefined) {
+    throw new Error(
+      "Có ít nhất hai biến thể trùng hoàn toàn (cùng tổ hợp thuộc tính). Vui lòng gộp tồn kho hoặc đổi giá trị thuộc tính.",
+    );
+  }
 
   if (Array.isArray(this.saleRules) && this.saleRules.length > 0) {
     for (const rule of this.saleRules) {
