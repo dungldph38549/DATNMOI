@@ -278,11 +278,12 @@ const OrderHistoryPage = () => {
 
   const subIcon = (kind) => {
     const green = "#26aa99";
-    if (kind === "truck") return <FaTruck className="inline" style={{ color: green }} />;
-    if (kind === "ok") return <FaCheckCircle className="inline" style={{ color: green }} />;
-    if (kind === "x") return <FaTimesCircle className="inline text-red-500" />;
-    if (kind === "return") return <FaUndoAlt className="inline text-orange-500" />;
-    return <FaBoxOpen className="inline text-slate-400" />;
+    const s = 16;
+    if (kind === "truck") return <FaTruck className="inline shrink-0" size={s} style={{ color: green }} />;
+    if (kind === "ok") return <FaCheckCircle className="inline shrink-0" size={s} style={{ color: green }} />;
+    if (kind === "x") return <FaTimesCircle className="inline shrink-0 text-red-500" size={s} />;
+    if (kind === "return") return <FaUndoAlt className="inline shrink-0 text-orange-500" size={s} />;
+    return <FaBoxOpen className="inline shrink-0 text-slate-400" size={s} />;
   };
 
   if (!userId && !guestId) return null;
@@ -293,18 +294,18 @@ const OrderHistoryPage = () => {
       style={{ background: "#fafafa" }}
     >
       <div className="container mx-auto max-w-7xl px-4">
-        <header className="mb-3">
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+        <header className="mb-5">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
             Đơn mua
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1.5 text-base leading-relaxed text-slate-600">
             Theo dõi và quản lý đơn hàng của bạn
           </p>
         </header>
 
         {/* Tabs — cùng lề với tiêu đề; tab chia đều trên màn lớn */}
         <div
-          className="bg-white rounded-t-lg border shadow-sm"
+          className="bg-white rounded-t-md border"
           style={{ borderColor: BORDER }}
         >
           <div className="overflow-x-auto scrollbar-thin lg:overflow-visible">
@@ -321,17 +322,17 @@ const OrderHistoryPage = () => {
                     role="tab"
                     aria-selected={active}
                     onClick={() => setActiveTab(tab.id)}
-                    className="relative min-w-[100px] flex-shrink-0 px-2 py-3.5 text-center text-base font-medium transition-colors sm:min-w-[112px] sm:px-3 lg:min-w-0 lg:flex-1 lg:px-3"
+                    className="relative min-w-[108px] flex-shrink-0 px-2.5 py-3 text-center text-base font-medium transition-colors sm:min-w-[128px] sm:px-3 sm:py-3.5 lg:min-w-0 lg:flex-1 lg:px-3"
                     style={{
-                      color: active ? SHOPEE_ORANGE : "#555",
+                      color: active ? SHOPEE_ORANGE : "#666",
                     }}
                   >
-                    <span className="inline-block max-w-[8.5rem] leading-snug sm:max-w-none">
+                    <span className="inline-block max-w-[8rem] leading-tight sm:max-w-none">
                       {tab.label}
                     </span>
                     {active && (
                       <span
-                        className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full sm:left-4 sm:right-4"
+                        className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full sm:left-3 sm:right-3"
                         style={{ background: SHOPEE_ORANGE }}
                       />
                     )}
@@ -345,7 +346,7 @@ const OrderHistoryPage = () => {
         <div className="h-px bg-transparent" />
 
         {loading ? (
-          <div className="flex justify-center items-center py-24">
+          <div className="flex justify-center items-center py-16">
             <div
               className="w-10 h-10 border-4 rounded-full animate-spin"
               style={{
@@ -356,21 +357,21 @@ const OrderHistoryPage = () => {
           </div>
         ) : filteredOrders.length === 0 ? (
           <div
-            className="bg-white border rounded-b-lg p-12 sm:p-16 text-center"
+            className="bg-white border rounded-b-md p-8 sm:p-10 text-center"
             style={{ borderColor: BORDER }}
           >
-            <div className="text-5xl mb-4 opacity-40">📦</div>
-            <h3 className="text-lg font-bold text-slate-800 mb-2">
+            <div className="text-4xl mb-3 opacity-40">📦</div>
+            <h3 className="mb-2 text-lg font-semibold text-slate-800">
               Chưa có đơn hàng
             </h3>
-            <p className="text-slate-500 text-sm mb-8 max-w-md mx-auto">
+            <p className="mx-auto mb-6 max-w-md text-base text-slate-500">
               {orders.length === 0
                 ? "Bạn chưa có đơn nào. Khám phá sản phẩm mới nhé."
                 : "Không có đơn hàng ở trạng thái này."}
             </p>
             <Link
               to="/product"
-              className="inline-block px-8 py-3 rounded text-white text-sm font-semibold"
+              className="inline-block rounded-md px-8 py-3 text-base font-semibold text-white"
               style={{ background: SHOPEE_ORANGE }}
             >
               Mua sắm ngay
@@ -425,58 +426,58 @@ const OrderHistoryPage = () => {
                 return (
                   <div
                     key={cardKey}
-                    className="bg-white border rounded-md overflow-hidden shadow-sm"
+                    className="bg-white border rounded-lg overflow-hidden shadow-sm"
                     style={{ borderColor: BORDER }}
                   >
                     <div
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-b"
+                      className="flex flex-col gap-2.5 border-b px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:py-4"
                       style={{ borderColor: BORDER }}
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span
-                          className="text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded-sm text-white"
+                          className="rounded-md px-2 py-0.5 text-sm font-semibold text-white"
                           style={{ background: SHOPEE_ORANGE }}
                         >
                           Yêu thích
                         </span>
-                        <span className="font-semibold text-slate-800 text-sm">
+                        <span className="text-base font-semibold text-slate-800">
                           {SHOP_NAME}
                         </span>
                         <Link
                           to="/chat"
-                          className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded border text-white"
+                          className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-base font-medium text-white"
                           style={{
                             background: SHOPEE_ORANGE,
                             borderColor: SHOPEE_ORANGE,
                           }}
                         >
-                          <FaCommentDots size={12} />
+                          <FaCommentDots size={15} />
                           Chat
                         </Link>
                         <Link
                           to="/product"
-                          className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded border bg-white text-slate-700"
+                          className="inline-flex items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-base font-medium text-slate-700"
                           style={{ borderColor: BORDER }}
                         >
-                          <FaStore size={12} />
+                          <FaStore size={15} />
                           Xem Shop
                         </Link>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 justify-end text-sm">
-                        <span className="inline-flex items-center gap-1.5 text-slate-600">
+                      <div className="flex flex-wrap items-center gap-2 justify-end text-base">
+                        <span className="inline-flex items-center gap-2 text-slate-600">
                           {subIcon(sub.icon)}
                           <span>{sub.text}</span>
                         </span>
                         <button
                           type="button"
-                          className="text-slate-400 hover:text-slate-600 p-0.5"
+                          className="p-0.5 text-slate-400 hover:text-slate-600"
                           title="Trợ giúp"
                           aria-label="Trợ giúp"
                         >
-                          <FaQuestionCircle size={14} />
+                          <FaQuestionCircle size={16} />
                         </button>
                         <span
-                          className="font-bold text-xs tracking-wide ml-1"
+                          className="ml-0.5 text-sm font-bold tracking-wide sm:text-base"
                           style={{ color: SHOPEE_ORANGE }}
                         >
                           {headline}
@@ -484,44 +485,44 @@ const OrderHistoryPage = () => {
                       </div>
                     </div>
 
-                    <div className="px-4 py-3">
-                      <div className="flex gap-3">
+                    <div className="px-4 py-4">
+                      <div className="flex gap-4">
                         <Link
                           to={`/orders/${order._id}`}
-                          className="w-[72px] h-[72px] shrink-0 border overflow-hidden bg-slate-50 rounded"
+                          className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border bg-slate-50"
                           style={{ borderColor: BORDER }}
                         >
                           <img
                             src={productImageUrl(p)}
                             alt={name}
-                            className="w-full h-full object-cover"
+                            className="h-full w-full object-cover"
                           />
                         </Link>
-                        <div className="flex-1 min-w-0 flex gap-2">
-                          <div className="flex-1 min-w-0">
+                        <div className="flex min-w-0 flex-1 gap-3">
+                          <div className="min-w-0 flex-1">
                             <Link
                               to={`/orders/${order._id}`}
-                              className="font-medium text-slate-900 text-sm line-clamp-2 hover:opacity-90"
+                              className="line-clamp-2 text-base font-medium leading-snug text-slate-900 hover:opacity-90 sm:text-lg"
                             >
                               {name}
                             </Link>
                             {variant && (
-                              <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                              <p className="mt-1.5 line-clamp-2 text-base text-slate-600">
                                 {variant}
                               </p>
                             )}
-                            <p className="text-xs text-slate-400 mt-1">
+                            <p className="mt-1.5 text-base text-slate-500">
                               x{qty}
                             </p>
                           </div>
-                          <div className="text-right shrink-0">
+                          <div className="shrink-0 text-right">
                             {showStrike && (
-                              <p className="text-xs text-slate-400 line-through">
+                              <p className="text-base text-slate-400 line-through tabular-nums">
                                 {formatMoney(base * qty)}
                               </p>
                             )}
                             <p
-                              className="text-sm font-medium"
+                              className="text-base font-semibold tabular-nums sm:text-lg"
                               style={{ color: SHOPEE_ORANGE }}
                             >
                               {formatMoney(lineTotal)}
@@ -532,19 +533,19 @@ const OrderHistoryPage = () => {
                     </div>
 
                     <div
-                      className="px-4 py-3 border-t flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                      className="flex flex-col gap-2 border-t px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:py-4"
                       style={{ borderColor: BORDER }}
                     >
-                      <p className="text-xs text-slate-500 order-2 sm:order-1">
+                      <p className="order-2 text-base leading-relaxed text-slate-600 sm:order-1">
                         Mã đơn #{String(order._id).slice(-8).toUpperCase()} ·{" "}
                         {new Date(order.createdAt).toLocaleString("vi-VN")}
                       </p>
-                      <div className="order-1 sm:order-2 text-right w-full sm:w-auto">
-                        <span className="text-sm text-slate-700 mr-2">
+                      <div className="order-1 w-full text-right sm:order-2 sm:w-auto">
+                        <span className="mr-2 text-base text-slate-600">
                           Thành tiền:
                         </span>
                         <span
-                          className="text-lg font-bold"
+                          className="text-xl font-bold tabular-nums sm:text-2xl"
                           style={{ color: SHOPEE_ORANGE }}
                         >
                           {formatMoney(lineTotal)}
@@ -552,24 +553,24 @@ const OrderHistoryPage = () => {
                       </div>
                     </div>
 
-                    <div className="px-4 pb-4 flex flex-wrap justify-end gap-2">
+                    <div className="flex flex-wrap justify-end gap-2.5 px-4 pb-4 pt-0.5">
                       <Link
                         to="/chat"
-                        className="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded border bg-white text-slate-800 min-h-[36px]"
+                        className="inline-flex min-h-[44px] items-center justify-center rounded-md border bg-white px-4 py-2 text-base font-medium text-slate-800"
                         style={{ borderColor: BORDER }}
                       >
                         Liên hệ Người Bán
                       </Link>
                       <Link
                         to={buyAgainTo}
-                        className="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded border bg-white text-slate-800 min-h-[36px]"
+                        className="inline-flex min-h-[44px] items-center justify-center rounded-md border bg-white px-4 py-2 text-base font-medium text-slate-800"
                         style={{ borderColor: BORDER }}
                       >
                         Mua lại
                       </Link>
                       <Link
                         to={`/orders/${order._id}`}
-                        className="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded border bg-white text-slate-800 min-h-[36px]"
+                        className="inline-flex min-h-[44px] items-center justify-center rounded-md border bg-white px-4 py-2 text-base font-medium text-slate-800"
                         style={{ borderColor: BORDER }}
                       >
                         Chi tiết
@@ -578,7 +579,7 @@ const OrderHistoryPage = () => {
                         <Link
                           to={`/orders/${order._id}`}
                           state={{ openReview: true }}
-                          className="inline-flex items-center justify-center px-4 py-2 text-sm font-semibold rounded text-white min-h-[36px]"
+                          className="inline-flex min-h-[44px] items-center justify-center rounded-md px-5 py-2 text-base font-semibold text-white"
                           style={{ background: SHOPEE_ORANGE }}
                         >
                           Đánh giá
@@ -596,14 +597,14 @@ const OrderHistoryPage = () => {
                                     order.paymentStatus === "paid",
                                   )
                                 }
-                                className="inline-flex items-center justify-center px-4 py-2 text-sm font-semibold rounded text-white min-h-[36px] bg-emerald-600 hover:bg-emerald-700"
+                                className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-emerald-600 px-5 py-2 text-base font-semibold text-white hover:bg-emerald-700"
                               >
                                 Đã nhận hàng
                               </button>
                               <button
                                 type="button"
                                 onClick={() => openReturnModal(order._id)}
-                                className="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded border min-h-[36px]"
+                                className="inline-flex min-h-[44px] items-center justify-center rounded-md border px-4 py-2 text-base font-medium"
                                 style={{ borderColor: BORDER }}
                               >
                                 Yêu cầu hoàn hàng
@@ -613,7 +614,7 @@ const OrderHistoryPage = () => {
                             <button
                               type="button"
                               onClick={() => navigate("/login")}
-                              className="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded border bg-slate-100 min-h-[36px]"
+                              className="inline-flex min-h-[44px] items-center justify-center rounded-md border bg-slate-100 px-4 py-2 text-base font-medium"
                               style={{ borderColor: BORDER }}
                             >
                               Đăng nhập
@@ -626,7 +627,7 @@ const OrderHistoryPage = () => {
                           <button
                             type="button"
                             onClick={() => handleCancelOrder(order._id)}
-                            className="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded border text-red-600 border-red-200 hover:bg-red-50 min-h-[36px]"
+                            className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-red-200 px-4 py-2 text-base font-medium text-red-600 hover:bg-red-50"
                           >
                             Hủy đơn
                           </button>
@@ -640,24 +641,24 @@ const OrderHistoryPage = () => {
         )}
 
         {totalPage > 1 && !loading && filteredOrders.length > 0 && (
-          <div className="flex justify-center items-center gap-4 mt-8">
+          <div className="mt-10 flex items-center justify-center gap-4">
             <button
               type="button"
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="w-10 h-10 flex items-center justify-center rounded border bg-white text-slate-600 disabled:opacity-40"
+              className="flex h-11 w-11 items-center justify-center rounded-lg border bg-white text-lg text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-40"
               style={{ borderColor: BORDER }}
             >
               {"<"}
             </button>
-            <div className="px-3 py-2 text-sm font-medium text-slate-700">
+            <div className="px-4 py-2 text-base font-medium text-slate-800">
               Trang {page} / {totalPage}
             </div>
             <button
               type="button"
               disabled={page >= totalPage}
               onClick={() => setPage((p) => p + 1)}
-              className="w-10 h-10 flex items-center justify-center rounded border bg-white text-slate-600 disabled:opacity-40"
+              className="flex h-11 w-11 items-center justify-center rounded-lg border bg-white text-lg text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-40"
               style={{ borderColor: BORDER }}
             >
               {">"}
@@ -684,7 +685,7 @@ const OrderHistoryPage = () => {
               <div className="flex justify-between items-start gap-4 mb-5">
                 <h3
                   id="return-modal-title-history"
-                  className="text-lg font-bold text-slate-800"
+                  className="text-xl font-bold text-slate-800"
                 >
                   Yêu cầu hoàn hàng
                 </h3>
@@ -698,13 +699,13 @@ const OrderHistoryPage = () => {
                   <FaTimes size={18} />
                 </button>
               </div>
-              <p className="text-sm text-slate-500 mb-4">
+              <p className="mb-4 text-base leading-relaxed text-slate-600">
                 Vui lòng mô tả lý do bạn muốn hoàn hàng. Shop sẽ xem xét và phản
                 hồi sớm nhất.
               </p>
               <label
                 htmlFor="return-reason-history"
-                className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2"
+                className="mb-2 block text-base font-semibold uppercase tracking-wide text-slate-700"
               >
                 Lý do hoàn hàng <span className="text-red-500">*</span>
               </label>
@@ -715,18 +716,18 @@ const OrderHistoryPage = () => {
                 rows={5}
                 maxLength={2000}
                 placeholder="Ví dụ: Sản phẩm không đúng size..."
-                className="w-full border-2 rounded-lg px-4 py-3 text-slate-800 focus:outline-none focus:border-orange-400 resize-y min-h-[120px]"
+                className="min-h-[120px] w-full resize-y rounded-lg border-2 px-4 py-3 text-base text-slate-800 focus:border-orange-400 focus:outline-none"
                 style={{ borderColor: BORDER }}
               />
-              <p className="text-xs text-slate-400 mt-2 text-right">
+              <p className="mt-2 text-right text-sm text-slate-400">
                 {returnReason.length}/2000
               </p>
-              <div className="flex flex-col-reverse sm:flex-row gap-3 mt-6">
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
                 <button
                   type="button"
                   onClick={closeReturnModal}
                   disabled={returnSubmitting}
-                  className="flex-1 py-3 border-2 text-slate-600 font-semibold rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                  className="flex-1 rounded-lg border-2 py-3.5 text-base font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                   style={{ borderColor: BORDER }}
                 >
                   Hủy
@@ -735,7 +736,7 @@ const OrderHistoryPage = () => {
                   type="button"
                   onClick={submitReturnRequest}
                   disabled={returnSubmitting}
-                  className="flex-1 py-3 text-white font-semibold rounded-lg disabled:opacity-60"
+                  className="flex-1 rounded-lg py-3.5 text-base font-semibold text-white disabled:opacity-60"
                   style={{ background: SHOPEE_ORANGE }}
                 >
                   {returnSubmitting ? "Đang gửi..." : "Gửi yêu cầu"}

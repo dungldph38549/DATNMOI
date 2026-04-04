@@ -280,10 +280,7 @@ const AdminPage = () => {
         return <Products />;
       case "orders":
         return (
-          <Order
-            mode="all"
-            onGoReturns={() => setSelectedMenu("order-returns")}
-          />
+          <Order mode="all" />
         );
       case "users":
         return <Users />;
