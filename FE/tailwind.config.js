@@ -10,10 +10,17 @@ module.exports = {
         "background-light": "#F8FAFC",
         "background-dark": "#0F172A",
         surface: "#ffffff",
+        convot: {
+          cream: "#FDFBF7",
+          sage: "#8BA88E",
+          charcoal: "#1A1A1A",
+        },
       },
       fontFamily: {
         display: ["Outfit", "sans-serif"],
         body: ["Plus Jakarta Sans", "sans-serif"],
+        serif: ["Cormorant Garamond", "Georgia", "serif"],
+        times: ['"Times New Roman"', "Times", "serif"],
       },
       boxShadow: {
         'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',

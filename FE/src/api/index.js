@@ -563,6 +563,12 @@ export const getVoucherByCode = async (code) => {
   }
 };
 
+/** Tính số tiền giảm (server, có áp trần nội bộ — không cần biết maxDiscountAmount ở client). */
+export const previewVoucherDiscount = async (payload) => {
+  const res = await axiosInstance.post("/voucher/preview", payload);
+  return res.data;
+};
+
 // ================== Size API ==================
 
 export const getAllSizes = async () => {

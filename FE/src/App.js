@@ -15,6 +15,7 @@ import FooterComponent from "./components/FooterComponent/FooterComponent";
 
 import HomePage from "./pages/HomePage/HomePage";
 import ProductPage from "./pages/ProductPage/ProductPage";
+import AccessoriesPage from "./pages/AccessoriesPage/AccessoriesPage";
 import ProductDetail from "./pages/ProductDetail/ProductDetail";
 import Register from "./pages/Register/Register";
 import Login from "./pages/Login/Login";
@@ -57,7 +58,7 @@ function AppContent() {
   const isAdminRoute = location.pathname.startsWith("/admin");
 
   return (
-    <div className="app min-h-screen flex flex-col bg-gray-50">
+    <div className="app min-h-screen flex flex-col bg-convot-cream">
       {/* Ẩn header site khi vào toàn bộ admin (/admin/*) */}
       {!isAdminRoute && <HeaderComponent />}
 
@@ -68,6 +69,7 @@ function AppContent() {
           {/* CLIENT ROUTES */}
           <Route path="/" element={<HomePage />} />
           <Route path="/product" element={<ProductPage />} />
+          <Route path="/phu-kien" element={<AccessoriesPage />} />
           <Route path="/sale" element={<SalePage />} />
           <Route path="/voucher" element={<VoucherPage />} />
           <Route path="/product/:id" element={<ProductDetail />} />

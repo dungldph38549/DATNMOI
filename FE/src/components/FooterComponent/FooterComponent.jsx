@@ -1,159 +1,103 @@
+import React from "react";
+import { Link } from "react-router-dom";
+
 const FooterComponent = () => {
+  const year = new Date().getFullYear();
+
   return (
-    <footer className="bg-background-dark text-white pt-20 pb-10 px-6 lg:px-20 border-t border-white/5 font-display">
-      <div className="w-full">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
-          {/* Brand Column */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-2">
-              <div className="bg-primary p-1 rounded">
-                <span className="material-symbols-outlined text-background-dark">
-                  vertical_split
-                </span>
-              </div>
-              <h2 className="text-xl font-bold tracking-tight">
-                SNEAKERHOUSE
-              </h2>
-            </div>
-            <p className="text-slate-400 leading-relaxed">
-              Định nghĩa lại văn hóa đường phố từ năm 2010. Chúng tôi tuyển chọn
-              những đôi giày độc quyền nhất dành cho những người muốn tạo lối đi riêng.
+    <footer className="bg-[#f7f7f7] border-t border-neutral-200/80 font-body text-neutral-900">
+      <div className="container mx-auto px-4 max-w-7xl py-12 md:py-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-12 text-left">
+          <div>
+            <h3 className="text-sm font-black uppercase tracking-wide text-neutral-900 mb-4">
+              Sneaker <span className="text-convot-sage font-semibold">house</span>
+            </h3>
+            <p className="text-sm text-neutral-600 leading-relaxed">
+              Nâng niu từng bước chân của bạn bằng những đôi giày chất lượng và phong cách nhất.
             </p>
-            <div className="flex gap-4">
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-900 mb-4">Dịch vụ khách hàng</h4>
+            <ul className="space-y-3 text-sm text-neutral-600">
+              <li>
+                <Link to="/terms" className="hover:text-neutral-900 transition-colors">
+                  Chính sách đổi trả
+                </Link>
+              </li>
+              <li>
+                <Link to="/terms" className="hover:text-neutral-900 transition-colors">
+                  Hướng dẫn chọn size
+                </Link>
+              </li>
+              <li>
+                <Link to="/terms" className="hover:text-neutral-900 transition-colors">
+                  Vận chuyển
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-900 mb-4">Cửa hàng</h4>
+            <ul className="space-y-3 text-sm text-neutral-600">
+              <li>
+                <Link to="/contact" className="hover:text-neutral-900 transition-colors">
+                  Hệ thống cửa hàng
+                </Link>
+              </li>
+              <li>
+                <Link to="/contact" className="hover:text-neutral-900 transition-colors">
+                  Tuyển dụng
+                </Link>
+              </li>
+              <li>
+                <Link to="/contact" className="hover:text-neutral-900 transition-colors">
+                  Liên hệ
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-900 mb-4">Mạng xã hội</h4>
+            <div className="flex items-center gap-3">
               <a
                 href="https://facebook.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary transition-colors"
-                aria-label="Facebook"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-300 bg-white text-neutral-700 hover:border-neutral-900 hover:bg-neutral-900 hover:text-white transition-colors"
+                aria-label="Website"
               >
-                <span className="material-symbols-outlined text-sm">public</span>
+                <span className="material-symbols-outlined text-[20px] font-light">public</span>
               </a>
               <a
-                href="https://instagram.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary transition-colors"
-                aria-label="Instagram"
+                href="mailto:support@sneakerhouse.vn"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-300 bg-white text-neutral-700 hover:border-neutral-900 hover:bg-neutral-900 hover:text-white transition-colors"
+                aria-label="Email"
               >
-                <span className="material-symbols-outlined text-sm">
-                  photo_camera
-                </span>
+                <span className="material-symbols-outlined text-[20px] font-light">alternate_email</span>
               </a>
-              <a
-                href="https://youtube.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary transition-colors"
-                aria-label="YouTube"
+              <Link
+                to="/contact"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-300 bg-white text-neutral-700 hover:border-neutral-900 hover:bg-neutral-900 hover:text-white transition-colors"
+                aria-label="Chia sẻ / Liên hệ"
               >
-                <span className="material-symbols-outlined text-sm">
-                  play_circle
-                </span>
-              </a>
+                <span className="material-symbols-outlined text-[20px] font-light">share</span>
+              </Link>
             </div>
-          </div>
-
-          {/* Navigation Links */}
-          <div>
-            <h4 className="text-lg font-bold mb-6">Liên kết nhanh</h4>
-            <ul className="space-y-4 text-slate-400">
-              <li>
-                <a href="/" className="hover:text-primary transition-colors">
-                  Sản phẩm mới
-                </a>
-              </li>
-              <li>
-                <a href="/" className="hover:text-primary transition-colors">
-                  Bán chạy nhất
-                </a>
-              </li>
-              <li>
-                <a href="/" className="hover:text-primary transition-colors">
-                  Lịch phát hành
-                </a>
-              </li>
-              <li>
-                <a href="/" className="hover:text-primary transition-colors">
-                  Chăm sóc giày
-                </a>
-              </li>
-              <li>
-                <a href="/" className="hover:text-primary transition-colors">
-                  Hướng dẫn chọn size
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          {/* Support Links */}
-          <div>
-            <h4 className="text-lg font-bold mb-6">Hỗ trợ khách hàng</h4>
-            <ul className="space-y-4 text-slate-400">
-              <li>
-                <a href="/orders" className="hover:text-primary transition-colors">
-                  Tra cứu đơn hàng
-                </a>
-              </li>
-              <li>
-                <a href="/" className="hover:text-primary transition-colors">
-                  Đổi trả &amp; bảo hành
-                </a>
-              </li>
-              <li>
-                <a href="/" className="hover:text-primary transition-colors">
-                  Thông tin giao hàng
-                </a>
-              </li>
-              <li>
-                <a href="/" className="hover:text-primary transition-colors">
-                  Liên hệ
-                </a>
-              </li>
-              <li>
-                <a href="/" className="hover:text-primary transition-colors">
-                  Câu hỏi thường gặp
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          {/* Newsletter */}
-          <div>
-            <h4 className="text-lg font-bold mb-6">Tham gia cộng đồng</h4>
-            <p className="text-slate-400 text-sm mb-4">
-              Nhận thông tin sớm về các bộ sưu tập độc quyền và tin tức mới nhất.
-            </p>
-            <form className="space-y-3">
-              <div className="relative">
-                <input
-                  type="email"
-                  placeholder="Nhập email của bạn"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg py-3 px-4 text-sm focus:outline-none focus:border-primary"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full bg-primary text-background-dark font-bold py-3 rounded-lg hover:brightness-110 transition-all"
-              >
-                Đăng ký ngay
-              </button>
-            </form>
           </div>
         </div>
 
-        <div className="pt-10 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 text-slate-500 text-sm">
-          <p>© 2026 SNEAKERHOUSE INC. Đã đăng ký bản quyền.</p>
-          <div className="flex gap-8">
-            <a href="/terms" className="hover:text-white transition-colors">
-              Chính sách bảo mật
-            </a>
-            <a href="/terms" className="hover:text-white transition-colors">
-              Điều khoản sử dụng
-            </a>
-            <a href="/" className="hover:text-white transition-colors">
-              Hỗ trợ truy cập
-            </a>
+        <div className="mt-12 pt-8 border-t border-neutral-200/90 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-neutral-500">
+          <p>© {year} SNEAKER HOUSE. ALL RIGHTS RESERVED.</p>
+          <div className="flex flex-wrap justify-center gap-6">
+            <Link to="/terms" className="hover:text-neutral-900 transition-colors">
+              Privacy Policy
+            </Link>
+            <Link to="/terms" className="hover:text-neutral-900 transition-colors">
+              Terms of Service
+            </Link>
           </div>
         </div>
       </div>

@@ -21,6 +21,9 @@ const {
   debitWalletForUserOrder,
   buildWalletCancelRefundPatch,
 } = require("../services/walletService.js");
+const {
+  computeFinalVoucherDiscountAmount,
+} = require("../services/VoucherService.js");
 
 const ROLE_VOUCHER_USAGE_LIMIT = {
   customer: 3,
@@ -402,12 +405,10 @@ exports.createOrder = async (req, res) => {
         });
       }
 
-      const discountValue = Number(voucherDoc.discountValue ?? 0);
-      const rawDiscount =
-        voucherDoc.discountType === "fixed"
-          ? discountValue
-          : (eligibleSubtotal * discountValue) / 100;
-      discountAmount = Math.max(0, Math.min(eligibleSubtotal, rawDiscount));
+      discountAmount = computeFinalVoucherDiscountAmount(
+        voucherDoc,
+        eligibleSubtotal,
+      );
     }
 
     for (const item of mappedProducts) {

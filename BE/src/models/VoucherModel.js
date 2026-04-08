@@ -34,6 +34,13 @@ const voucherSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // Trần số tiền được giảm (vd: giảm 20% nhưng tối đa 50.000đ). 0 = không giới hạn. Chỉ hiển thị trong admin.
+    maxDiscountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     startDate: {
       type: Date,
       required: true,

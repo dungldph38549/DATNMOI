@@ -1,5 +1,23 @@
 const VoucherService = require("../services/VoucherService");
 
+const canSeeInternalVoucherFields = (user) =>
+  Boolean(user && (user.isAdmin === true || user.isStaff === true));
+
+const sanitizeVoucherPayload = (payload, user) => {
+  if (payload == null) return payload;
+  if (canSeeInternalVoucherFields(user)) return payload;
+  const strip = (doc) => {
+    const o =
+      doc && typeof doc.toObject === "function"
+        ? doc.toObject({ virtuals: false })
+        : { ...doc };
+    delete o.maxDiscountAmount;
+    return o;
+  };
+  if (Array.isArray(payload)) return payload.map(strip);
+  return strip(payload);
+};
+
 const createVoucher = async (req, res) => {
   try {
     const response = await VoucherService.createVoucher(req.body);
@@ -20,6 +38,9 @@ const createVoucher = async (req, res) => {
 const getAllVouchers = async (req, res) => {
   try {
     const response = await VoucherService.getAllVouchers();
+    if (response.data) {
+      response.data = sanitizeVoucherPayload(response.data, req.user);
+    }
     return res.status(200).json(response);
   } catch (e) {
     return res.status(500).json({
@@ -39,6 +60,9 @@ const getVoucherDetail = async (req, res) => {
       return res.status(status).json(response);
     }
 
+    if (response.data) {
+      response.data = sanitizeVoucherPayload(response.data, req.user);
+    }
     return res.status(200).json(response);
   } catch (e) {
     return res.status(500).json({
@@ -58,6 +82,24 @@ const getVoucherByCode = async (req, res) => {
       return res.status(status).json(response);
     }
 
+    if (response.data) {
+      response.data = sanitizeVoucherPayload(response.data, req.user);
+    }
+    return res.status(200).json(response);
+  } catch (e) {
+    return res.status(500).json({
+      status: "ERR",
+      message: e.message || "Internal server error",
+    });
+  }
+};
+
+const previewVoucherDiscount = async (req, res) => {
+  try {
+    const response = await VoucherService.previewVoucherDiscount(req.body);
+    if (response.status === "ERR") {
+      return res.status(400).json(response);
+    }
     return res.status(200).json(response);
   } catch (e) {
     return res.status(500).json({
@@ -110,6 +152,7 @@ module.exports = {
   getAllVouchers,
   getVoucherDetail,
   getVoucherByCode,
+  previewVoucherDiscount,
   updateVoucher,
   deleteVoucher,
 };
