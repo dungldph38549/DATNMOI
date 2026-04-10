@@ -15,13 +15,26 @@ const STATUS_OPTIONS = [
   { value: "accepted", label: "Chấp nhận hoàn hàng" },
   { value: "rejected", label: "Từ chối hoàn hàng" },
 ];
+const RETURN_REASON_OPTIONS = [
+  { value: "all", label: "Tất cả lý do hoàn" },
+  { value: "wrong_size", label: "Sai size / không vừa" },
+  { value: "wrong_item", label: "Giao sai mẫu / sai màu" },
+  { value: "defective", label: "Lỗi sản xuất" },
+  { value: "damaged_shipping", label: "Hư hỏng khi vận chuyển" },
+  { value: "not_as_described", label: "Không đúng mô tả" },
+  { value: "other", label: "Lý do khác" },
+];
+const RETURN_REASON_LABELS = RETURN_REASON_OPTIONS.reduce((acc, x) => {
+  if (x.value !== "all") acc[x.value] = x.label;
+  return acc;
+}, {});
 
 const TRANSITIONS = {
   pending: ["confirmed", "canceled"],
   confirmed: ["shipped", "canceled"],
   shipped: ["delivered"],
   delivered: ["return-request"],
-  received: [],
+  received: ["return-request"],
   canceled: [],
   "return-request": ["accepted", "rejected"],
   accepted: [],
@@ -95,6 +108,7 @@ export default function Order({ mode = "all" }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [methodFilter, setMethodFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
+  const [returnReasonFilter, setReturnReasonFilter] = useState("all");
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-orders", page, limit],
@@ -157,10 +171,17 @@ export default function Order({ mode = "all" }) {
         paymentFilter === "all" || paymentStatus === paymentFilter;
       const byStatus = statusFilter === "all" || orderStatus === statusFilter;
       const byMethod = methodFilter === "all" || paymentMethod === methodFilter;
+      const reasonCode = String(o?.returnRequestReasonCode || "")
+        .trim()
+        .toLowerCase();
+      const byReturnReason =
+        mode !== "returns" ||
+        returnReasonFilter === "all" ||
+        reasonCode === returnReasonFilter;
 
-      return byKeyword && byPaymentStatus && byStatus && byMethod;
+      return byKeyword && byPaymentStatus && byStatus && byMethod && byReturnReason;
     });
-  }, [orders, keyword, paymentFilter, statusFilter, methodFilter]);
+  }, [orders, keyword, paymentFilter, statusFilter, methodFilter, mode, returnReasonFilter]);
   const allowedNext = (current) => TRANSITIONS[current] || [];
 
   /** Mỗi dòng = một sản phẩm trong đơn (tách dòng). */
@@ -362,6 +383,26 @@ export default function Order({ mode = "all" }) {
         );
       },
     },
+    ...(mode === "returns"
+      ? [
+          {
+            title: "Lý do hoàn",
+            key: "returnReason",
+            width: "12%",
+            render: (_, record) => {
+              const code = String(record?.order?.returnRequestReasonCode || "")
+                .trim()
+                .toLowerCase();
+              const label = RETURN_REASON_LABELS[code] || "—";
+              return (
+                <span style={{ fontSize: 12, color: "#4B5563", fontWeight: 600 }}>
+                  {label}
+                </span>
+              );
+            },
+          },
+        ]
+      : []),
     {
       title: "Ngày đặt",
       key: "createdAt",
@@ -485,6 +526,15 @@ export default function Order({ mode = "all" }) {
           ]}
           onChange={setPaymentFilter}
         />
+        {mode === "returns" && (
+          <Select
+            size="small"
+            value={returnReasonFilter}
+            style={{ flex: "1 1 180px", minWidth: 170 }}
+            options={RETURN_REASON_OPTIONS}
+            onChange={setReturnReasonFilter}
+          />
+        )}
         <Button
           size="small"
           onClick={() => {
@@ -492,6 +542,7 @@ export default function Order({ mode = "all" }) {
             setStatusFilter("all");
             setMethodFilter("all");
             setPaymentFilter("all");
+            setReturnReasonFilter("all");
           }}
         >
           Xóa lọc

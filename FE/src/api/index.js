@@ -499,9 +499,16 @@ export const createVnpayUrl = async (orderId, returnUrl, cancelUrl) => {
   return res.data;
 };
 
-export const returnOrderRequest = async (id, reason) => {
+export const returnOrderRequest = async (
+  id,
+  reason,
+  images = [],
+  reasonCode = "",
+) => {
   const res = await axiosInstance.post(`/order/${id}/return-request`, {
     reason,
+    images,
+    reasonCode,
   });
   return res.data;
 };

@@ -6,6 +6,7 @@ import {
   confirmDelivery,
   returnOrderRequest,
   cancelOrderByUser,
+  uploadImages,
 } from "../../api";
 import {
   FaBoxOpen,
@@ -39,6 +40,14 @@ const STATUS_LABELS = {
 const RETURN_STATUSES = new Set(["return-request", "accepted", "rejected"]);
 const REVIEWABLE_STATUSES = new Set(["delivered", "received"]);
 const PAGE_SIZE = 10;
+const RETURN_REASON_OPTIONS = [
+  { value: "wrong_size", label: "Sai size / không vừa", requireImage: false },
+  { value: "wrong_item", label: "Giao sai mẫu / sai màu", requireImage: true },
+  { value: "defective", label: "Lỗi sản xuất", requireImage: true },
+  { value: "damaged_shipping", label: "Hư hỏng khi vận chuyển", requireImage: true },
+  { value: "not_as_described", label: "Không đúng mô tả", requireImage: false },
+  { value: "other", label: "Lý do khác", requireImage: false },
+];
 
 const TABS = [
   { id: "all", label: "Tất cả" },
@@ -138,6 +147,8 @@ const OrderHistoryPage = () => {
   const [activeTab, setActiveTab] = useState("all");
   const [returnModalOrderId, setReturnModalOrderId] = useState(null);
   const [returnReason, setReturnReason] = useState("");
+  const [returnReasonCode, setReturnReasonCode] = useState("wrong_size");
+  const [returnFiles, setReturnFiles] = useState([]);
   const [returnSubmitting, setReturnSubmitting] = useState(false);
 
   const isLoggedIn = !!user?.login;
@@ -227,12 +238,25 @@ const OrderHistoryPage = () => {
   const openReturnModal = (orderId) => {
     setReturnModalOrderId(orderId);
     setReturnReason("");
+    setReturnReasonCode("wrong_size");
+    setReturnFiles([]);
   };
 
   const closeReturnModal = () => {
     if (returnSubmitting) return;
     setReturnModalOrderId(null);
     setReturnReason("");
+    setReturnReasonCode("wrong_size");
+    setReturnFiles([]);
+  };
+
+  const handleSelectReturnFiles = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const remaining = Math.max(0, 5 - returnFiles.length);
+    if (remaining <= 0) return;
+    setReturnFiles((prev) => [...prev, ...files.slice(0, remaining)]);
+    e.target.value = null;
   };
 
   const submitReturnRequest = async () => {
@@ -241,10 +265,34 @@ const OrderHistoryPage = () => {
       notify.warning("Vui lòng nhập lý do hoàn hàng (tối thiểu 5 ký tự).");
       return;
     }
+    const selectedReason = RETURN_REASON_OPTIONS.find(
+      (x) => x.value === returnReasonCode,
+    );
+    if (!selectedReason) {
+      notify.warning("Vui lòng chọn lý do hoàn hàng.");
+      return;
+    }
+    if (selectedReason.requireImage && returnFiles.length === 0) {
+      notify.warning("Lý do này yêu cầu ít nhất 1 ảnh minh chứng.");
+      return;
+    }
     if (!returnModalOrderId) return;
     setReturnSubmitting(true);
     try {
-      await returnOrderRequest(returnModalOrderId, reason);
+      let images = [];
+      if (returnFiles.length > 0) {
+        const fd = new FormData();
+        returnFiles.forEach((f) => fd.append("files", f));
+        const uploadRes = await uploadImages(fd);
+        const paths = uploadRes?.paths ?? uploadRes?.data?.paths ?? uploadRes?.data ?? [];
+        if (Array.isArray(paths)) images = paths;
+      }
+      await returnOrderRequest(
+        returnModalOrderId,
+        reason,
+        images,
+        returnReasonCode,
+      );
       const oid = returnModalOrderId;
       setOrders((prev) =>
         prev.map((o) =>
@@ -253,6 +301,7 @@ const OrderHistoryPage = () => {
       );
       setReturnModalOrderId(null);
       setReturnReason("");
+      setReturnFiles([]);
       notify.success("Đã gửi yêu cầu hoàn hàng.");
     } catch (err) {
       notify.error(err?.response?.data?.message || "Có lỗi xảy ra.");
@@ -585,7 +634,8 @@ const OrderHistoryPage = () => {
                           Đánh giá
                         </Link>
                       )}
-                      {lineIndex === 0 && st === "delivered" && (
+                      {lineIndex === 0 &&
+                        (st === "delivered" || st === "received") && (
                         <>
                           {isLoggedIn ? (
                             <>
@@ -709,6 +759,18 @@ const OrderHistoryPage = () => {
               >
                 Lý do hoàn hàng <span className="text-red-500">*</span>
               </label>
+              <select
+                value={returnReasonCode}
+                onChange={(e) => setReturnReasonCode(String(e.target.value || ""))}
+                className="mb-3 w-full rounded-lg border-2 px-4 py-3 text-base text-slate-800 focus:border-orange-400 focus:outline-none"
+                style={{ borderColor: BORDER }}
+              >
+                {RETURN_REASON_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
               <textarea
                 id="return-reason-history"
                 value={returnReason}
@@ -722,6 +784,30 @@ const OrderHistoryPage = () => {
               <p className="mt-2 text-right text-sm text-slate-400">
                 {returnReason.length}/2000
               </p>
+              <div className="mt-4">
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Ảnh minh chứng (tối đa 5 ảnh)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleSelectReturnFiles}
+                  disabled={returnSubmitting || returnFiles.length >= 5}
+                  className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:font-semibold"
+                />
+                {returnFiles.length > 0 ? (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Đã chọn {returnFiles.length}/5 ảnh
+                  </p>
+                ) : null}
+                {RETURN_REASON_OPTIONS.find((x) => x.value === returnReasonCode)
+                  ?.requireImage ? (
+                  <p className="mt-2 text-xs text-amber-600">
+                    Lý do này yêu cầu tối thiểu 1 ảnh minh chứng.
+                  </p>
+                ) : null}
+              </div>
               <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
                 <button
                   type="button"
