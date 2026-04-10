@@ -33,6 +33,13 @@ const ROLE_VOUCHER_USAGE_LIMIT = {
 };
 const GUEST_VOUCHER_USAGE_LIMIT = 2;
 
+/** Không tính doanh thu: hủy đơn, đang yêu cầu hoàn hàng, hoặc đã chấp nhận hoàn (đã hoàn tiền). */
+const ORDER_STATUSES_EXCLUDED_FROM_REVENUE = [
+  "canceled",
+  "return-request",
+  "accepted",
+];
+
 // Khi không khai báo VNP_* trong .env sẽ dùng fallback bên dưới.
 // Chỉ truyền host (không thêm /paymentv2/...): thư viện tự nối endpoint thanh toán.
 const vnpayEnv = (key, fallback) => {
@@ -1069,6 +1076,7 @@ exports.dashboard = async (req, res) => {
           {
             $match: {
               createdAt: { $gte: start, $lte: end },
+              status: { $nin: ORDER_STATUSES_EXCLUDED_FROM_REVENUE },
               $or: [
                 { paymentStatus: "paid" },
                 { paymentMethod: "cod", status: "delivered" },
@@ -1143,8 +1151,17 @@ exports.revenue = async (req, res) => {
       $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
     };
 
+    const revenueMatch = {
+      createdAt: { $gte: start, $lte: end },
+      status: { $nin: ORDER_STATUSES_EXCLUDED_FROM_REVENUE },
+      $or: [
+        { paymentStatus: "paid" },
+        { paymentMethod: "cod", status: "delivered" },
+      ],
+    };
+
     const results = await Order.aggregate([
-      { $match: { createdAt: { $gte: start, $lte: end } } },
+      { $match: revenueMatch },
       {
         $group: {
           _id: groupId,
@@ -1200,7 +1217,7 @@ exports.topSelling = async (req, res) => {
       {
         $match: {
           createdAt: { $gte: start, $lte: end },
-          status: { $ne: "canceled" },
+          status: { $nin: ORDER_STATUSES_EXCLUDED_FROM_REVENUE },
         },
       },
       {
@@ -1269,7 +1286,12 @@ exports.paymentMethod = async (req, res) => {
     const end = endDate ? new Date(endDate) : new Date();
 
     const result = await Order.aggregate([
-      { $match: { createdAt: { $gte: start, $lte: end } } },
+      {
+        $match: {
+          createdAt: { $gte: start, $lte: end },
+          status: { $nin: ORDER_STATUSES_EXCLUDED_FROM_REVENUE },
+        },
+      },
       {
         $group: {
           _id: "$paymentMethod",
