@@ -9,6 +9,8 @@ const WalletTopUp = require("../models/WalletTopUpModel.js");
 async function buildWalletRefundPatchForReturn(order, session) {
   if (!order?.userId) return {};
   if (order.walletRefundTransactionId) return {};
+  // COD: tiền không thu qua ví/VNPay trong hệ thống — không hoàn vào ví.
+  if (order.paymentMethod === "cod") return {};
 
   if (order.paymentMethod === "vnpay" && order.paymentStatus !== "paid") {
     return {};
