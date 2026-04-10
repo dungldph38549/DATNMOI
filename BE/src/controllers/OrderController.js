@@ -701,7 +701,7 @@ exports.updateOrder = async (req, res) => {
       confirmed: ["shipped", "canceled"],
       shipped: ["delivered"],
       delivered: ["return-request"],
-      received: [],
+      received: ["return-request"],
       canceled: [],
       "return-request": ["accepted", "rejected"],
       accepted: [],
@@ -1519,25 +1519,89 @@ exports.returnPayment = async (req, res) => {
 // User: Tạo yêu cầu hoàn hàng
 // POST /api/order/:id/return-request
 // ================================================================
+const RETURN_REASON_RULES = {
+  wrong_size: { label: "Sai size / không vừa", requireImage: false },
+  wrong_item: { label: "Giao sai mẫu / sai màu", requireImage: true },
+  defective: { label: "Lỗi sản xuất", requireImage: true },
+  damaged_shipping: { label: "Hư hỏng khi vận chuyển", requireImage: true },
+  not_as_described: { label: "Không đúng mô tả", requireImage: false },
+  other: { label: "Lý do khác", requireImage: false },
+};
+
 exports.returnOrderRequest = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order)
       return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
-    if (order.status !== "delivered")
+    const currentStatus = String(order.status || "").trim().toLowerCase();
+    if (!["delivered", "received"].includes(currentStatus))
       return res
         .status(400)
-        .json({ message: "Chỉ đơn hàng đã giao mới được yêu cầu hoàn hàng" });
+        .json({
+          message: "Chỉ đơn hàng đã giao/đã nhận mới được yêu cầu hoàn hàng",
+        });
+    const reason = String(req.body?.reason || "").trim();
+    if (reason.length < 5) {
+      return res
+        .status(422)
+        .json({ message: "Lý do hoàn hàng tối thiểu 5 ký tự" });
+    }
+    const returnWindowDays = Math.max(
+      1,
+      Number(process.env.RETURN_WINDOW_DAYS || 7),
+    );
+    const deliveredOrReceived = await OrderStatusHistory.findOne({
+      orderId: order._id,
+      newStatus: { $in: ["delivered", "received"] },
+    }).sort({ createdAt: -1 });
+    const baseDate = deliveredOrReceived?.createdAt || order.updatedAt || order.createdAt;
+    if (baseDate) {
+      const elapsedDays = (Date.now() - new Date(baseDate).getTime()) / (1000 * 60 * 60 * 24);
+      if (elapsedDays > returnWindowDays) {
+        return res.status(400).json({
+          message: `Đơn hàng đã quá thời hạn hoàn (${returnWindowDays} ngày)`,
+        });
+      }
+    }
+    const reasonCode = String(req.body?.reasonCode || "")
+      .trim()
+      .toLowerCase();
+    const reasonRule = RETURN_REASON_RULES[reasonCode];
+    if (!reasonRule) {
+      return res.status(422).json({
+        message: "Vui lòng chọn lý do hoàn hàng hợp lệ",
+      });
+    }
+    const returnImagesRaw = Array.isArray(req.body?.images)
+      ? req.body.images
+      : [];
+    const returnImages = returnImagesRaw
+      .map((x) => String(x || "").trim())
+      .filter(Boolean)
+      .slice(0, 6);
+    if (reasonRule.requireImage && returnImages.length === 0) {
+      return res.status(422).json({
+        message: `Lý do "${reasonRule.label}" yêu cầu ít nhất 1 ảnh minh chứng`,
+      });
+    }
     const updated = await Order.findByIdAndUpdate(
       req.params.id,
-      { status: "return-request" },
+      {
+        status: "return-request",
+        returnRequestReason: reason,
+        returnRequestReasonCode: reasonCode,
+        returnRequestImages: returnImages,
+      },
       { new: true },
     ).populate("products.productId");
     await OrderStatusHistory.create({
-      oldStatus: "delivered",
+      oldStatus: currentStatus,
       newStatus: "return-request",
       orderId: order._id,
-      note: req.body?.reason || "",
+      reasonCode,
+      note: reason,
+      image: returnImages[0] || "",
+      images: returnImages,
     });
     res.status(200).json(updated);
   } catch (err) {

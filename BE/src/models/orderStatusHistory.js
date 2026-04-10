@@ -41,6 +41,15 @@ const orderStatusHistorySchema = new mongoose.Schema(
     image: {
       type: String,
     },
+    images: {
+      type: [String],
+      default: [],
+    },
+    reasonCode: {
+      type: String,
+      default: "",
+      trim: true,
+    },
     note: {
       type: String,
     },

@@ -144,14 +144,20 @@ exports.vnpayTopupReturn = async (req, res) => {
     const ok =
       result.isVerified && result.isSuccess && String(result.vnp_ResponseCode ?? "") === "00";
     if (!ok) {
-      await WalletTopUp.findByIdAndUpdate(topUpId, { status: "failed" });
+      await WalletTopUp.findOneAndUpdate(
+        { _id: topUpId, status: { $ne: "completed" } },
+        { status: "failed" },
+      );
       return res.redirect(`${cancelUrl}?topup=0`);
     }
 
     const expected = Math.round(Number(topUp.amount) * 100);
     const received = Number(result.vnp_Amount);
     if (expected !== received) {
-      await WalletTopUp.findByIdAndUpdate(topUpId, { status: "failed" });
+      await WalletTopUp.findOneAndUpdate(
+        { _id: topUpId, status: { $ne: "completed" } },
+        { status: "failed" },
+      );
       return res.redirect(`${cancelUrl}?topup=0&reason=amount`);
     }
 
@@ -216,6 +222,11 @@ exports.vnpayTopupIpn = async (req, res) => {
       } finally {
         session.endSession();
       }
+    } else {
+      await WalletTopUp.findOneAndUpdate(
+        { _id: topUpId, status: { $ne: "completed" } },
+        { status: "failed" },
+      );
     }
 
     return res.status(200).json(IpnSuccess);
@@ -355,10 +366,12 @@ exports.adminConfirmBankTopup = async (req, res) => {
       session.endSession();
       return res.status(404).json({ message: "Không tìm thấy yêu cầu nạp CK" });
     }
-    if (!["awaiting_transfer", "awaiting_admin"].includes(topUp.status)) {
+    if (topUp.status !== "awaiting_admin") {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ message: "Trạng thái không hợp lệ để xác nhận" });
+      return res.status(400).json({
+        message: "Chỉ xác nhận được khi khách đã bấm 'Tôi đã chuyển khoản'",
+      });
     }
 
     const adminId = req.user?.id || req.user?._id;

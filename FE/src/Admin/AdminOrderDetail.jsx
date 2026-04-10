@@ -20,7 +20,7 @@ const TRANSITIONS = {
   confirmed: ["shipped", "canceled"],
   shipped: ["delivered"],
   delivered: ["return-request"],
-  received: [],
+  received: ["return-request"],
   canceled: [],
   "return-request": ["accepted", "rejected"],
   accepted: [],
