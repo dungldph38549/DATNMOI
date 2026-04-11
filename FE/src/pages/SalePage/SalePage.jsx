@@ -67,7 +67,7 @@ const getSubLabel = (p) => {
   if (cat) return cat.toUpperCase();
   const short = (p?.shortDescription || "").trim();
   if (short) return short.slice(0, 48).toUpperCase();
-  return "SNEAKER HOUSE";
+  return "SNEAKER CONVERSE";
 };
 
 const SalePage = () => {

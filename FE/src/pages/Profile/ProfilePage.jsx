@@ -200,7 +200,7 @@ const ProfilePage = () => {
                                     onClick={() => setActiveTab("wallet")}
                                     className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-bold text-sm ${activeTab === "wallet" ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-slate-500 hover:bg-slate-50"}`}
                                 >
-                                    <FaWallet size={16} /> Ví SNEAKERHOUSE
+                                    <FaWallet size={16} /> Ví SNEAKERCONVERSE
                                 </button>
                                 <button
                                     onClick={() => setActiveTab("security")}

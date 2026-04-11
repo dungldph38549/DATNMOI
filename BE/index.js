@@ -72,7 +72,7 @@ const upload = multer({ storage });
 
 // 5. Routes trực tiếp (Upload & Test)
 app.get("/", (req, res) => {
-  res.send("--- HELLO! BACKEND SNEAKERHOUSE CHẠY THÀNH CÔNG ---");
+  res.send("--- HELLO! BACKEND SNEAKERCONVERSE CHẠY THÀNH CÔNG ---");
 });
 
 // Health check cho FE / công cụ kiểm tra API

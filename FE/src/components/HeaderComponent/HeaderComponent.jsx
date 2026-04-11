@@ -189,7 +189,7 @@ const Header = () => {
           <div onClick={goHome} className="flex items-center cursor-pointer shrink-0 order-1">
             <span className="text-lg md:text-xl xl:text-2xl font-display tracking-tight">
               <span className="font-black text-neutral-900">SNEAKER</span>
-              <span className="font-semibold text-convot-sage">HOUSE</span>
+              <span className="font-semibold text-convot-sage">CONVERSE</span>
             </span>
           </div>
 

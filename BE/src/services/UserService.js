@@ -1,5 +1,5 @@
 // ================================================================
-// services/UserService.js — SneakerHouse (Merged Version)
+// services/UserService.js — SneakerConverse (Merged Version)
 // ================================================================
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");

@@ -1,5 +1,5 @@
 // ================================================================
-// services/ProductService.js — SneakerHouse
+// services/ProductService.js — SneakerConverse
 // ================================================================
 const mongoose = require("mongoose");
 const Product = require("../models/ProductModel");

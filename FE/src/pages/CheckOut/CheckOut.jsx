@@ -989,7 +989,7 @@ const CheckOut = () => {
                         return (
                           <label className={`block p-3 rounded-xl border transition-all ${!isLoggedIn || !walletOk ? "border-[#ece8df] bg-slate-50 opacity-70 cursor-not-allowed" : paymentMethod === "wallet" ? "border-[#ee4d2d] bg-[#fff2ee] cursor-pointer" : "border-[#e4e1d8] bg-white cursor-pointer"}`}>
                             <div className="flex items-center justify-between">
-                              <span className="font-semibold text-slate-800">Ví SNEAKERHOUSE</span>
+                              <span className="font-semibold text-slate-800">Ví SNEAKERCONVERSE</span>
                               <FaWallet className={paymentMethod === "wallet" ? "text-[#ee4d2d]" : "text-slate-400"} />
                               <input
                                 type="radio"
