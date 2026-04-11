@@ -4,6 +4,7 @@ import { FaChevronLeft, FaChevronRight, FaHeart, FaRegHeart } from "react-icons/
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProducts, getAllCategories, getVoucherByCode } from "../../api";
 import { getProductPriceInfo } from "../../utils/pricing";
+import { getVariantColorValue, getVariantSizeValue } from "../../utils/variantAttributes";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 
 const PAGE_SIZE = 12;
@@ -46,7 +47,8 @@ const getProductSizes = (product) => {
   const sizes = [];
   if (Array.isArray(product?.variants)) {
     product.variants.forEach((variant) => {
-      const candidate = variant?.size ?? variant?.sizeName;
+      const fromAttrs = getVariantSizeValue(variant);
+      const candidate = fromAttrs ?? variant?.size ?? variant?.sizeName;
       if (candidate != null && String(candidate).trim() !== "") {
         sizes.push(String(candidate).trim());
       }
@@ -62,7 +64,8 @@ const getProductColors = (product) => {
   const colors = [];
   if (Array.isArray(product?.variants)) {
     product.variants.forEach((variant) => {
-      const candidate = variant?.color ?? variant?.colorName;
+      const fromAttrs = getVariantColorValue(variant);
+      const candidate = fromAttrs ?? variant?.color ?? variant?.colorName;
       if (candidate != null && String(candidate).trim() !== "") {
         colors.push(String(candidate).trim());
       }
