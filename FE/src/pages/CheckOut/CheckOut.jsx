@@ -111,6 +111,7 @@ const CheckOut = () => {
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [shippingMethod, setShippingMethod] = useState("standard");
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
   const [voucherCode, setVoucherCode] = useState("");
   const [discount, setDiscount] = useState(0);
   const [voucherChecking, setVoucherChecking] = useState(false);
@@ -578,8 +579,43 @@ const CheckOut = () => {
   const shipping = useMemo(() => (shippingMethod === "fast" ? 30000 : 0), [shippingMethod]);
   const total = Math.max(0, subtotal + shipping - discount);
 
+  const validateForm = () => {
+    let newErrors = {};
+    if (!form.fullName?.trim()) {
+      newErrors.fullName = "Vui lòng nhập họ và tên";
+    } else if (form.fullName.trim().length < 2) {
+      newErrors.fullName = "Họ và tên phải có ít nhất 2 ký tự";
+    }
+
+    if (!form.email?.trim()) {
+      newErrors.email = "Vui lòng nhập email";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      newErrors.email = "Email không hợp lệ";
+    }
+
+    if (!form.phone?.trim()) {
+      newErrors.phone = "Vui lòng nhập số điện thoại";
+    } else if (!/^0\d{9,10}$/.test(form.phone.trim())) {
+      newErrors.phone = "Số điện thoại phải bắt đầu bằng 0 và có 10-11 chữ số";
+    }
+
+    if (!selectedProvinceCode) newErrors.province = "Vui lòng chọn Tỉnh/Thành";
+    if (!selectedDistrictCode) newErrors.district = "Vui lòng chọn Quận/Huyện";
+    if (!selectedWardCode) newErrors.ward = "Vui lòng chọn Phường/Xã";
+    if (!streetAddress?.trim()) newErrors.streetAddress = "Vui lòng nhập địa chỉ cụ thể";
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const onPlaceOrder = async (e) => {
     e.preventDefault();
+
+    if (!validateForm()) {
+      notify.warning("Vui lòng kiểm tra lại thông tin giao hàng.");
+      return;
+    }
+
     const userIdCandidate = user?._id || user?.id;
     const isLoggedIn = !!user?.login;
     const userId = isLoggedIn && isProbablyObjectId(userIdCandidate) ? userIdCandidate : null;
@@ -599,11 +635,6 @@ const CheckOut = () => {
       }
     }
     if (checkoutItems.length === 0) { notify.warning("Gio hang trong."); return; }
-    if (!form.email?.trim()) { notify.warning("Vui long nhap email."); return; }
-    if (!selectedProvinceCode || !selectedDistrictCode || !selectedWardCode || !streetAddress.trim()) {
-      notify.warning("Vui long chon day du Tinh/Thanh, Quan/Huyen, Phuong/Xa va nhap so nha, ten duong.");
-      return;
-    }
 
     try {
       setLoading(true);
@@ -779,14 +810,17 @@ const CheckOut = () => {
                     <label className="block text-sm font-semibold text-slate-600 mb-1.5">Họ và tên</label>
                     <div className="relative">
                       <input
-                        className="w-full bg-white border border-[#d8d5cc] rounded-xl px-4 py-2.5 pl-11 text-slate-700 outline-none focus:border-[#ee4d2d]"
+                        className={`w-full bg-white border ${errors.fullName ? 'border-red-500' : 'border-[#d8d5cc]'} rounded-xl px-4 py-2.5 pl-11 text-slate-700 outline-none focus:border-[#ee4d2d]`}
                         value={form.fullName}
-                        onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-                        required
+                        onChange={(e) => {
+                          setForm({ ...form, fullName: e.target.value });
+                          if (errors.fullName) setErrors(prev => ({ ...prev, fullName: null }));
+                        }}
                         placeholder="Nhập họ và tên"
                       />
                       <FaUser className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                     </div>
+                    {errors.fullName && <p className="text-red-500 text-xs mt-1">{errors.fullName}</p>}
                   </div>
 
                   <div>
@@ -794,24 +828,29 @@ const CheckOut = () => {
                     <div className="relative">
                       <input
                         type="email"
-                        className="w-full bg-white border border-[#d8d5cc] rounded-xl px-4 py-2.5 pl-11 text-slate-700 outline-none focus:border-[#ee4d2d]"
+                        className={`w-full bg-white border ${errors.email ? 'border-red-500' : 'border-[#d8d5cc]'} rounded-xl px-4 py-2.5 pl-11 text-slate-700 outline-none focus:border-[#ee4d2d]`}
                         value={form.email}
-                        onChange={(e) => setForm({ ...form, email: e.target.value })}
-                        required
+                        onChange={(e) => {
+                          setForm({ ...form, email: e.target.value });
+                          if (errors.email) setErrors(prev => ({ ...prev, email: null }));
+                        }}
                         placeholder="Nhập email"
                       />
                       <FaEnvelope className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                     </div>
+                    {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                   </div>
 
                   <div>
                     <label className="block text-sm font-semibold text-slate-600 mb-1.5">Địa chỉ</label>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                       <select
-                        className="w-full bg-white border border-[#d8d5cc] rounded-xl px-3 py-2.5 text-slate-700 outline-none focus:border-[#ee4d2d]"
+                        className={`w-full bg-white border ${errors.province ? 'border-red-500' : 'border-[#d8d5cc]'} rounded-xl px-3 py-2.5 text-slate-700 outline-none focus:border-[#ee4d2d]`}
                         value={selectedProvinceCode}
-                        onChange={(e) => setSelectedProvinceCode(e.target.value)}
-                        required
+                        onChange={(e) => {
+                          setSelectedProvinceCode(e.target.value);
+                          if (errors.province) setErrors(prev => ({ ...prev, province: null }));
+                        }}
                         disabled={addressLoading.province}
                       >
                         <option value="">{addressLoading.province ? "Đang tải Tỉnh/Thành..." : "Chọn Tỉnh/Thành"}</option>
@@ -822,10 +861,12 @@ const CheckOut = () => {
                         ))}
                       </select>
                       <select
-                        className="w-full bg-white border border-[#d8d5cc] rounded-xl px-3 py-2.5 text-slate-700 outline-none focus:border-[#ee4d2d] disabled:bg-slate-100 disabled:text-slate-400"
+                        className={`w-full bg-white border ${errors.district ? 'border-red-500' : 'border-[#d8d5cc]'} rounded-xl px-3 py-2.5 text-slate-700 outline-none focus:border-[#ee4d2d] disabled:bg-slate-100 disabled:text-slate-400`}
                         value={selectedDistrictCode}
-                        onChange={(e) => setSelectedDistrictCode(e.target.value)}
-                        required
+                        onChange={(e) => {
+                          setSelectedDistrictCode(e.target.value);
+                          if (errors.district) setErrors(prev => ({ ...prev, district: null }));
+                        }}
                         disabled={!selectedProvinceCode || addressLoading.district}
                       >
                         <option value="">
@@ -838,10 +879,12 @@ const CheckOut = () => {
                         ))}
                       </select>
                       <select
-                        className="w-full bg-white border border-[#d8d5cc] rounded-xl px-3 py-2.5 text-slate-700 outline-none focus:border-[#ee4d2d] disabled:bg-slate-100 disabled:text-slate-400"
+                        className={`w-full bg-white border ${errors.ward ? 'border-red-500' : 'border-[#d8d5cc]'} rounded-xl px-3 py-2.5 text-slate-700 outline-none focus:border-[#ee4d2d] disabled:bg-slate-100 disabled:text-slate-400`}
                         value={selectedWardCode}
-                        onChange={(e) => setSelectedWardCode(e.target.value)}
-                        required
+                        onChange={(e) => {
+                          setSelectedWardCode(e.target.value);
+                          if (errors.ward) setErrors(prev => ({ ...prev, ward: null }));
+                        }}
                         disabled={!selectedDistrictCode || addressLoading.ward}
                       >
                         <option value="">
@@ -856,28 +899,40 @@ const CheckOut = () => {
                     </div>
                     <div className="relative">
                       <input
-                        className="w-full bg-white border border-[#d8d5cc] rounded-xl px-4 py-2.5 pl-11 text-slate-700 outline-none focus:border-[#ee4d2d]"
+                        className={`w-full bg-white border ${errors.streetAddress ? 'border-red-500' : 'border-[#d8d5cc]'} rounded-xl px-4 py-2.5 pl-11 text-slate-700 outline-none focus:border-[#ee4d2d]`}
                         value={streetAddress}
-                        onChange={(e) => setStreetAddress(e.target.value)}
-                        required
+                        onChange={(e) => {
+                          setStreetAddress(e.target.value);
+                          if (errors.streetAddress) setErrors(prev => ({ ...prev, streetAddress: null }));
+                        }}
                         placeholder="Địa chỉ cụ thể"
                       />
                       <FaMapMarkerAlt className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                     </div>
+                    {(errors.province || errors.district || errors.ward || errors.streetAddress) && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {[errors.province, errors.district, errors.ward, errors.streetAddress].filter(Boolean).join(" • ")}
+                      </p>
+                    )}
                   </div>
 
                   <div>
                     <label className="block text-sm font-semibold text-slate-600 mb-1.5">Số điện thoại</label>
                     <div className="relative">
                       <input
-                        className="w-full bg-white border border-[#d8d5cc] rounded-xl px-4 py-2.5 pl-11 text-slate-700 outline-none focus:border-[#ee4d2d]"
+                        type="text"
+                        className={`w-full bg-white border ${errors.phone ? 'border-red-500' : 'border-[#d8d5cc]'} rounded-xl px-4 py-2.5 pl-11 text-slate-700 outline-none focus:border-[#ee4d2d]`}
                         value={form.phone}
-                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                        required
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, ''); // Ensure only numbers
+                          setForm({ ...form, phone: val });
+                          if (errors.phone) setErrors(prev => ({ ...prev, phone: null }));
+                        }}
                         placeholder="Nhập số điện thoại"
                       />
                       <FaPhone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                     </div>
+                    {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                   </div>
 
                   <div>
