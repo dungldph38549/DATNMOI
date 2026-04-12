@@ -74,8 +74,8 @@ const WalletTopups = () => {
       dataIndex: "status",
       render: (s) => {
         const map = {
-          awaiting_transfer: "Chờ CK",
-          awaiting_admin: "Đã báo đã CK",
+          awaiting_transfer: "Chờ khách xác nhận",
+          awaiting_admin: "Chờ xử lý (cũ)",
         };
         return map[s] || s;
       },
@@ -135,7 +135,8 @@ const WalletTopups = () => {
         <Button onClick={() => refetch()}>Làm mới</Button>
       </div>
       <p style={{ color: "#64748b", marginBottom: 16, fontSize: 13 }}>
-        Đối soát sao kê ngân hàng với nội dung &amp; số tiền, sau đó bấm xác nhận để cộng ví.
+        Khách tự cộng ví ngay khi bấm xác nhận trên trang cá nhân. Trang này chỉ còn các yêu cầu CK{" "}
+        <strong>đã tạo mã nhưng chưa bấm xác nhận</strong>, hoặc bản ghi <code>awaiting_admin</code> cũ — có thể xác nhận / từ chối thủ công nếu cần.
       </p>
       <Table
         rowKey="_id"

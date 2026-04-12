@@ -144,10 +144,10 @@ async function buildWalletCancelRefundPatch(order, session) {
 }
 
 /**
- * Cộng ví khi nạp (VNPay hoặc admin xác nhận CK).
+ * Cộng ví khi nạp (VNPay, user xác nhận CK, hoặc admin).
  * @param {import("mongoose").Document} topUpDoc
  * @param {import("mongoose").ClientSession} session
- * @param {{ confirmedBy?: import("mongoose").Types.ObjectId }} [options]
+ * @param {{ confirmedBy?: import("mongoose").Types.ObjectId, patchTopUp?: Record<string, unknown> }} [options]
  */
 async function creditWalletForTopUp(topUpDoc, session, options = {}) {
   if (topUpDoc.status === "completed" && topUpDoc.walletTransactionId) {
@@ -167,6 +167,7 @@ async function creditWalletForTopUp(topUpDoc, session, options = {}) {
         status: "completed",
         walletTransactionId: dup._id,
         completedAt: new Date(),
+        ...(options.patchTopUp || {}),
       },
       { session },
     );
@@ -209,6 +210,7 @@ async function creditWalletForTopUp(topUpDoc, session, options = {}) {
       walletTransactionId: tx._id,
       completedAt: new Date(),
       ...(options.confirmedBy ? { confirmedBy: options.confirmedBy } : {}),
+      ...(options.patchTopUp || {}),
     },
     { session },
   );

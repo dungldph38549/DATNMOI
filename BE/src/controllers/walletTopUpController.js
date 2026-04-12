@@ -52,6 +52,13 @@ const mergeVnpayIpnParams = (req) => {
   return out;
 };
 
+/** Nối thêm query khi base đã có ?... (tránh /profile?tab=wallet?topup=1). */
+const appendQuery = (baseUrl, queryWithoutQuestion) => {
+  const b = String(baseUrl || "");
+  const sep = b.includes("?") ? "&" : "?";
+  return `${b}${sep}${queryWithoutQuestion}`;
+};
+
 const MIN_TOPUP = 10000;
 const maxTopup = () =>
   Math.min(
@@ -138,7 +145,7 @@ exports.vnpayTopupReturn = async (req, res) => {
 
     const topUp = await WalletTopUp.findById(topUpId);
     if (!topUp || topUp.method !== "vnpay") {
-      return res.redirect(`${cancelUrl}?topup=0&reason=invalid`);
+      return res.redirect(appendQuery(cancelUrl, "topup=0&reason=invalid"));
     }
 
     const ok =
@@ -148,7 +155,7 @@ exports.vnpayTopupReturn = async (req, res) => {
         { _id: topUpId, status: { $ne: "completed" } },
         { status: "failed" },
       );
-      return res.redirect(`${cancelUrl}?topup=0`);
+      return res.redirect(appendQuery(cancelUrl, "topup=0"));
     }
 
     const expected = Math.round(Number(topUp.amount) * 100);
@@ -158,7 +165,7 @@ exports.vnpayTopupReturn = async (req, res) => {
         { _id: topUpId, status: { $ne: "completed" } },
         { status: "failed" },
       );
-      return res.redirect(`${cancelUrl}?topup=0&reason=amount`);
+      return res.redirect(appendQuery(cancelUrl, "topup=0&reason=amount"));
     }
 
     const session = await mongoose.startSession();
@@ -174,7 +181,9 @@ exports.vnpayTopupReturn = async (req, res) => {
       session.endSession();
     }
 
-    return res.redirect(`${successUrl}?topup=1&amount=${topUp.amount}`);
+    return res.redirect(
+      appendQuery(successUrl, `topup=1&amount=${encodeURIComponent(topUp.amount)}`),
+    );
   } catch (err) {
     console.error("[VNPay topup return]", err?.message || err);
     return res.redirect(`${feUrl}/profile?tab=wallet&topup=0&error=1`);
@@ -291,26 +300,43 @@ exports.createBankTopupRequest = async (req, res) => {
 };
 
 exports.markBankTopupSent = async (req, res) => {
+  const { id } = req.params;
+  const session = await mongoose.startSession();
   try {
-    const { id } = req.params;
-    const updated = await WalletTopUp.findOneAndUpdate(
-      {
-        _id: id,
-        userId: req.user.id,
-        method: "bank_transfer",
-        status: "awaiting_transfer",
-      },
-      { status: "awaiting_admin", userMarkedSentAt: new Date() },
-      { new: true },
-    );
-    if (!updated) {
+    session.startTransaction();
+    const topUp = await WalletTopUp.findOne({
+      _id: id,
+      userId: req.user.id,
+      method: "bank_transfer",
+      status: "awaiting_transfer",
+    }).session(session);
+
+    if (!topUp) {
+      await session.abortTransaction();
       return res.status(400).json({
         message: "Không tìm thấy yêu cầu hoặc đã xử lý",
       });
     }
-    res.status(200).json(updated);
+
+    const uid = req.user?.id || req.user?._id;
+    const confirmedBy =
+      uid && mongoose.Types.ObjectId.isValid(String(uid))
+        ? new mongoose.Types.ObjectId(String(uid))
+        : undefined;
+
+    await creditWalletForTopUp(topUp, session, {
+      ...(confirmedBy ? { confirmedBy } : {}),
+      patchTopUp: { userMarkedSentAt: new Date() },
+    });
+
+    await session.commitTransaction();
+    const out = await WalletTopUp.findById(id).lean();
+    res.status(200).json(out);
   } catch (err) {
+    await session.abortTransaction();
     res.status(500).json({ message: err?.message || "Internal server error" });
+  } finally {
+    session.endSession();
   }
 };
 
