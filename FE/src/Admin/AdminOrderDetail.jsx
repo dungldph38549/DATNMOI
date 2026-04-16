@@ -20,7 +20,7 @@ const TRANSITIONS = {
   confirmed: ["shipped", "canceled"],
   shipped: ["delivered"],
   delivered: ["return-request"],
-  received: [],
+  received: ["return-request"],
   canceled: [],
   "return-request": ["accepted", "rejected"],
   accepted: [],
@@ -97,9 +97,10 @@ export default function AdminOrderDetail() {
 
   const onChangeStatus = async (newStatus) => {
     if (!order?._id || newStatus === normalizedStatus) return;
+    const prevStatus = normalizedStatus;
     setSaving(true);
     try {
-      await updateOrderStatus(order._id, {
+      const data = await updateOrderStatus(order._id, {
         status: newStatus,
         lookup: {
           createdAt: order?.createdAt || null,
@@ -107,10 +108,19 @@ export default function AdminOrderDetail() {
           fullName: order?.fullName || order?.userId?.name || "",
         },
       });
-      setOrder((prev) => ({ ...prev, status: newStatus }));
-      message.success("Cap nhat trang thai thanh cong.");
+      setOrder((prev) => ({ ...prev, ...data, status: newStatus }));
+      if (newStatus === "accepted" && prevStatus === "return-request") {
+        const amt = Number(data?.walletRefundAmount);
+        message.success(
+          amt > 0
+            ? `Đã chuyển ${amt.toLocaleString("vi-VN")}đ về ví tài khoản khách hàng.`
+            : "Đã chấp nhận hoàn hàng.",
+        );
+      } else {
+        message.success("Cập nhật trạng thái thành công.");
+      }
     } catch (err) {
-      message.error(err?.response?.data?.message || "Khong cap nhat duoc trang thai.");
+      message.error(err?.response?.data?.message || "Không cập nhật được trạng thái.");
     } finally {
       setSaving(false);
     }

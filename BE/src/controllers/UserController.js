@@ -1,5 +1,5 @@
 // ================================================================
-// controllers/UserController.js — SneakerHouse
+// controllers/UserController.js — SneakerConverse
 // ================================================================
 const UserService = require("../services/UserService"); // ← "services" số nhiều
 const { successResponse, errorResponse } = require("../utils/response");

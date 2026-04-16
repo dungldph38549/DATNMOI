@@ -21,6 +21,9 @@ const {
   debitWalletForUserOrder,
   buildWalletCancelRefundPatch,
 } = require("../services/walletService.js");
+const {
+  computeFinalVoucherDiscountAmount,
+} = require("../services/VoucherService.js");
 
 const ROLE_VOUCHER_USAGE_LIMIT = {
   customer: 3,
@@ -29,6 +32,17 @@ const ROLE_VOUCHER_USAGE_LIMIT = {
   admin: 0,
 };
 const GUEST_VOUCHER_USAGE_LIMIT = 2;
+
+
+
+
+/** Không tính doanh thu: hủy đơn, đang yêu cầu hoàn hàng, hoặc đã chấp nhận hoàn (đã hoàn tiền). */
+const ORDER_STATUSES_EXCLUDED_FROM_REVENUE = [
+  "canceled",
+  "return-request",
+  "accepted",
+];
+
 
 // Khi không khai báo VNP_* trong .env sẽ dùng fallback bên dưới.
 // Chỉ truyền host (không thêm /paymentv2/...): thư viện tự nối endpoint thanh toán.
@@ -80,6 +94,29 @@ const buildVnpayPaymentUrlForOrder = (req, order, returnUrl, cancelUrl) => {
     vnp_IpAddr: req.ip || "127.0.0.1",
   });
 };
+
+/**
+ * Hoàn tồn kho khi admin chấp nhận hoàn hàng (order đã populate products.productId).
+ */
+async function restoreStockForAcceptedReturn(order, session) {
+  for (const item of order.products || []) {
+    const qty = Number(item?.quantity || 0);
+    if (qty <= 0) continue;
+
+    const productDoc = item.productId;
+    if (!productDoc) continue;
+    if (item.sku && productDoc.hasVariants) {
+      const variant = productDoc.variants?.find((v) => v.sku === item.sku);
+      if (variant) {
+        variant.stock = Number(variant.stock || 0) + qty;
+        await productDoc.save({ session });
+      }
+    } else if (!productDoc.hasVariants) {
+      productDoc.stock = Number(productDoc.stock || 0) + qty;
+      await productDoc.save({ session });
+    }
+  }
+}
 
 // ================================================================
 // Tạo đơn hàng
@@ -379,12 +416,10 @@ exports.createOrder = async (req, res) => {
         });
       }
 
-      const discountValue = Number(voucherDoc.discountValue ?? 0);
-      const rawDiscount =
-        voucherDoc.discountType === "fixed"
-          ? discountValue
-          : (eligibleSubtotal * discountValue) / 100;
-      discountAmount = Math.max(0, Math.min(eligibleSubtotal, rawDiscount));
+      discountAmount = computeFinalVoucherDiscountAmount(
+        voucherDoc,
+        eligibleSubtotal,
+      );
     }
 
     for (const item of mappedProducts) {
@@ -677,7 +712,7 @@ exports.updateOrder = async (req, res) => {
       confirmed: ["shipped", "canceled"],
       shipped: ["delivered"],
       delivered: ["return-request"],
-      received: [],
+      received: ["return-request"],
       canceled: [],
       "return-request": ["accepted", "rejected"],
       accepted: [],
@@ -785,6 +820,20 @@ exports.updateOrder = async (req, res) => {
         session,
       );
       Object.assign(updateFields, walletCancelPatch);
+    }
+
+    // Admin UI dùng PUT /order/:id (updateOrder) để chuyển return-request → accepted,
+    // không gọi accept-return — cần cùng logic hoàn tồn + hoàn ví như acceptOrRejectReturn.
+    if (status === "accepted" && order.status === "return-request") {
+      const orderPop = await Order.findById(order._id)
+        .populate("products.productId")
+        .session(session);
+      await restoreStockForAcceptedReturn(orderPop, session);
+      const walletReturnPatch = await buildWalletRefundPatchForReturn(
+        orderPop,
+        session,
+      );
+      Object.assign(updateFields, walletReturnPatch);
     }
 
     if (Object.keys(updateFields).length === 0) {
@@ -1031,6 +1080,7 @@ exports.dashboard = async (req, res) => {
           {
             $match: {
               createdAt: { $gte: start, $lte: end },
+              status: { $nin: ORDER_STATUSES_EXCLUDED_FROM_REVENUE },
               $or: [
                 { paymentStatus: "paid" },
                 { paymentMethod: "cod", status: "delivered" },
@@ -1105,8 +1155,26 @@ exports.revenue = async (req, res) => {
       $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
     };
 
+    const revenueMatch = {
+      createdAt: { $gte: start, $lte: end },
+      status: { $nin: ORDER_STATUSES_EXCLUDED_FROM_REVENUE },
+      $or: [
+        { paymentStatus: "paid" },
+        { paymentMethod: "cod", status: "delivered" },
+      ],
+    };
+
     const results = await Order.aggregate([
-      { $match: { createdAt: { $gte: start, $lte: end } } },
+
+      {
+        $match: {
+          createdAt: { $gte: start, $lte: end },
+          status: { $nin: ORDER_STATUSES_EXCLUDED_FROM_REVENUE },
+        },
+      },
+
+      { $match: revenueMatch },
+
       {
         $group: {
           _id: groupId,
@@ -1162,7 +1230,7 @@ exports.topSelling = async (req, res) => {
       {
         $match: {
           createdAt: { $gte: start, $lte: end },
-          status: { $ne: "canceled" },
+          status: { $nin: ORDER_STATUSES_EXCLUDED_FROM_REVENUE },
         },
       },
       {
@@ -1231,7 +1299,12 @@ exports.paymentMethod = async (req, res) => {
     const end = endDate ? new Date(endDate) : new Date();
 
     const result = await Order.aggregate([
-      { $match: { createdAt: { $gte: start, $lte: end } } },
+      {
+        $match: {
+          createdAt: { $gte: start, $lte: end },
+          status: { $nin: ORDER_STATUSES_EXCLUDED_FROM_REVENUE },
+        },
+      },
       {
         $group: {
           _id: "$paymentMethod",
@@ -1481,25 +1554,89 @@ exports.returnPayment = async (req, res) => {
 // User: Tạo yêu cầu hoàn hàng
 // POST /api/order/:id/return-request
 // ================================================================
+const RETURN_REASON_RULES = {
+  wrong_size: { label: "Sai size / không vừa", requireImage: false },
+  wrong_item: { label: "Giao sai mẫu / sai màu", requireImage: true },
+  defective: { label: "Lỗi sản xuất", requireImage: true },
+  damaged_shipping: { label: "Hư hỏng khi vận chuyển", requireImage: true },
+  not_as_described: { label: "Không đúng mô tả", requireImage: false },
+  other: { label: "Lý do khác", requireImage: false },
+};
+
 exports.returnOrderRequest = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order)
       return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
-    if (order.status !== "delivered")
+    const currentStatus = String(order.status || "").trim().toLowerCase();
+    if (!["delivered", "received"].includes(currentStatus))
       return res
         .status(400)
-        .json({ message: "Chỉ đơn hàng đã giao mới được yêu cầu hoàn hàng" });
+        .json({
+          message: "Chỉ đơn hàng đã giao/đã nhận mới được yêu cầu hoàn hàng",
+        });
+    const reason = String(req.body?.reason || "").trim();
+    if (reason.length < 5) {
+      return res
+        .status(422)
+        .json({ message: "Lý do hoàn hàng tối thiểu 5 ký tự" });
+    }
+    const returnWindowDays = Math.max(
+      1,
+      Number(process.env.RETURN_WINDOW_DAYS || 7),
+    );
+    const deliveredOrReceived = await OrderStatusHistory.findOne({
+      orderId: order._id,
+      newStatus: { $in: ["delivered", "received"] },
+    }).sort({ createdAt: -1 });
+    const baseDate = deliveredOrReceived?.createdAt || order.updatedAt || order.createdAt;
+    if (baseDate) {
+      const elapsedDays = (Date.now() - new Date(baseDate).getTime()) / (1000 * 60 * 60 * 24);
+      if (elapsedDays > returnWindowDays) {
+        return res.status(400).json({
+          message: `Đơn hàng đã quá thời hạn hoàn (${returnWindowDays} ngày)`,
+        });
+      }
+    }
+    const reasonCode = String(req.body?.reasonCode || "")
+      .trim()
+      .toLowerCase();
+    const reasonRule = RETURN_REASON_RULES[reasonCode];
+    if (!reasonRule) {
+      return res.status(422).json({
+        message: "Vui lòng chọn lý do hoàn hàng hợp lệ",
+      });
+    }
+    const returnImagesRaw = Array.isArray(req.body?.images)
+      ? req.body.images
+      : [];
+    const returnImages = returnImagesRaw
+      .map((x) => String(x || "").trim())
+      .filter(Boolean)
+      .slice(0, 6);
+    if (reasonRule.requireImage && returnImages.length === 0) {
+      return res.status(422).json({
+        message: `Lý do "${reasonRule.label}" yêu cầu ít nhất 1 ảnh minh chứng`,
+      });
+    }
     const updated = await Order.findByIdAndUpdate(
       req.params.id,
-      { status: "return-request" },
+      {
+        status: "return-request",
+        returnRequestReason: reason,
+        returnRequestReasonCode: reasonCode,
+        returnRequestImages: returnImages,
+      },
       { new: true },
     ).populate("products.productId");
     await OrderStatusHistory.create({
-      oldStatus: "delivered",
+      oldStatus: currentStatus,
       newStatus: "return-request",
       orderId: order._id,
-      note: req.body?.reason || "",
+      reasonCode,
+      note: reason,
+      image: returnImages[0] || "",
+      images: returnImages,
     });
     res.status(200).json(updated);
   } catch (err) {
@@ -1538,23 +1675,7 @@ exports.acceptOrRejectReturn = async (req, res) => {
     let walletPatch = {};
     // Nếu chấp nhận hoàn hàng: cộng lại tồn + hoàn tiền vào ví (nếu đủ điều kiện).
     if (action === "accepted") {
-      for (const item of order.products || []) {
-        const qty = Number(item?.quantity || 0);
-        if (qty <= 0) continue;
-
-        const productDoc = item.productId;
-        if (!productDoc) continue;
-        if (item.sku && productDoc.hasVariants) {
-          const variant = productDoc.variants?.find((v) => v.sku === item.sku);
-          if (variant) {
-            variant.stock = Number(variant.stock || 0) + qty;
-            await productDoc.save({ session });
-          }
-        } else if (!productDoc.hasVariants) {
-          productDoc.stock = Number(productDoc.stock || 0) + qty;
-          await productDoc.save({ session });
-        }
-      }
+      await restoreStockForAcceptedReturn(order, session);
       walletPatch = await buildWalletRefundPatchForReturn(order, session);
     }
 

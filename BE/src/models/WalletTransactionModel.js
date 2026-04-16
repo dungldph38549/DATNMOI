@@ -53,14 +53,17 @@ walletTransactionSchema.index(
   { orderId: 1, type: 1 },
   {
     unique: true,
-    partialFilterExpression: {
-      orderId: { $exists: true, $ne: null },
-    },
+    // MongoDB partial index không hỗ trợ $ne: null; dùng $type objectId.
+    partialFilterExpression: { orderId: { $type: "objectId" } },
   },
 );
+// Unique chỉ khi có topUpId (nạp ví). Sparse unique vẫn index nhiều doc topUpId: null → E11000.
 walletTransactionSchema.index(
   { topUpId: 1 },
-  { unique: true, sparse: true },
+  {
+    unique: true,
+    partialFilterExpression: { topUpId: { $type: "objectId" } },
+  },
 );
 
 module.exports = mongoose.model("WalletTransaction", walletTransactionSchema);

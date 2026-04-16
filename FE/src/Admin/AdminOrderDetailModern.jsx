@@ -20,7 +20,7 @@ const TRANSITIONS = {
   confirmed: ["shipped", "canceled"],
   shipped: ["delivered"],
   delivered: ["return-request"],
-  received: [],
+  received: ["return-request"],
   canceled: [],
   "return-request": ["accepted", "rejected"],
   accepted: [],
@@ -28,6 +28,14 @@ const TRANSITIONS = {
 };
 
 const FLOW = ["pending", "confirmed", "shipped", "delivered", "received"];
+const RETURN_REASON_LABELS = {
+  wrong_size: "Sai size / không vừa",
+  wrong_item: "Giao sai mẫu / sai màu",
+  defective: "Lỗi sản xuất",
+  damaged_shipping: "Hư hỏng khi vận chuyển",
+  not_as_described: "Không đúng mô tả",
+  other: "Lý do khác",
+};
 
 const getAdminSession = () => {
   try {
@@ -176,12 +184,29 @@ export default function AdminOrderDetailModern() {
         .sort((a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0))[0] || null,
     [history],
   );
+  const returnRequestImages = useMemo(() => {
+    const fromHistory = Array.isArray(returnRequestEntry?.images)
+      ? returnRequestEntry.images
+      : [];
+    const legacyImage = returnRequestEntry?.image ? [returnRequestEntry.image] : [];
+    const fromOrder = Array.isArray(order?.returnRequestImages)
+      ? order.returnRequestImages
+      : [];
+    return [...fromHistory, ...legacyImage, ...fromOrder]
+      .map((x) => String(x || "").trim())
+      .filter(Boolean)
+      .filter((x, idx, arr) => arr.indexOf(x) === idx);
+  }, [returnRequestEntry, order?.returnRequestImages]);
+  const returnReasonCode = String(
+    returnRequestEntry?.reasonCode || order?.returnRequestReasonCode || "",
+  ).trim();
 
   const onChangeStatus = async (newStatus) => {
     if (!order?._id || newStatus === currentStatus) return;
+    const prevStatus = currentStatus;
     setSaving(true);
     try {
-      await updateOrderStatus(order._id, {
+      const data = await updateOrderStatus(order._id, {
         status: newStatus,
         lookup: {
           createdAt: order?.createdAt || null,
@@ -189,8 +214,17 @@ export default function AdminOrderDetailModern() {
           fullName: order?.fullName || order?.userId?.name || "",
         },
       });
-      setOrder((prev) => ({ ...prev, status: newStatus }));
-      message.success("Cập nhật trạng thái thành công.");
+      setOrder((prev) => ({ ...prev, ...data, status: newStatus }));
+      if (newStatus === "accepted" && prevStatus === "return-request") {
+        const amt = Number(data?.walletRefundAmount);
+        message.success(
+          amt > 0
+            ? `Đã chuyển ${amt.toLocaleString("vi-VN")}đ về ví tài khoản khách hàng.`
+            : "Đã chấp nhận hoàn hàng.",
+        );
+      } else {
+        message.success("Cập nhật trạng thái thành công.");
+      }
     } catch (err) {
       message.error(err?.response?.data?.message || "Không cập nhật được trạng thái.");
     } finally {
@@ -422,6 +456,39 @@ export default function AdminOrderDetailModern() {
                         : "Chưa có lý do hoàn hàng."}
                     </p>
                   </div>
+                  {returnReasonCode ? (
+                    <p>
+                      <b>Danh mục lý do:</b>{" "}
+                      {RETURN_REASON_LABELS[returnReasonCode] || returnReasonCode}
+                    </p>
+                  ) : null}
+                  {returnRequestImages.length > 0 ? (
+                    <div>
+                      <p className="mb-2 font-semibold">Ảnh khách gửi:</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {returnRequestImages.map((img, idx) => {
+                          const src = String(img).startsWith("http")
+                            ? img
+                            : `http://localhost:3002/uploads/${String(img).replace(/^\/+/, "")}`;
+                          return (
+                            <a
+                              key={`${img}-${idx}`}
+                              href={src}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block overflow-hidden rounded-lg border border-orange-200 bg-white"
+                            >
+                              <img
+                                src={src}
+                                alt={`return-${idx + 1}`}
+                                className="h-20 w-full object-cover"
+                              />
+                            </a>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
                   {returnDecisionEntry?.note ? (
                     <div>
                       <p className="mb-1 font-semibold">Phản hồi admin:</p>

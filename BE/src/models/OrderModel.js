@@ -112,6 +112,21 @@ const orderSchema = new mongoose.Schema(
       ],
       default: "pending",
     },
+    /** Lý do và ảnh khách gửi khi tạo yêu cầu hoàn hàng */
+    returnRequestReason: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    returnRequestReasonCode: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    returnRequestImages: {
+      type: [String],
+      default: [],
+    },
     /** Giao dịch hoàn tiền vào ví (sau khi admin chấp nhận hoàn hàng) */
     walletRefundTransactionId: {
       type: mongoose.Schema.Types.ObjectId,

@@ -1,6 +1,24 @@
 const mongoose = require("mongoose");
 const Voucher = require("../models/VoucherModel");
 
+/**
+ * Tính số tiền giảm cuối cùng (có áp trần maxDiscountAmount nếu > 0).
+ */
+const computeFinalVoucherDiscountAmount = (voucherDoc, eligibleSubtotal) => {
+  const eligible = Math.max(0, Number(eligibleSubtotal) || 0);
+  const discountValue = Number(voucherDoc.discountValue ?? 0);
+  const rawDiscount =
+    voucherDoc.discountType === "fixed"
+      ? discountValue
+      : (eligible * discountValue) / 100;
+  let discountAmount = Math.max(0, Math.min(eligible, rawDiscount));
+  const maxCap = Number(voucherDoc.maxDiscountAmount ?? 0);
+  if (maxCap > 0) {
+    discountAmount = Math.min(discountAmount, maxCap);
+  }
+  return discountAmount;
+};
+
 const normalizeDate = (value) => {
   if (!value) return null;
   const d = new Date(value);
@@ -56,6 +74,7 @@ const createVoucher = async (newVoucher) => {
       discountType,
       discountValue,
       minOrderValue,
+      maxDiscountAmount,
       startDate,
       endDate,
       usageLimit,
@@ -75,6 +94,10 @@ const createVoucher = async (newVoucher) => {
       minOrderValue !== undefined && minOrderValue !== null
         ? Number(minOrderValue)
         : 0;
+    const numericMaxDiscount =
+      maxDiscountAmount !== undefined && maxDiscountAmount !== null
+        ? Number(maxDiscountAmount)
+        : 0;
     const numericUsageLimit =
       usageLimit !== undefined && usageLimit !== null
         ? Number(usageLimit)
@@ -91,6 +114,13 @@ const createVoucher = async (newVoucher) => {
       return {
         status: "ERR",
         message: "minOrderValue must be a non-negative number",
+      };
+    }
+
+    if (Number.isNaN(numericMaxDiscount) || numericMaxDiscount < 0) {
+      return {
+        status: "ERR",
+        message: "maxDiscountAmount must be a non-negative number",
       };
     }
 
@@ -128,6 +158,7 @@ const createVoucher = async (newVoucher) => {
       discountType: discountType || "percent",
       discountValue: numericDiscountValue,
       minOrderValue: numericMinOrderValue,
+      maxDiscountAmount: numericMaxDiscount,
       startDate,
       endDate,
       usageLimit: numericUsageLimit,
@@ -182,6 +213,104 @@ const getVoucherDetail = async (voucherId) => {
     };
   } catch (e) {
     throw e;
+  }
+};
+
+const previewVoucherDiscount = async (body) => {
+  try {
+    const { code, items } = body || {};
+    const normalizedCode = String(code || "").trim().toUpperCase();
+    if (!normalizedCode) {
+      return { status: "ERR", message: "Thiếu mã voucher" };
+    }
+
+    const lineItems = Array.isArray(items) ? items : [];
+    const computedSubtotal = lineItems.reduce(
+      (sum, item) =>
+        sum +
+        (Number(item?.price) || 0) *
+          (Number(item?.quantity ?? item?.qty) || 0),
+      0,
+    );
+
+    const voucherDoc = await Voucher.findOne({ code: normalizedCode });
+    if (!voucherDoc) {
+      return { status: "ERR", message: "Voucher không tồn tại" };
+    }
+    if (voucherDoc.status !== "active") {
+      return { status: "ERR", message: "Voucher không hoạt động" };
+    }
+
+    const now = new Date();
+    const start = voucherDoc.startDate ? new Date(voucherDoc.startDate) : null;
+    const end = voucherDoc.endDate ? new Date(voucherDoc.endDate) : null;
+    if (start && now < start) {
+      const fromStr = start.toLocaleString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return {
+        status: "ERR",
+        message: `Voucher chưa có hiệu lực. Có thể sử dụng từ ${fromStr}.`,
+      };
+    }
+    if (end && now > end) {
+      return { status: "ERR", message: "Voucher đã hết hạn" };
+    }
+
+    const minOrderValue = Number(voucherDoc.minOrderValue ?? 0);
+    if (computedSubtotal < minOrderValue) {
+      return {
+        status: "ERR",
+        message: `Đơn hàng tối thiểu để dùng voucher là ${minOrderValue.toLocaleString()} đ`,
+      };
+    }
+
+    const usageLimit = Number(voucherDoc.usageLimit ?? 0);
+    const usedCount = Number(voucherDoc.usedCount ?? 0);
+    if (usageLimit !== 0 && usedCount >= usageLimit) {
+      return { status: "ERR", message: "Voucher đã hết lượt sử dụng" };
+    }
+
+    const applicableIds = Array.isArray(voucherDoc.applicableProductIds)
+      ? voucherDoc.applicableProductIds.map((id) => String(id))
+      : [];
+    const hasProductScope = applicableIds.length > 0;
+
+    const eligibleSubtotal = hasProductScope
+      ? lineItems.reduce((sum, item) => {
+          const pid = String(item?.productId || item?._id || "").trim();
+          if (!applicableIds.includes(pid)) return sum;
+          return (
+            sum +
+            (Number(item?.price) || 0) *
+              (Number(item?.quantity ?? item?.qty) || 0)
+          );
+        }, 0)
+      : computedSubtotal;
+
+    if (hasProductScope && eligibleSubtotal <= 0) {
+      return {
+        status: "ERR",
+        message: "Voucher này không áp dụng cho sản phẩm đã chọn",
+      };
+    }
+
+    const discountAmount = computeFinalVoucherDiscountAmount(
+      voucherDoc,
+      eligibleSubtotal,
+    );
+
+    return {
+      status: "OK",
+      message: "SUCCESS",
+      data: { discountAmount },
+    };
+  } catch (e) {
+    return { status: "ERR", message: e.message || "Lỗi tính giảm giá" };
   }
 };
 
@@ -285,6 +414,17 @@ const updateVoucher = async (voucherId, updateData) => {
       payload.minOrderValue = num;
     }
 
+    if (updateData.maxDiscountAmount !== undefined) {
+      const num = Number(updateData.maxDiscountAmount);
+      if (Number.isNaN(num) || num < 0) {
+        return {
+          status: "ERR",
+          message: "maxDiscountAmount must be a non-negative number",
+        };
+      }
+      payload.maxDiscountAmount = num;
+    }
+
     if (updateData.usageLimit !== undefined) {
       const num = Number(updateData.usageLimit);
       if (Number.isNaN(num) || num < 0) {
@@ -369,10 +509,12 @@ const deleteVoucher = async (voucherId) => {
 };
 
 module.exports = {
+  computeFinalVoucherDiscountAmount,
   createVoucher,
   getAllVouchers,
   getVoucherDetail,
   getVoucherByCode,
+  previewVoucherDiscount,
   updateVoucher,
   deleteVoucher,
 };

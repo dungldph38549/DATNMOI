@@ -13,6 +13,9 @@ const { Server } = require("socket.io");
 // 1. Import Routes và Cấu hình hệ thống
 const routes = require("./src/routers");
 const { syncReviewIndexes } = require("./src/migrations/syncReviewIndexes");
+const {
+  syncWalletTransactionIndexes,
+} = require("./src/migrations/syncWalletTransactionIndexes");
 const { initChatSocket } = require("./src/socket/chatSocket");
 const { cleanupUnpaidVnpayOrders } = require("./src/services/vnpayCleanupService");
 
@@ -69,7 +72,7 @@ const upload = multer({ storage });
 
 // 5. Routes trực tiếp (Upload & Test)
 app.get("/", (req, res) => {
-  res.send("--- HELLO! BACKEND SNEAKERHOUSE CHẠY THÀNH CÔNG ---");
+  res.send("--- HELLO! BACKEND SNEAKERCONVERSE CHẠY THÀNH CÔNG ---");
 });
 
 // Health check cho FE / công cụ kiểm tra API
@@ -186,6 +189,14 @@ const startServer = async () => {
         } catch (idxErr) {
           console.error(
             "[reviews] Lỗi đồng bộ index (có thể cần xóa tay productId_1_userId_1 trong MongoDB):",
+            idxErr?.message || idxErr,
+          );
+        }
+        try {
+          await syncWalletTransactionIndexes();
+        } catch (idxErr) {
+          console.error(
+            "[wallettransactions] Lỗi đồng bộ index:",
             idxErr?.message || idxErr,
           );
         }

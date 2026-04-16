@@ -138,7 +138,7 @@ export const getAllUser = async (page, limit) => {
   return res.data;
 };
 // ================== Product API ==================
-// Khớp với ProductController.js — SneakerHouse
+// Khớp với ProductController.js — SneakerConverse
 
 // ── KHÁCH HÀNG ────────────────────────────────────────────────
 
@@ -499,9 +499,16 @@ export const createVnpayUrl = async (orderId, returnUrl, cancelUrl) => {
   return res.data;
 };
 
-export const returnOrderRequest = async (id, reason) => {
+export const returnOrderRequest = async (
+  id,
+  reason,
+  images = [],
+  reasonCode = "",
+) => {
   const res = await axiosInstance.post(`/order/${id}/return-request`, {
     reason,
+    images,
+    reasonCode,
   });
   return res.data;
 };
@@ -561,6 +568,12 @@ export const getVoucherByCode = async (code) => {
     if (err?.response?.status === 404) return null;
     throw err;
   }
+};
+
+/** Tính số tiền giảm (server, có áp trần nội bộ — không cần biết maxDiscountAmount ở client). */
+export const previewVoucherDiscount = async (payload) => {
+  const res = await axiosInstance.post("/voucher/preview", payload);
+  return res.data;
 };
 
 // ================== Size API ==================

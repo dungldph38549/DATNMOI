@@ -36,9 +36,12 @@ const ProfilePage = () => {
     const [walletTx, setWalletTx] = useState([]);
     const [walletLoading, setWalletLoading] = useState(false);
     const [topupAmountVnpay, setTopupAmountVnpay] = useState("100000");
-    const [topupAmountBank, setTopupAmountBank] = useState("100000");
-    const [bankTopupResult, setBankTopupResult] = useState(null);
+    const [showAllWalletTx, setShowAllWalletTx] = useState(false);
     const [topupSubmitting, setTopupSubmitting] = useState(false);
+    const [bankAmount, setBankAmount] = useState("100000");
+    const [bankRequest, setBankRequest] = useState(null);
+    const [bankCreating, setBankCreating] = useState(false);
+    const [bankConfirming, setBankConfirming] = useState(false);
 
     // Handle tab switching from query params
     useEffect(() => {
@@ -136,31 +139,34 @@ const ProfilePage = () => {
         }
     };
 
-    const handleBankTopupRequest = async () => {
-        const n = Number(String(topupAmountBank).replace(/\D/g, ""));
+    const handleCreateBankRequest = async () => {
+        const n = Number(String(bankAmount).replace(/\D/g, ""));
         if (!Number.isFinite(n) || n < 10000) {
-            notify.warning("So tien toi thieu 10.000d.");
+            notify.warning("Số tiền tối thiểu 10.000đ.");
             return;
         }
-        setTopupSubmitting(true);
+        setBankCreating(true);
         try {
             const data = await createWalletBankTopupRequest(n);
-            setBankTopupResult(data);
+            setBankRequest(data);
+            notify.success(
+                "Đã tạo yêu cầu. Chuyển khoản đúng số tiền và nội dung, sau đó bấm xác nhận để cộng ví.",
+            );
         } catch (err) {
-            notify.error(err?.response?.data?.message || "Khong tao yeu cau.");
+            notify.error(err?.response?.data?.message || "Không tạo được yêu cầu nạp CK.");
         } finally {
-            setTopupSubmitting(false);
+            setBankCreating(false);
         }
     };
 
-    const handleMarkBankSent = async () => {
-        const id = bankTopupResult?.topUp?._id;
+    const handleConfirmBankSent = async () => {
+        const id = bankRequest?.topUp?._id;
         if (!id) return;
-        setTopupSubmitting(true);
+        setBankConfirming(true);
         try {
             await markWalletBankTopupSent(id);
-            notify.success("Da ghi nhan. Shop se cong vi sau khi doi soat.");
-            setBankTopupResult(null);
+            notify.success("Đã cộng tiền vào ví.");
+            setBankRequest(null);
             const [bal, txRes] = await Promise.all([
                 getWalletBalance(),
                 getWalletTransactions(1, 30),
@@ -172,11 +178,13 @@ const ProfilePage = () => {
             );
             setWalletTx(Array.isArray(txRes?.data) ? txRes.data : []);
         } catch (err) {
-            notify.error(err?.response?.data?.message || "Cap nhat that bai.");
+            notify.error(err?.response?.data?.message || "Không xác nhận được.");
         } finally {
-            setTopupSubmitting(false);
+            setBankConfirming(false);
         }
     };
+
+    const displayedWalletTx = showAllWalletTx ? walletTx : walletTx.slice(0, 3);
 
     const handleInfoUpdate = async (e) => {
         e.preventDefault();
@@ -243,7 +251,7 @@ const ProfilePage = () => {
                                     onClick={() => setActiveTab("wallet")}
                                     className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-bold text-sm ${activeTab === "wallet" ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-slate-500 hover:bg-slate-50"}`}
                                 >
-                                    <FaWallet size={16} /> Ví SNEAKERHOUSE
+                                    <FaWallet size={16} /> Ví SNEAKERCONVERSE
                                 </button>
                                 <button
                                     onClick={() => setActiveTab("security")}
@@ -392,7 +400,7 @@ const ProfilePage = () => {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 gap-6">
                                     <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 md:p-8">
                                         <h4 className="font-black text-slate-900 mb-2 flex items-center gap-2">
                                             <span className="text-primary">●</span> Nạp qua VNPay
@@ -420,12 +428,15 @@ const ProfilePage = () => {
                                             </button>
                                         </div>
                                     </div>
+
                                     <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 md:p-8">
                                         <h4 className="font-black text-slate-900 mb-2 flex items-center gap-2">
-                                            <span className="text-emerald-600">●</span> Chuyển khoản ngân hàng
+                                            <span className="text-primary">●</span> Nạp chuyển khoản
                                         </h4>
-                                        <p className="text-xs text-slate-500 mb-4">Tạo mã nội dung, chuyển đúng số tiền; shop xác nhận và cộng ví.</p>
-                                        {!bankTopupResult ? (
+                                        <p className="text-xs text-slate-500 mb-4">
+                                            Tạo mã nội dung, chuyển đúng số tiền rồi bấm &quot;Đã chuyển khoản&quot; — hệ thống cộng ví ngay (không cần chờ admin).
+                                        </p>
+                                        {!bankRequest ? (
                                             <div className="flex flex-wrap gap-3 items-end">
                                                 <div className="flex-1 min-w-[140px]">
                                                     <label className="text-xs font-bold text-slate-400 uppercase">Số tiền (đ)</label>
@@ -433,66 +444,77 @@ const ProfilePage = () => {
                                                         type="number"
                                                         min={10000}
                                                         step={1000}
-                                                        value={topupAmountBank}
-                                                        onChange={(e) => setTopupAmountBank(e.target.value)}
+                                                        value={bankAmount}
+                                                        onChange={(e) => setBankAmount(e.target.value)}
                                                         className="w-full mt-1 px-4 py-3 rounded-xl border border-slate-200 font-bold text-slate-800"
                                                     />
                                                 </div>
                                                 <button
                                                     type="button"
-                                                    disabled={topupSubmitting}
-                                                    onClick={handleBankTopupRequest}
-                                                    className="px-6 py-3 rounded-xl border-2 border-emerald-600 text-emerald-700 font-black text-sm hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                                                    disabled={bankCreating}
+                                                    onClick={handleCreateBankRequest}
+                                                    className="px-6 py-3 rounded-xl bg-slate-900 text-white font-black text-sm hover:bg-primary transition-colors disabled:opacity-50"
                                                 >
-                                                    {topupSubmitting ? "…" : "Tạo mã CK"}
+                                                    {bankCreating ? "…" : "Tạo mã nạp"}
                                                 </button>
                                             </div>
                                         ) : (
-                                            <div className="space-y-3 text-sm">
-                                                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
-                                                    <p><span className="font-bold text-slate-500">Ngân hàng:</span> {bankTopupResult.bank?.bankName || "—"}</p>
-                                                    <p><span className="font-bold text-slate-500">Số TK:</span> {bankTopupResult.bank?.accountNumber || "—"}</p>
-                                                    <p><span className="font-bold text-slate-500">Chủ TK:</span> {bankTopupResult.bank?.accountOwner || "—"}</p>
-                                                    {bankTopupResult.bank?.branch && (
-                                                        <p><span className="font-bold text-slate-500">Chi nhánh:</span> {bankTopupResult.bank.branch}</p>
-                                                    )}
-                                                    <p className="font-black text-primary text-lg">
-                                                        {Number(bankTopupResult.topUp?.amount || 0).toLocaleString("vi-VN")}đ
+                                            <div className="space-y-4 rounded-2xl bg-slate-50 border border-slate-100 p-5">
+                                                <p className="text-sm font-bold text-slate-800">
+                                                    Số tiền:{" "}
+                                                    <span className="text-primary">
+                                                        {Number(bankRequest.topUp?.amount || 0).toLocaleString("vi-VN")}đ
+                                                    </span>
+                                                </p>
+                                                <div className="text-sm text-slate-700 space-y-1">
+                                                    <p>
+                                                        <span className="font-bold text-slate-500">Ngân hàng:</span>{" "}
+                                                        {bankRequest.bank?.bankName || "—"}
                                                     </p>
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className="font-bold text-slate-500">Nội dung:</span>
-                                                        <code className="bg-white px-2 py-1 rounded border text-primary font-mono text-xs">
-                                                            {bankTopupResult.topUp?.referenceCode}
+                                                    <p>
+                                                        <span className="font-bold text-slate-500">Số TK:</span>{" "}
+                                                        <code className="bg-white px-2 py-0.5 rounded border border-slate-200">
+                                                            {bankRequest.bank?.accountNumber || "—"}
                                                         </code>
-                                                        <button
-                                                            type="button"
-                                                            className="text-xs font-bold text-primary underline"
-                                                            onClick={() => {
-                                                                navigator.clipboard.writeText(bankTopupResult.topUp?.referenceCode || "");
-                                                            }}
-                                                        >
-                                                            Sao chép
-                                                        </button>
-                                                    </div>
-                                                    {bankTopupResult.bank?.note && (
-                                                        <p className="text-xs text-amber-700">{bankTopupResult.bank.note}</p>
-                                                    )}
+                                                    </p>
+                                                    <p>
+                                                        <span className="font-bold text-slate-500">Chủ TK:</span>{" "}
+                                                        {bankRequest.bank?.accountOwner || "—"}
+                                                    </p>
+                                                    {bankRequest.bank?.branch ? (
+                                                        <p>
+                                                            <span className="font-bold text-slate-500">Chi nhánh:</span>{" "}
+                                                            {bankRequest.bank.branch}
+                                                        </p>
+                                                    ) : null}
+                                                    <p>
+                                                        <span className="font-bold text-slate-500">Nội dung CK:</span>{" "}
+                                                        <code className="bg-amber-50 text-amber-900 px-2 py-0.5 rounded border border-amber-200 font-bold">
+                                                            {bankRequest.topUp?.referenceCode || "—"}
+                                                        </code>
+                                                    </p>
+                                                    {bankRequest.bank?.note ? (
+                                                        <p className="text-xs text-slate-500 italic">{bankRequest.bank.note}</p>
+                                                    ) : null}
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    disabled={topupSubmitting}
-                                                    onClick={handleMarkBankSent}
-                                                    className="w-full py-3 rounded-xl bg-emerald-600 text-white font-black text-sm hover:bg-emerald-700 disabled:opacity-50"
-                                                >
-                                                    Tôi đã chuyển khoản
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="w-full py-2 text-slate-500 text-sm font-bold"
-                                                    onClick={() => setBankTopupResult(null)}
-                                                >
-                                                    Đóng
-                                                </button>
+                                                <div className="flex flex-wrap gap-3 pt-2">
+                                                    <button
+                                                        type="button"
+                                                        disabled={bankConfirming}
+                                                        onClick={handleConfirmBankSent}
+                                                        className="px-6 py-3 rounded-xl bg-green-600 text-white font-black text-sm hover:bg-green-700 transition-colors disabled:opacity-50"
+                                                    >
+                                                        {bankConfirming ? "…" : "Đã chuyển khoản — cộng ví"}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        disabled={bankConfirming}
+                                                        onClick={() => setBankRequest(null)}
+                                                        className="px-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-white"
+                                                    >
+                                                        Hủy
+                                                    </button>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -509,7 +531,7 @@ const ProfilePage = () => {
                                         ) : walletTx.length === 0 ? (
                                             <p className="text-center py-8 text-slate-400 font-bold text-sm italic">Chưa có giao dịch</p>
                                         ) : (
-                                            walletTx.map((tx) => {
+                                            displayedWalletTx.map((tx) => {
                                                 const oid = tx.orderId?._id || tx.orderId;
                                                 const shortId = oid ? String(oid).slice(-6).toUpperCase() : "";
                                                 const title =
@@ -556,6 +578,17 @@ const ProfilePage = () => {
                                             })
                                         )}
                                     </div>
+                                    {walletTx.length > 3 && (
+                                        <div className="mt-4 flex justify-center">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAllWalletTx((prev) => !prev)}
+                                                className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition-colors"
+                                            >
+                                                {showAllWalletTx ? "Ẩn bớt" : "Xem thêm"}
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}

@@ -87,6 +87,7 @@ export default function Vouchers() {
       description: values.description,
       discountType: values.discountType || "percent",
       discountValue: values.discountValue,
+      maxDiscountAmount: values.maxDiscountAmount ?? 0,
       minOrderValue: values.minOrderValue || 0,
       startDate: values.startDate?.toDate?.() || values.startDate,
       endDate: values.endDate?.toDate?.() || values.endDate,
@@ -110,6 +111,7 @@ export default function Vouchers() {
       description: record.description,
       discountType: record.discountType || "percent",
       discountValue: record.discountValue,
+      maxDiscountAmount: record.maxDiscountAmount ?? 0,
       minOrderValue: record.minOrderValue || 0,
       startDate: record.startDate ? dayjs(record.startDate) : null,
       endDate: record.endDate ? dayjs(record.endDate) : null,
@@ -150,6 +152,13 @@ export default function Vouchers() {
         Array.isArray(r.applicableProductIds) && r.applicableProductIds.length > 0
           ? `${r.applicableProductIds.length} sản phẩm`
           : "Toàn bộ sản phẩm",
+    },
+    {
+      title: "Giảm tối đa",
+      dataIndex: "maxDiscountAmount",
+      key: "maxDiscountAmount",
+      width: 110,
+      render: (v) => (v > 0 ? `${Number(v).toLocaleString()}đ` : "—"),
     },
     {
       title: "Đơn tối thiểu",
@@ -250,6 +259,14 @@ export default function Vouchers() {
             ]}
           >
             <InputNumber min={0} style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item
+            name="maxDiscountAmount"
+            label="Giảm tối đa (đ)"
+            extra="Trần số tiền được giảm (vd: giảm 20% nhưng tối đa 50.000đ). Để 0 = không giới hạn. Chỉ hiển thị trong admin."
+            initialValue={0}
+          >
+            <InputNumber min={0} style={{ width: "100%" }} placeholder="0 = không giới hạn" />
           </Form.Item>
           <Form.Item name="minOrderValue" label="Đơn tối thiểu (đ)">
             <InputNumber min={0} style={{ width: "100%" }} />

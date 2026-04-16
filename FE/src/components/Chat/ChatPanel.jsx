@@ -164,7 +164,7 @@ export default function ChatPanel({ onClose, compact = false }) {
         }}
       >
         <div style={{ fontWeight: 800 }}>
-          {compact ? "Hỗ trợ" : "Chat với SneakerHouse"}
+          {compact ? "Hỗ trợ" : "Chat với SneakerConverse"}
         </div>
         {onClose && (
           <button
