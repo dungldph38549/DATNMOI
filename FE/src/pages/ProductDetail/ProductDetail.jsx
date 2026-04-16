@@ -696,7 +696,7 @@ const ProductDetail = () => {
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-neutral-500">
               {product.brandId?.name || "CONVOT"}
             </p>
-            <h1 className="mt-3 font-serif text-4xl font-semibold leading-[1.08] tracking-tight text-convot-charcoal md:text-5xl">
+            <h1 className="mt-3 font-display text-4xl font-semibold leading-[1.08] tracking-tight text-convot-charcoal md:text-5xl">
               {product.name}
             </h1>
 
@@ -917,7 +917,7 @@ const ProductDetail = () => {
                     dangerouslySetInnerHTML={{ __html: product.description.replace(/\n/g, "<br/>") }}
                   />
                 ) : (
-                  <p className="text-center font-times text-sm italic text-neutral-400">
+                  <p className="text-center font-body text-sm italic text-neutral-400">
                     Mô tả đang được cập nhật.
                   </p>
                 )}
@@ -928,12 +928,17 @@ const ProductDetail = () => {
               <div className="max-w-none">
                 <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
                   <div className="border-b border-neutral-100 bg-slate-50/80 px-4 py-3">
-                    <h4 className="text-sm font-black uppercase tracking-wide text-slate-800">Đánh giá sản phẩm</h4>
+                    <h4 className="font-display text-sm font-black uppercase tracking-wide text-slate-800">
+                      Đánh giá sản phẩm
+                    </h4>
                   </div>
                   <div className="border-b border-neutral-100 px-4 py-5 md:px-5">
                   <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                     <div className="shrink-0">
-                      <p className="text-2xl md:text-3xl font-black leading-tight" style={{ color: REVIEW_ACCENT }}>
+                      <p
+                        className="font-display text-2xl md:text-3xl font-black leading-tight"
+                        style={{ color: REVIEW_ACCENT }}
+                      >
                         {ratingAverage == null ? "—" : Number(ratingAverage).toFixed(1)}{" "}
                         <span className="text-base md:text-lg font-bold text-slate-800">trên 5</span>
                       </p>
@@ -1166,7 +1171,7 @@ const ProductDetail = () => {
       {showSizeGuide && (
         <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-[2px] flex items-center justify-center p-4" onClick={() => setShowSizeGuide(false)}>
           <div
-            className="relative w-full max-w-2xl bg-white rounded-3xl border border-slate-200 shadow-2xl p-6 md:p-8"
+            className="relative w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 font-body shadow-2xl md:p-8"
             onClick={(e) => e.stopPropagation()}
           >
             <button

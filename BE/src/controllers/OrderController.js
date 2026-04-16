@@ -34,8 +34,7 @@ const ROLE_VOUCHER_USAGE_LIMIT = {
 const GUEST_VOUCHER_USAGE_LIMIT = 2;
 
 
-/** Canceled and accepted-return orders are excluded from admin revenue stats. */
-const ORDER_STATUSES_EXCLUDED_FROM_REVENUE = ["canceled", "accepted"];
+
 
 /** Không tính doanh thu: hủy đơn, đang yêu cầu hoàn hàng, hoặc đã chấp nhận hoàn (đã hoàn tiền). */
 const ORDER_STATUSES_EXCLUDED_FROM_REVENUE = [

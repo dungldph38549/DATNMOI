@@ -1,29 +1,40 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "antd/dist/reset.css";
 import "./index.css";
 import App from "./App";
 import reportWebVitals from "./reportWebVitals";
 import { store } from "./redux/store";
 import { Provider } from "react-redux";
+import { ConfigProvider } from "antd";
 
 // 1. Import QueryClient và QueryClientProvider
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-
-import "antd/dist/reset.css";
 
 
 // 2. Khởi tạo instance của QueryClient
 const queryClient = new QueryClient();
 
+const googleSans =
+  '"Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"';
+
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <Provider store={store}>
-        {/* 3. Bọc QueryClientProvider bên ngoài App */}
-        <App />
-      </Provider>
-    </QueryClientProvider>
+    <ConfigProvider
+      theme={{
+        token: {
+          fontFamily: googleSans,
+        },
+      }}
+    >
+      <QueryClientProvider client={queryClient}>
+        <Provider store={store}>
+          {/* 3. Bọc QueryClientProvider bên ngoài App */}
+          <App />
+        </Provider>
+      </QueryClientProvider>
+    </ConfigProvider>
   </React.StrictMode>,
 );
 

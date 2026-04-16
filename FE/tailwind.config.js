@@ -17,10 +17,15 @@ module.exports = {
         },
       },
       fontFamily: {
-        display: ["Outfit", "sans-serif"],
-        body: ["Plus Jakarta Sans", "sans-serif"],
+        display: ["Outfit", "ui-sans-serif", "system-ui", "sans-serif"],
+        body: [
+          "Plus Jakarta Sans",
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif",
+        ],
         serif: ["Cormorant Garamond", "Georgia", "serif"],
-        times: ['"Times New Roman"', "Times", "serif"],
+        times: ["Cormorant Garamond", "Georgia", "serif"],
       },
       boxShadow: {
         'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
