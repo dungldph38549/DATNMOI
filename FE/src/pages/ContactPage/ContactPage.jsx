@@ -83,8 +83,8 @@ const ContactPage = () => {
               </div>
               <div>
                 <h3 className="font-bold text-slate-800 text-lg mb-1">Email liên hệ</h3>
-                <p className="text-slate-500 font-medium break-all">support@sneakerhouse.vn</p>
-                <p className="text-slate-500 font-medium break-all">contact@sneakerhouse.vn</p>
+                <p className="text-slate-500 font-medium break-all">support@sneakerconverse.vn</p>
+                <p className="text-slate-500 font-medium break-all">contact@sneakerconverse.vn</p>
               </div>
             </div>
 

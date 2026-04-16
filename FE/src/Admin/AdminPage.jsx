@@ -31,7 +31,7 @@ const getAdminSession = () => {
 };
 
 // ================================================================
-// Design tokens — SneakerHouse
+// Design tokens — SneakerConverse
 // ================================================================
 const T = {
   primary: "#f49d25",
@@ -479,7 +479,7 @@ const AdminPage = () => {
                     lineHeight: 1.2,
                   }}
                 >
-                  SneakerHouse
+                  SneakerConverse
                 </div>
                 <div
                   style={{

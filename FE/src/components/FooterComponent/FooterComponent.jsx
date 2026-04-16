@@ -72,7 +72,7 @@ const FooterComponent = () => {
                 <span className="material-symbols-outlined text-[20px] font-light">public</span>
               </a>
               <a
-                href="mailto:support@sneakerhouse.vn"
+                href="mailto:support@sneakerconverse.vn"
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-300 bg-white text-neutral-700 hover:border-neutral-900 hover:bg-neutral-900 hover:text-white transition-colors"
                 aria-label="Email"
               >

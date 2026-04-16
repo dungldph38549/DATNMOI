@@ -23,7 +23,7 @@ import notify from "../../utils/notify";
 
 const SHOPEE_ORANGE = "#ee4d2d";
 const BORDER = "#e8e8e8";
-const SHOP_NAME = "SneakerHouse";
+const SHOP_NAME = "SneakerConverse";
 
 const STATUS_LABELS = {
   pending: "Chờ xử lý",

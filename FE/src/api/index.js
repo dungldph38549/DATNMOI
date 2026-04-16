@@ -138,7 +138,7 @@ export const getAllUser = async (page, limit) => {
   return res.data;
 };
 // ================== Product API ==================
-// Khớp với ProductController.js — SneakerHouse
+// Khớp với ProductController.js — SneakerConverse
 
 // ── KHÁCH HÀNG ────────────────────────────────────────────────
 

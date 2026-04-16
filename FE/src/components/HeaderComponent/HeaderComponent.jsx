@@ -77,6 +77,94 @@ const Header = () => {
   const isSaleNav = location.pathname === "/sale";
   const isVoucherNav = location.pathname === "/voucher";
 
+  const breadcrumbTrail = (() => {
+    const path = location.pathname;
+    const home = "Trang ch\u1ee7";
+    const rest = [{ label: home, to: "/" }];
+    if (path === "/") {
+      return [{ label: home, to: null }];
+    }
+    if (path === "/phu-kien") {
+      rest.push({ label: "Ph\u1ee5 ki\u1ec7n", to: null });
+      return rest;
+    }
+    if (path === "/product") {
+      rest.push({ label: "S\u1ea3n ph\u1ea9m", to: null });
+      return rest;
+    }
+    if (path === "/sale") {
+      rest.push({ label: "Sale", to: null });
+      return rest;
+    }
+    if (path === "/voucher") {
+      rest.push({ label: "Voucher", to: null });
+      return rest;
+    }
+    if (path === "/terms") {
+      rest.push({ label: "\u0110i\u1ec1u kho\u1ea3n & \u0111i\u1ec1u ki\u1ec7n", to: null });
+      return rest;
+    }
+    if (path === "/contact") {
+      rest.push({ label: "Li\u00ean h\u1ec7", to: null });
+      return rest;
+    }
+    if (path === "/search") {
+      rest.push({ label: "T\u00ecm ki\u1ebfm", to: null });
+      return rest;
+    }
+    if (path === "/cart") {
+      rest.push({ label: "Gi\u1ecf h\u00e0ng", to: null });
+      return rest;
+    }
+    if (path === "/checkout") {
+      rest.push({ label: "Thanh to\u00e1n", to: null });
+      return rest;
+    }
+    if (path === "/login") {
+      rest.push({ label: "\u0110\u0103ng nh\u1eadp", to: null });
+      return rest;
+    }
+    if (path === "/register") {
+      rest.push({ label: "\u0110\u0103ng k\u00fd", to: null });
+      return rest;
+    }
+    if (path === "/profile") {
+      rest.push({ label: "T\u00e0i kho\u1ea3n", to: null });
+      return rest;
+    }
+    if (path === "/wishlist") {
+      rest.push({ label: "Y\u00eau th\u00edch", to: null });
+      return rest;
+    }
+    if (path === "/orders") {
+      rest.push({ label: "\u0110\u01a1n h\u00e0ng", to: null });
+      return rest;
+    }
+    if (path.startsWith("/orders/")) {
+      rest.push({ label: "\u0110\u01a1n h\u00e0ng", to: "/orders" });
+      rest.push({ label: "Chi ti\u1ebft", to: null });
+      return rest;
+    }
+    if (path.startsWith("/product/")) {
+      rest.push({ label: "S\u1ea3n ph\u1ea9m", to: "/product?segment=products" });
+      rest.push({ label: "Chi ti\u1ebft", to: null });
+      return rest;
+    }
+    if (path === "/category") {
+      rest.push({ label: "Danh m\u1ee5c", to: null });
+      return rest;
+    }
+    if (path === "/payment/return") {
+      rest.push({ label: "Thanh to\u00e1n", to: null });
+      return rest;
+    }
+    if (path === "/chat") {
+      rest.push({ label: "Chat", to: null });
+      return rest;
+    }
+    return rest;
+  })();
+
   const mainNav = (
     <>
       <Link to="/product?segment=products" className={navActive(isProductsNav)}>
@@ -101,7 +189,7 @@ const Header = () => {
           <div onClick={goHome} className="flex items-center cursor-pointer shrink-0 order-1">
             <span className="text-lg md:text-xl xl:text-2xl font-display tracking-tight">
               <span className="font-black text-neutral-900">SNEAKER</span>
-              <span className="font-semibold text-convot-sage">HOUSE</span>
+              <span className="font-semibold text-convot-sage">CONVERSE</span>
             </span>
           </div>
 
@@ -246,13 +334,29 @@ const Header = () => {
           </Link>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 pb-3 pt-2 border-t border-neutral-200/50">
-          <Link to="/" className={subLinkClass}>
-            Trang chủ
-          </Link>
-          <Link to="/terms" className={subLinkClass}>
-            Điều khoản &amp; điều kiện
-          </Link>
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 pb-3 pt-2 border-t border-neutral-200/50">
+          <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-x-2 text-xs md:text-sm">
+            {breadcrumbTrail.map((item, idx) => {
+              const showSep = idx > 0;
+              return (
+                <span key={`${item.label}-${idx}`} className="inline-flex items-center gap-x-2">
+                  {showSep && <span className="text-neutral-300 select-none">/</span>}
+                  {item.to != null ? (
+                    <Link to={item.to} className={subLinkClass}>
+                      {item.label}
+                    </Link>
+                  ) : (
+                    <span className="font-medium text-neutral-800">{item.label}</span>
+                  )}
+                </span>
+              );
+            })}
+          </nav>
+          {location.pathname !== "/terms" && (
+            <Link to="/terms" className={`${subLinkClass} shrink-0`}>
+              {"\u0110i\u1ec1u kho\u1ea3n & \u0111i\u1ec1u ki\u1ec7n"}
+            </Link>
+          )}
         </div>
       </div>
     </header>

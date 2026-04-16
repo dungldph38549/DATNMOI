@@ -1,5 +1,5 @@
 // ================================================================
-// middlewares/auth.js — SneakerHouse
+// middlewares/auth.js — SneakerConverse
 // ================================================================
 const jwt = require("jsonwebtoken");
 const User = require("../models/UserModel"); // khớp với models/ (plural)

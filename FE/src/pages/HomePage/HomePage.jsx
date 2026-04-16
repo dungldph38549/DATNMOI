@@ -133,7 +133,7 @@ const HomePage = () => {
     } catch {
       /* ignore */
     }
-    notify.success("Đăng ký thành công! Cảm ơn bạn đã đồng hành cùng Sneaker House.");
+    notify.success("Đăng ký thành công! Cảm ơn bạn đã đồng hành cùng Sneaker Converse.");
     setNewsletterEmail("");
   };
 
@@ -365,7 +365,7 @@ const HomePage = () => {
       <section className="bg-white border-t border-neutral-100 py-14 md:py-20 px-4">
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-2xl md:text-3xl font-display font-bold text-neutral-900 tracking-tight">
-            Gia nhập Sneaker House
+            Gia nhập Sneaker Converse
           </h2>
           <p className="mt-4 text-sm md:text-base text-neutral-600 leading-relaxed">
             Đăng ký để nhận thông tin về các bộ sưu tập mới nhất và ưu đãi độc quyền dành riêng cho bạn.

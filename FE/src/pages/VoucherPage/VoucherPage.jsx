@@ -313,7 +313,7 @@ const VoucherPage = () => {
             ƯU ĐÃI ĐỘC QUYỀN
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-neutral-600 md:text-lg">
-            Tích lũy mã giảm giá, freeship và quà tặng dành cho thành viên Sneaker House — áp dụng khi thanh toán trong thời gian hiệu lực.
+            Tích lũy mã giảm giá, freeship và quà tặng dành cho thành viên Sneaker Converse — áp dụng khi thanh toán trong thời gian hiệu lực.
           </p>
 
           {!loading && featured && (

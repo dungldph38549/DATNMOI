@@ -4,6 +4,7 @@ import { FaHeart, FaRegHeart } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProducts } from "../../api";
 import { getProductPriceInfo } from "../../utils/pricing";
+import { getVariantColorValue } from "../../utils/variantAttributes";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 
 const PAGE_STEP = 12;
@@ -25,7 +26,8 @@ const getProductColors = (product) => {
   const colors = [];
   if (Array.isArray(product?.variants)) {
     product.variants.forEach((variant) => {
-      const candidate = variant?.color ?? variant?.colorName;
+      const fromAttrs = getVariantColorValue(variant);
+      const candidate = fromAttrs ?? variant?.color ?? variant?.colorName;
       if (candidate != null && String(candidate).trim() !== "") {
         colors.push(String(candidate).trim());
       }
@@ -65,7 +67,7 @@ const getSubLabel = (p) => {
   if (cat) return cat.toUpperCase();
   const short = (p?.shortDescription || "").trim();
   if (short) return short.slice(0, 48).toUpperCase();
-  return "SNEAKER HOUSE";
+  return "SNEAKER CONVERSE";
 };
 
 const SalePage = () => {

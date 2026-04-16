@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 
-const WISHLIST_KEY = 'sneakerhouse_wishlist_v1';
+const WISHLIST_KEY = 'sneakerconverse_wishlist_v1';
 
 const loadWishlist = () => {
   try {
