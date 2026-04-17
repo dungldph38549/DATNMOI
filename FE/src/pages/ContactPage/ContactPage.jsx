@@ -1,96 +1,192 @@
 import React from "react";
-import { FaMapMarkerAlt, FaPhoneAlt, FaEnvelope, FaPaperPlane } from "react-icons/fa";
+import { Link } from "react-router-dom";
+
+const inputClass =
+  "w-full rounded-2xl border border-neutral-200 bg-neutral-50/80 px-5 py-3.5 text-sm font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-convot-sage focus:bg-white focus:ring-2 focus:ring-convot-sage/15";
+
+const infoCard =
+  "flex gap-4 rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-sm transition hover:border-convot-sage/30 hover:shadow-md";
 
 const ContactPage = () => {
   return (
-    <div className="bg-background-light min-h-screen font-body pb-20 pt-24 text-slate-800">
+    <div className="min-h-screen bg-convot-cream pb-16 pt-8 font-body text-neutral-800 md:pt-12">
+      <div className="container mx-auto max-w-7xl px-4">
+        <nav className="mb-8 text-sm text-neutral-500" aria-label="Breadcrumb">
+          <ol className="flex flex-wrap items-center gap-2">
+            <li>
+              <Link to="/" className="text-convot-sage transition-colors hover:underline">
+                Trang chủ
+              </Link>
+            </li>
+            <li className="text-neutral-300" aria-hidden>
+              /
+            </li>
+            <li className="font-medium text-neutral-700">Liên hệ</li>
+          </ol>
+        </nav>
 
-      {/* MAP BANNER */}
-      <div className="w-full h-80 md:h-[400px] bg-slate-200 relative">
-        <iframe
-          title="Google Map Location"
-          src="https://www.google.com/maps?q=21.0285,105.8542&z=15&output=embed"
-          className="w-full h-full border-0 grayscale opacity-80"
-          loading="lazy"
-        ></iframe>
-        <div className="absolute inset-0 bg-gradient-to-t from-background-light via-transparent to-transparent pointer-events-none"></div>
-      </div>
+        {/* Tiêu đề */}
+        <header className="mb-10">
+          <h1 className="font-display text-3xl font-black uppercase tracking-tight text-neutral-900 md:text-4xl">
+            Liên <span className="text-convot-sage">hệ</span>
+          </h1>
+          <p className="mt-3 max-w-2xl text-base text-neutral-600 md:text-lg">
+            Sneaker Converse luôn sẵn sàng lắng nghe góp ý, hỗ trợ đơn hàng và tư vấn size — phản hồi trong giờ làm việc.
+          </p>
+          <div className="mt-4 h-1 w-14 rounded-full bg-convot-sage" aria-hidden />
+        </header>
 
-      <div className="container mx-auto px-4 max-w-6xl -mt-20 relative z-10">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-10">
+          {/* Form */}
+          <section className="lg:col-span-7">
+            <div className="rounded-3xl border border-neutral-200/80 bg-white p-6 shadow-sm md:p-10">
+              <h2 className="font-display text-lg font-bold text-neutral-900 md:text-xl">
+                Gửi tin nhắn cho chúng tôi
+              </h2>
+              <p className="mt-1 text-sm text-neutral-500">
+                Điền form bên dưới — chúng tôi sẽ liên hệ qua email hoặc điện thoại bạn đã nhập.
+              </p>
 
-        <div className="flex flex-col lg:flex-row gap-8">
-
-          {/* LEFT: FORM */}
-          <div className="w-full lg:w-2/3 bg-white p-8 md:p-12 rounded-3xl shadow-xl shadow-slate-900/5 border border-slate-100">
-            <h1 className="text-3xl md:text-4xl font-display font-black text-slate-900 mb-2">Liên Hệ Với Chúng Tôi.</h1>
-            <p className="text-slate-500 mb-10 text-lg">Chúng tôi luôn sẵn sàng lắng nghe mọi góp ý và giải đáp thắc mắc của bạn.</p>
-
-            <form className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700 ml-1">Họ và tên <span className="text-red-500">*</span></label>
-                  <input type="text" placeholder="Nguyễn Văn A" className="w-full h-14 px-5 rounded-2xl border border-slate-200 bg-slate-50 font-medium outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all" />
+              <form className="mt-8 space-y-5" onSubmit={(e) => e.preventDefault()}>
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label htmlFor="contact-name" className="text-sm font-bold text-neutral-700">
+                      Họ và tên <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="contact-name"
+                      type="text"
+                      name="name"
+                      placeholder="Nguyễn Văn A"
+                      autoComplete="name"
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="contact-email" className="text-sm font-bold text-neutral-700">
+                      Email <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="contact-email"
+                      type="email"
+                      name="email"
+                      placeholder="ban@email.com"
+                      autoComplete="email"
+                      className={inputClass}
+                    />
+                  </div>
                 </div>
+
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700 ml-1">Email <span className="text-red-500">*</span></label>
-                  <input type="email" placeholder="example@gmail.com" className="w-full h-14 px-5 rounded-2xl border border-slate-200 bg-slate-50 font-medium outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all" />
+                  <label htmlFor="contact-subject" className="text-sm font-bold text-neutral-700">
+                    Tiêu đề <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="contact-subject"
+                    type="text"
+                    name="subject"
+                    placeholder="Ví dụ: Hỏi về đơn hàng, đổi size…"
+                    className={inputClass}
+                  />
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 ml-1">Tiêu đề <span className="text-red-500">*</span></label>
-                <input type="text" placeholder="Bạn cần hỗ trợ về vấn đề gì?" className="w-full h-14 px-5 rounded-2xl border border-slate-200 bg-slate-50 font-medium outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all" />
-              </div>
+                <div className="space-y-2">
+                  <label htmlFor="contact-body" className="text-sm font-bold text-neutral-700">
+                    Nội dung <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    id="contact-body"
+                    name="message"
+                    rows={5}
+                    placeholder="Nhập chi tiết nội dung cần hỗ trợ…"
+                    className={`${inputClass} resize-none`}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 ml-1">Nội dung <span className="text-red-500">*</span></label>
-                <textarea rows="5" placeholder="Nhập chi tiết nội dung cần hỗ trợ..." className="w-full p-5 rounded-2xl border border-slate-200 bg-slate-50 font-medium outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all resize-none custom-scrollbar"></textarea>
-              </div>
+                <button
+                  type="submit"
+                  className="inline-flex h-12 items-center gap-2 rounded-full bg-convot-sage px-8 text-sm font-bold text-white shadow-md transition hover:bg-[#7a9680]"
+                >
+                  <span className="material-symbols-outlined text-[20px]">send</span>
+                  Gửi lời nhắn
+                </button>
+              </form>
+            </div>
+          </section>
 
-              <button type="button" className="inline-flex items-center gap-2 h-14 px-10 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:bg-primary transition-colors shadow-lg shadow-primary/20">
-                <FaPaperPlane /> Gửi Lời Nhắn
-              </button>
-            </form>
-          </div>
-
-          {/* RIGHT: INFO */}
-          <div className="w-full lg:w-1/3 flex flex-col gap-6 lg:mt-24">
-
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex gap-4 items-start group hover:border-primary/30 transition-colors">
-              <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                <FaMapMarkerAlt size={20} />
-              </div>
+          {/* Thông tin */}
+          <aside className="flex flex-col gap-4 lg:col-span-5">
+            <div className={infoCard}>
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-convot-sage/15 text-convot-sage">
+                <span className="material-symbols-outlined text-[24px]">location_on</span>
+              </span>
               <div>
-                <h3 className="font-bold text-slate-800 text-lg mb-1">Địa chỉ</h3>
-                <p className="text-slate-500 font-medium leading-relaxed">FPT Polytechnic, Tòa nhà F, Phố Trịnh Văn Bô, Nam Từ Liêm, Hà Nội</p>
+                <h3 className="font-display font-bold text-neutral-900">Địa chỉ</h3>
+                <p className="mt-1 text-sm leading-relaxed text-neutral-600">
+                  FPT Polytechnic, Tòa nhà F, Phố Trịnh Văn Bô, Nam Từ Liêm, Hà Nội
+                </p>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex gap-4 items-start group hover:border-primary/30 transition-colors">
-              <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                <FaPhoneAlt size={18} />
-              </div>
+            <div className={infoCard}>
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-convot-sage/15 text-convot-sage">
+                <span className="material-symbols-outlined text-[24px]">call</span>
+              </span>
               <div>
-                <h3 className="font-bold text-slate-800 text-lg mb-1">Điện thoại</h3>
-                <p className="text-slate-500 font-medium">0123 456 789</p>
-                <p className="text-slate-500 font-medium">0987 654 321</p>
+                <h3 className="font-display font-bold text-neutral-900">Điện thoại</h3>
+                <p className="mt-1 text-sm text-neutral-600">0123 456 789</p>
+                <p className="text-sm text-neutral-600">0987 654 321</p>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex gap-4 items-start group hover:border-primary/30 transition-colors">
-              <div className="w-12 h-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                <FaEnvelope size={18} />
-              </div>
+            <div className={infoCard}>
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-convot-sage/15 text-convot-sage">
+                <span className="material-symbols-outlined text-[24px]">mail</span>
+              </span>
               <div>
-                <h3 className="font-bold text-slate-800 text-lg mb-1">Email liên hệ</h3>
-                <p className="text-slate-500 font-medium break-all">support@sneakerconverse.vn</p>
-                <p className="text-slate-500 font-medium break-all">contact@sneakerconverse.vn</p>
+                <h3 className="font-display font-bold text-neutral-900">Email</h3>
+                <a
+                  href="mailto:support@sneakerconverse.vn"
+                  className="mt-1 block text-sm font-medium text-convot-sage hover:underline"
+                >
+                  support@sneakerconverse.vn
+                </a>
+                <a
+                  href="mailto:contact@sneakerconverse.vn"
+                  className="mt-0.5 block text-sm font-medium text-convot-sage hover:underline"
+                >
+                  contact@sneakerconverse.vn
+                </a>
               </div>
             </div>
 
-          </div>
-
+            <div className={infoCard}>
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-convot-sage/15 text-convot-sage">
+                <span className="material-symbols-outlined text-[24px]">schedule</span>
+              </span>
+              <div>
+                <h3 className="font-display font-bold text-neutral-900">Giờ làm việc</h3>
+                <p className="mt-1 text-sm text-neutral-600">Thứ 2 – Chủ nhật: 9h00 – 21h00</p>
+              </div>
+            </div>
+          </aside>
         </div>
+
+        {/* Bản đồ */}
+        <section className="mt-12 overflow-hidden rounded-3xl border border-neutral-200/80 bg-white shadow-sm">
+          <div className="relative aspect-[21/9] min-h-[220px] w-full md:min-h-[280px]">
+            <iframe
+              title="Bản đồ Sneaker Converse — Hà Nội"
+              src="https://www.google.com/maps?q=21.0383,105.7474&z=15&output=embed"
+              className="absolute inset-0 h-full w-full border-0"
+              loading="lazy"
+            />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-convot-cream/40 to-transparent" />
+          </div>
+          <p className="border-t border-neutral-100 px-4 py-3 text-center text-xs text-neutral-500">
+            Vị trí minh họa — có thể cập nhật tọa độ cửa hàng trong mã nguồn.
+          </p>
+        </section>
       </div>
     </div>
   );

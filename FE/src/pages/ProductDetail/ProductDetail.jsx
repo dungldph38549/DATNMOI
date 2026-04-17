@@ -14,6 +14,7 @@ import {
   getOrderStatusLabelForReview,
   shouldShowOrderStatusOnReview,
 } from "../../utils/orderStatusForReview";
+import SizeGuideInner from "../../components/SizeGuide/SizeGuideInner";
 
 const REVIEW_ACCENT = "#1a1a1a";
 
@@ -59,7 +60,6 @@ const ProductDetail = () => {
   const [activeTab, setActiveTab] = useState("story");
   const [mainImage, setMainImage] = useState("");
   const [showSizeGuide, setShowSizeGuide] = useState(false);
-  const [footLength, setFootLength] = useState("");
 
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
@@ -561,31 +561,6 @@ const ProductDetail = () => {
   const maxSelectableQty = Math.max(0, Number(stockCountDisplay || 0));
   const canIncreaseQty = maxSelectableQty <= 0 ? false : quantity < maxSelectableQty;
   const isOutOfStock = maxSelectableQty <= 0 || stockInfo?.available === false;
-  const sizeGuideRows = useMemo(
-    () => [
-      { eu: "36", footMin: 22.0, footMax: 22.5 },
-      { eu: "37", footMin: 22.6, footMax: 23.0 },
-      { eu: "38", footMin: 23.1, footMax: 23.5 },
-      { eu: "39", footMin: 23.6, footMax: 24.0 },
-      { eu: "40", footMin: 24.1, footMax: 24.5 },
-      { eu: "41", footMin: 24.6, footMax: 25.0 },
-      { eu: "42", footMin: 25.1, footMax: 25.5 },
-      { eu: "43", footMin: 25.6, footMax: 26.0 },
-      { eu: "44", footMin: 26.1, footMax: 26.5 },
-      { eu: "45", footMin: 26.6, footMax: 27.0 },
-    ],
-    [],
-  );
-  const recommendedSize = useMemo(() => {
-    const len = Number(footLength);
-    if (!Number.isFinite(len) || len <= 0) return null;
-    const found =
-      sizeGuideRows.find((r) => len >= r.footMin && len <= r.footMax) ||
-      sizeGuideRows.find((r) => len <= r.footMax) ||
-      sizeGuideRows[sizeGuideRows.length - 1];
-    return found?.eu ?? null;
-  }, [footLength, sizeGuideRows]);
-
   useEffect(() => {
     if (!showSizeGuide) return undefined;
     const prevOverflow = document.body.style.overflow;
@@ -1182,72 +1157,9 @@ const ProductDetail = () => {
             >
               <FaTimes size={14} />
             </button>
-            <div className="mb-5 pr-14">
-              <div>
-                <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-black text-primary bg-primary/10 px-3 py-1 rounded-full mb-2">
-                  <FaRulerCombined />
-                  Size Guide
-                </span>
-                <h3 className="text-xl md:text-2xl font-display font-black text-slate-900">Hướng dẫn chọn size</h3>
-                <p className="text-slate-500 text-sm mt-1">Đo chiều dài bàn chân (cm) từ gót đến ngón dài nhất để chọn size gần đúng.</p>
-              </div>
+            <div className="pr-14">
+              <SizeGuideInner />
             </div>
-
-            <div className="mb-5 bg-gradient-to-r from-slate-50 to-white border border-slate-200 rounded-2xl p-4">
-              <label className="block text-sm font-bold text-slate-700 mb-2">Nhập chiều dài chân của bạn (cm)</label>
-              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-                <input
-                  type="number"
-                  step="0.1"
-                  min="18"
-                  max="35"
-                  value={footLength}
-                  onChange={(e) => setFootLength(e.target.value)}
-                  placeholder="VD: 25.2"
-                  className="w-full sm:w-48 rounded-xl border border-slate-300 px-4 py-2.5 font-semibold text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-                <div className="text-sm font-semibold text-slate-600">
-                  {recommendedSize ? (
-                    <span className="inline-flex items-center gap-2">
-                      Gợi ý size:
-                      <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary text-white font-black text-sm shadow-lg shadow-primary/30">
-                        EU {recommendedSize}
-                      </span>
-                    </span>
-                  ) : (
-                    <span>Nhập chiều dài để nhận gợi ý nhanh.</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="overflow-auto rounded-2xl border border-slate-100">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-900 text-slate-100">
-                    <th className="text-left px-4 py-3 font-bold">Size EU</th>
-                    <th className="text-left px-4 py-3 font-bold">Chiều dài chân (cm)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sizeGuideRows.map((row) => (
-                    <tr
-                      key={row.eu}
-                      className={`border-t border-slate-100 ${String(recommendedSize) === String(row.eu) ? "bg-primary/5" : "hover:bg-slate-50"}`}
-                    >
-                      <td className="px-4 py-3 font-bold text-slate-800">EU {row.eu}</td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {row.footMin.toFixed(1)} - {row.footMax.toFixed(1)} cm
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <p className="text-xs text-slate-400 mt-4">
-              Mẹo: nếu số đo nằm giữa 2 size và bạn thích đi thoải mái, hãy chọn size lớn hơn 0.5 - 1.
-            </p>
           </div>
         </div>
       )}

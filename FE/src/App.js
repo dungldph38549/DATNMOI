@@ -21,6 +21,11 @@ import Register from "./pages/Register/Register";
 import Login from "./pages/Login/Login";
 import ShoppingCartPage from "./pages/ShoppingCartPage/ShoppingCartPage";
 import TermsConditionsPage from "./pages/TermsConditionsPage/TermsConditionsPage";
+import ShippingPolicyPage from "./pages/ShippingPolicyPage/ShippingPolicyPage";
+import ReturnPolicyPage from "./pages/ReturnPolicyPage/ReturnPolicyPage";
+import SizeGuidePage from "./pages/SizeGuidePage/SizeGuidePage";
+import StoreLocatorPage from "./pages/StoreLocatorPage/StoreLocatorPage";
+import RecruitmentPage from "./pages/RecruitmentPage/RecruitmentPage";
 import ContactPage from "./pages/ContactPage/ContactPage";
 import CheckOut from "./pages/CheckOut/CheckOut";
 import CategoryPage from "./pages/Category/CategoryPage";
@@ -103,6 +108,11 @@ function AppContent() {
           />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/terms" element={<TermsConditionsPage />} />
+          <Route path="/van-chuyen" element={<ShippingPolicyPage />} />
+          <Route path="/chinh-sach-doi-tra" element={<ReturnPolicyPage />} />
+          <Route path="/huong-dan-chon-size" element={<SizeGuidePage />} />
+          <Route path="/he-thong-cua-hang" element={<StoreLocatorPage />} />
+          <Route path="/tuyen-dung" element={<RecruitmentPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route
             path="/orders"
