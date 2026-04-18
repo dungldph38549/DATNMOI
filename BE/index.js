@@ -17,6 +17,7 @@ const {
   syncWalletTransactionIndexes,
 } = require("./src/migrations/syncWalletTransactionIndexes");
 const { initChatSocket } = require("./src/socket/chatSocket");
+const { setSocketIO } = require("./src/socket/ioSingleton");
 const { cleanupUnpaidVnpayOrders } = require("./src/services/vnpayCleanupService");
 
 const app = express();
@@ -132,6 +133,7 @@ app.use((err, req, res, next) => {
 });
 
 // 8. Khởi chạy Socket & Jobs
+setSocketIO(io);
 initChatSocket(io);
 setInterval(async () => {
   try {

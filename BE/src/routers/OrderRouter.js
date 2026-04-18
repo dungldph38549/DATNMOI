@@ -54,6 +54,18 @@ router.post("/:id/create-vnpay-url", orderController.createVnpayUrl);
 // User: Yêu cầu hoàn hàng
 router.post("/:id/return-request", authMiddleware, orderController.returnOrderRequest);
 
+// Hủy từng dòng sản phẩm (đơn chờ / đã xác nhận)
+router.post(
+  "/admin/:id/cancel-line",
+  authAdminMiddleware,
+  orderController.cancelOrderLineByAdmin,
+);
+router.post(
+  "/:id/cancel-line",
+  authMiddleware,
+  orderController.cancelOrderLineByUser,
+);
+
 // Admin: Chấp nhận / Từ chối hoàn hàng
 router.put("/:id/accept-return", authAdminMiddleware, orderController.acceptOrRejectReturn);
 router.put("/:id/reject-return", authAdminMiddleware, orderController.acceptOrRejectReturn);

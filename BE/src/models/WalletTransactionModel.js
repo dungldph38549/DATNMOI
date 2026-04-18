@@ -24,6 +24,7 @@ const walletTransactionSchema = new mongoose.Schema(
         "return_refund",
         "order_payment",
         "order_cancel_refund",
+        "order_line_cancel_refund",
         "topup_vnpay",
         "topup_bank",
       ],
@@ -49,12 +50,16 @@ const walletTransactionSchema = new mongoose.Schema(
 );
 
 walletTransactionSchema.index({ userId: 1, createdAt: -1 });
+// Chỉ giới hạn 1 giao dịch / đơn với order_payment & order_cancel_refund.
+// order_line_cancel_refund có thể nhiều bản ghi cho cùng đơn.
 walletTransactionSchema.index(
   { orderId: 1, type: 1 },
   {
     unique: true,
-    // MongoDB partial index không hỗ trợ $ne: null; dùng $type objectId.
-    partialFilterExpression: { orderId: { $type: "objectId" } },
+    partialFilterExpression: {
+      orderId: { $type: "objectId" },
+      type: { $in: ["order_payment", "order_cancel_refund"] },
+    },
   },
 );
 // Unique chỉ khi có topUpId (nạp ví). Sparse unique vẫn index nhiều doc topUpId: null → E11000.

@@ -74,6 +74,20 @@ const orderSchema = new mongoose.Schema(
           type: Object,
           default: {},
         },
+        /** Hủy từng dòng (đơn vẫn tồn tại nếu còn dòng active) */
+        lineStatus: {
+          type: String,
+          enum: ["active", "canceled"],
+          default: "active",
+        },
+        canceledAt: {
+          type: Date,
+          default: null,
+        },
+        canceledBy: {
+          type: String,
+          enum: ["user", "admin"],
+        },
       },
     ],
     discount: {

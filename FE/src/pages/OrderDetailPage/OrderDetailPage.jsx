@@ -7,12 +7,14 @@ import {
   returnOrderRequest,
   createVnpayUrl,
   cancelOrderByUser,
+  cancelOrderLineByUser,
   createReview,
   uploadImages,
   getMyReviewByProduct,
 } from "../../api";
 import { FaBoxOpen, FaCheckCircle, FaTruck, FaMapMarkerAlt, FaTimesCircle, FaChevronLeft, FaUndoAlt, FaCreditCard, FaMoneyBillWave, FaShieldAlt, FaTimes, FaStar, FaImage, FaVideo, FaChevronDown, FaCoins } from "react-icons/fa";
 import notify from "../../utils/notify";
+import { confirmShopee } from "../../utils/shopeeNotify";
 
 const STATUS_LABELS = {
   pending: "Chờ xử lý", confirmed: "Đã xác nhận", shipped: "Đang giao", delivered: "Đã giao",
@@ -56,6 +58,9 @@ const getTrackingProgress = (status) => {
 };
 
 const formatMoney = (v) => `${Number(v || 0).toLocaleString("vi-VN")}đ`;
+
+const isOrderLineActive = (p) =>
+  !p?.lineStatus || p.lineStatus !== "canceled";
 
 const normHistoryStatus = (s) =>
   typeof s === "string" ? s.trim().toLowerCase() : s;
@@ -153,13 +158,19 @@ const OrderDetailPage = () => {
   useEffect(() => {
     const run = async () => {
       const status = typeof order?.status === "string" ? order.status.trim().toLowerCase() : order?.status;
-      if (!isLoggedIn || !REVIEWABLE_STATUSES.has(status) || !Array.isArray(order?.products) || order.products.length === 0) {
+      if (
+        !isLoggedIn ||
+        !REVIEWABLE_STATUSES.has(status) ||
+        !Array.isArray(order?.products) ||
+        order.products.length === 0
+      ) {
         setMyReviewsByProduct({});
         return;
       }
       const productIds = Array.from(
         new Set(
           order.products
+            .filter(isOrderLineActive)
             .map((p) => String(p?.productId?._id || p?.productId || ""))
             .filter(Boolean),
         ),
@@ -270,12 +281,36 @@ const OrderDetailPage = () => {
   };
 
   const handleCancelOrder = async () => {
-    if (!window.confirm("Bạn có chắc muốn hủy đơn hàng này?")) return;
+    const ok = await confirmShopee({
+      text: "Bạn có chắc muốn hủy toàn bộ đơn hàng này?",
+      confirmText: "Đồng ý",
+      cancelText: "Đóng",
+    });
+    if (!ok) return;
     try {
       await cancelOrderByUser(id);
       setOrder((o) => (o ? { ...o, status: "canceled" } : o));
       notify.success("Da huy don hang.");
     } catch (err) { notify.error(err?.response?.data?.message || "Khong the huy don hang."); }
+  };
+
+  const handleCancelOrderLine = async (lineIndex) => {
+    const ok = await confirmShopee({
+      text: "Hủy đơn nầy khỏi đơn? Tiền ví (nếu có) sẽ được hoàn tương ứng.",
+      confirmText: "Đồng ý",
+      cancelText: "Đóng",
+    });
+    if (!ok) return;
+    try {
+      const data = await cancelOrderLineByUser(id, lineIndex);
+      if (data?.order) {
+        setOrder(data.order);
+        setHistory(Array.isArray(data.history) ? data.history : []);
+      }
+      notify.success("Đã hủy dòng hàng.");
+    } catch (err) {
+      notify.error(err?.response?.data?.message || "Không thể hủy dòng hàng.");
+    }
   };
 
   const openReviewModal = (item) => {
@@ -363,6 +398,17 @@ const OrderDetailPage = () => {
       : order?.status;
   const canReviewOrder = REVIEWABLE_STATUSES.has(st);
 
+  const latestCancelNote = useMemo(() => {
+    const list = Array.isArray(history) ? history : [];
+    const sorted = [...list].sort(
+      (a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0),
+    );
+    const entry = sorted.find(
+      (h) => normHistoryStatus(h?.newStatus) === "canceled",
+    );
+    return entry?.note != null ? String(entry.note).trim() : "";
+  }, [history]);
+
   const reviewMergedPreview = useMemo(
     () => buildMergedReviewContent(reviewQuality, reviewDiversity),
     [reviewQuality, reviewDiversity],
@@ -381,7 +427,9 @@ const OrderDetailPage = () => {
   useEffect(() => {
     if (!location?.state?.openReview) return;
     if (!canReviewOrder || !isLoggedIn) return;
-    const firstProduct = Array.isArray(order?.products) ? order.products[0] : null;
+    const firstProduct = Array.isArray(order?.products)
+      ? order.products.find(isOrderLineActive)
+      : null;
     if (!firstProduct) return;
     openReviewModal(firstProduct);
     navigate(location.pathname, { replace: true, state: {} });
@@ -406,10 +454,18 @@ const OrderDetailPage = () => {
     </div>
   );
 
-  const saleDiscountTotal = (order?.products || []).reduce(
-    (sum, p) => sum + Math.max(0, Number((p.basePrice ?? p.price) - (p.price ?? 0))) * Number(p.quantity || 0),
-    0,
-  );
+  const saleDiscountTotal = (order?.products || [])
+    .filter(isOrderLineActive)
+    .reduce(
+      (sum, p) =>
+        sum +
+        Math.max(
+          0,
+          Number((p.basePrice ?? p.price) - (p.price ?? 0)),
+        ) *
+          Number(p.quantity || 0),
+      0,
+    );
 
   return (
     <div className="bg-background-light min-h-screen font-body pb-20 pt-24">
@@ -462,11 +518,21 @@ const OrderDetailPage = () => {
                   </div>
                 </div>
               ) : (
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-4 text-slate-600 font-bold">
-                  <span className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm">
-                    {STATUS_ICONS[st]}
-                  </span>
-                  {STATUS_LABELS[st]}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4 text-slate-600 font-bold">
+                  <div className="flex items-center gap-4 shrink-0">
+                    <span className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm">
+                      {STATUS_ICONS[st]}
+                    </span>
+                    {STATUS_LABELS[st]}
+                  </div>
+                  {st === "canceled" && latestCancelNote ? (
+                    <p className="text-sm font-medium text-slate-800 leading-relaxed border-t border-slate-200 pt-3 sm:border-t-0 sm:pt-0 sm:flex-1">
+                      <span className="text-slate-500 font-bold text-xs uppercase tracking-wide block mb-1">
+                        Lý do hủy
+                      </span>
+                      {latestCancelNote}
+                    </p>
+                  ) : null}
                 </div>
               )}
 
@@ -512,6 +578,14 @@ const OrderDetailPage = () => {
                               <p className="text-xs font-semibold text-slate-400 mt-0.5">
                                 {new Date(h.createdAt).toLocaleString("vi-VN")}
                               </p>
+                              {h?.note != null && String(h.note).trim() !== "" ? (
+                                <p className="text-xs text-slate-600 mt-2 leading-relaxed border-t border-slate-100 pt-2">
+                                  {normHistoryStatus(h.newStatus) === "canceled"
+                                    ? "Lý do hủy: "
+                                    : "Ghi chú: "}
+                                  {String(h.note).trim()}
+                                </p>
+                              ) : null}
                             </div>
                           </div>
                         );
@@ -528,7 +602,10 @@ const OrderDetailPage = () => {
 
               <div className="space-y-4">
                 {order.products?.map((p, i) => (
-                  <div key={i} className="flex gap-4 items-center p-3 border border-slate-100 rounded-2xl bg-slate-50">
+                  <div
+                    key={i}
+                    className={`flex gap-4 items-center p-3 border border-slate-100 rounded-2xl bg-slate-50 ${isOrderLineActive(p) ? "" : "opacity-60 border-dashed"}`}
+                  >
                     <div className="w-20 h-20 bg-white border border-slate-200 rounded-xl overflow-hidden shrink-0">
                       <img 
                         src={
@@ -543,14 +620,19 @@ const OrderDetailPage = () => {
                         className="w-full h-full object-cover p-1" 
                       />
                     </div>
-                    <div className="flex-1 flex justify-between items-center">
-                      <div>
+                    <div className="flex flex-1 justify-between gap-3 items-start">
+                      <div className="min-w-0">
                         <h4 className="font-bold text-slate-800 text-sm md:text-base hover:text-primary transition-colors cursor-pointer line-clamp-2 leading-tight mb-2"><Link to={`/product/${p.productId?._id || p.productId}`}>{p.productId?.name || p.name || "Sản phẩm"}</Link></h4>
                         <div className="flex gap-3 text-xs font-bold">
                           <span className="bg-white border shadow-sm px-2 py-1 rounded-md text-slate-500">Size: {p.size || "Mặc định"}</span>
                           <span className="bg-white border shadow-sm px-2 py-1 rounded-md text-slate-500">x{p.quantity}</span>
                         </div>
-                        {canReviewOrder && isLoggedIn && (() => {
+                        {!isOrderLineActive(p) && (
+                          <p className="mt-2 text-xs font-bold text-red-600">
+                            Đã hủy dòng{p.canceledBy === "admin" ? " (admin)" : ""}
+                          </p>
+                        )}
+                        {canReviewOrder && isLoggedIn && isOrderLineActive(p) && (() => {
                           const productIdKey = String(p?.productId?._id || p?.productId || "");
                           const myReview = myReviewsByProduct[productIdKey];
                           if (myReview) {
@@ -583,13 +665,23 @@ const OrderDetailPage = () => {
                           );
                         })()}
                       </div>
-                      <div className="text-right ml-4">
+                      <div className="ml-4 flex shrink-0 flex-col items-end gap-2 text-right">
                         {Number(p.basePrice || 0) > Number(p.price || 0) && (
                           <p className="text-xs text-slate-400 line-through font-bold">
                             {formatMoney((p.basePrice || 0) * (p.quantity || 0))}
                           </p>
                         )}
                         <span className="font-black text-slate-900">{formatMoney(p.price * p.quantity)}</span>
+                        {(st === "pending" || st === "confirmed") &&
+                          isOrderLineActive(p) && (
+                          <button
+                            type="button"
+                            onClick={() => handleCancelOrderLine(i)}
+                            className="inline-flex min-h-[40px] items-center justify-center rounded-xl border-2 border-red-100 bg-white px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 hover:border-red-200 transition-colors"
+                          >
+                            Hủy đơn nầy
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

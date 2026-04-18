@@ -6,6 +6,7 @@ import {
   confirmDelivery,
   returnOrderRequest,
   cancelOrderByUser,
+  cancelOrderLineByUser,
   uploadImages,
 } from "../../api";
 import {
@@ -20,9 +21,8 @@ import {
   FaQuestionCircle,
 } from "react-icons/fa";
 import notify from "../../utils/notify";
+import { confirmShopee } from "../../utils/shopeeNotify";
 
-const SHOPEE_ORANGE = "#ee4d2d";
-const BORDER = "#e8e8e8";
 const SHOP_NAME = "SneakerConverse";
 
 const STATUS_LABELS = {
@@ -105,6 +105,10 @@ function productImageUrl(p) {
   if (!imgName) return "https://via.placeholder.com/80/f0f0f0/999?text=SP";
   if (String(imgName).startsWith("http")) return imgName;
   return `http://localhost:3002/uploads/${String(imgName).startsWith("/") ? String(imgName).slice(1) : imgName}`;
+}
+
+function isOrderLineActive(p) {
+  return !p?.lineStatus || p.lineStatus !== "canceled";
 }
 
 function formatVariantLine(p) {
@@ -311,12 +315,17 @@ const OrderHistoryPage = () => {
   };
 
   const handleCancelOrder = async (orderId) => {
-    if (!window.confirm("Bạn có chắc muốn hủy đơn hàng này?")) return;
+    const ok = await confirmShopee({
+      text: "Bạn có chắc muốn hủy toàn bộ đơn hàng này?",
+      confirmText: "Đồng ý",
+      cancelText: "Đóng",
+    });
+    if (!ok) return;
     try {
       await cancelOrderByUser(orderId);
       setOrders((prev) =>
         prev.map((o) =>
-          o._id === orderId ? { ...o, status: "canceled" } : o,
+          String(o._id) === String(orderId) ? { ...o, status: "canceled" } : o,
         ),
       );
       notify.success("Đã hủy đơn hàng.");
@@ -325,26 +334,53 @@ const OrderHistoryPage = () => {
     }
   };
 
+  const handleCancelOrderLine = async (orderId, lineIndex) => {
+    const ok = await confirmShopee({
+      text: "Hủy đơn này khỏi đơn? Tiền (nếu đã trừ ví) sẽ được hoàn tương ứng.",
+      confirmText: "Đồng ý",
+      cancelText: "Đóng",
+    });
+    if (!ok) return;
+    try {
+      const data = await cancelOrderLineByUser(orderId, lineIndex);
+      const updated = data?.order;
+      if (updated?._id) {
+        setOrders((prev) =>
+          prev.map((o) =>
+            String(o._id) === String(orderId) ? updated : o,
+          ),
+        );
+      }
+      notify.success("Đã hủy dòng hàng.");
+    } catch (err) {
+      notify.error(err?.response?.data?.message || "Không thể hủy dòng hàng.");
+    }
+  };
+
   const subIcon = (kind) => {
-    const green = "#26aa99";
     const s = 16;
-    if (kind === "truck") return <FaTruck className="inline shrink-0" size={s} style={{ color: green }} />;
-    if (kind === "ok") return <FaCheckCircle className="inline shrink-0" size={s} style={{ color: green }} />;
+    if (kind === "truck")
+      return <FaTruck className="inline shrink-0 text-convot-sage" size={s} />;
+    if (kind === "ok")
+      return <FaCheckCircle className="inline shrink-0 text-convot-sage" size={s} />;
     if (kind === "x") return <FaTimesCircle className="inline shrink-0 text-red-500" size={s} />;
     if (kind === "return") return <FaUndoAlt className="inline shrink-0 text-orange-500" size={s} />;
     return <FaBoxOpen className="inline shrink-0 text-slate-400" size={s} />;
   };
 
+  const headlineClass = (st) => {
+    if (st === "canceled") return "text-red-600";
+    if (RETURN_STATUSES.has(st)) return "text-orange-600";
+    return "text-primary";
+  };
+
   if (!userId && !guestId) return null;
 
   return (
-    <div
-      className="min-h-screen font-body pb-10 pt-4 sm:pt-5"
-      style={{ background: "#fafafa" }}
-    >
+    <div className="min-h-screen bg-[#f7f6f3] font-body pb-10 pt-4 sm:pt-5">
       <div className="container mx-auto max-w-7xl px-4">
         <header className="mb-5">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+          <h1 className="font-display text-2xl font-black tracking-tight text-neutral-900 sm:text-3xl">
             Đơn mua
           </h1>
           <p className="mt-1.5 text-base leading-relaxed text-slate-600">
@@ -353,10 +389,7 @@ const OrderHistoryPage = () => {
         </header>
 
         {/* Tabs — cùng lề với tiêu đề; tab chia đều trên màn lớn */}
-        <div
-          className="bg-white rounded-t-md border"
-          style={{ borderColor: BORDER }}
-        >
+        <div className="rounded-t-md border border-neutral-200 bg-white">
           <div className="overflow-x-auto scrollbar-thin lg:overflow-visible">
             <div
               className="flex w-max min-w-full lg:w-full"
@@ -371,19 +404,15 @@ const OrderHistoryPage = () => {
                     role="tab"
                     aria-selected={active}
                     onClick={() => setActiveTab(tab.id)}
-                    className="relative min-w-[108px] flex-shrink-0 px-2.5 py-3 text-center text-base font-medium transition-colors sm:min-w-[128px] sm:px-3 sm:py-3.5 lg:min-w-0 lg:flex-1 lg:px-3"
-                    style={{
-                      color: active ? SHOPEE_ORANGE : "#666",
-                    }}
+                    className={`relative min-w-[108px] flex-shrink-0 px-2.5 py-3 text-center text-base font-medium transition-colors sm:min-w-[128px] sm:px-3 sm:py-3.5 lg:min-w-0 lg:flex-1 lg:px-3 ${
+                      active ? "text-primary" : "text-neutral-600 hover:text-neutral-800"
+                    }`}
                   >
                     <span className="inline-block max-w-[8rem] leading-tight sm:max-w-none">
                       {tab.label}
                     </span>
                     {active && (
-                      <span
-                        className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full sm:left-3 sm:right-3"
-                        style={{ background: SHOPEE_ORANGE }}
-                      />
+                      <span className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-primary sm:left-3 sm:right-3" />
                     )}
                   </button>
                 );
@@ -396,19 +425,10 @@ const OrderHistoryPage = () => {
 
         {loading ? (
           <div className="flex justify-center items-center py-16">
-            <div
-              className="w-10 h-10 border-4 rounded-full animate-spin"
-              style={{
-                borderColor: `${BORDER}`,
-                borderTopColor: SHOPEE_ORANGE,
-              }}
-            />
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-neutral-200 border-t-primary" />
           </div>
         ) : filteredOrders.length === 0 ? (
-          <div
-            className="bg-white border rounded-b-md p-8 sm:p-10 text-center"
-            style={{ borderColor: BORDER }}
-          >
+          <div className="rounded-b-md border border-neutral-200 bg-white p-8 text-center sm:p-10">
             <div className="text-4xl mb-3 opacity-40">📦</div>
             <h3 className="mb-2 text-lg font-semibold text-slate-800">
               Chưa có đơn hàng
@@ -420,21 +440,20 @@ const OrderHistoryPage = () => {
             </p>
             <Link
               to="/product"
-              className="inline-block rounded-md px-8 py-3 text-base font-semibold text-white"
-              style={{ background: SHOPEE_ORANGE }}
+              className="inline-block rounded-xl bg-slate-900 px-8 py-3 text-base font-semibold text-white transition-colors hover:bg-primary"
             >
               Mua sắm ngay
             </Link>
           </div>
         ) : (
           <div className="space-y-4 mt-2">
-            {currentOrders.flatMap((order) => {
+            {currentOrders.map((order) => {
               const st = normalize(order);
               const canReviewOrder = REVIEWABLE_STATUSES.has(st);
               const sub = statusSubline(st);
               const lines = order.products;
               if (!lines?.length) {
-                return [];
+                return null;
               }
 
               const headline =
@@ -452,240 +471,261 @@ const OrderHistoryPage = () => {
                             ? "CHỜ XÁC NHẬN"
                             : (STATUS_LABELS[st] || String(st)).toUpperCase();
 
-              return lines.map((p, lineIndex) => {
-                const name =
-                  p.productId?.name || p.name || "Sản phẩm";
-                const variant = formatVariantLine(p);
-                const qty = p.quantity ?? 1;
-                const base = Number(p.basePrice || 0);
-                const unit = Number(p.price || 0);
-                const showStrike = base > unit && base > 0;
-                const lineTotal = unit * qty;
-                const rawPid = p.productId;
-                const lineProductId =
-                  rawPid && typeof rawPid === "object"
-                    ? rawPid._id
-                    : rawPid;
-                const buyAgainTo =
-                  lineProductId != null
-                    ? `/product/${String(lineProductId)}`
-                    : "/product";
-                const cardKey = `${order._id}-${String(p?.sku ?? "")}-${lineIndex}`;
+              const orderTotal =
+                typeof order.totalAmount === "number" && !Number.isNaN(order.totalAmount)
+                  ? order.totalAmount
+                  : lines.reduce((sum, p) => {
+                      const q = p.quantity ?? 1;
+                      return sum + Number(p.price || 0) * q;
+                    }, 0) +
+                    Number(order.shippingFee || 0) -
+                    Number(order.discount || 0);
 
-                return (
-                  <div
-                    key={cardKey}
-                    className="bg-white border rounded-lg overflow-hidden shadow-sm"
-                    style={{ borderColor: BORDER }}
-                  >
-                    <div
-                      className="flex flex-col gap-2.5 border-b px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:py-4"
-                      style={{ borderColor: BORDER }}
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className="rounded-md px-2 py-0.5 text-sm font-semibold text-white"
-                          style={{ background: SHOPEE_ORANGE }}
-                        >
-                          Yêu thích
-                        </span>
-                        <span className="text-base font-semibold text-slate-800">
-                          {SHOP_NAME}
-                        </span>
-                        <Link
-                          to="/chat"
-                          className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-base font-medium text-white"
-                          style={{
-                            background: SHOPEE_ORANGE,
-                            borderColor: SHOPEE_ORANGE,
-                          }}
-                        >
-                          <FaCommentDots size={15} />
-                          Chat
-                        </Link>
-                        <Link
-                          to="/product"
-                          className="inline-flex items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-base font-medium text-slate-700"
-                          style={{ borderColor: BORDER }}
-                        >
-                          <FaStore size={15} />
-                          Xem Shop
-                        </Link>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 justify-end text-base">
-                        <span className="inline-flex items-center gap-2 text-slate-600">
-                          {subIcon(sub.icon)}
-                          <span>{sub.text}</span>
-                        </span>
-                        <button
-                          type="button"
-                          className="p-0.5 text-slate-400 hover:text-slate-600"
-                          title="Trợ giúp"
-                          aria-label="Trợ giúp"
-                        >
-                          <FaQuestionCircle size={16} />
-                        </button>
-                        <span
-                          className="ml-0.5 text-sm font-bold tracking-wide sm:text-base"
-                          style={{ color: SHOPEE_ORANGE }}
-                        >
-                          {headline}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="px-4 py-4">
-                      <div className="flex gap-4">
-                        <Link
-                          to={`/orders/${order._id}`}
-                          className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border bg-slate-50"
-                          style={{ borderColor: BORDER }}
-                        >
-                          <img
-                            src={productImageUrl(p)}
-                            alt={name}
-                            className="h-full w-full object-cover"
-                          />
-                        </Link>
-                        <div className="flex min-w-0 flex-1 gap-3">
-                          <div className="min-w-0 flex-1">
-                            <Link
-                              to={`/orders/${order._id}`}
-                              className="line-clamp-2 text-base font-medium leading-snug text-slate-900 hover:opacity-90 sm:text-lg"
-                            >
-                              {name}
-                            </Link>
-                            {variant && (
-                              <p className="mt-1.5 line-clamp-2 text-base text-slate-600">
-                                {variant}
-                              </p>
-                            )}
-                            <p className="mt-1.5 text-base text-slate-500">
-                              x{qty}
-                            </p>
-                          </div>
-                          <div className="shrink-0 text-right">
-                            {showStrike && (
-                              <p className="text-base text-slate-400 line-through tabular-nums">
-                                {formatMoney(base * qty)}
-                              </p>
-                            )}
-                            <p
-                              className="text-base font-semibold tabular-nums sm:text-lg"
-                              style={{ color: SHOPEE_ORANGE }}
-                            >
-                              {formatMoney(lineTotal)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div
-                      className="flex flex-col gap-2 border-t px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:py-4"
-                      style={{ borderColor: BORDER }}
-                    >
-                      <p className="order-2 text-base leading-relaxed text-slate-600 sm:order-1">
-                        Mã đơn #{String(order._id).slice(-8).toUpperCase()} ·{" "}
-                        {new Date(order.createdAt).toLocaleString("vi-VN")}
-                      </p>
-                      <div className="order-1 w-full text-right sm:order-2 sm:w-auto">
-                        <span className="mr-2 text-base text-slate-600">
-                          Thành tiền:
-                        </span>
-                        <span
-                          className="text-xl font-bold tabular-nums sm:text-2xl"
-                          style={{ color: SHOPEE_ORANGE }}
-                        >
-                          {formatMoney(lineTotal)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap justify-end gap-2.5 px-4 pb-4 pt-0.5">
+              return (
+                <div
+                  key={order._id}
+                  className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm"
+                >
+                  <div className="flex flex-col gap-2.5 border-b border-neutral-200 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:py-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-md bg-convot-sage px-2 py-0.5 text-sm font-semibold text-white">
+                        Yêu thích
+                      </span>
+                      <span className="text-base font-semibold text-slate-800">
+                        {SHOP_NAME}
+                      </span>
                       <Link
                         to="/chat"
-                        className="inline-flex min-h-[44px] items-center justify-center rounded-md border bg-white px-4 py-2 text-base font-medium text-slate-800"
-                        style={{ borderColor: BORDER }}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-primary bg-primary px-3 py-1.5 text-base font-medium text-white transition-colors hover:bg-primary/90"
                       >
-                        Liên hệ Người Bán
+                        <FaCommentDots size={15} />
+                        Chat
                       </Link>
                       <Link
-                        to={buyAgainTo}
-                        className="inline-flex min-h-[44px] items-center justify-center rounded-md border bg-white px-4 py-2 text-base font-medium text-slate-800"
-                        style={{ borderColor: BORDER }}
+                        to="/product"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-base font-medium text-slate-700 transition-colors hover:border-convot-sage/40"
                       >
-                        Mua lại
+                        <FaStore size={15} />
+                        Xem Shop
                       </Link>
-                      <Link
-                        to={`/orders/${order._id}`}
-                        className="inline-flex min-h-[44px] items-center justify-center rounded-md border bg-white px-4 py-2 text-base font-medium text-slate-800"
-                        style={{ borderColor: BORDER }}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 justify-end text-base">
+                      <span className="inline-flex items-center gap-2 text-slate-600">
+                        {subIcon(sub.icon)}
+                        <span>{sub.text}</span>
+                      </span>
+                      <button
+                        type="button"
+                        className="p-0.5 text-slate-400 hover:text-slate-600"
+                        title="Trợ giúp"
+                        aria-label="Trợ giúp"
                       >
-                        Chi tiết
-                      </Link>
-                      {canReviewOrder && (
-                        <Link
-                          to={`/orders/${order._id}`}
-                          state={{ openReview: true }}
-                          className="inline-flex min-h-[44px] items-center justify-center rounded-md px-5 py-2 text-base font-semibold text-white"
-                          style={{ background: SHOPEE_ORANGE }}
-                        >
-                          Đánh giá
-                        </Link>
-                      )}
-                      {lineIndex === 0 &&
-                        (st === "delivered" || st === "received") && (
-                        <>
-                          {isLoggedIn ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleConfirmDelivery(
-                                    order._id,
-                                    order.paymentStatus === "paid",
-                                  )
-                                }
-                                className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-emerald-600 px-5 py-2 text-base font-semibold text-white hover:bg-emerald-700"
-                              >
-                                Đã nhận hàng
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => openReturnModal(order._id)}
-                                className="inline-flex min-h-[44px] items-center justify-center rounded-md border px-4 py-2 text-base font-medium"
-                                style={{ borderColor: BORDER }}
-                              >
-                                Yêu cầu hoàn hàng
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => navigate("/login")}
-                              className="inline-flex min-h-[44px] items-center justify-center rounded-md border bg-slate-100 px-4 py-2 text-base font-medium"
-                              style={{ borderColor: BORDER }}
-                            >
-                              Đăng nhập
-                            </button>
-                          )}
-                        </>
-                      )}
-                      {lineIndex === 0 &&
-                        (st === "pending" || st === "confirmed") && (
-                          <button
-                            type="button"
-                            onClick={() => handleCancelOrder(order._id)}
-                            className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-red-200 px-4 py-2 text-base font-medium text-red-600 hover:bg-red-50"
-                          >
-                            Hủy đơn
-                          </button>
-                        )}
+                        <FaQuestionCircle size={16} />
+                      </button>
+                      <span
+                        className={`ml-0.5 text-sm font-bold tracking-wide sm:text-base ${headlineClass(st)}`}
+                      >
+                        {headline}
+                      </span>
                     </div>
                   </div>
-                );
-              });
+
+                  {st === "canceled" && order.cancelReasonNote ? (
+                    <div
+                      className="mx-4 mt-3 rounded-lg border px-3 py-2.5 text-sm leading-snug"
+                      style={{
+                        borderColor: "#FDE68A",
+                        background: "#FFFBEB",
+                        color: "#78350F",
+                      }}
+                    >
+                      <span className="font-semibold">Lý do hủy: </span>
+                      {order.cancelReasonNote}
+                    </div>
+                  ) : null}
+
+                  <div>
+                    {lines.map((p, lineIndex) => {
+                      const lineLive = isOrderLineActive(p);
+                      const name =
+                        p.productId?.name || p.name || "Sản phẩm";
+                      const variant = formatVariantLine(p);
+                      const qty = p.quantity ?? 1;
+                      const base = Number(p.basePrice || 0);
+                      const unit = Number(p.price || 0);
+                      const showStrike = base > unit && base > 0;
+                      const lineTotal = unit * qty;
+                      const rawPid = p.productId;
+                      const lineProductId =
+                        rawPid && typeof rawPid === "object"
+                          ? rawPid._id
+                          : rawPid;
+                      const buyAgainTo =
+                        lineProductId != null
+                          ? `/product/${String(lineProductId)}`
+                          : "/product";
+                      const rowKey = `${order._id}-${String(p?.sku ?? "")}-${lineIndex}`;
+
+                      return (
+                        <div
+                          key={rowKey}
+                          className={`px-4 py-4${lineIndex > 0 ? " border-t border-neutral-200" : ""}${lineLive ? "" : " bg-slate-50/80"}`}
+                        >
+                          <div className={`flex gap-4${lineLive ? "" : " opacity-65"}`}>
+                            <Link
+                              to={`/orders/${order._id}`}
+                              className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-neutral-200 bg-slate-50"
+                            >
+                              <img
+                                src={productImageUrl(p)}
+                                alt={name}
+                                className="h-full w-full object-cover"
+                              />
+                            </Link>
+                            <div className="flex min-w-0 flex-1 gap-3">
+                              <div className="min-w-0 flex-1">
+                                <Link
+                                  to={`/orders/${order._id}`}
+                                  className="line-clamp-2 text-base font-medium leading-snug text-slate-900 hover:opacity-90 sm:text-lg"
+                                >
+                                  {name}
+                                </Link>
+                                {variant && (
+                                  <p className="mt-1.5 line-clamp-2 text-base text-slate-600">
+                                    {variant}
+                                  </p>
+                                )}
+                                <p className="mt-1.5 text-base text-slate-500">
+                                  x{qty}
+                                </p>
+                                {!lineLive && (
+                                  <p className="mt-2 text-sm font-semibold text-red-600">
+                                    Đã hủy dòng
+                                    {p.canceledBy === "admin" ? " (admin)" : ""}
+                                  </p>
+                                )}
+                                {lineLive ? (
+                                  <Link
+                                    to={buyAgainTo}
+                                    className="mt-2 inline-block text-sm font-medium text-primary hover:underline"
+                                  >
+                                    Mua lại
+                                  </Link>
+                                ) : null}
+                              </div>
+                              <div className="flex shrink-0 flex-col items-end gap-2 text-right">
+                                {showStrike && (
+                                  <p className="text-base text-slate-400 line-through tabular-nums">
+                                    {formatMoney(base * qty)}
+                                  </p>
+                                )}
+                                <p className="text-base font-black tabular-nums text-slate-900 sm:text-lg">
+                                  {formatMoney(lineTotal)}
+                                </p>
+                                {(st === "pending" || st === "confirmed") &&
+                                  lineLive && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleCancelOrderLine(order._id, lineIndex)
+                                    }
+                                    className="inline-flex min-h-[40px] items-center justify-center rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                                  >
+                                    Hủy đơn này
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex flex-col gap-2 border-t border-neutral-200 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:py-4">
+                    <p className="order-2 text-base leading-relaxed text-slate-600 sm:order-1">
+                      Mã đơn #{String(order._id).slice(-8).toUpperCase()} ·{" "}
+                      {new Date(order.createdAt).toLocaleString("vi-VN")}
+                    </p>
+                    <div className="order-1 w-full text-right sm:order-2 sm:w-auto">
+                      <span className="mr-2 text-base text-slate-600">
+                        Thành tiền:
+                      </span>
+                      <span className="text-xl font-black tabular-nums text-secondary sm:text-2xl">
+                        {formatMoney(orderTotal)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap justify-end gap-2.5 px-4 pb-4 pt-0.5">
+                    <Link
+                      to="/chat"
+                      className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-neutral-200 bg-white px-4 py-2 text-base font-medium text-slate-800 transition-colors hover:border-convot-sage/40"
+                    >
+                      Liên hệ Người Bán
+                    </Link>
+                    <Link
+                      to={`/orders/${order._id}`}
+                      className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-neutral-200 bg-white px-4 py-2 text-base font-medium text-slate-800 transition-colors hover:border-convot-sage/40"
+                    >
+                      Chi tiết
+                    </Link>
+                    {canReviewOrder && (
+                      <Link
+                        to={`/orders/${order._id}`}
+                        state={{ openReview: true }}
+                        className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-primary px-5 py-2 text-base font-semibold text-white transition-colors hover:bg-primary/90"
+                      >
+                        Đánh giá
+                      </Link>
+                    )}
+                    {(st === "delivered" || st === "received") && (
+                      <>
+                        {isLoggedIn ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleConfirmDelivery(
+                                  order._id,
+                                  order.paymentStatus === "paid",
+                                )
+                              }
+                              className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-emerald-600 px-5 py-2 text-base font-semibold text-white hover:bg-emerald-700"
+                            >
+                              Đã nhận hàng
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openReturnModal(order._id)}
+                              className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-neutral-200 px-4 py-2 text-base font-medium"
+                            >
+                              Yêu cầu hoàn hàng
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => navigate("/login")}
+                            className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-neutral-200 bg-slate-100 px-4 py-2 text-base font-medium"
+                          >
+                            Đăng nhập
+                          </button>
+                        )}
+                      </>
+                    )}
+                    {(st === "pending" || st === "confirmed") && (
+                      <button
+                        type="button"
+                        onClick={() => handleCancelOrder(order._id)}
+                        className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-red-200 px-4 py-2 text-base font-medium text-red-600 hover:bg-red-50"
+                      >
+                        Hủy đơn
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
             })}
           </div>
         )}
@@ -696,8 +736,7 @@ const OrderHistoryPage = () => {
               type="button"
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="flex h-11 w-11 items-center justify-center rounded-lg border bg-white text-lg text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-40"
-              style={{ borderColor: BORDER }}
+              className="flex h-11 w-11 items-center justify-center rounded-lg border border-neutral-200 bg-white text-lg text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-40"
             >
               {"<"}
             </button>
@@ -708,8 +747,7 @@ const OrderHistoryPage = () => {
               type="button"
               disabled={page >= totalPage}
               onClick={() => setPage((p) => p + 1)}
-              className="flex h-11 w-11 items-center justify-center rounded-lg border bg-white text-lg text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-40"
-              style={{ borderColor: BORDER }}
+              className="flex h-11 w-11 items-center justify-center rounded-lg border border-neutral-200 bg-white text-lg text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-40"
             >
               {">"}
             </button>
@@ -728,8 +766,7 @@ const OrderHistoryPage = () => {
             }}
           >
             <div
-              className="bg-white rounded-xl shadow-xl border max-w-lg w-full p-6 relative"
-              style={{ borderColor: BORDER }}
+              className="relative w-full max-w-lg rounded-xl border border-neutral-200 bg-white p-6 shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between items-start gap-4 mb-5">
@@ -762,8 +799,7 @@ const OrderHistoryPage = () => {
               <select
                 value={returnReasonCode}
                 onChange={(e) => setReturnReasonCode(String(e.target.value || ""))}
-                className="mb-3 w-full rounded-lg border-2 px-4 py-3 text-base text-slate-800 focus:border-orange-400 focus:outline-none"
-                style={{ borderColor: BORDER }}
+                className="mb-3 w-full rounded-lg border-2 border-neutral-200 px-4 py-3 text-base text-slate-800 focus:border-primary focus:outline-none"
               >
                 {RETURN_REASON_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -778,8 +814,7 @@ const OrderHistoryPage = () => {
                 rows={5}
                 maxLength={2000}
                 placeholder="Ví dụ: Sản phẩm không đúng size..."
-                className="min-h-[120px] w-full resize-y rounded-lg border-2 px-4 py-3 text-base text-slate-800 focus:border-orange-400 focus:outline-none"
-                style={{ borderColor: BORDER }}
+                className="min-h-[120px] w-full resize-y rounded-lg border-2 border-neutral-200 px-4 py-3 text-base text-slate-800 focus:border-primary focus:outline-none"
               />
               <p className="mt-2 text-right text-sm text-slate-400">
                 {returnReason.length}/2000
@@ -813,8 +848,7 @@ const OrderHistoryPage = () => {
                   type="button"
                   onClick={closeReturnModal}
                   disabled={returnSubmitting}
-                  className="flex-1 rounded-lg border-2 py-3.5 text-base font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                  style={{ borderColor: BORDER }}
+                  className="flex-1 rounded-lg border-2 border-neutral-200 py-3.5 text-base font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                 >
                   Hủy
                 </button>
@@ -822,8 +856,7 @@ const OrderHistoryPage = () => {
                   type="button"
                   onClick={submitReturnRequest}
                   disabled={returnSubmitting}
-                  className="flex-1 rounded-lg py-3.5 text-base font-semibold text-white disabled:opacity-60"
-                  style={{ background: SHOPEE_ORANGE }}
+                  className="flex-1 rounded-lg bg-primary py-3.5 text-base font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
                 >
                   {returnSubmitting ? "Đang gửi..." : "Gửi yêu cầu"}
                 </button>

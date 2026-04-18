@@ -27,6 +27,7 @@ const cleanupUnpaidVnpayOrders = async ({
     try {
       for (const item of order.products || []) {
         if (!item?.quantity) continue;
+        if (String(item.lineStatus || "active") === "canceled") continue;
 
         if (item.sku) {
           try {

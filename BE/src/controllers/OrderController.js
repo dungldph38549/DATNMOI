@@ -16,14 +16,19 @@ const {
 } = require("vnpay");
 const { pickBestActiveRule, calculateEffectivePrice } = require("../utils/salePricing");
 const { restoreVariantStockBySku } = require("../utils/stockRestore");
+const { isLineActive, sumActiveSubtotal } = require("../utils/orderLines");
 const {
   buildWalletRefundPatchForReturn,
   debitWalletForUserOrder,
   buildWalletCancelRefundPatch,
+  creditWalletForOrderLineCancel,
 } = require("../services/walletService.js");
 const {
   computeFinalVoucherDiscountAmount,
 } = require("../services/VoucherService.js");
+const {
+  notifyCustomerOfAdminOrderCancel,
+} = require("../services/orderCancelNotify.js");
 
 const ROLE_VOUCHER_USAGE_LIMIT = {
   customer: 3,
@@ -575,6 +580,20 @@ exports.getOrdersByUserOrGuest = async (req, res) => {
 
     const total = await Order.countDocuments(query);
 
+    const orderIds = orders.map((o) => o._id);
+    let cancelNoteByOrderId = {};
+    if (orderIds.length) {
+      const rows = await OrderStatusHistory.aggregate([
+        { $match: { orderId: { $in: orderIds }, newStatus: "canceled" } },
+        { $sort: { createdAt: -1 } },
+        { $group: { _id: "$orderId", note: { $first: "$note" } } },
+      ]);
+      cancelNoteByOrderId = rows.reduce((acc, r) => {
+        acc[String(r._id)] = r.note || "";
+        return acc;
+      }, {});
+    }
+
     const formattedOrders = await Promise.all(
       orders.map(async (orderDoc) => {
         const order = orderDoc.toObject();
@@ -582,6 +601,11 @@ exports.getOrdersByUserOrGuest = async (req, res) => {
           order.voucher = await Voucher.findOne({
             code: order.voucherCode.trim().toUpperCase(),
           });
+        }
+        const st = String(order.status || "").trim().toLowerCase();
+        if (st === "canceled") {
+          const cn = cancelNoteByOrderId[String(order._id)];
+          if (cn) order.cancelReasonNote = cn;
         }
         return order;
       }),
@@ -782,6 +806,24 @@ exports.updateOrder = async (req, res) => {
       }
     }
 
+    /** Admin hủy đơn qua PUT: bắt buộc lưu lý do (ghi OrderStatusHistory). */
+    let historyNote = note;
+    if (status === "canceled" && order.status !== "canceled") {
+      const trimmed =
+        typeof note === "string" ? note.trim() : String(note ?? "").trim();
+      if (trimmed.length < 5) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(422).json({
+          message: "Khi hủy đơn, bắt buộc nhập lý do (ít nhất 5 ký tự).",
+        });
+      }
+      historyNote = trimmed;
+    }
+
+    const adminCanceledOrder =
+      status === "canceled" && order.status !== "canceled";
+
     const NON_EDITABLE_STATUSES = [
       "shipped",
       "delivered",
@@ -820,6 +862,18 @@ exports.updateOrder = async (req, res) => {
         session,
       );
       Object.assign(updateFields, walletCancelPatch);
+      updateFields.products = (order.products || []).map((item) => {
+        const plain =
+          item && typeof item.toObject === "function"
+            ? item.toObject()
+            : { ...item };
+        return {
+          ...plain,
+          lineStatus: "canceled",
+          canceledAt: plain.canceledAt || new Date(),
+          canceledBy: plain.canceledBy || "admin",
+        };
+      });
     }
 
     // Admin UI dùng PUT /order/:id (updateOrder) để chuyển return-request → accepted,
@@ -855,6 +909,7 @@ exports.updateOrder = async (req, res) => {
       if (status === "canceled") {
         for (const item of order.products) {
           if (!item?.quantity) continue;
+          if (String(item.lineStatus || "active") === "canceled") continue;
           if (item.sku) {
             await restoreVariantStockBySku(item, item.quantity, session);
             continue;
@@ -881,7 +936,7 @@ exports.updateOrder = async (req, res) => {
               status === "delivered" && order.paymentStatus !== "paid"
                 ? "paid"
                 : null,
-            note,
+            note: historyNote,
           },
         ],
         { session },
@@ -890,6 +945,26 @@ exports.updateOrder = async (req, res) => {
 
     await session.commitTransaction();
     session.endSession();
+
+    if (adminCanceledOrder && historyNote) {
+      try {
+        const orderForNotify = await Order.findById(order._id).populate(
+          "userId",
+        );
+        if (orderForNotify) {
+          await notifyCustomerOfAdminOrderCancel({
+            order: orderForNotify,
+            note: historyNote,
+          });
+        }
+      } catch (notifyErr) {
+        console.error(
+          "[OrderController] notifyCustomerOfAdminOrderCancel:",
+          notifyErr?.message || notifyErr,
+        );
+      }
+    }
+
     res.status(200).json(updatedOrder);
   } catch (err) {
     await session.abortTransaction();
@@ -941,6 +1016,7 @@ exports.updateOrderById = async (req, res) => {
 
         for (const item of o.products || []) {
           if (!item?.quantity) continue;
+          if (String(item.lineStatus || "active") === "canceled") continue;
 
           if (item.sku) {
             await restoreVariantStockBySku(item, item.quantity, session);
@@ -956,6 +1032,14 @@ exports.updateOrderById = async (req, res) => {
             await productDoc.save({ session });
           }
         }
+
+        for (const item of o.products || []) {
+          if (!item) continue;
+          item.lineStatus = "canceled";
+          item.canceledAt = item.canceledAt || new Date();
+          item.canceledBy = item.canceledBy || "user";
+        }
+        o.markModified("products");
 
         const walletPatch = await buildWalletCancelRefundPatch(o, session);
         Object.assign(o, walletPatch);
@@ -995,6 +1079,215 @@ exports.updateOrderById = async (req, res) => {
   } catch (err) {
     const statusCode = err?.status || err?.statusCode || 500;
     res.status(statusCode).json({
+      message: err?.message || err?.error || "Internal server error",
+    });
+  }
+};
+
+function assertUserOwnsOrderForLineCancel(order, reqUser) {
+  const uid = String(reqUser?.id || reqUser?._id || "").trim();
+  if (!uid) return false;
+  if (order.userId && String(order.userId) === uid) return true;
+  if (order.guestId && String(order.guestId).trim() === uid) return true;
+  return false;
+}
+
+async function cancelOrderLineCore({
+  orderId,
+  lineIndex,
+  canceledBy,
+  reqUser,
+  requireOwnership,
+}) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const order = await Order.findById(orderId).session(session);
+    if (!order) {
+      const e = new Error("Không tìm thấy đơn hàng");
+      e.statusCode = 404;
+      throw e;
+    }
+
+    if (requireOwnership && !assertUserOwnsOrderForLineCancel(order, reqUser)) {
+      const e = new Error("Bạn không có quyền thao tác trên đơn này");
+      e.statusCode = 403;
+      throw e;
+    }
+
+    const idx = Number(lineIndex);
+    if (
+      !Number.isInteger(idx) ||
+      idx < 0 ||
+      idx >= (order.products || []).length
+    ) {
+      const e = new Error("Dòng sản phẩm không hợp lệ");
+      e.statusCode = 422;
+      throw e;
+    }
+
+    const line = order.products[idx];
+    if (!isLineActive(line)) {
+      const e = new Error("Dòng này đã được hủy trước đó");
+      e.statusCode = 400;
+      throw e;
+    }
+
+    const st = String(order.status || "").trim().toLowerCase();
+    if (!["pending", "confirmed"].includes(st)) {
+      const e = new Error(
+        "Chỉ hủy dòng khi đơn đang chờ xử lý hoặc đã xác nhận",
+      );
+      e.statusCode = 400;
+      throw e;
+    }
+
+    if (order.paymentMethod === "vnpay" && order.paymentStatus === "paid") {
+      const e = new Error(
+        "Đơn đã thanh toán VNPay — không hủy từng dòng trên hệ thống. Liên hệ shop.",
+      );
+      e.statusCode = 400;
+      throw e;
+    }
+
+    const oldSub = sumActiveSubtotal(order.products);
+    const oldTotal = Math.round(Number(order.totalAmount) || 0);
+
+    if (!line?.quantity) {
+      const e = new Error("Dòng hàng không hợp lệ");
+      e.statusCode = 400;
+      throw e;
+    }
+
+    if (line.sku) {
+      await restoreVariantStockBySku(line, line.quantity, session);
+    } else {
+      const productDoc = await Product.findById(line.productId).session(
+        session,
+      );
+      if (productDoc && !productDoc.hasVariants) {
+        productDoc.stock =
+          Number(productDoc.stock || 0) + Number(line.quantity || 0);
+        await productDoc.save({ session });
+      }
+    }
+
+    const prevOrderStatus = order.status;
+    line.lineStatus = "canceled";
+    line.canceledAt = new Date();
+    line.canceledBy = canceledBy;
+
+    const activeAfter = (order.products || []).filter(isLineActive);
+    const newSub = sumActiveSubtotal(order.products);
+
+    if (activeAfter.length === 0) {
+      order.status = "canceled";
+      order.shippingFee = 0;
+      order.discount = 0;
+      order.totalAmount = 0;
+    } else {
+      const newDiscount =
+        oldSub > 0
+          ? Math.round(Number(order.discount || 0) * (newSub / oldSub))
+          : 0;
+      order.discount = newDiscount;
+      order.totalAmount = Math.max(
+        0,
+        newSub -
+          newDiscount +
+          Math.round(Number(order.shippingFee || 0)),
+      );
+    }
+
+    const newTotal = Math.round(Number(order.totalAmount) || 0);
+
+    if (
+      order.paymentMethod === "wallet" &&
+      order.paymentStatus === "paid" &&
+      order.userId
+    ) {
+      const refund = oldTotal - newTotal;
+      if (refund > 0) {
+        await creditWalletForOrderLineCancel(
+          order.userId,
+          order._id,
+          refund,
+          session,
+        );
+      }
+    }
+
+    order.markModified("products");
+    await order.save({ session });
+
+    const historyNewStatus = order.status;
+    await OrderStatusHistory.create(
+      [
+        {
+          oldStatus: prevOrderStatus,
+          newStatus: historyNewStatus,
+          orderId: order._id,
+          note: `Hủy dòng #${idx + 1} — ${canceledBy === "admin" ? "Admin" : "Khách hàng"}`,
+        },
+      ],
+      { session },
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    const populated = await Order.findById(order._id)
+      .populate("products.productId")
+      .populate("userId");
+    return populated;
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    throw err;
+  }
+}
+
+exports.cancelOrderLineByUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const lineIndex = req.body?.lineIndex ?? req.body?.line_index;
+    const order = await cancelOrderLineCore({
+      orderId: id,
+      lineIndex,
+      canceledBy: "user",
+      reqUser: req.user,
+      requireOwnership: true,
+    });
+    const history = await OrderStatusHistory.find({ orderId: order._id }).sort({
+      createdAt: -1,
+    });
+    return res.status(200).json({ order, history });
+  } catch (err) {
+    const statusCode = err?.statusCode || err?.status || 500;
+    return res.status(statusCode).json({
+      message: err?.message || err?.error || "Internal server error",
+    });
+  }
+};
+
+exports.cancelOrderLineByAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const lineIndex = req.body?.lineIndex ?? req.body?.line_index;
+    const order = await cancelOrderLineCore({
+      orderId: id,
+      lineIndex,
+      canceledBy: "admin",
+      reqUser: req.user,
+      requireOwnership: false,
+    });
+    const history = await OrderStatusHistory.find({ orderId: order._id }).sort({
+      createdAt: -1,
+    });
+    return res.status(200).json({ order, history });
+  } catch (err) {
+    const statusCode = err?.statusCode || err?.status || 500;
+    return res.status(statusCode).json({
       message: err?.message || err?.error || "Internal server error",
     });
   }
@@ -1237,8 +1530,13 @@ exports.topSelling = async (req, res) => {
         // Một số đơn có thể thiếu `products` (null/undefined) => tránh lỗi $unwind
         $unwind: { path: "$products", preserveNullAndEmptyArrays: true },
       },
-      // Lọc bỏ các bản ghi không có productId (tránh group _id = null)
-      { $match: { "products.productId": { $ne: null } } },
+      // Lọc bỏ các bản ghi không có productId; bỏ dòng đã hủy riêng lẻ
+      {
+        $match: {
+          "products.productId": { $ne: null },
+          "products.lineStatus": { $ne: "canceled" },
+        },
+      },
       {
         $group: {
           _id: {
@@ -1453,6 +1751,7 @@ const cancelUnpaidVnpayOrder = async (orderId) => {
   // Trả lại tồn Product khi thanh toán VNPay thất bại/hủy.
   for (const item of order.products || []) {
     if (!item?.quantity) continue;
+    if (String(item.lineStatus || "active") === "canceled") continue;
 
     if (item.sku) {
       try {

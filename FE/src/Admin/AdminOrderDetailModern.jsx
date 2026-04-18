@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Button, Select, message } from "antd";
-import { getOrderById, updateOrderStatus } from "../api";
+import { Button, Select, Modal, Input } from "antd";
+import { getOrderById, updateOrderStatus, cancelOrderLineByAdmin } from "../api";
+import notify from "../utils/notify";
+import { confirmShopee } from "../utils/shopeeNotify";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Chờ xử lý" },
@@ -14,6 +16,8 @@ const STATUS_OPTIONS = [
   { value: "accepted", label: "Chấp nhận hoàn hàng" },
   { value: "rejected", label: "Từ chối hoàn hàng" },
 ];
+
+const MIN_ADMIN_CANCEL_NOTE_LEN = 5;
 
 const TRANSITIONS = {
   pending: ["confirmed", "canceled"],
@@ -117,6 +121,9 @@ export default function AdminOrderDetailModern() {
   const [saving, setSaving] = useState(false);
   const [order, setOrder] = useState(null);
   const [history, setHistory] = useState([]);
+  const [lineCanceling, setLineCanceling] = useState(null);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelNote, setCancelNote] = useState("");
 
   useEffect(() => {
     const admin = getAdminSession();
@@ -132,7 +139,7 @@ export default function AdminOrderDetailModern() {
         setOrder(res?.order || res);
         setHistory(Array.isArray(res?.history) ? res.history : []);
       } catch (err) {
-        message.error(err?.response?.data?.message || "Không tải được chi tiết đơn.");
+        notify.error(err?.response?.data?.message || "Không tải được chi tiết đơn.");
         setOrder(null);
       } finally {
         setLoading(false);
@@ -201,35 +208,74 @@ export default function AdminOrderDetailModern() {
     returnRequestEntry?.reasonCode || order?.returnRequestReasonCode || "",
   ).trim();
 
-  const onChangeStatus = async (newStatus) => {
+  const isLineLive = (p) => !p?.lineStatus || p.lineStatus !== "canceled";
+
+  const onCancelOrderLine = async (lineIndex) => {
+    if (!order?._id) return;
+    const ok = await confirmShopee({
+      text: `Hủy đơn nầy (dòng #${lineIndex + 1}) khỏi đơn?`,
+      confirmText: "Đồng ý",
+      cancelText: "Đóng",
+    });
+    if (!ok) return;
+    setLineCanceling(lineIndex);
+    try {
+      const data = await cancelOrderLineByAdmin(order._id, lineIndex);
+      if (data?.order) setOrder(data.order);
+      if (Array.isArray(data?.history)) setHistory(data.history);
+      notify.success("Đã hủy dòng hàng.");
+    } catch (err) {
+      notify.error(err?.response?.data?.message || "Không hủy được dòng hàng.");
+    } finally {
+      setLineCanceling(null);
+    }
+  };
+
+  const applyStatusChange = async (newStatus, note) => {
     if (!order?._id || newStatus === currentStatus) return;
     const prevStatus = currentStatus;
     setSaving(true);
     try {
-      const data = await updateOrderStatus(order._id, {
+      const body = {
         status: newStatus,
         lookup: {
           createdAt: order?.createdAt || null,
           totalAmount: order?.totalAmount ?? null,
           fullName: order?.fullName || order?.userId?.name || "",
         },
-      });
+      };
+      if (note != null && String(note).trim() !== "") {
+        body.note = String(note).trim();
+      }
+      const data = await updateOrderStatus(order._id, body);
       setOrder((prev) => ({ ...prev, ...data, status: newStatus }));
       if (newStatus === "accepted" && prevStatus === "return-request") {
         const amt = Number(data?.walletRefundAmount);
-        message.success(
+        notify.success(
           amt > 0
             ? `Đã chuyển ${amt.toLocaleString("vi-VN")}đ về ví tài khoản khách hàng.`
             : "Đã chấp nhận hoàn hàng.",
         );
+      } else if (newStatus === "canceled") {
+        notify.success("Đã hủy đơn hàng.");
       } else {
-        message.success("Cập nhật trạng thái thành công.");
+        notify.success("Cập nhật trạng thái thành công.");
       }
     } catch (err) {
-      message.error(err?.response?.data?.message || "Không cập nhật được trạng thái.");
+      notify.error(err?.response?.data?.message || "Không cập nhật được trạng thái.");
     } finally {
       setSaving(false);
     }
+  };
+
+  const onChangeStatus = async (newStatus) => {
+    if (!order?._id || newStatus === currentStatus) return;
+    if (newStatus === "canceled") {
+      setCancelNote("");
+      setCancelModalOpen(true);
+      return;
+    }
+    await applyStatusChange(newStatus);
   };
 
   if (loading) return <div className="p-6">Đang tải chi tiết đơn hàng...</div>;
@@ -244,6 +290,42 @@ export default function AdminOrderDetailModern() {
 
   return (
     <div className="min-h-screen bg-[#f8f6f6] p-6 lg:p-8">
+      <Modal
+        title="Lý do hủy đơn (bắt buộc)"
+        open={cancelModalOpen}
+        okText="Xác nhận hủy"
+        cancelText="Đóng"
+        destroyOnClose
+        confirmLoading={saving}
+        onCancel={() => {
+          setCancelModalOpen(false);
+          setCancelNote("");
+        }}
+        onOk={async () => {
+          const t = cancelNote.trim();
+          if (t.length < MIN_ADMIN_CANCEL_NOTE_LEN) {
+            notify.error(
+              `Vui lòng nhập lý do hủy (ít nhất ${MIN_ADMIN_CANCEL_NOTE_LEN} ký tự).`,
+            );
+            return Promise.reject(new Error("invalid-note"));
+          }
+          setCancelModalOpen(false);
+          setCancelNote("");
+          await applyStatusChange("canceled", t);
+        }}
+      >
+        <p className="mb-2 text-sm text-slate-600">
+          Lý do sẽ được lưu trong lịch sử trạng thái đơn hàng.
+        </p>
+        <Input.TextArea
+          rows={4}
+          maxLength={2000}
+          showCount
+          value={cancelNote}
+          onChange={(e) => setCancelNote(e.target.value)}
+          placeholder="Ví dụ: Khách yêu cầu hủy — hết hàng, sai thông tin giao hàng..."
+        />
+      </Modal>
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex items-center gap-2 text-xs font-semibold text-slate-500">
           <Link to="/admin" className="hover:text-[#874e00]">Quản lý đơn hàng</Link>
@@ -336,10 +418,14 @@ export default function AdminOrderDetailModern() {
                   const pid = p?.productId?._id || p?.productId;
                   const cardKey = `${order?._id}-${String(p?.sku ?? "")}-${idx}`;
                   const showStrike = base > unit && base > 0;
+                  const lineLive = isLineLive(p);
+                  const canCancelLine =
+                    lineLive &&
+                    (currentStatus === "pending" || currentStatus === "confirmed");
                   return (
                     <div
                       key={cardKey}
-                      className="rounded-xl border border-slate-200 bg-white p-4 shadow-md"
+                      className={`rounded-xl border border-slate-200 bg-white p-4 shadow-md ${lineLive ? "" : "border-dashed opacity-75"}`}
                     >
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                         <img
@@ -390,6 +476,23 @@ export default function AdminOrderDetailModern() {
                             >
                               Xem sản phẩm trên shop →
                             </Link>
+                          ) : null}
+                          {!lineLive && (
+                            <p className="mt-2 text-xs font-bold text-red-600">
+                              Đã hủy dòng
+                              {p.canceledBy === "user" ? " (khách)" : ""}
+                            </p>
+                          )}
+                          {canCancelLine ? (
+                            <Button
+                              danger
+                              size="small"
+                              className="mt-3"
+                              loading={lineCanceling === idx}
+                              onClick={() => onCancelOrderLine(idx)}
+                            >
+                              Hủy đơn nầy
+                            </Button>
                           ) : null}
                         </div>
                         <div className="shrink-0 text-right sm:min-w-[140px]">

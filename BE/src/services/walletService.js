@@ -146,6 +146,41 @@ async function buildWalletCancelRefundPatch(order, session) {
 }
 
 /**
+ * Hoàn ví khi khách/admin hủy một dòng sản phẩm (đơn ví đã thanh toán).
+ * Có thể gọi nhiều lần trên cùng đơn (mỗi dòng một giao dịch).
+ */
+async function creditWalletForOrderLineCancel(userId, orderId, amount, session) {
+  if (!userId || !orderId) return;
+  const rounded = Math.round(Number(amount) || 0);
+  if (rounded <= 0) return;
+
+  const updatedUser = await User.findOneAndUpdate(
+    { _id: userId },
+    { $inc: { walletBalance: rounded } },
+    { new: true, session },
+  );
+  if (!updatedUser) {
+    throw new Error("Không tìm thấy người dùng để hoàn ví");
+  }
+
+  const balanceAfter = Math.max(0, Number(updatedUser.walletBalance) || 0);
+
+  await WalletTransaction.create(
+    [
+      {
+        userId,
+        orderId,
+        type: "order_line_cancel_refund",
+        amount: rounded,
+        balanceAfter,
+        note: "Hoàn ví do hủy dòng hàng trong đơn",
+      },
+    ],
+    { session },
+  );
+}
+
+/**
  * Cộng ví khi nạp (VNPay, user xác nhận CK, hoặc admin).
  * @param {import("mongoose").Document} topUpDoc
  * @param {import("mongoose").ClientSession} session
@@ -224,5 +259,6 @@ module.exports = {
   buildWalletRefundPatchForReturn,
   debitWalletForUserOrder,
   buildWalletCancelRefundPatch,
+  creditWalletForOrderLineCancel,
   creditWalletForTopUp,
 };

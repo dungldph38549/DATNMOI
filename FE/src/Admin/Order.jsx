@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
-import { Table, Select, Button, message, Input, Pagination } from "antd";
+import { Table, Select, Button, Input, Pagination, Modal } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { getAllOrders, updateOrderStatus } from "../api/index";
+import notify from "../utils/notify";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Chờ xử lý" },
@@ -28,6 +29,8 @@ const RETURN_REASON_LABELS = RETURN_REASON_OPTIONS.reduce((acc, x) => {
   if (x.value !== "all") acc[x.value] = x.label;
   return acc;
 }, {});
+
+const MIN_ADMIN_CANCEL_NOTE_LEN = 5;
 
 const TRANSITIONS = {
   pending: ["confirmed", "canceled"],
@@ -109,6 +112,8 @@ export default function Order({ mode = "all" }) {
   const [methodFilter, setMethodFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [returnReasonFilter, setReturnReasonFilter] = useState("all");
+  const [cancelReasonFlow, setCancelReasonFlow] = useState(null);
+  const [cancelReasonText, setCancelReasonText] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-orders", page, limit],
@@ -126,20 +131,22 @@ export default function Order({ mode = "all" }) {
       const to = variables?.body?.status;
       if (to === "accepted" && from === "return-request") {
         const amt = Number(data?.walletRefundAmount);
-        message.success(
+        notify.success(
           amt > 0
             ? `Đã chuyển ${amt.toLocaleString("vi-VN")}đ về ví tài khoản khách hàng.`
             : "Đã chấp nhận hoàn hàng.",
         );
+      } else if (to === "canceled") {
+        notify.success("Đã hủy đơn hàng.");
       } else {
-        message.success("Cập nhật trạng thái thành công");
+        notify.success("Cập nhật trạng thái thành công.");
       }
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
     },
     onError: (err) => {
       const status = err?.response?.status;
       const msg = err?.response?.data?.message || err?.message || "Lỗi cập nhật";
-      message.error(status ? `(${status}) ${msg}` : msg);
+      notify.error(status ? `(${status}) ${msg}` : msg);
     },
   });
 
@@ -184,31 +191,27 @@ export default function Order({ mode = "all" }) {
   }, [orders, keyword, paymentFilter, statusFilter, methodFilter, mode, returnReasonFilter]);
   const allowedNext = (current) => TRANSITIONS[current] || [];
 
-  /** Mỗi dòng = một sản phẩm trong đơn (tách dòng). */
-  const tableRows = useMemo(() => {
-    const rows = [];
-    filteredOrders.forEach((order) => {
-      const products = Array.isArray(order.products) ? order.products : [];
-      if (products.length === 0) {
-        rows.push({
-          key: `order-empty-${order._id}`,
-          order,
-          line: null,
-          lineIndex: 0,
-        });
-        return;
-      }
-      products.forEach((line, lineIndex) => {
-        rows.push({
-          key: `${order._id}-line-${lineIndex}-${String(line?.sku ?? "")}`,
-          order,
-          line,
-          lineIndex,
-        });
-      });
-    });
-    return rows;
-  }, [filteredOrders]);
+  /** Một dòng = một đơn; sản phẩm hiển thị dạng danh sách con trong ô. */
+  const tableRows = useMemo(
+    () =>
+      filteredOrders.map((order, idx) => ({
+        key: `order-${String(order?._id ?? idx)}`,
+        order,
+      })),
+    [filteredOrders],
+  );
+
+  const productLineCount = useMemo(
+    () =>
+      filteredOrders.reduce(
+        (acc, o) => acc + (Array.isArray(o?.products) ? o.products.length : 0),
+        0,
+      ),
+    [filteredOrders],
+  );
+
+  const isLineActive = (p) =>
+    p && String(p.lineStatus || "active") !== "canceled";
 
   const paymentMethodLabel = (m) => {
     const x = String(m || "").toLowerCase();
@@ -221,11 +224,13 @@ export default function Order({ mode = "all" }) {
     {
       title: "Mã đơn",
       key: "orderId",
-      width: "7%",
+      width: 88,
+      fixed: "left",
+      className: "admin-order-col-id",
       render: (_, record) => {
         const id = record.order?._id;
         return (
-          <span style={{ fontWeight: 700, color: "#1F2937" }}>
+          <span style={{ fontWeight: 700, color: "#1F2937", whiteSpace: "nowrap" }}>
             {id ? `#${String(id).slice(-8).toUpperCase()}` : "-"}
           </span>
         );
@@ -234,25 +239,61 @@ export default function Order({ mode = "all" }) {
     {
       title: "Sản phẩm",
       key: "product",
-      width: "28%",
+      className: "admin-order-col-product",
       render: (_, record) => {
-        const p = record.line;
-        if (!p) {
+        const order = record.order;
+        const products = Array.isArray(order?.products) ? order.products : [];
+        if (products.length === 0) {
           return (
             <span style={{ color: "#9CA3AF", fontSize: 12 }}>Không có dòng sản phẩm</span>
           );
         }
-        const name = p?.productId?.name || p?.name || "—";
-        const sub = formatLineLabel(p);
         return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontWeight: 600, color: "#111827", lineHeight: 1.35 }}>{name}</span>
-            {sub ? (
-              <span style={{ fontSize: 12, color: "#6B7280" }}>{sub}</span>
-            ) : null}
-            <span style={{ fontSize: 11, color: "#9CA3AF" }}>
-              SKU: {p?.sku || "—"} · SL: {p?.quantity ?? 0}
-            </span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            {products.map((p, idx) => {
+              const name = p?.productId?.name || p?.name || "—";
+              const sub = formatLineLabel(p);
+              const lineTotal = Number(p.price || 0) * Number(p.quantity || 0);
+              const canceled = !isLineActive(p);
+              const isLast = idx === products.length - 1;
+              return (
+                <div
+                  key={`${order._id}-p-${idx}-${String(p?.sku ?? "")}`}
+                  style={{
+                    paddingBottom: isLast ? 0 : 10,
+                    marginBottom: isLast ? 0 : 10,
+                    borderBottom: isLast ? "none" : "1px dashed #E5E7EB",
+                    opacity: canceled ? 0.7 : 1,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: "#111827", lineHeight: 1.35 }}>
+                    {name}
+                  </div>
+                  {sub ? (
+                    <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>{sub}</div>
+                  ) : null}
+                  <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>
+                    SKU: {p?.sku || "—"} · SL: {p?.quantity ?? 0}
+                    {canceled ? (
+                      <span style={{ color: "#CF1322", marginLeft: 8, fontWeight: 600 }}>
+                        · Đã hủy dòng
+                      </span>
+                    ) : null}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "#0F766E",
+                      marginTop: 4,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {Number(lineTotal).toLocaleString("vi-VN")} đ
+                  </div>
+                </div>
+              );
+            })}
           </div>
         );
       },
@@ -260,7 +301,8 @@ export default function Order({ mode = "all" }) {
     {
       title: "Khách hàng",
       key: "customer",
-      width: "15%",
+      width: 168,
+      className: "admin-order-col-customer",
       render: (_, record) => {
         const o = record.order;
         const name = o?.fullName || o?.userId?.name || "-";
@@ -276,21 +318,26 @@ export default function Order({ mode = "all" }) {
       },
     },
     {
-      title: (
-        <span title="Thành tiền từng dòng sản phẩm (đơn giá × SL), không phải tổng cả đơn">
-          Tổng đơn
-        </span>
-      ),
-      key: "lineTotalAsOrderSplit",
-      width: "8%",
+      title: "Tổng đơn",
+      key: "orderTotal",
+      width: 118,
       align: "right",
+      className: "admin-order-col-total",
       render: (_, record) => {
-        const p = record.line;
-        if (!p) return "—";
-        const t = Number(p.price || 0) * Number(p.quantity || 0);
+        const t = Number(record.order?.totalAmount || 0);
         return (
-          <span style={{ fontWeight: 700, color: "#0F766E" }}>
-            {Number(t).toLocaleString("vi-VN")}đ
+          <span
+            style={{
+              fontWeight: 700,
+              color: "#0F766E",
+              fontSize: 14,
+              whiteSpace: "nowrap",
+              display: "inline-block",
+              textAlign: "right",
+              width: "100%",
+            }}
+          >
+            {Number(t).toLocaleString("vi-VN")} đ
           </span>
         );
       },
@@ -298,16 +345,24 @@ export default function Order({ mode = "all" }) {
     {
       title: "Thanh toán",
       key: "payment",
-      width: "6%",
+      width: 100,
+      align: "center",
+      className: "admin-order-col-center",
       render: (_, record) => {
         const pm = paymentMethodLabel(record.order?.paymentMethod);
-        return <StatusBadge status={pm.status} label={pm.label} />;
+        return (
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <StatusBadge status={pm.status} label={pm.label} />
+          </div>
+        );
       },
     },
     {
       title: "TT tiền",
       key: "paymentStatus",
-      width: "9%",
+      width: 124,
+      align: "center",
+      className: "admin-order-col-center",
       render: (_, record) => {
         const paymentStatus = record.order?.paymentStatus;
         const normalized =
@@ -315,13 +370,21 @@ export default function Order({ mode = "all" }) {
             ? paymentStatus.trim().toLowerCase()
             : "";
         const isPaid = normalized === "paid";
-        return <StatusBadge status={isPaid ? "paid" : "unpaid"} label={isPaid ? "Đã trả tiền" : "Chưa trả tiền"} />;
+        return (
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <StatusBadge
+              status={isPaid ? "paid" : "unpaid"}
+              label={isPaid ? "Đã trả tiền" : "Chưa trả tiền"}
+            />
+          </div>
+        );
       },
     },
     {
       title: "Trạng thái đơn",
       key: "status",
-      width: "14%",
+      width: 168,
+      className: "admin-order-col-status",
       render: (_, record) => {
         const order = record.order;
         const status = order?.status;
@@ -330,20 +393,22 @@ export default function Order({ mode = "all" }) {
         const next = allowedNext(normalized);
         if (next.length === 0) {
           return (
-            <StatusBadge
-              status={normalized}
-              label={
-                STATUS_OPTIONS.find((o) => o.value === normalized)?.label ||
-                status
-              }
-            />
+            <div style={{ display: "flex", justifyContent: "flex-start" }}>
+              <StatusBadge
+                status={normalized}
+                label={
+                  STATUS_OPTIONS.find((o) => o.value === normalized)?.label ||
+                  status
+                }
+              />
+            </div>
           );
         }
         return (
           <Select
             size="small"
             value={normalized}
-            style={{ width: "100%", maxWidth: "100%" }}
+            style={{ width: "100%", maxWidth: 220 }}
             getPopupContainer={() => document.body}
             options={[
               {
@@ -363,7 +428,12 @@ export default function Order({ mode = "all" }) {
                 order?._id?.$oid || order?._id || order?.id || "",
               ).trim();
               if (!orderId) {
-                message.error("Đơn hàng không hợp lệ (thiếu ID).");
+                notify.error("Đơn hàng không hợp lệ (thiếu ID).");
+                return;
+              }
+              if (newStatus === "canceled") {
+                setCancelReasonFlow({ id: orderId, fromStatus: normalized, order });
+                setCancelReasonText("");
                 return;
               }
               updateMutation.mutate({
@@ -388,7 +458,7 @@ export default function Order({ mode = "all" }) {
           {
             title: "Lý do hoàn",
             key: "returnReason",
-            width: "12%",
+            width: 140,
             render: (_, record) => {
               const code = String(record?.order?.returnRequestReasonCode || "")
                 .trim()
@@ -406,31 +476,148 @@ export default function Order({ mode = "all" }) {
     {
       title: "Ngày đặt",
       key: "createdAt",
-      width: "7%",
+      width: 104,
+      align: "center",
+      className: "admin-order-col-center",
       render: (_, record) => {
         const v = record.order?.createdAt;
-        return v ? new Date(v).toLocaleDateString("vi-VN") : "-";
+        return (
+          <span style={{ color: "#4B5563", whiteSpace: "nowrap" }}>
+            {v ? new Date(v).toLocaleDateString("vi-VN") : "-"}
+          </span>
+        );
       },
     },
     {
-      title: "Chi tiết",
+      title: "Thao tác",
       key: "detail",
-      width: "6%",
-      render: (_, record) => (
-        <Link to={`/admin/orders/${record.order?._id || ""}`}>
-          <Button size="small">Xem</Button>
-        </Link>
-      ),
+      width: 108,
+      align: "center",
+      fixed: "right",
+      className: "admin-order-col-actions",
+      render: (_, record) => {
+        const order = record.order;
+        const orderIdRaw = order?._id?.$oid || order?._id || order?.id || "";
+        const orderId = String(orderIdRaw || "").trim();
+        const normalized =
+          typeof order?.status === "string"
+            ? order.status.trim().toLowerCase()
+            : "";
+        const canCancelWhole =
+          mode !== "returns" &&
+          (normalized === "pending" || normalized === "confirmed");
+        const mutatingId = updateMutation.isPending
+          ? String(updateMutation.variables?.id || "")
+          : "";
+        const cancelLoading =
+          updateMutation.isPending && mutatingId === orderId;
+
+        const runCancelOrder = () => {
+          if (!orderId) {
+            notify.error("Đơn hàng không hợp lệ (thiếu ID).");
+            return;
+          }
+          setCancelReasonFlow({ id: orderId, fromStatus: normalized, order });
+          setCancelReasonText("");
+        };
+
+        return (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+            }}
+          >
+            <Link to={`/admin/orders/${orderId}`} style={{ lineHeight: 1 }}>
+              <Button size="small" type="default" style={{ minWidth: 76 }}>
+                Xem
+              </Button>
+            </Link>
+            {canCancelWhole ? (
+              <Button
+                size="small"
+                danger
+                ghost
+                loading={cancelLoading}
+                onClick={runCancelOrder}
+                style={{
+                  minWidth: 76,
+                  borderRadius: 6,
+                  fontWeight: 600,
+                  fontSize: 12,
+                  borderColor: "#FECACA",
+                  color: "#DC2626",
+                }}
+              >
+                Hủy đơn
+              </Button>
+            ) : null}
+          </div>
+        );
+      },
     },
   ];
 
   return (
     <div style={{ padding: "12px 16px 20px", width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
+      <Modal
+        title="Lý do hủy đơn (bắt buộc)"
+        open={!!cancelReasonFlow}
+        okText="Xác nhận hủy"
+        cancelText="Đóng"
+        destroyOnClose
+        onCancel={() => {
+          setCancelReasonFlow(null);
+          setCancelReasonText("");
+        }}
+        onOk={() => {
+          const t = cancelReasonText.trim();
+          if (t.length < MIN_ADMIN_CANCEL_NOTE_LEN) {
+            notify.error(
+              `Vui lòng nhập lý do hủy (ít nhất ${MIN_ADMIN_CANCEL_NOTE_LEN} ký tự).`,
+            );
+            return Promise.reject(new Error("invalid-note"));
+          }
+          const flow = cancelReasonFlow;
+          if (!flow?.id) return Promise.reject(new Error("no-flow"));
+          updateMutation.mutate({
+            id: flow.id,
+            fromStatus: flow.fromStatus,
+            body: {
+              status: "canceled",
+              note: t,
+              lookup: {
+                createdAt: flow.order?.createdAt || null,
+                totalAmount: flow.order?.totalAmount ?? null,
+                fullName: flow.order?.fullName || flow.order?.userId?.name || "",
+              },
+            },
+          });
+          setCancelReasonFlow(null);
+          setCancelReasonText("");
+        }}
+      >
+        <p style={{ marginBottom: 8, color: "#4B5563", fontSize: 13 }}>
+          Nhập lý do hủy (bắt buộc). Lý do được lưu trong lịch sử đơn. Khi xác nhận,
+          hệ thống sẽ hoàn tồn và hoàn ví (nếu có) theo cấu hình.
+        </p>
+        <Input.TextArea
+          rows={4}
+          maxLength={2000}
+          showCount
+          value={cancelReasonText}
+          onChange={(e) => setCancelReasonText(e.target.value)}
+          placeholder="Ví dụ: Khách yêu cầu hủy — hết hàng, sai thông tin giao hàng..."
+        />
+      </Modal>
       <style>{`
         .admin-order-table-wrap {
           width: 100%;
           max-width: 100%;
-          overflow-x: hidden;
+          overflow-x: auto;
         }
         .admin-order-table .ant-table-wrapper,
         .admin-order-table .ant-spin-nested-loading,
@@ -439,15 +626,31 @@ export default function Order({ mode = "all" }) {
         .admin-order-table .ant-table-container {
           width: 100% !important;
         }
-        .admin-order-table table {
-          table-layout: fixed !important;
+        .admin-order-table .ant-table-content table {
+          table-layout: auto !important;
           width: 100% !important;
         }
         .admin-order-table .ant-table-cell {
           word-break: break-word;
-          overflow-wrap: anywhere;
+          overflow-wrap: break-word;
           vertical-align: top;
           font-size: 13px;
+        }
+        .admin-order-table .admin-order-col-total .ant-table-cell,
+        .admin-order-table th.admin-order-col-total {
+          text-align: right !important;
+        }
+        .admin-order-table .admin-order-col-center .ant-table-cell,
+        .admin-order-table th.admin-order-col-center {
+          text-align: center !important;
+        }
+        .admin-order-table .admin-order-col-actions .ant-table-cell,
+        .admin-order-table th.admin-order-col-actions {
+          text-align: center !important;
+        }
+        .admin-order-table .admin-order-col-id .ant-table-cell,
+        .admin-order-table th.admin-order-col-id {
+          vertical-align: middle;
         }
         .admin-order-table .ant-select { min-width: 0 !important; }
         .admin-order-table .ant-table {
@@ -462,10 +665,11 @@ export default function Order({ mode = "all" }) {
           font-size: 11px;
           text-transform: uppercase;
           letter-spacing: 0.03em;
-          padding: 8px 10px !important;
+          padding: 10px 12px !important;
+          vertical-align: middle !important;
         }
         .admin-order-table .ant-table-tbody > tr > td {
-          padding: 8px 10px !important;
+          padding: 10px 12px !important;
         }
         .admin-order-table .ant-table-tbody > tr:hover > td {
           background: #FFFBF5 !important;
@@ -548,7 +752,7 @@ export default function Order({ mode = "all" }) {
           Xóa lọc
         </Button>
         <span style={{ fontSize: 12, color: "#888", marginLeft: "auto", whiteSpace: "nowrap" }}>
-          {filteredOrders.length} đơn · {tableRows.length} dòng
+          {filteredOrders.length} đơn · {productLineCount} dòng SP
         </span>
       </div>
       {mode === "returns" && (
@@ -563,7 +767,8 @@ export default function Order({ mode = "all" }) {
           loading={isLoading}
           dataSource={tableRows}
           columns={columns}
-          tableLayout="fixed"
+          tableLayout="auto"
+          scroll={{ x: 1180 }}
           size="small"
           pagination={false}
         />
@@ -579,7 +784,7 @@ export default function Order({ mode = "all" }) {
         }}
       >
         <span style={{ fontSize: 12, color: "#666", marginRight: "auto" }}>
-          {tableRows.length} dòng / {filteredOrders.length} đơn (đã lọc)
+          {filteredOrders.length} đơn · {productLineCount} dòng SP (đã lọc trang này)
         </span>
         <Pagination
           current={page + 1}

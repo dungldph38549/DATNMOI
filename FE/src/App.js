@@ -45,6 +45,7 @@ import User from "./pages/User";
 import AdminPage from "./Admin/AdminPage";
 import AdminOrderDetail from "./Admin/AdminOrderDetailModern";
 import ChatWidget from "./components/Chat/ChatWidget";
+import CustomerSocketNotifier from "./components/CustomerSocketNotifier";
 
 function RequireAuth({ children }) {
   const user = useSelector((state) => state.user);
@@ -69,6 +70,7 @@ function AppContent() {
 
       <div className="content flex-1">
         {/* Chat widget (customer) - cố định góc dưới phải */}
+        {!isAdminRoute && <CustomerSocketNotifier />}
         {!isAdminRoute && <ChatWidget />}
         <Routes>
           {/* CLIENT ROUTES */}

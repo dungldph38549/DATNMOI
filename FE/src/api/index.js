@@ -491,6 +491,23 @@ export const cancelOrderByUser = async (id) => {
   return res.data;
 };
 
+/** Hủy một dòng sản phẩm (đơn chờ xử lý / đã xác nhận). Trả về { order, history } */
+export const cancelOrderLineByUser = async (orderId, lineIndex) => {
+  const res = await axiosInstance.post(`/order/${orderId}/cancel-line`, {
+    lineIndex,
+  });
+  return res.data;
+};
+
+/** Admin: hủy một dòng sản phẩm — cùng quy tắc với khách */
+export const cancelOrderLineByAdmin = async (orderId, lineIndex) => {
+  const res = await axiosInstance.post(
+    `/order/admin/${orderId}/cancel-line`,
+    { lineIndex },
+  );
+  return res.data;
+};
+
 export const createVnpayUrl = async (orderId, returnUrl, cancelUrl) => {
   const res = await axiosInstance.post(`/order/${orderId}/create-vnpay-url`, {
     returnUrl,
