@@ -15,6 +15,24 @@ import axiosInstance from "../api/axiosConfig";
 
 dayjs.extend(isBetween);
 
+/** Nhãn mốc so sánh: cùng độ dài, ngay trước khoảng đang xem. */
+const formatComparisonCaption = (period, showZeroBaselineHint) => {
+  if (!period?.start || !period?.end) return null;
+  const a = dayjs(period.start).format("DD/MM/YYYY");
+  const b = dayjs(period.end).format("DD/MM/YYYY");
+  let s = `So với (${a} → ${b})`;
+  if (showZeroBaselineHint) s += " · kỳ trước = 0, không tính %";
+  return s;
+};
+
+const roundPctChange = (cur, prev) => {
+  const c = Number(cur) || 0;
+  const p = Number(prev) || 0;
+  if (p === 0 && c === 0) return 0;
+  if (p === 0) return null;
+  return Math.round(((c - p) / p) * 1000) / 10;
+};
+
 // ── Design tokens ──────────────────────────────────────────────
 const T = {
   primary: "#f49d25",
@@ -36,7 +54,29 @@ const T = {
 };
 
 // ── Metric card ────────────────────────────────────────────────
-const MetricCard = ({ icon, label, value, sub, color, bg }) => (
+const MetricCard = ({
+  icon,
+  label,
+  value,
+  deltaPercent,
+  comparisonLabel,
+  color,
+  bg,
+}) => {
+  const hasDelta =
+    deltaPercent !== null && deltaPercent !== undefined && !Number.isNaN(deltaPercent);
+  const isDown = hasDelta && deltaPercent < 0;
+  const isFlat = hasDelta && deltaPercent === 0;
+  const badgeBg = isDown ? T.redBg : isFlat ? "#F1F5F9" : T.greenBg;
+  const badgeColor = isDown ? T.red : isFlat ? T.textMuted : T.green;
+  const deltaText = hasDelta
+    ? `${deltaPercent > 0 ? "+" : ""}${deltaPercent.toLocaleString("vi-VN", {
+        maximumFractionDigits: 1,
+        minimumFractionDigits: 0,
+      })}%`
+    : null;
+
+  return (
   <div
     style={{
       background: T.card,
@@ -52,6 +92,7 @@ const MetricCard = ({ icon, label, value, sub, color, bg }) => (
         alignItems: "flex-start",
         justifyContent: "space-between",
         marginBottom: 16,
+        gap: 12,
       }}
     >
       <div
@@ -63,6 +104,7 @@ const MetricCard = ({ icon, label, value, sub, color, bg }) => (
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          flexShrink: 0,
         }}
       >
         <span
@@ -72,19 +114,46 @@ const MetricCard = ({ icon, label, value, sub, color, bg }) => (
           {icon}
         </span>
       </div>
-      {sub && (
-        <span
+      {(comparisonLabel || hasDelta) && (
+        <div
           style={{
-            fontSize: 11,
-            fontWeight: 700,
-            padding: "3px 8px",
-            borderRadius: 8,
-            background: T.greenBg,
-            color: T.green,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 4,
+            minWidth: 0,
+            textAlign: "right",
           }}
         >
-          {sub}
-        </span>
+          {hasDelta && (
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                padding: "3px 8px",
+                borderRadius: 8,
+                background: badgeBg,
+                color: badgeColor,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {deltaText}
+            </span>
+          )}
+          {comparisonLabel && (
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: T.textMid,
+                lineHeight: 1.4,
+                maxWidth: 220,
+              }}
+            >
+              {comparisonLabel}
+            </span>
+          )}
+        </div>
       )}
     </div>
     <p
@@ -111,7 +180,8 @@ const MetricCard = ({ icon, label, value, sub, color, bg }) => (
       {value}
     </p>
   </div>
-);
+  );
+};
 
 // ── Section card ───────────────────────────────────────────────
 const SCard = ({ title, action, children }) => (
@@ -211,6 +281,9 @@ const Dashboard = () => {
     totalOrders: 0,
     totalRevenue: 0,
     canceledOrders: 0,
+    comparisonPeriod: null,
+    revenueChangePercent: null,
+    ordersChangePercent: null,
   });
   const [revenue, setRevenue] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
@@ -257,10 +330,66 @@ const Dashboard = () => {
         const pd = paymentRes.data?.data || [];
         const td = topVariantRes.data?.data || [];
 
+        const startMs = dateRange[0].valueOf();
+        const endMs = dateRange[1].valueOf();
+        const spanMs = endMs - startMs;
+        const prevParams =
+          spanMs > 0
+            ? (() => {
+                const prevEndMs = startMs - 1;
+                const prevStartMs = prevEndMs - spanMs;
+                return {
+                  startDate: new Date(prevStartMs).toISOString(),
+                  endDate: new Date(prevEndMs).toISOString(),
+                };
+              })()
+            : null;
+
+        const hasServerCompare =
+          Boolean(od.comparisonPeriod?.start && od.comparisonPeriod?.end) &&
+          typeof od.revenueChangePercent !== "undefined" &&
+          typeof od.ordersChangePercent !== "undefined";
+
+        let comparisonPeriod = od.comparisonPeriod || null;
+        let revenueChangePercent =
+          od.revenueChangePercent !== undefined
+            ? od.revenueChangePercent
+            : null;
+        let ordersChangePercent =
+          od.ordersChangePercent !== undefined ? od.ordersChangePercent : null;
+
+        if (prevParams && !hasServerCompare) {
+          try {
+            const prevRes = await axiosInstance.get("/order/dashboard", {
+              params: prevParams,
+            });
+            const pod = prevRes.data?.data || {};
+            comparisonPeriod = {
+              start: prevParams.startDate,
+              end: prevParams.endDate,
+            };
+            revenueChangePercent = roundPctChange(
+              od.totalRevenue || 0,
+              pod.totalRevenue || 0,
+            );
+            ordersChangePercent = roundPctChange(
+              od.totalOrders || 0,
+              pod.totalOrders || 0,
+            );
+          } catch {
+            comparisonPeriod = null;
+            revenueChangePercent = null;
+            ordersChangePercent = null;
+          }
+        }
+
         setOverview({
           totalOrders: od.totalOrders || 0,
           totalRevenue: od.totalRevenue || 0,
           canceledOrders: od.canceledOrders || 0,
+          comparisonPeriod,
+          revenueChangePercent,
+          ordersChangePercent,
         });
         setRevenue(Array.isArray(rd) ? rd : []);
         setPaymentMethods(Array.isArray(pd) ? pd : []);
@@ -271,7 +400,14 @@ const Dashboard = () => {
             err?.message ||
             "Không thể tải dữ liệu dashboard",
         );
-        setOverview({ totalOrders: 0, totalRevenue: 0, canceledOrders: 0 });
+        setOverview({
+          totalOrders: 0,
+          totalRevenue: 0,
+          canceledOrders: 0,
+          comparisonPeriod: null,
+          revenueChangePercent: null,
+          ordersChangePercent: null,
+        });
         setRevenue([]);
         setPaymentMethods([]);
         setTopVariants([]);
@@ -430,7 +566,12 @@ const Dashboard = () => {
             color={T.primary}
             bg={T.primaryBg}
             value={`${overview.totalRevenue.toLocaleString("vi-VN")}₫`}
-            sub="+12.5%"
+            deltaPercent={overview.revenueChangePercent}
+            comparisonLabel={formatComparisonCaption(
+              overview.comparisonPeriod,
+              overview.revenueChangePercent === null &&
+                overview.totalRevenue > 0,
+            )}
           />
           <MetricCard
             icon="local_shipping"
@@ -438,7 +579,12 @@ const Dashboard = () => {
             color={T.blue}
             bg={T.blueBg}
             value={overview.totalOrders.toLocaleString()}
-            sub="+8.2%"
+            deltaPercent={overview.ordersChangePercent}
+            comparisonLabel={formatComparisonCaption(
+              overview.comparisonPeriod,
+              overview.ordersChangePercent === null &&
+                overview.totalOrders > 0,
+            )}
           />
           <MetricCard
             icon="cancel"

@@ -1366,41 +1366,78 @@ exports.dashboard = async (req, res) => {
       : new Date(new Date().getFullYear(), 0, 1);
     const end = endDate ? new Date(endDate) : new Date();
 
-    const [totalOrders, totalRevenue, canceledOrders, deliveredOrders] =
-      await Promise.all([
-        Order.countDocuments({ createdAt: { $gte: start, $lte: end } }),
-        Order.aggregate([
-          {
-            $match: {
-              createdAt: { $gte: start, $lte: end },
-              status: { $nin: ORDER_STATUSES_EXCLUDED_FROM_REVENUE },
-              $or: [
-                { paymentStatus: "paid" },
-                { paymentMethod: "cod", status: "delivered" },
-              ],
-            },
-          },
-          { $group: { _id: null, total: { $sum: "$totalAmount" } } },
-        ]),
-        Order.countDocuments({
-          createdAt: { $gte: start, $lte: end },
-          status: "canceled",
-        }),
-        Order.countDocuments({
-          createdAt: { $gte: start, $lte: end },
-          status: "delivered",
-        }),
+    const revenueMatch = (s, e) => ({
+      createdAt: { $gte: s, $lte: e },
+      status: { $nin: ORDER_STATUSES_EXCLUDED_FROM_REVENUE },
+      $or: [
+        { paymentStatus: "paid" },
+        { paymentMethod: "cod", status: "delivered" },
+      ],
+    });
+
+    const loadMetrics = async (s, e) => {
+      const [totalOrders, totalRevenue, canceledOrders, deliveredOrders] =
+        await Promise.all([
+          Order.countDocuments({ createdAt: { $gte: s, $lte: e } }),
+          Order.aggregate([
+            { $match: revenueMatch(s, e) },
+            { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+          ]),
+          Order.countDocuments({
+            createdAt: { $gte: s, $lte: e },
+            status: "canceled",
+          }),
+          Order.countDocuments({
+            createdAt: { $gte: s, $lte: e },
+            status: "delivered",
+          }),
+        ]);
+      return {
+        totalOrders: totalOrders || 0,
+        totalRevenue: totalRevenue[0]?.total || 0,
+        canceledOrders: canceledOrders || 0,
+        deliveredOrders: deliveredOrders || 0,
+      };
+    };
+
+    const spanMs = end.getTime() - start.getTime();
+    let comparisonPeriod = null;
+    let revenueChangePercent = null;
+    let ordersChangePercent = null;
+
+    let current;
+    if (spanMs > 0) {
+      const prevEnd = new Date(start.getTime() - 1);
+      const prevStart = new Date(prevEnd.getTime() - spanMs);
+      comparisonPeriod = {
+        start: prevStart.toISOString(),
+        end: prevEnd.toISOString(),
+      };
+      const roundPct = (cur, prev) => {
+        if (prev === 0 && cur === 0) return 0;
+        if (prev === 0) return null;
+        return Math.round(((cur - prev) / prev) * 1000) / 10;
+      };
+      const [cur, prev] = await Promise.all([
+        loadMetrics(start, end),
+        loadMetrics(prevStart, prevEnd),
       ]);
+      current = cur;
+      revenueChangePercent = roundPct(cur.totalRevenue, prev.totalRevenue);
+      ordersChangePercent = roundPct(cur.totalOrders, prev.totalOrders);
+    } else {
+      current = await loadMetrics(start, end);
+    }
 
     const result = {
-      totalOrders: totalOrders || 0,
-      totalRevenue: totalRevenue[0]?.total || 0,
-      canceledOrders: canceledOrders || 0,
-      deliveredOrders: deliveredOrders || 0,
+      ...current,
       successRate:
-        totalOrders > 0
-          ? ((deliveredOrders / totalOrders) * 100).toFixed(2)
+        current.totalOrders > 0
+          ? ((current.deliveredOrders / current.totalOrders) * 100).toFixed(2)
           : 0,
+      comparisonPeriod,
+      revenueChangePercent,
+      ordersChangePercent,
     };
 
     res.status(200).json({
