@@ -87,19 +87,19 @@ export default function Reviews() {
   const approveMutation = useMutation({
     mutationFn: (id) => approveAdminReview(id),
     onSuccess: () => {
-      message.success("Đã duyệt review");
+      message.success("Đã duyệt đánh giá");
       setDetailReview(null);
       queryClient.invalidateQueries({ queryKey: ["admin-reviews"] });
     },
     onError: (err) => {
-      message.error(err?.response?.data?.message || "Lỗi duyệt review");
+      message.error(err?.response?.data?.message || "Lỗi duyệt đánh giá");
     },
   });
 
   const rejectMutation = useMutation({
     mutationFn: ({ id, reason }) => rejectAdminReview(id, reason),
     onSuccess: () => {
-      message.success("Đã từ chối review");
+      message.success("Đã từ chối đánh giá");
       setDetailReview(null);
       queryClient.invalidateQueries({ queryKey: ["admin-reviews"] });
       setRejectModalOpen(false);
@@ -107,7 +107,7 @@ export default function Reviews() {
       setRejectReason("");
     },
     onError: (err) => {
-      message.error(err?.response?.data?.message || "Lỗi từ chối review");
+      message.error(err?.response?.data?.message || "Lỗi từ chối đánh giá");
     },
   });
 

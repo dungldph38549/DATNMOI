@@ -139,7 +139,7 @@ export default function AdminOrderDetailModern() {
         setOrder(res?.order || res);
         setHistory(Array.isArray(res?.history) ? res.history : []);
       } catch (err) {
-        notify.error(err?.response?.data?.message || "Không tải được chi tiết đơn.");
+        notify.error(err?.response?.data?.message || "Không tải được chi tiết đơn hàng.");
         setOrder(null);
       } finally {
         setLoading(false);
@@ -213,7 +213,7 @@ export default function AdminOrderDetailModern() {
   const onCancelOrderLine = async (lineIndex) => {
     if (!order?._id) return;
     const ok = await confirmShopee({
-      text: `Hủy đơn nầy (dòng #${lineIndex + 1}) khỏi đơn?`,
+      text: `Hủy dòng này (#${lineIndex + 1}) khỏi đơn?`,
       confirmText: "Đồng ý",
       cancelText: "Đóng",
     });
@@ -491,7 +491,7 @@ export default function AdminOrderDetailModern() {
                               loading={lineCanceling === idx}
                               onClick={() => onCancelOrderLine(idx)}
                             >
-                              Hủy đơn nầy
+                              Hủy dòng này
                             </Button>
                           ) : null}
                         </div>

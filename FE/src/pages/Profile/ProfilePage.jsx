@@ -119,7 +119,7 @@ const ProfilePage = () => {
     const handleVnpayTopup = async () => {
         const n = Number(String(topupAmountVnpay).replace(/\D/g, ""));
         if (!Number.isFinite(n) || n < 10000) {
-            notify.warning("So tien toi thieu 10.000d.");
+            notify.warning("Số tiền tối thiểu 10.000đ.");
             return;
         }
         setTopupSubmitting(true);
@@ -131,9 +131,9 @@ const ProfilePage = () => {
                 cancelUrl: `${base}/profile?tab=wallet`,
             });
             if (data?.paymentUrl) window.location.href = data.paymentUrl;
-            else notify.error("Khong nhan duoc link thanh toan.");
+            else notify.error("Không nhận được liên kết thanh toán.");
         } catch (err) {
-            notify.error(err?.response?.data?.message || "Khong tao duoc link VNPay.");
+            notify.error(err?.response?.data?.message || "Không tạo được liên kết VNPay.");
         } finally {
             setTopupSubmitting(false);
         }

@@ -101,7 +101,7 @@ const ShoppingCartPage = () => {
   };
 
   const goCheckoutWithSelected = () => {
-    if (selectedItemKeys.length === 0) { notify.warning("Vui long chon it nhat 1 san pham de thanh toan."); return; }
+    if (selectedItemKeys.length === 0) { notify.warning("Vui lòng chọn ít nhất 1 sản phẩm để thanh toán."); return; }
     navigate("/checkout", { state: { selectedItemKeys } });
   };
 

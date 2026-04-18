@@ -81,7 +81,7 @@ export default function AdminOrderDetail() {
         setOrder(res?.order || res);
         setHistory(Array.isArray(res?.history) ? res.history : []);
       } catch (err) {
-        notify.error(err?.response?.data?.message || "Khong tai duoc chi tiet don.");
+        notify.error(err?.response?.data?.message || "Không tải được chi tiết đơn hàng.");
         setOrder(null);
       } finally {
         setLoading(false);
@@ -107,7 +107,7 @@ export default function AdminOrderDetail() {
   const onCancelOrderLine = async (lineIndex) => {
     if (!order?._id) return;
     const ok = await confirmShopee({
-      text: `Hủy đơn nầy (dòng #${lineIndex + 1}) khỏi đơn?`,
+      text: `Hủy dòng này (#${lineIndex + 1}) khỏi đơn?`,
       confirmText: "Đồng ý",
       cancelText: "Đóng",
     });
@@ -172,8 +172,8 @@ export default function AdminOrderDetail() {
     await applyStatusChange(newStatus);
   };
 
-  if (loading) return <div style={{ padding: 24 }}>Dang tai chi tiet don hang...</div>;
-  if (!order) return <div style={{ padding: 24 }}>Khong tim thay don hang.</div>;
+  if (loading) return <div style={{ padding: 24 }}>Đang tải chi tiết đơn hàng...</div>;
+  if (!order) return <div style={{ padding: 24 }}>Không tìm thấy đơn hàng.</div>;
 
   return (
     <div style={{ padding: 24, background: "#F8F7F5", minHeight: "100vh" }}>

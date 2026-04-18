@@ -11,47 +11,47 @@ export const actionNotificationMiddleware = (store) => (next) => (action) => {
 
   switch (action.type) {
     case "cart/addToCart":
-      notify.success("Da them san pham vao gio hang.");
+      notify.success("Đã thêm sản phẩm vào giỏ hàng.");
       break;
     case "cart/removeFromCart":
-      notify.info("Da xoa san pham khoi gio hang.");
+      notify.info("Đã xóa sản phẩm khỏi giỏ hàng.");
       break;
     case "cart/removeManyFromCart":
-      notify.info("Da xoa cac san pham da chon khoi gio hang.");
+      notify.info("Đã xóa các sản phẩm đã chọn khỏi giỏ hàng.");
       break;
     case "cart/setQty":
-      notify.info("Da cap nhat so luong san pham.");
+      notify.info("Đã cập nhật số lượng sản phẩm.");
       break;
     case "cart/updateCartVariant":
-      notify.success("Da cap nhat phan loai san pham.");
+      notify.success("Đã cập nhật phân loại sản phẩm.");
       break;
     case "cart/clearCart":
-      notify.info("Da xoa toan bo gio hang.");
+      notify.info("Đã xóa toàn bộ giỏ hàng.");
       break;
     case "wishlist/toggleWishlist": {
       const prevLen = prevState?.wishlist?.items?.length || 0;
       const nextLen = nextState?.wishlist?.items?.length || 0;
       if (nextLen > prevLen) {
-        notify.success("Da them vao danh sach yeu thich.");
+        notify.success("Đã thêm vào danh sách yêu thích.");
       } else if (nextLen < prevLen) {
-        notify.info("Da xoa khoi danh sach yeu thich.");
+        notify.info("Đã xóa khỏi danh sách yêu thích.");
       }
       break;
     }
     case "wishlist/addToWishlist":
-      notify.success("Da them vao danh sach yeu thich.");
+      notify.success("Đã thêm vào danh sách yêu thích.");
       break;
     case "wishlist/removeFromWishlist":
-      notify.info("Da xoa khoi danh sach yeu thich.");
+      notify.info("Đã xóa khỏi danh sách yêu thích.");
       break;
     case "wishlist/clearWishlist":
-      notify.info("Da xoa toan bo danh sach yeu thich.");
+      notify.info("Đã xóa toàn bộ danh sách yêu thích.");
       break;
     case "user/setUser":
-      notify.success("Dang nhap thanh cong.");
+      notify.success("Đăng nhập thành công.");
       break;
     case "user/clearUser":
-      notify.info("Ban da dang xuat.");
+      notify.info("Bạn đã đăng xuất.");
       break;
     default:
       break;

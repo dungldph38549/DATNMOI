@@ -203,7 +203,7 @@ const OrderDetailPage = () => {
           : "Đã xác nhận nhận hàng.",
       );
     } catch (err) {
-      notify.error(err?.response?.data?.message || "Co loi.");
+      notify.error(err?.response?.data?.message || "Có lỗi xảy ra.");
     }
   };
 
@@ -234,7 +234,7 @@ const OrderDetailPage = () => {
   const submitReturnRequest = async () => {
     const reason = returnReason.trim();
     if (reason.length < 5) {
-      notify.warning("Vui long nhap ly do hoan hang (toi thieu 5 ky tu).");
+      notify.warning("Vui lòng nhập lý do hoàn hàng (tối thiểu 5 ký tự).");
       return;
     }
     const selectedReason = RETURN_REASON_OPTIONS.find(
@@ -263,9 +263,9 @@ const OrderDetailPage = () => {
       setReturnModalOpen(false);
       setReturnReason("");
       setReturnFiles([]);
-      notify.success("Da gui yeu cau hoan hang.");
+      notify.success("Đã gửi yêu cầu hoàn hàng.");
     } catch (err) {
-      notify.error(err?.response?.data?.message || "Co loi.");
+      notify.error(err?.response?.data?.message || "Có lỗi xảy ra.");
     } finally {
       setReturnSubmitting(false);
     }
@@ -276,8 +276,8 @@ const OrderDetailPage = () => {
       const baseUrl = window.location.origin;
       const res = await createVnpayUrl(id, `${baseUrl}/payment/return`, `${baseUrl}/orders/${id}`);
       if (res?.url) window.location.href = res.url;
-      else notify.error("Khong tao duoc link thanh toan VNPay.");
-    } catch (err) { notify.error(err?.response?.data?.message || "Khong the tao thanh toan VNPay."); }
+      else notify.error("Không tạo được liên kết thanh toán VNPay.");
+    } catch (err) { notify.error(err?.response?.data?.message || "Không thể tạo thanh toán VNPay."); }
   };
 
   const handleCancelOrder = async () => {
@@ -290,13 +290,13 @@ const OrderDetailPage = () => {
     try {
       await cancelOrderByUser(id);
       setOrder((o) => (o ? { ...o, status: "canceled" } : o));
-      notify.success("Da huy don hang.");
-    } catch (err) { notify.error(err?.response?.data?.message || "Khong the huy don hang."); }
+      notify.success("Đã hủy đơn hàng.");
+    } catch (err) { notify.error(err?.response?.data?.message || "Không thể hủy đơn hàng."); }
   };
 
   const handleCancelOrderLine = async (lineIndex) => {
     const ok = await confirmShopee({
-      text: "Hủy đơn nầy khỏi đơn? Tiền ví (nếu có) sẽ được hoàn tương ứng.",
+      text: "Hủy dòng này khỏi đơn? Tiền ví (nếu có) sẽ được hoàn tương ứng.",
       confirmText: "Đồng ý",
       cancelText: "Đóng",
     });
@@ -383,7 +383,7 @@ const OrderDetailPage = () => {
           },
         }));
       }
-      notify.success("Da gui danh gia. Danh gia se hien thi sau khi duoc duyet.");
+      notify.success("Đã gửi đánh giá. Đánh giá sẽ hiển thị sau khi được duyệt.");
       closeReviewModal();
     } catch (err) {
       setReviewError(err?.response?.data?.message || "Không thể gửi đánh giá.");
@@ -679,7 +679,7 @@ const OrderDetailPage = () => {
                             onClick={() => handleCancelOrderLine(i)}
                             className="inline-flex min-h-[40px] items-center justify-center rounded-xl border-2 border-red-100 bg-white px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 hover:border-red-200 transition-colors"
                           >
-                            Hủy đơn nầy
+                            Hủy dòng này
                           </button>
                         )}
                       </div>

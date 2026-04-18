@@ -94,7 +94,7 @@ export default function ChatAdmin() {
       const list = await getChatInbox();
       setInbox(Array.isArray(list) ? list : []);
     } catch (e) {
-      message.error(e?.response?.data?.message || e?.message || "Không tải được inbox");
+      message.error(e?.response?.data?.message || e?.message || "Không tải được danh sách tin nhắn");
     } finally {
       setInboxLoading(false);
     }

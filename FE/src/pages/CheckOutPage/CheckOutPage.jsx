@@ -62,24 +62,24 @@ function CheckOutPage() {
   const handleOrder = async () => {
     try {
       if (!cartItems.length) {
-        notify.warning("Gio hang trong.");
+        notify.warning("Giỏ hàng trống.");
         return;
       }
 
       if (!name.trim()) {
-        notify.warning("Vui long nhap ho ten.");
+        notify.warning("Vui lòng nhập họ tên.");
         return;
       }
       if (!email.trim()) {
-        notify.warning("Vui long nhap email.");
+        notify.warning("Vui lòng nhập email.");
         return;
       }
       if (!phone.trim()) {
-        notify.warning("Vui long nhap so dien thoai.");
+        notify.warning("Vui lòng nhập số điện thoại.");
         return;
       }
       if (!address.trim()) {
-        notify.warning("Vui long nhap dia chi.");
+        notify.warning("Vui lòng nhập địa chỉ.");
         return;
       }
 
@@ -97,11 +97,11 @@ function CheckOutPage() {
       const baseUrl = window.location.origin;
       if (paymentMethod === "WALLET") {
         if (!userId) {
-          notify.warning("Dang nhap de thanh toan bang vi.");
+          notify.warning("Đăng nhập để thanh toán bằng ví.");
           return;
         }
         if (totalPrice > 0 && (walletBalance ?? 0) < totalPrice) {
-          notify.warning("So du vi khong du.");
+          notify.warning("Số dư ví không đủ.");
           return;
         }
       }
@@ -177,7 +177,7 @@ function CheckOutPage() {
       }
 
       dispatch(clearCart());
-      notify.success("Dat hang thanh cong!");
+      notify.success("Đặt hàng thành công!");
       navigate("/orders");
     } catch (error) {
       const msg =

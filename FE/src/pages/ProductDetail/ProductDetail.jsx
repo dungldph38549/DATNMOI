@@ -415,7 +415,7 @@ const ProductDetail = () => {
     const sizeToSave = hasVariants ? selectedSizeValue : null;
     const skuToSave = hasVariants ? selectedSku : null;
 
-    if (hasVariants && !skuToSave) { notify.warning("Vui long chon size!"); return false; }
+    if (hasVariants && !skuToSave) { notify.warning("Vui lòng chọn kích cỡ!"); return false; }
     if (stockInfo?.available === false) { notify.warning("Sản phẩm đã hết hàng với phân loại đã chọn."); return false; }
 
     const maxStock = Number(stockInfo?.countInStock ?? 0);
@@ -488,7 +488,7 @@ const ProductDetail = () => {
     const skuToSave = hasVariants ? selectedSku : null;
 
     if (hasVariants && !skuToSave) {
-      notify.warning("Vui long chon size!");
+      notify.warning("Vui lòng chọn kích cỡ!");
       return;
     }
     if (stockInfo?.available === false) {

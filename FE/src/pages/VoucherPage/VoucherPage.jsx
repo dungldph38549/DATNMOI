@@ -165,7 +165,7 @@ const VoucherPage = () => {
     const next = Array.from(new Set([...collectedCodes, normalizedCode]));
     setCollectedCodes(next);
     localStorage.setItem(storageKey, JSON.stringify(next));
-    notify.success("Đã lưu voucher vào tài khoản.");
+    notify.success("Đã lưu phiếu giảm giá vào tài khoản.");
   };
 
   const saveVoucherIntent = (code) => {
@@ -185,7 +185,7 @@ const VoucherPage = () => {
       await navigator.clipboard.writeText(c);
       notify.success("Đã sao chép mã.");
     } catch {
-      notify.warning("Không sao chép được. Hãy chọn mã và copy thủ công.");
+      notify.warning("Không sao chép được. Hãy chọn mã và sao chép thủ công.");
     }
   };
 

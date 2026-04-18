@@ -336,7 +336,7 @@ const OrderHistoryPage = () => {
 
   const handleCancelOrderLine = async (orderId, lineIndex) => {
     const ok = await confirmShopee({
-      text: "Hủy đơn này khỏi đơn? Tiền (nếu đã trừ ví) sẽ được hoàn tương ứng.",
+      text: "Hủy dòng này khỏi đơn? Tiền (nếu đã trừ ví) sẽ được hoàn tương ứng.",
       confirmText: "Đồng ý",
       cancelText: "Đóng",
     });
@@ -631,7 +631,7 @@ const OrderHistoryPage = () => {
                                     }
                                     className="inline-flex min-h-[40px] items-center justify-center rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
                                   >
-                                    Hủy đơn này
+                                    Hủy dòng này
                                   </button>
                                 )}
                               </div>
@@ -720,7 +720,7 @@ const OrderHistoryPage = () => {
                         onClick={() => handleCancelOrder(order._id)}
                         className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-red-200 px-4 py-2 text-base font-medium text-red-600 hover:bg-red-50"
                       >
-                        Hủy đơn
+                        Hủy đơn hàng
                       </button>
                     )}
                   </div>

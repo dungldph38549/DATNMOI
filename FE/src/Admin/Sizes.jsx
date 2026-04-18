@@ -31,38 +31,38 @@ export default function Sizes() {
   const createMutation = useMutation({
     mutationFn: createSize,
     onSuccess: () => {
-      message.success("Tạo size thành công");
+      message.success("Tạo kích cỡ thành công");
       queryClient.invalidateQueries({ queryKey: ["admin-sizes"] });
       setModalOpen(false);
       form.resetFields();
     },
     onError: (err) => {
-      message.error(err?.response?.data?.message || "Không thể tạo size");
+      message.error(err?.response?.data?.message || "Không thể tạo kích cỡ");
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }) => updateSize(id, payload),
     onSuccess: () => {
-      message.success("Cập nhật size thành công");
+      message.success("Cập nhật kích cỡ thành công");
       queryClient.invalidateQueries({ queryKey: ["admin-sizes"] });
       setModalOpen(false);
       setEditingId(null);
       form.resetFields();
     },
     onError: (err) => {
-      message.error(err?.response?.data?.message || "Không thể cập nhật size");
+      message.error(err?.response?.data?.message || "Không thể cập nhật kích cỡ");
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteSize,
     onSuccess: () => {
-      message.success("Đã xóa size");
+      message.success("Đã xóa kích cỡ");
       queryClient.invalidateQueries({ queryKey: ["admin-sizes"] });
     },
     onError: (err) => {
-      message.error(err?.response?.data?.message || "Không thể xóa size");
+      message.error(err?.response?.data?.message || "Không thể xóa kích cỡ");
     },
   });
 

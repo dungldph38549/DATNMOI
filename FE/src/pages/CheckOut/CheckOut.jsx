@@ -621,10 +621,10 @@ const CheckOut = () => {
     const userId = isLoggedIn && isProbablyObjectId(userIdCandidate) ? userIdCandidate : null;
     const guestId = !isLoggedIn ? String(user?.id || "") : null;
 
-    if (!userId && (!guestId || guestId.length < 6)) { notify.error("Khong xac dinh duoc tai khoan. Vui long dang nhap lai."); return; }
+    if (!userId && (!guestId || guestId.length < 6)) { notify.error("Không xác định được tài khoản. Vui lòng đăng nhập lại."); return; }
     if (paymentMethod === "wallet") {
       if (!userId) {
-        notify.warning("Vui long dang nhap de thanh toan bang vi.");
+        notify.warning("Vui lòng đăng nhập để thanh toán bằng ví.");
         return;
       }
       if (total > 0 && (walletBalance ?? 0) < total) {
@@ -634,7 +634,7 @@ const CheckOut = () => {
         return;
       }
     }
-    if (checkoutItems.length === 0) { notify.warning("Gio hang trong."); return; }
+    if (checkoutItems.length === 0) { notify.warning("Giỏ hàng trống."); return; }
 
     try {
       setLoading(true);
@@ -715,7 +715,7 @@ const CheckOut = () => {
           return;
         }
         notify.error(
-          "Không nhận được link thanh toán VNPay. Kiểm tra backend (log lỗi), biến BE_URL / VNP_TMN_CODE trong .env.",
+          "Không nhận được liên kết thanh toán VNPay. Kiểm tra máy chủ (nhật ký lỗi), biến môi trường BE_URL / VNP_TMN_CODE trong tệp .env.",
         );
         return;
       }
@@ -725,7 +725,7 @@ const CheckOut = () => {
       persistCheckoutInfo();
       await updateProfileIfLoggedIn();
 
-      notify.success("Dat hang thanh cong!");
+      notify.success("Đặt hàng thành công!");
       navigate("/orders");
     } catch (error) {
       console.error(error);
@@ -771,10 +771,10 @@ const CheckOut = () => {
 
         try {
           const fixed = await attemptAutoFix();
-          if (fixed) { notify.warning(`${msg}\nDa tu cap nhat SKU theo size (${cartItem?.size}). Thu checkout lai.`); return; }
+          if (fixed) { notify.warning(`${msg}\nĐã tự cập nhật mã SKU theo kích cỡ (${cartItem?.size}). Thử thanh toán lại.`); return; }
         } catch { }
 
-        notify.error(`${msg}\n${data?.invalidSku ? `SKU dang gui: ${data.invalidSku}\n` : ""}Cac SKU hop le: ${availableSkus.join(", ")}`);
+        notify.error(`${msg}\n${data?.invalidSku ? `Mã SKU đang gửi: ${data.invalidSku}\n` : ""}Các mã SKU hợp lệ: ${availableSkus.join(", ")}`);
         if (productId) dispatch(removeFromCart(productId));
         return;
       }

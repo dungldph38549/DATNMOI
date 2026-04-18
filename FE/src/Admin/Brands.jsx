@@ -167,7 +167,7 @@ export default function Brands() {
         setImagePreview(result.path);
         message.success("Tải ảnh thành công");
       } catch (err) {
-        message.error("Upload ảnh thất bại");
+        message.error("Tải lên ảnh thất bại");
       }
     };
 
@@ -229,7 +229,7 @@ export default function Brands() {
         setCreateImagePreview(result.path);
         message.success("Tải ảnh thành công");
       } catch (err) {
-        message.error("Upload ảnh thất bại");
+        message.error("Tải lên ảnh thất bại");
       }
     };
 
