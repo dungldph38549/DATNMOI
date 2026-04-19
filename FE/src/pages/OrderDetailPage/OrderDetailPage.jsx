@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+import { addToCart } from "../../redux/cart/cartSlice";
 import {
   getOrderById,
   confirmDelivery,
@@ -12,7 +13,7 @@ import {
   uploadImages,
   getMyReviewByProduct,
 } from "../../api";
-import { FaBoxOpen, FaCheckCircle, FaTruck, FaMapMarkerAlt, FaTimesCircle, FaChevronLeft, FaUndoAlt, FaCreditCard, FaMoneyBillWave, FaShieldAlt, FaTimes, FaStar, FaImage, FaVideo, FaChevronDown, FaCoins } from "react-icons/fa";
+import { FaBoxOpen, FaCheckCircle, FaTruck, FaTimesCircle, FaChevronLeft, FaUndoAlt, FaShieldAlt, FaTimes, FaStar, FaImage, FaVideo, FaChevronDown, FaCoins, FaPrint, FaGlobe, FaCreditCard } from "react-icons/fa";
 import notify from "../../utils/notify";
 import { confirmShopee } from "../../utils/shopeeNotify";
 
@@ -26,21 +27,6 @@ const STATUS_LABELS = {
   returned: "Hoàn hàng: Hoàn tất",
 };
 
-const STATUS_ICONS = {
-  pending: <FaBoxOpen />, confirmed: <FaCheckCircle />, shipped: <FaTruck />, delivered: <FaMapMarkerAlt />,
-  received: <FaCheckCircle />,
-  canceled: <FaTimesCircle />, "return-request": <FaUndoAlt />, accepted: <FaCheckCircle />, rejected: <FaTimesCircle />
-};
-
-const STATUS_COLORS = {
-  pending: "bg-blue-50 text-blue-600 border-blue-200", confirmed: "bg-indigo-50 text-indigo-600 border-indigo-200",
-  shipped: "bg-purple-50 text-purple-600 border-purple-200", delivered: "bg-green-50 text-green-600 border-green-200",
-  received: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  canceled: "bg-red-50 text-red-600 border-red-200", "return-request": "bg-orange-50 text-orange-600 border-orange-200",
-  accepted: "bg-teal-50 text-teal-600 border-teal-200", rejected: "bg-red-50 text-red-600 border-red-200",
-};
-
-const TRACKING_STEPS = ["pending", "confirmed", "shipped", "delivered", "received"];
 const RETURN_STATUSES = new Set(["return-request", "accepted", "rejected", "returned"]);
 const REVIEWABLE_STATUSES = new Set(["delivered", "received"]);
 const RETURN_REASON_OPTIONS = [
@@ -51,11 +37,6 @@ const RETURN_REASON_OPTIONS = [
   { value: "not_as_described", label: "Không đúng mô tả", requireImage: false },
   { value: "other", label: "Lý do khác", requireImage: false },
 ];
-const getTrackingProgress = (status) => {
-  if (status === "canceled") return -1;
-  if (RETURN_STATUSES.has(status)) return 3;
-  return TRACKING_STEPS.indexOf(status);
-};
 
 const formatMoney = (v) => `${Number(v || 0).toLocaleString("vi-VN")}đ`;
 
@@ -79,6 +60,130 @@ const getHistoryHighlightIndex = (chron, orderStatus) => {
     if (normHistoryStatus(h.newStatus) === st) idx = i;
   });
   return idx >= 0 ? idx : chron.length - 1;
+};
+
+/** Timeline ngang 4 bước (mock Chi tiết đơn hàng) */
+const buildFourStepTimeline = (order, st, history) => {
+  const created = order?.createdAt;
+  const h = historyChronological(history || []);
+
+  const fmt = (d) => {
+    if (!d) return null;
+    try {
+      return new Date(d).toLocaleString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return null;
+    }
+  };
+
+  const findHist = (status) =>
+    h.find((x) => normHistoryStatus(x.newStatus) === status)?.createdAt;
+
+  if (st === "canceled") {
+    const cancelH = [...h]
+      .reverse()
+      .find((x) => normHistoryStatus(x.newStatus) === "canceled");
+    const hasRefund = Number(order?.walletRefundAmount) > 0;
+    return [
+      {
+        label: "Đã đặt hàng",
+        stepState: "done",
+        date: fmt(created),
+        Icon: FaCheckCircle,
+      },
+      {
+        label: "Đang xử lý",
+        stepState: "done",
+        date: fmt(findHist("confirmed") || h[0]?.createdAt || created),
+        Icon: FaBoxOpen,
+      },
+      {
+        label: "Đã hủy",
+        stepState: "danger",
+        date: fmt(cancelH?.createdAt),
+        Icon: FaTimesCircle,
+      },
+      {
+        label: "Đã hoàn tiền",
+        stepState: hasRefund ? "done" : "muted",
+        date: hasRefund ? fmt(order?.walletRefundedAt) : null,
+        sub: hasRefund ? null : "Dự kiến: —",
+        Icon: FaCoins,
+      },
+    ];
+  }
+
+  if (RETURN_STATUSES.has(st)) {
+    return [
+      {
+        label: "Đã đặt hàng",
+        stepState: "done",
+        date: fmt(created),
+        Icon: FaCheckCircle,
+      },
+      {
+        label: "Đang xử lý",
+        stepState: "done",
+        date: fmt(h[1]?.createdAt || created),
+        Icon: FaBoxOpen,
+      },
+      {
+        label: STATUS_LABELS[st] || "Hoàn hàng",
+        stepState: "current",
+        date: fmt(h[h.length - 1]?.createdAt),
+        Icon: FaUndoAlt,
+      },
+      {
+        label: "Hoàn tất",
+        stepState: "muted",
+        date: null,
+        sub: "Xem lịch sử bên dưới",
+        Icon: FaBoxOpen,
+      },
+    ];
+  }
+
+  const stepStates =
+    st === "pending" || st === "confirmed"
+      ? ["done", "current", "upcoming", "upcoming"]
+      : st === "shipped"
+        ? ["done", "done", "current", "upcoming"]
+        : st === "delivered" || st === "received"
+          ? ["done", "done", "done", "done"]
+          : ["done", "current", "upcoming", "upcoming"];
+
+  return [
+    {
+      label: "Đã đặt hàng",
+      stepState: stepStates[0],
+      date: fmt(created),
+      Icon: FaCheckCircle,
+    },
+    {
+      label: "Đang xử lý",
+      stepState: stepStates[1],
+      date: fmt(findHist("confirmed") || findHist("pending") || created),
+      Icon: FaBoxOpen,
+    },
+    {
+      label: "Đang giao",
+      stepState: stepStates[2],
+      date: fmt(findHist("shipped")),
+      Icon: FaTruck,
+    },
+    {
+      label: "Đã giao",
+      stepState: stepStates[3],
+      date: fmt(findHist("received") || findHist("delivered")),
+      Icon: FaCheckCircle,
+    },
+  ];
 };
 
 const RATING_LABELS = {
@@ -139,6 +244,7 @@ const OrderDetailPage = () => {
   const [reviewError, setReviewError] = useState("");
   const [myReviewsByProduct, setMyReviewsByProduct] = useState({});
   const user = useSelector((state) => state.user);
+  const dispatch = useDispatch();
   const isLoggedIn = !!user?.login;
 
   useEffect(() => {
@@ -292,6 +398,46 @@ const OrderDetailPage = () => {
       setOrder((o) => (o ? { ...o, status: "canceled" } : o));
       notify.success("Đã hủy đơn hàng.");
     } catch (err) { notify.error(err?.response?.data?.message || "Không thể hủy đơn hàng."); }
+  };
+
+  const handleReorder = () => {
+    const lines = (order?.products || []).filter(isOrderLineActive);
+    if (!lines.length) {
+      notify.warning("Không có sản phẩm để mua lại.");
+      return;
+    }
+    lines.forEach((p) => {
+      dispatch(
+        addToCart({
+          productId: p.productId?._id || p.productId,
+          name: p.productId?.name || p.name || "Sản phẩm",
+          image: p.image || p.productId?.image || "",
+          price: Number(p.price || 0),
+          qty: Math.max(1, Number(p.quantity || 1)),
+          size: p.size ?? null,
+          sku: p.sku ?? null,
+        }),
+      );
+    });
+    notify.success("Đã thêm sản phẩm vào giỏ hàng.");
+    navigate("/cart");
+  };
+
+  const handlePrintInvoice = () => {
+    window.print();
+  };
+
+  const handleTrackPackage = () => {
+    const t = order?.trackingNumber ?? order?.tracking ?? order?.trackingCode;
+    if (t && String(t).trim()) {
+      window.open(
+        `https://www.google.com/search?q=${encodeURIComponent(`${String(t).trim()} vận đơn`)}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+    } else {
+      notify.info("Đơn hàng chưa có mã vận đơn để theo dõi.");
+    }
   };
 
   const handleCancelOrderLine = async (lineIndex) => {
@@ -467,80 +613,145 @@ const OrderDetailPage = () => {
       0,
     );
 
-  return (
-    <div className="bg-background-light min-h-screen font-body pb-20 pt-24">
-      <div className="container mx-auto px-4 max-w-5xl">
+  const timelineSteps = buildFourStepTimeline(order, st, history);
+  const orderRefDisplay = `#CV-${String(order._id || "").slice(-6).toUpperCase()}`;
+  const orderedAtLabel = order?.createdAt
+    ? (() => {
+        const d = new Date(order.createdAt);
+        return `Đặt vào lúc ${d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}, ${d.toLocaleDateString("vi-VN", { day: "numeric", month: "long", year: "numeric" })}`;
+      })()
+    : "";
 
-        {/* TOP NAV */}
-        <Link to="/orders" className="inline-flex items-center gap-2 text-primary font-bold hover:text-secondary transition-colors mb-6 text-sm bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100">
-          <FaChevronLeft /> Quay lại lịch sử đơn hàng
+  const paymentMethodLong =
+    order.paymentMethod === "vnpay"
+      ? "VNPay"
+      : order.paymentMethod === "wallet"
+        ? "Ví tài khoản"
+        : "Thanh toán khi nhận hàng (COD)";
+
+  const subtotalExShip =
+    Number(order.totalAmount || 0) -
+    Number(order.shippingFee || 0) +
+    Number(order.discount || 0);
+
+  return (
+    <div className="min-h-screen bg-[#F8F9FA] font-body pb-16 pt-24 print:pt-4">
+      <div className="container mx-auto max-w-6xl px-4" id="order-detail-print">
+
+        <Link
+          to="/orders"
+          className="print:hidden mb-6 inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-4 py-2 text-sm font-bold text-slate-600 shadow-sm transition-colors hover:border-[#2E5BFF]/30 hover:text-[#2E5BFF]"
+        >
+          <FaChevronLeft className="text-xs" /> Quay lại lịch sử đơn hàng
         </Link>
 
-        {/* HEADER BAR */}
-        <div className="bg-slate-900 rounded-3xl p-6 md:p-8 mb-8 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-xl shadow-slate-900/10 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-3xl -mr-20 -mt-20"></div>
-          <div className="relative z-10">
-            <h1 className="text-3xl font-display font-black mb-2 tracking-tight">Chi tiết đơn hàng.</h1>
-            <p className="text-slate-400 font-medium">Mã Đơn: <span className="text-white font-bold ml-1 uppercase">#{order._id?.slice(-8)}</span></p>
+        {/* Page header — mock Convot */}
+        <div className="mb-8 flex flex-col gap-6 print:mb-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-[#2E5BFF]">
+              Mã đơn hàng:{" "}
+              <span className="font-black">{orderRefDisplay}</span>
+            </p>
+            <h1 className="mt-1 font-display text-3xl font-black tracking-tight text-slate-900 md:text-4xl">
+              Chi tiết đơn hàng
+            </h1>
+            {orderedAtLabel ? (
+              <p className="mt-2 text-sm font-medium text-slate-500">{orderedAtLabel}</p>
+            ) : null}
           </div>
-          <div className="relative z-10">
-            <span className={`px-4 py-2.5 rounded-xl text-sm font-bold border-2 flex items-center gap-2 shadow-sm ${STATUS_COLORS[st] || "bg-slate-800 text-white border-slate-700"}`}>
-              {STATUS_ICONS[st] || <FaBoxOpen />} {STATUS_LABELS[st] || order.status}
-            </span>
+          <div className="flex flex-wrap items-center gap-3 print:hidden">
+            <button
+              type="button"
+              onClick={handlePrintInvoice}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+            >
+              <FaPrint className="text-slate-400" />
+              In hóa đơn
+            </button>
+            <button
+              type="button"
+              onClick={handleTrackPackage}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#2E5BFF] px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-[#2E5BFF]/25 transition-colors hover:bg-[#2550e0]"
+            >
+              <FaGlobe className="text-white/90" />
+              Theo dõi kiện hàng
+            </button>
           </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-8">
+        <div className="flex flex-col gap-8 lg:flex-row">
 
           {/* MAIN COLUMN */}
-          <div className="w-full lg:w-2/3 space-y-8">
-
-            {/* TIMELINE */}
-            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100">
-              <h3 className="text-xl font-display font-black text-slate-800 mb-8 border-b border-slate-100 pb-4">Trạng Thái Giao Hàng</h3>
-              {(st !== "canceled" && !RETURN_STATUSES.has(st)) ? (
-                <div className="relative mb-8 pt-4 pb-2 px-4 md:px-8">
-                  <div className="absolute top-8 left-4 md:left-8 right-4 md:right-8 h-1.5 bg-slate-100 rounded-full pointer-events-none" aria-hidden />
-                  <div className="absolute top-8 left-4 md:left-8 h-1.5 bg-primary rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(238,77,45,0.5)] pointer-events-none" style={{ width: `calc(${Math.max(0, getTrackingProgress(st) / Math.max(1, TRACKING_STEPS.length - 1) * 100)}% - 2rem)` }} aria-hidden />
-
-                  <div className="relative flex justify-between text-xs font-bold text-slate-400">
-                    {TRACKING_STEPS.map((step, idx) => {
-                      const active = getTrackingProgress(st) >= idx;
+          <div className="w-full space-y-6 lg:w-2/3">
+            {/* TIMELINE — 4 bước ngang */}
+            <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">
+              <h3 className="mb-6 border-b border-slate-100 pb-4 font-display text-lg font-black text-slate-900 md:text-xl">
+                Trạng thái đơn hàng
+              </h3>
+              <div className="relative overflow-x-auto pb-2">
+                <div className="relative min-w-[600px] px-1">
+                  <div
+                    className="absolute left-[12%] right-[12%] top-5 hidden h-0.5 bg-slate-200 md:block"
+                    aria-hidden
+                  />
+                  <div className="relative z-[1] flex justify-between gap-2">
+                    {timelineSteps.map((step, idx) => {
+                      const Icon = step.Icon;
+                      const circle =
+                        step.stepState === "done"
+                          ? "border-[#2E5BFF] bg-[#2E5BFF] text-white shadow-md shadow-[#2E5BFF]/25"
+                          : step.stepState === "current"
+                            ? "border-2 border-[#2E5BFF] bg-white text-[#2E5BFF] shadow-sm"
+                            : step.stepState === "danger"
+                              ? "border-red-500 bg-red-500 text-white shadow-md"
+                              : step.stepState === "muted"
+                                ? "border-slate-200 bg-slate-100 text-slate-400"
+                                : "border-2 border-slate-200 bg-white text-slate-300";
                       return (
-                        <div key={step} className={`flex flex-col items-center gap-3 ${active ? 'text-primary' : ''} w-1/4`}>
-                          <div className={`w-10 h-10 rounded-full border-[3px] flex items-center justify-center bg-white z-10 transition-colors ${active ? 'border-primary text-primary shadow-lg shadow-primary/20' : 'border-slate-200 text-slate-300'}`}>
-                            {active ? <FaCheckCircle size={16} /> : <div className="w-2 h-2 rounded-full bg-slate-200"></div>}
+                        <div
+                          key={`${step.label}-${idx}`}
+                          className="flex max-w-[140px] flex-1 flex-col items-center text-center"
+                        >
+                          <div
+                            className={`mb-3 flex h-10 w-10 items-center justify-center rounded-full border ${circle}`}
+                          >
+                            <Icon className="h-4 w-4" aria-hidden />
                           </div>
-                          <span className="text-center">{STATUS_LABELS[step]}</span>
+                          <p className="text-xs font-bold leading-tight text-slate-800">
+                            {step.label}
+                          </p>
+                          {step.date ? (
+                            <p className="mt-1 text-[11px] font-medium leading-snug text-slate-500">
+                              {step.date.replace(", ", " • ")}
+                            </p>
+                          ) : step.sub ? (
+                            <p className="mt-1 text-[11px] font-medium text-slate-400">{step.sub}</p>
+                          ) : (
+                            <p className="mt-1 text-[11px] text-slate-400">—</p>
+                          )}
                         </div>
                       );
                     })}
                   </div>
                 </div>
-              ) : (
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4 text-slate-600 font-bold">
-                  <div className="flex items-center gap-4 shrink-0">
-                    <span className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm">
-                      {STATUS_ICONS[st]}
-                    </span>
-                    {STATUS_LABELS[st]}
-                  </div>
-                  {st === "canceled" && latestCancelNote ? (
-                    <p className="text-sm font-medium text-slate-800 leading-relaxed border-t border-slate-200 pt-3 sm:border-t-0 sm:pt-0 sm:flex-1">
-                      <span className="text-slate-500 font-bold text-xs uppercase tracking-wide block mb-1">
-                        Lý do hủy
-                      </span>
-                      {latestCancelNote}
-                    </p>
-                  ) : null}
+              </div>
+
+              {st === "canceled" && latestCancelNote ? (
+                <div className="mt-6 rounded-xl border border-red-100 bg-red-50/80 p-4 text-sm font-medium text-slate-800">
+                  <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-red-700">
+                    Lý do hủy
+                  </span>
+                  {latestCancelNote}
                 </div>
-              )}
+              ) : null}
 
               {/* HISTORY LOG */}
               {history?.length > 0 && (
-                <div className="mt-8 pt-6 border-t border-slate-100">
-                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Chi Tiết Lịch Sử</h4>
-                  <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
+                <div className="mt-8 border-t border-slate-100 pt-6">
+                  <h4 className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-400">
+                    Chi tiết lịch sử
+                  </h4>
+                  <div className="relative space-y-4 before:absolute before:inset-0 before:ml-2 before:-translate-x-px before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent md:before:mx-auto md:before:translate-x-0">
                     {(() => {
                       const chron = historyChronological(history);
                       const hi = getHistoryHighlightIndex(chron, st);
@@ -552,34 +763,34 @@ const OrderDetailPage = () => {
                         return (
                           <div
                             key={rowKey}
-                            className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group"
+                            className="group relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse"
                           >
                             <div
-                              className={`flex items-center justify-center w-5 h-5 rounded-full border-2 border-white shadow-sm z-10 transition-all md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 ${
+                              className={`z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-white shadow-sm transition-all md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 ${
                                 current
-                                  ? "bg-primary scale-125 shadow-md shadow-primary/25"
+                                  ? "scale-125 bg-[#2E5BFF] shadow-md shadow-[#2E5BFF]/25"
                                   : "bg-slate-300"
                               }`}
                             />
                             <div
-                              className={`w-[calc(100%-2rem)] md:w-[calc(50%-1.5rem)] p-3 rounded-xl border-2 shadow-sm transition-all ${
+                              className={`w-[calc(100%-2rem)] rounded-xl border-2 p-3 shadow-sm transition-all md:w-[calc(50%-1.5rem)] ${
                                 current
-                                  ? "border-primary/30 bg-primary/5 ring-1 ring-primary/10"
+                                  ? "border-[#2E5BFF]/30 bg-[#2E5BFF]/5 ring-1 ring-[#2E5BFF]/10"
                                   : "border-slate-100 bg-slate-50"
                               }`}
                             >
                               <p
-                                className={`font-bold text-sm ${
-                                  current ? "text-primary" : "text-slate-700"
+                                className={`text-sm font-bold ${
+                                  current ? "text-[#2E5BFF]" : "text-slate-700"
                                 }`}
                               >
                                 {STATUS_LABELS[h.newStatus] || h.newStatus}
                               </p>
-                              <p className="text-xs font-semibold text-slate-400 mt-0.5">
+                              <p className="mt-0.5 text-xs font-semibold text-slate-400">
                                 {new Date(h.createdAt).toLocaleString("vi-VN")}
                               </p>
                               {h?.note != null && String(h.note).trim() !== "" ? (
-                                <p className="text-xs text-slate-600 mt-2 leading-relaxed border-t border-slate-100 pt-2">
+                                <p className="mt-2 border-t border-slate-100 pt-2 text-xs leading-relaxed text-slate-600">
                                   {normHistoryStatus(h.newStatus) === "canceled"
                                     ? "Lý do hủy: "
                                     : "Ghi chú: "}
@@ -596,60 +807,105 @@ const OrderDetailPage = () => {
               )}
             </div>
 
-            {/* ORDER ITEMS */}
-            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100">
-              <h3 className="text-xl font-display font-black text-slate-800 mb-6 border-b border-slate-100 pb-4">Danh Sách Sản Phẩm</h3>
+            {/* SẢN PHẨM */}
+            <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">
+              <h3 className="mb-6 border-b border-slate-100 pb-4 font-display text-lg font-black text-slate-900 md:text-xl">
+                Sản phẩm đã chọn
+              </h3>
 
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {order.products?.map((p, i) => (
                   <div
                     key={i}
-                    className={`flex gap-4 items-center p-3 border border-slate-100 rounded-2xl bg-slate-50 ${isOrderLineActive(p) ? "" : "opacity-60 border-dashed"}`}
+                    className={`flex flex-col gap-4 border-b border-slate-100 pb-6 last:border-0 last:pb-0 sm:flex-row sm:items-start ${
+                      isOrderLineActive(p) ? "" : "opacity-60"
+                    }`}
                   >
-                    <div className="w-20 h-20 bg-white border border-slate-200 rounded-xl overflow-hidden shrink-0">
-                      <img 
-                        src={
-                          (() => {
-                            const imgName = p.image || p.productId?.image;
-                            if (!imgName) return "https://via.placeholder.com/80/f0f0f0/999?text=SP";
-                            if (imgName.startsWith("http")) return imgName;
-                            return `http://localhost:3002/uploads/${imgName.startsWith("/") ? imgName.slice(1) : imgName}`;
-                          })()
-                        } 
-                        alt={p.productId?.name || p.name || "Sản phẩm"} 
-                        className="w-full h-full object-cover p-1" 
+                    <div className="h-28 w-28 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                      <img
+                        src={(() => {
+                          const imgName = p.image || p.productId?.image;
+                          if (!imgName) {
+                            return "https://via.placeholder.com/80/f0f0f0/999?text=SP";
+                          }
+                          if (imgName.startsWith("http")) return imgName;
+                          return `http://localhost:3002/uploads/${imgName.startsWith("/") ? imgName.slice(1) : imgName}`;
+                        })()}
+                        alt={p.productId?.name || p.name || "Sản phẩm"}
+                        className="h-full w-full object-cover"
                       />
                     </div>
-                    <div className="flex flex-1 justify-between gap-3 items-start">
+                    <div className="flex min-w-0 flex-1 flex-col justify-between gap-3 sm:flex-row">
                       <div className="min-w-0">
-                        <h4 className="font-bold text-slate-800 text-sm md:text-base hover:text-primary transition-colors cursor-pointer line-clamp-2 leading-tight mb-2"><Link to={`/product/${p.productId?._id || p.productId}`}>{p.productId?.name || p.name || "Sản phẩm"}</Link></h4>
-                        <div className="flex gap-3 text-xs font-bold">
-                          <span className="bg-white border shadow-sm px-2 py-1 rounded-md text-slate-500">Size: {p.size || "Mặc định"}</span>
-                          <span className="bg-white border shadow-sm px-2 py-1 rounded-md text-slate-500">x{p.quantity}</span>
-                        </div>
+                        <h4 className="font-bold leading-snug text-slate-900">
+                          <Link
+                            to={`/product/${p.productId?._id || p.productId}`}
+                            className="transition-colors hover:text-[#2E5BFF]"
+                          >
+                            {p.productId?.name || p.name || "Sản phẩm"}
+                          </Link>
+                        </h4>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {getReviewVariantLabel(p)}
+                        </p>
+                        <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+                          Số lượng:{" "}
+                          <span className="text-slate-700">
+                            {String(p.quantity || 1).padStart(2, "0")}
+                          </span>
+                        </p>
+                        <Link
+                          to={`/product/${p.productId?._id || p.productId}`}
+                          className="mt-2 inline-block text-sm font-bold text-[#2E5BFF] hover:underline"
+                        >
+                          Xem chi tiết sản phẩm
+                        </Link>
                         {!isOrderLineActive(p) && (
                           <p className="mt-2 text-xs font-bold text-red-600">
-                            Đã hủy dòng{p.canceledBy === "admin" ? " (admin)" : ""}
+                            Đã hủy dòng
+                            {p.canceledBy === "admin" ? " (admin)" : ""}
                           </p>
                         )}
                         {canReviewOrder && isLoggedIn && isOrderLineActive(p) && (() => {
-                          const productIdKey = String(p?.productId?._id || p?.productId || "");
+                          const productIdKey = String(
+                            p?.productId?._id || p?.productId || "",
+                          );
                           const myReview = myReviewsByProduct[productIdKey];
                           if (myReview) {
                             return (
-                              <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                                <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                                <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-700">
                                   <span>Đánh giá của bạn:</span>
                                   <span className="inline-flex items-center gap-1 text-secondary">
                                     <FaStar size={11} />
                                     {myReview.rating || 0}/5
                                   </span>
-                                  <span className={`ml-auto px-2 py-0.5 rounded border text-[10px] ${myReview.status === "approved" ? "bg-green-50 text-green-700 border-green-200" : myReview.status === "rejected" ? "bg-red-50 text-red-700 border-red-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
-                                    {myReview.status === "approved" ? "Đã duyệt" : myReview.status === "rejected" ? "Bị từ chối" : "Chờ duyệt"}
+                                  <span
+                                    className={`ml-auto rounded border px-2 py-0.5 text-[10px] ${
+                                      myReview.status === "approved"
+                                        ? "border-green-200 bg-green-50 text-green-700"
+                                        : myReview.status === "rejected"
+                                          ? "border-red-200 bg-red-50 text-red-700"
+                                          : "border-amber-200 bg-amber-50 text-amber-700"
+                                    }`}
+                                  >
+                                    {myReview.status === "approved"
+                                      ? "Đã duyệt"
+                                      : myReview.status === "rejected"
+                                        ? "Bị từ chối"
+                                        : "Chờ duyệt"}
                                   </span>
                                 </div>
-                                {myReview.title && <p className="mt-1 text-xs font-semibold text-slate-700 line-clamp-1">{myReview.title}</p>}
-                                {myReview.content && <p className="mt-1 text-xs text-slate-500 line-clamp-2">{myReview.content}</p>}
+                                {myReview.title && (
+                                  <p className="mt-1 line-clamp-1 text-xs font-semibold text-slate-700">
+                                    {myReview.title}
+                                  </p>
+                                )}
+                                {myReview.content && (
+                                  <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                                    {myReview.content}
+                                  </p>
+                                )}
                               </div>
                             );
                           }
@@ -657,7 +913,7 @@ const OrderDetailPage = () => {
                             <button
                               type="button"
                               onClick={() => openReviewModal(p)}
-                              className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/15 transition-colors"
+                              className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#2E5BFF]/10 px-3 py-1.5 text-xs font-bold text-[#2E5BFF] hover:bg-[#2E5BFF]/15"
                             >
                               <FaStar size={12} />
                               Đánh giá
@@ -665,23 +921,25 @@ const OrderDetailPage = () => {
                           );
                         })()}
                       </div>
-                      <div className="ml-4 flex shrink-0 flex-col items-end gap-2 text-right">
+                      <div className="flex shrink-0 flex-col items-start gap-2 text-left sm:items-end sm:text-right">
                         {Number(p.basePrice || 0) > Number(p.price || 0) && (
-                          <p className="text-xs text-slate-400 line-through font-bold">
+                          <p className="text-xs font-bold text-slate-400 line-through">
                             {formatMoney((p.basePrice || 0) * (p.quantity || 0))}
                           </p>
                         )}
-                        <span className="font-black text-slate-900">{formatMoney(p.price * p.quantity)}</span>
+                        <span className="text-lg font-black text-slate-900">
+                          {formatMoney(p.price * p.quantity)}
+                        </span>
                         {(st === "pending" || st === "confirmed") &&
                           isOrderLineActive(p) && (
-                          <button
-                            type="button"
-                            onClick={() => handleCancelOrderLine(i)}
-                            className="inline-flex min-h-[40px] items-center justify-center rounded-xl border-2 border-red-100 bg-white px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 hover:border-red-200 transition-colors"
-                          >
-                            Hủy dòng này
-                          </button>
-                        )}
+                            <button
+                              type="button"
+                              onClick={() => handleCancelOrderLine(i)}
+                              className="inline-flex min-h-[36px] items-center justify-center rounded-xl border border-red-100 bg-white px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50"
+                            >
+                              Hủy dòng này
+                            </button>
+                          )}
                       </div>
                     </div>
                   </div>
@@ -689,130 +947,223 @@ const OrderDetailPage = () => {
               </div>
             </div>
 
-          </div>
-
-          {/* RIGHT SIDEBAR */}
-          <div className="w-full lg:w-1/3">
-            <div className="sticky top-28 space-y-6">
-
-              {/* ADDRESS INFO */}
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                <h3 className="text-lg font-display font-black text-slate-800 mb-4 pb-3 border-b border-slate-100 flex items-center gap-2"><FaMapMarkerAlt className="text-primary" /> Giao Hàng</h3>
-                <div className="space-y-3">
+            {/* Thông tin nhận hàng + Thanh toán */}
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+                <h3 className="mb-4 font-display text-base font-black text-slate-900">
+                  Thông tin nhận hàng
+                </h3>
+                <p className="text-base font-bold text-slate-900">{order.fullName}</p>
+                <p className="mt-1 font-semibold text-slate-600">{order.phone}</p>
+                <p className="mt-4 text-sm leading-relaxed text-slate-600">
+                  {order.address}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+                <h3 className="mb-4 font-display text-base font-black text-slate-900">
+                  Hình thức thanh toán
+                </h3>
+                <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+                  {order.paymentMethod === "vnpay" || order.paymentMethod === "wallet" ? (
+                    <FaCreditCard className="mt-0.5 shrink-0 text-lg text-slate-600" />
+                  ) : (
+                    <FaTruck className="mt-0.5 shrink-0 text-lg text-slate-600" />
+                  )}
                   <div>
-                    <span className="block text-xs font-bold text-slate-400 uppercase tracking-wide">Người nhận</span>
-                    <span className="block font-bold text-slate-800 text-lg">{order.fullName}</span>
-                    <span className="block font-semibold text-slate-600">{order.phone}</span>
-                  </div>
-                  <div className="pt-2">
-                    <span className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Địa chỉ</span>
-                    <p className="font-medium text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">{order.address}</p>
+                    <p className="font-bold text-slate-800">{paymentMethodLong}</p>
+                    <div className="mt-4 border-t border-slate-200 pt-4">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                        Tình trạng thanh toán
+                      </p>
+                      <div className="mt-2 flex items-center gap-2">
+                        <span
+                          className={`h-2 w-2 shrink-0 rounded-full ${
+                            st === "canceled"
+                              ? "bg-red-500"
+                              : order.paymentStatus === "paid"
+                                ? "bg-emerald-500"
+                                : "bg-amber-400"
+                          }`}
+                        />
+                        <span className="font-bold text-slate-800">
+                          {st === "canceled"
+                            ? "Đã hủy giao dịch"
+                            : order.paymentStatus === "paid"
+                              ? "Đã thanh toán"
+                              : "Chưa thanh toán"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
 
-              {/* PAYMENT INFO */}
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                <h3 className="text-lg font-display font-black text-slate-800 mb-4 pb-3 border-b border-slate-100 flex items-center gap-2"><FaCreditCard className="text-primary" /> Thanh Toán</h3>
-
-                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100 mb-6">
-                  <div className="flex items-center gap-2 font-bold text-slate-700">
-                    {order.paymentMethod === "vnpay" ? (
-                      <FaCreditCard className="text-blue-500" />
-                    ) : order.paymentMethod === "wallet" ? (
-                      <FaCreditCard className="text-emerald-500" />
-                    ) : (
-                      <FaMoneyBillWave className="text-green-500" />
-                    )}
-                    {order.paymentMethod === "vnpay"
-                      ? "VNPay"
-                      : order.paymentMethod === "wallet"
-                        ? "Ví tài khoản"
-                        : "Tiền mặt (COD)"}
+          {/* SIDEBAR — tổng kết tối + thao tác */}
+          <div className="w-full lg:w-1/3">
+            <div className="space-y-6 lg:sticky lg:top-28">
+              <div className="overflow-hidden rounded-2xl bg-[#2D3142] text-white shadow-xl shadow-slate-900/15">
+                <div className="border-b border-white/10 px-6 py-5">
+                  <h3 className="font-display text-lg font-black tracking-tight">
+                    Tổng kết đơn hàng
+                  </h3>
+                </div>
+                <div className="space-y-3 px-6 py-5 text-sm">
+                  <div className="flex justify-between font-semibold text-white/90">
+                    <span className="text-white/70">Tạm tính</span>
+                    <span>{formatMoney(subtotalExShip)}</span>
                   </div>
-                  <span className={`text-xs font-bold px-2 py-1 rounded border ${order.paymentStatus === "paid" ? "bg-green-100 text-green-700 border-green-200" : "bg-orange-100 text-orange-700 border-orange-200"}`}>
-                    {order.paymentStatus === "paid" ? "Đã Thanh Toán" : "Chưa Thanh Toán"}
-                  </span>
-                </div>
-
-                <div className="space-y-3 text-sm font-semibold text-slate-500 mb-6 border-b border-slate-100 pb-6">
-                  <div className="flex justify-between"><span className="text-slate-400">Tạm tính:</span> <span className="text-slate-800">{formatMoney(order.totalAmount - (order.shippingFee || 0) + (order.discount || 0))}</span></div>
-                  {saleDiscountTotal > 0 && <div className="flex justify-between text-blue-600"><span>Giảm giá sản phẩm:</span> <span>-{formatMoney(saleDiscountTotal)}</span></div>}
-                  <div className="flex justify-between"><span className="text-slate-400">Phí giao hàng:</span> <span className="text-slate-800">{formatMoney(order.shippingFee || 0)}</span></div>
-                  {(order.discount || 0) > 0 && <div className="flex justify-between text-green-600"><span>Giảm giá:</span> <span>-{formatMoney(order.discount)}</span></div>}
-                </div>
-
-                <div className="flex justify-between items-end mb-6">
-                  <span className="font-bold text-slate-700">Tổng cộng</span>
-                  <span className="text-3xl font-black text-secondary">{formatMoney(order.totalAmount)}</span>
-                </div>
-
-                {Number(order.walletRefundAmount) > 0 && (
-                  <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-bold">
-                    Đã hoàn {formatMoney(order.walletRefundAmount)} vào ví tài khoản của bạn.
-                    {order.walletRefundedAt && (
-                      <span className="block text-xs font-semibold text-emerald-700 mt-1">
-                        {new Date(order.walletRefundedAt).toLocaleString("vi-VN")}
+                  {saleDiscountTotal > 0 && (
+                    <div className="flex justify-between font-semibold text-sky-200/90">
+                      <span>Giảm giá sản phẩm</span>
+                      <span>-{formatMoney(saleDiscountTotal)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-semibold text-white/90">
+                    <span className="text-white/70">Phí giao hàng</span>
+                    <span>{formatMoney(order.shippingFee || 0)}</span>
+                  </div>
+                  {(order.discount || 0) > 0 && (
+                    <div className="flex justify-between font-semibold text-[#7BA3FF]">
+                      <span>
+                        {order.voucherCode
+                          ? `Mã giảm giá (${order.voucherCode})`
+                          : "Giảm giá"}
                       </span>
-                    )}
+                      <span>-{formatMoney(order.discount)}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="border-t border-white/10 px-6 py-6">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                    <span className="text-sm font-bold text-white/80">
+                      Tổng thanh toán
+                    </span>
+                    <span className="font-display text-3xl font-black tracking-tight text-[#6B9FFF]">
+                      {formatMoney(order.totalAmount)}
+                    </span>
+                  </div>
+                </div>
+
+                {st === "canceled" && (
+                  <div className="mx-6 mb-6 rounded-xl bg-black/25 px-4 py-3 text-sm leading-relaxed text-white/85">
+                    Đơn hàng đã được hủy. Nếu bạn đã thanh toán trước đó, khoản hoàn sẽ được xử lý
+                    trong khoảng{" "}
+                    <span className="font-bold text-white">3–5 ngày làm việc</span>.
                   </div>
                 )}
 
-                {/* ACTIONS */}
-                <div className="space-y-3">
-                  {order.paymentMethod === "vnpay" && order.paymentStatus !== "paid" && st !== "canceled" && (
-                    <button type="button" onClick={handleRepayVnpay} className="w-full flex justify-center items-center gap-2 py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-primary transition-colors shadow-lg"><FaShieldAlt /> Thanh Toán VNPay Lại</button>
+                <div className="space-y-4 px-6 pb-6 print:hidden">
+                  <button
+                    type="button"
+                    onClick={handleReorder}
+                    className="w-full rounded-xl bg-white py-3.5 text-center text-sm font-black text-slate-900 shadow-lg transition hover:bg-slate-100"
+                  >
+                    Mua lại đơn hàng này
+                  </button>
+                  <Link
+                    to="/contact"
+                    className="block text-center text-xs font-semibold text-white/60 transition hover:text-white"
+                  >
+                    Cần trợ giúp với đơn hàng này?
+                  </Link>
+                </div>
+              </div>
+
+              {Number(order.walletRefundAmount) > 0 && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-900">
+                  Đã hoàn {formatMoney(order.walletRefundAmount)} vào ví tài khoản của bạn.
+                  {order.walletRefundedAt && (
+                    <span className="mt-1 block text-xs font-semibold text-emerald-700">
+                      {new Date(order.walletRefundedAt).toLocaleString("vi-VN")}
+                    </span>
                   )}
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm print:hidden">
+                <p className="mb-4 text-xs font-bold uppercase tracking-wide text-slate-400">
+                  Thao tác đơn hàng
+                </p>
+                <div className="space-y-3">
+                  {order.paymentMethod === "vnpay" &&
+                    order.paymentStatus !== "paid" &&
+                    st !== "canceled" && (
+                      <button
+                        type="button"
+                        onClick={handleRepayVnpay}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-3.5 text-sm font-bold text-white shadow-lg transition hover:bg-[#2E5BFF]"
+                      >
+                        <FaShieldAlt /> Thanh toán VNPay lại
+                      </button>
+                    )}
 
                   {(st === "pending" || st === "confirmed") && (
-                    <button type="button" onClick={handleCancelOrder} className="w-full py-3.5 border-2 border-red-100 text-red-500 font-bold rounded-xl hover:bg-red-50 hover:border-red-200 transition-colors">Hủy Đơn Hàng</button>
+                    <button
+                      type="button"
+                      onClick={handleCancelOrder}
+                      className="w-full rounded-xl border-2 border-red-100 py-3.5 text-sm font-bold text-red-500 transition hover:bg-red-50"
+                    >
+                      Hủy đơn hàng
+                    </button>
                   )}
 
                   {(st === "delivered" || st === "received") && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="min-w-0">
-                        {isLoggedIn ? (
-                          <button
-                            type="button"
-                            onClick={handleConfirmDelivery}
-                            className="w-full py-3.5 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition-colors shadow-md shadow-green-600/15"
-                          >
-                            Đã nhận hàng
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => navigate("/login")}
-                            className="w-full py-3.5 bg-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-300 transition-colors"
-                          >
-                            Đăng nhập
-                          </button>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        {isLoggedIn ? (
-                          <button
-                            type="button"
-                            onClick={openReturnModal}
-                            className="w-full py-3.5 bg-orange-100 text-orange-600 text-sm font-bold rounded-xl hover:bg-orange-200 transition-colors"
-                          >
-                            Yêu cầu hoàn hàng
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => navigate("/login")}
-                            className="w-full py-3.5 bg-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-300 transition-colors"
-                          >
-                            Đăng nhập
-                          </button>
-                        )}
-                      </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {isLoggedIn ? (
+                        <button
+                          type="button"
+                          onClick={handleConfirmDelivery}
+                          className="w-full rounded-xl bg-emerald-600 py-3.5 text-sm font-bold text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-700"
+                        >
+                          Đã nhận hàng
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => navigate("/login")}
+                          className="w-full rounded-xl bg-slate-200 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-300"
+                        >
+                          Đăng nhập
+                        </button>
+                      )}
+                      {isLoggedIn ? (
+                        <button
+                          type="button"
+                          onClick={openReturnModal}
+                          className="w-full rounded-xl bg-orange-100 py-3.5 text-sm font-bold text-orange-700 transition hover:bg-orange-200"
+                        >
+                          Yêu cầu hoàn hàng
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => navigate("/login")}
+                          className="w-full rounded-xl bg-slate-200 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-300"
+                        >
+                          Đăng nhập
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
 
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:hidden">
+                <p className="font-display text-base font-black text-slate-900">
+                  Trở thành Member
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                  Tích điểm và ưu đãi độc quyền cho thành viên Convot.
+                </p>
+                <Link
+                  to="/voucher"
+                  className="mt-3 inline-block text-sm font-bold text-[#2E5BFF] hover:underline"
+                >
+                  Tìm hiểu thêm
+                </Link>
+              </div>
             </div>
           </div>
 

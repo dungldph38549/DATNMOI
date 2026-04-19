@@ -278,13 +278,13 @@ export default function ChatAdmin() {
               </div>
             )}
             {messages.map((m) => {
-              const isUser = m.senderRole === "user";
+              const isAdmin = m.senderRole === "admin";
               const bubbleKey =
-                m.senderRole === "ai" ? "ai" : isUser ? "user" : "admin";
+              m.senderRole === "ai" ? "ai"  : m.senderRole === "admin"? "admin" : "user";
               return (
                 <div
                   key={m._id}
-                  style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", marginBottom: 10 }}
+                  style={{ display: "flex", justifyContent: isAdmin ? "flex-end" : "flex-start", marginBottom: 10 }}
                 >
                   <div
                     style={{
