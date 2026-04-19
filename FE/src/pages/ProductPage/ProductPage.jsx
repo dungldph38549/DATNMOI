@@ -401,8 +401,8 @@ const ProductPage = () => {
               <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Đánh giá</h3>
               <div className="space-y-3">
                 {[
-                  { id: "3", label: "Từ 3 sao" },
                   { id: "4", label: "Từ 4 sao" },
+                  { id: "5", label: "Từ 5 sao" },
                 ].map((item) => (
                   <label key={item.id} className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer">
                     <input
