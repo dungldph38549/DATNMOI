@@ -339,6 +339,22 @@ const ProductPage = () => {
               </div>
             )}
 
+            <div>
+              <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Giá</h3>
+              <input
+                type="range"
+                min={0}
+                max={maxAvailablePrice || 1}
+                value={maxPriceFilter}
+                onChange={(e) => setMaxPriceFilter(Number(e.target.value))}
+                className="w-full accent-[#8ca587]"
+              />
+              <div className="mt-2 flex items-center justify-between text-xs text-neutral-600">
+                <span>0đ</span>
+                <span>{Number(maxPriceFilter || 0).toLocaleString("vi-VN")}đ</span>
+              </div>
+            </div>
+
             {availableSizes.length > 0 && (
               <div>
                 <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Kích cỡ</h3>
@@ -380,22 +396,6 @@ const ProductPage = () => {
                 </div>
               </div>
             )}
-
-            <div>
-              <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Giá</h3>
-              <input
-                type="range"
-                min={0}
-                max={maxAvailablePrice || 1}
-                value={maxPriceFilter}
-                onChange={(e) => setMaxPriceFilter(Number(e.target.value))}
-                className="w-full accent-[#8ca587]"
-              />
-              <div className="mt-2 flex items-center justify-between text-xs text-neutral-600">
-                <span>0đ</span>
-                <span>{Number(maxPriceFilter || 0).toLocaleString("vi-VN")}đ</span>
-              </div>
-            </div>
 
             <div>
               <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Đánh giá</h3>

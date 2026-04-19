@@ -228,31 +228,42 @@ const ProductDetail = () => {
   }, [product, availableSizes, selectedSize, hasVariants, getVariantSizeLabel]);
 
   const availableColors = useMemo(() => {
-    if (!hasVariants || !selectedSize || !Array.isArray(product?.variants)) return [];
+    if (!product || !hasVariants) return [];
     const colors = product.variants
-      .filter((v) => String(getVariantSizeLabel(v) ?? "") === String(selectedSize))
       .map((v) => getVariantColorLabel(v))
       .filter((c) => c != null && String(c).trim() !== "");
     return Array.from(new Set(colors.map((c) => String(c))));
-  }, [product, hasVariants, selectedSize, getVariantSizeLabel, getVariantColorLabel]);
+  }, [product, hasVariants, getVariantColorLabel]);
 
-  useEffect(() => {
-    if (!hasVariants || !selectedSize) return;
-    if (!Array.isArray(product?.variants) || !product.variants.length) return;
-    if (!availableColors.length) {
-      if (selectedColor) setSelectedColor(null);
-      return;
+  /** 
+   * Logic chọn size: Ưu tiên giữ màu hiện tại. 
+   * Nếu màu hiện tại không có trong size mới, chọn màu đầu tiên có sẵn của size đó.
+   */
+  const handleSizeClick = (size) => {
+    setSelectedSize(size);
+    const variantsInSize = product.variants.filter(v => String(getVariantSizeLabel(v)) === String(size));
+    const hasCurrentColor = variantsInSize.some(v => String(getVariantColorLabel(v)) === String(selectedColor));
+    
+    if (!hasCurrentColor && variantsInSize.length > 0) {
+      const firstInStock = variantsInSize.find(v => (v.stock ?? 0) > 0) || variantsInSize[0];
+      setSelectedColor(String(getVariantColorLabel(firstInStock) || ""));
     }
-    const isCurrentValid = availableColors.some((c) => String(c) === String(selectedColor));
-    if (isCurrentValid) return;
-    const matched = product.variants.find(
-      (v) =>
-        String(getVariantSizeLabel(v) ?? "") === String(selectedSize) &&
-        (getVariantColorLabel(v) ?? "").trim() !== "" &&
-        (v?.stock ?? 0) > 0,
-    );
-    setSelectedColor(String(getVariantColorLabel(matched) || availableColors[0]));
-  }, [product, hasVariants, selectedSize, selectedColor, availableColors, getVariantSizeLabel, getVariantColorLabel]);
+  };
+
+  /** 
+   * Logic chọn màu: Ưu tiên giữ size hiện tại. 
+   * Nếu size hiện tại không có màu mới, chọn size đầu tiên có sẵn của màu đó.
+   */
+  const handleColorClick = (color) => {
+    setSelectedColor(color);
+    const variantsInColor = product.variants.filter(v => String(getVariantColorLabel(v)) === String(color));
+    const hasCurrentSize = variantsInColor.some(v => String(getVariantSizeLabel(v)) === String(selectedSize));
+
+    if (!hasCurrentSize && variantsInColor.length > 0) {
+      const firstInStock = variantsInColor.find(v => (v.stock ?? 0) > 0) || variantsInColor[0];
+      setSelectedSize(String(getVariantSizeLabel(firstInStock) || ""));
+    }
+  };
 
   useEffect(() => {
     const run = async () => {
@@ -734,21 +745,27 @@ const ProductDetail = () => {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {availableSizes.map((size) => {
-                    const v = product.variants?.find((vv) => String(getVariantSizeLabel(vv)) === String(size));
-                    const isDisabled = (v?.stock ?? 0) <= 0;
+                    const allVariantsInSize = product.variants.filter(vv => String(getVariantSizeLabel(vv)) === String(size));
+                    const isTotalOutOfStock = allVariantsInSize.every(vv => (vv.stock ?? 0) <= 0);
+                    
+                    const variantWithCurrentColor = allVariantsInSize.find(vv => String(getVariantColorLabel(vv)) === String(selectedColor));
+                    const isUnavailableInCurrentColor = !variantWithCurrentColor || (variantWithCurrentColor.stock ?? 0) <= 0;
+                    
                     const isSelected = String(selectedSize) === String(size);
                     return (
                       <button
                         key={size}
                         type="button"
-                        onClick={() => !isDisabled && setSelectedSize(String(size))}
-                        disabled={isDisabled}
+                        onClick={() => handleSizeClick(String(size))}
+                        disabled={isTotalOutOfStock}
                         className={`flex h-12 min-w-[3rem] items-center justify-center rounded-full border px-4 text-sm font-semibold transition-all ${
                           isSelected
                             ? "border-convot-charcoal bg-convot-charcoal text-white"
-                            : isDisabled
-                              ? "cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-300"
-                              : "border-neutral-300 bg-white text-neutral-700 hover:border-convot-charcoal"
+                            : isTotalOutOfStock
+                              ? "cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-200 line-through opacity-50"
+                              : isUnavailableInCurrentColor
+                                ? "border-neutral-200 bg-white text-neutral-400 opacity-60 hover:border-convot-charcoal"
+                                : "border-neutral-300 bg-white text-neutral-700 hover:border-convot-charcoal"
                         }`}
                       >
                         {formatVariantButtonLabel(size, "size")}
@@ -769,28 +786,30 @@ const ProductDetail = () => {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {availableColors.map((color) => {
-                    const variantByColor = product.variants?.find(
-                      (vv) =>
-                        String(getVariantSizeLabel(vv) ?? "") === String(selectedSize) &&
-                        String(getVariantColorLabel(vv) ?? "") === String(color),
-                    );
-                    const isDisabled = (variantByColor?.stock ?? 0) <= 0;
+                    const allVariantsInColor = product.variants.filter(vv => String(getVariantColorLabel(vv)) === String(color));
+                    const isTotalOutOfStock = allVariantsInColor.every(vv => (vv.stock ?? 0) <= 0);
+
+                    const variantWithCurrentSize = allVariantsInColor.find(vv => String(getVariantSizeLabel(vv)) === String(selectedSize));
+                    const isUnavailableInCurrentSize = !variantWithCurrentSize || (variantWithCurrentSize.stock ?? 0) <= 0;
+
                     const isSelected = String(selectedColor || "") === String(color);
                     return (
                       <button
                         key={color}
                         type="button"
-                        onClick={() => !isDisabled && setSelectedColor(String(color))}
-                        disabled={isDisabled}
+                        onClick={() => handleColorClick(String(color))}
+                        disabled={isTotalOutOfStock}
                         className={`inline-flex h-11 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-all ${
                           isSelected
                             ? "border-convot-charcoal bg-convot-charcoal text-white"
-                            : isDisabled
-                              ? "cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-300"
-                              : "border-neutral-300 bg-white text-neutral-700 hover:border-convot-charcoal"
+                            : isTotalOutOfStock
+                              ? "cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-200 line-through opacity-50"
+                              : isUnavailableInCurrentSize
+                                ? "border-neutral-200 bg-white text-neutral-400 opacity-60 hover:border-convot-charcoal"
+                                : "border-neutral-300 bg-white text-neutral-700 hover:border-convot-charcoal"
                         }`}
                       >
-                        <span className={`h-2 w-2 rounded-full ${isSelected ? "bg-white" : "bg-neutral-400"}`} />
+                        <span className={`h-2 w-2 rounded-full ${isSelected ? "bg-white" : isUnavailableInCurrentSize ? "bg-neutral-300" : "bg-neutral-400"}`} />
                         {formatVariantButtonLabel(color, "color")}
                       </button>
                     );
