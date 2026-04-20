@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
@@ -60,6 +60,8 @@ const ProductDetail = () => {
   const [activeTab, setActiveTab] = useState("story");
   const [mainImage, setMainImage] = useState("");
   const [showSizeGuide, setShowSizeGuide] = useState(false);
+  const [isMainImagePopping, setIsMainImagePopping] = useState(false);
+  const shakeTimeoutRef = useRef(null);
 
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
@@ -257,6 +259,9 @@ const ProductDetail = () => {
       const firstInStock = variantsInSize.find(v => (v.stock ?? 0) > 0) || variantsInSize[0];
       setSelectedColor(String(getVariantColorLabel(firstInStock) || ""));
     }
+    if (shakeTimeoutRef.current) clearTimeout(shakeTimeoutRef.current);
+    setIsMainImagePopping(true);
+    shakeTimeoutRef.current = setTimeout(() => setIsMainImagePopping(false), 220);
   };
 
   /** 
@@ -272,7 +277,16 @@ const ProductDetail = () => {
       const firstInStock = variantsInColor.find(v => (v.stock ?? 0) > 0) || variantsInColor[0];
       setSelectedSize(String(getVariantSizeLabel(firstInStock) || ""));
     }
+    if (shakeTimeoutRef.current) clearTimeout(shakeTimeoutRef.current);
+    setIsMainImagePopping(true);
+    shakeTimeoutRef.current = setTimeout(() => setIsMainImagePopping(false), 220);
   };
+
+  useEffect(() => {
+    return () => {
+      if (shakeTimeoutRef.current) clearTimeout(shakeTimeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const run = async () => {
@@ -626,6 +640,17 @@ const ProductDetail = () => {
 
   return (
     <div className="min-h-screen bg-convot-cream font-body pb-16 pt-16 md:pt-20">
+      <style>{`
+        @keyframes pd-main-image-pop {
+          0% { transform: scale(1); }
+          60% { transform: scale(1.035); }
+          100% { transform: scale(1); }
+        }
+        .pd-main-image-pop {
+          animation: pd-main-image-pop 220ms ease-out 1;
+          will-change: transform;
+        }
+      `}</style>
       <div className="container mx-auto max-w-7xl px-4 md:px-6">
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-10 xl:gap-14">
           <div className="lg:col-span-7">
@@ -675,7 +700,7 @@ const ProductDetail = () => {
                   onError={(e) => {
                     e.target.src = PLACEHOLDER_IMG;
                   }}
-                  className="h-full w-full object-cover transition duration-700 ease-out hover:scale-[1.02]"
+                  className={`h-full w-full object-cover transition duration-700 ease-out hover:scale-[1.02] ${isMainImagePopping ? "pd-main-image-pop" : ""}`}
                   alt={product.name}
                 />
                 {product.isNew && (
@@ -754,12 +779,12 @@ const ProductDetail = () => {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {availableSizes.map((size) => {
-                    const allVariantsInSize = product.variants.filter(vv => String(getVariantSizeLabel(vv)) === String(size));
-                    const isTotalOutOfStock = allVariantsInSize.every(vv => (vv.stock ?? 0) <= 0);
-                    
-                    const variantWithCurrentColor = allVariantsInSize.find(vv => String(getVariantColorLabel(vv)) === String(selectedColor));
+                    const allVariantsInSize = product.variants.filter((vv) => String(getVariantSizeLabel(vv)) === String(size));
+                    const isTotalOutOfStock = allVariantsInSize.every((vv) => (vv.stock ?? 0) <= 0);
+
+                    const variantWithCurrentColor = allVariantsInSize.find((vv) => String(getVariantColorLabel(vv)) === String(selectedColor));
                     const isUnavailableInCurrentColor = !variantWithCurrentColor || (variantWithCurrentColor.stock ?? 0) <= 0;
-                    
+
                     const isSelected = String(selectedSize) === String(size);
                     return (
                       <button
@@ -795,10 +820,10 @@ const ProductDetail = () => {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {availableColors.map((color) => {
-                    const allVariantsInColor = product.variants.filter(vv => String(getVariantColorLabel(vv)) === String(color));
-                    const isTotalOutOfStock = allVariantsInColor.every(vv => (vv.stock ?? 0) <= 0);
+                    const allVariantsInColor = product.variants.filter((vv) => String(getVariantColorLabel(vv)) === String(color));
+                    const isTotalOutOfStock = allVariantsInColor.every((vv) => (vv.stock ?? 0) <= 0);
 
-                    const variantWithCurrentSize = allVariantsInColor.find(vv => String(getVariantSizeLabel(vv)) === String(selectedSize));
+                    const variantWithCurrentSize = allVariantsInColor.find((vv) => String(getVariantSizeLabel(vv)) === String(selectedSize));
                     const isUnavailableInCurrentSize = !variantWithCurrentSize || (variantWithCurrentSize.stock ?? 0) <= 0;
 
                     const isSelected = String(selectedColor || "") === String(color);
