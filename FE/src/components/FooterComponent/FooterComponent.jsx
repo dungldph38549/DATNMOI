@@ -76,11 +76,6 @@ const FooterComponent = () => {
                   Tuyển dụng
                 </Link>
               </li>
-              <li>
-                <Link to="/contact" className={footerNavLinkClass}>
-                  Liên hệ
-                </Link>
-              </li>
             </ul>
           </div>
 
