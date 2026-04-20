@@ -229,7 +229,7 @@ const AccessoriesPage = () => {
   const [colorFilter, setColorFilter] = useState("");
   const [lengthFilter, setLengthFilter] = useState("");
   const [soleFilter, setSoleFilter] = useState("");
-  const [sizeFilter, setSizeFilter] = useState("");
+  // const [sizeFilter, setSizeFilter] = useState("");
   const [sort, setSort] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_STEP);
 
@@ -302,10 +302,10 @@ const AccessoriesPage = () => {
 
   useEffect(() => {
     if (selectedAccessoryKind === "insole") setLengthFilter("");
-    if (selectedAccessoryKind === "shoelace") {
-      setSizeFilter("");
-      setSoleFilter("");
-    }
+    // if (selectedAccessoryKind === "shoelace") {
+    //   setSizeFilter("");
+    //   setSoleFilter("");
+    // }
   }, [selectedAccessoryKind]);
 
   const colorOptions = useMemo(() => {
@@ -326,18 +326,18 @@ const AccessoriesPage = () => {
     return [...set].sort((a, b) => a.localeCompare(b, "vi"));
   }, [productsForFilterOptions]);
 
-  const sizeOptions = useMemo(() => {
-    const set = new Set();
-    productsForFilterOptions.forEach((p) => getProductVariantSizes(p).forEach((v) => set.add(v)));
-    return [...set].sort(sortLengthLabels);
-  }, [productsForFilterOptions]);
+  // const sizeOptions = useMemo(() => {
+  //   const set = new Set();
+  //   productsForFilterOptions.forEach((p) => getProductVariantSizes(p).forEach((v) => set.add(v)));
+  //   return [...set].sort(sortLengthLabels);
+  // }, [productsForFilterOptions]);
 
   const showLengthFilter =
     (selectedAccessoryKind === "all" || selectedAccessoryKind === "other" || selectedAccessoryKind === "shoelace") &&
     lengthOptions.length > 0;
-  const showSizeFilter =
-    (selectedAccessoryKind === "all" || selectedAccessoryKind === "other" || selectedAccessoryKind === "insole") &&
-    sizeOptions.length > 0;
+  // const showSizeFilter =
+  //   (selectedAccessoryKind === "all" || selectedAccessoryKind === "other" || selectedAccessoryKind === "insole") &&
+  //   sizeOptions.length > 0;
   const showSoleFilter =
     (selectedAccessoryKind === "all" || selectedAccessoryKind === "other" || selectedAccessoryKind === "insole") &&
     soleOptions.length > 0;
@@ -388,11 +388,11 @@ const AccessoriesPage = () => {
       );
     }
 
-    if (sizeFilter && showSizeFilter) {
-      data = data.filter((p) =>
-        getProductVariantSizes(p).some((v) => normalizeValue(v) === normalizeValue(sizeFilter)),
-      );
-    }
+    // if (sizeFilter && showSizeFilter) {
+    //   data = data.filter((p) =>
+    //     getProductVariantSizes(p).some((v) => normalizeValue(v) === normalizeValue(sizeFilter)),
+    //   );
+    // }
 
     if (sort === "priceAsc") data.sort((a, b) => getProductMinPrice(a) - getProductMinPrice(b));
     else if (sort === "priceDesc") data.sort((a, b) => getProductMinPrice(b) - getProductMinPrice(a));
@@ -407,16 +407,14 @@ const AccessoriesPage = () => {
     colorFilter,
     lengthFilter,
     soleFilter,
-    sizeFilter,
     showLengthFilter,
     showSoleFilter,
-    showSizeFilter,
     sort,
   ]);
 
-  useEffect(() => {
-    setVisibleCount(PAGE_STEP);
-  }, [categoryFilterId, priceBracket, colorFilter, lengthFilter, soleFilter, sizeFilter, sort]);
+  // useEffect(() => {
+  //   setVisibleCount(PAGE_STEP);
+  // }, [categoryFilterId, priceBracket, colorFilter, lengthFilter, soleFilter, sizeFilter, sort]);
 
   const visibleList = useMemo(
     () => filteredProducts.slice(0, visibleCount),
@@ -436,9 +434,9 @@ const AccessoriesPage = () => {
     setCategoryFilterId("");
     setPriceBracket("");
     setColorFilter("");
-    setLengthFilter("");
-    setSoleFilter("");
-    setSizeFilter("");
+    // setLengthFilter("");
+    // setSoleFilter("");
+    // setSizeFilter("");
   };
 
   const wishlistIds = useMemo(
@@ -507,7 +505,7 @@ const AccessoriesPage = () => {
               />
             )}
 
-            {showSizeFilter && (
+            {/* {showSizeFilter && (
               <VerticalOptionFilter
                 title={FILTER_LABELS.sizeSection}
                 allLabel={FILTER_LABELS.allSizes}
@@ -516,7 +514,7 @@ const AccessoriesPage = () => {
                 onChange={setSizeFilter}
                 radioName="accessory-size"
               />
-            )}
+            )} */}
 
             <div>
               <h3 className={filterHeadingClass}>Khoảng giá</h3>
