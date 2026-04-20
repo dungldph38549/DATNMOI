@@ -1,6 +1,16 @@
-import React from "react";
+import React, { useMemo } from "react";
 
-const ProductFilterSidebar = ({ selectedSize, onChangeSize }) => {
+const formatVnd = (n) => `${Number(n || 0).toLocaleString()}đ`;
+
+const ProductFilterSidebar = ({
+  selectedSize,
+  onChangeSize,
+  priceMax,
+  onChangePrice,
+  priceMaxLimit,
+} = {}) => {
+  const sliderMax = useMemo(() => Number(priceMaxLimit ?? 0) || 0, [priceMaxLimit]);
+
   return (
     <aside className="w-full lg:w-64 shrink-0">
       <div className="sticky top-28 space-y-8">
@@ -9,13 +19,13 @@ const ProductFilterSidebar = ({ selectedSize, onChangeSize }) => {
             <span className="material-symbols-outlined text-primary">
               filter_list
             </span>
-            Filters
+            Bộ lọc
           </h3>
           <div className="space-y-6">
             {/* Brand */}
             <div>
               <h4 className="text-sm font-semibold mb-3 uppercase tracking-wider text-slate-400">
-                Brand
+                Thương hiệu
               </h4>
               <div className="space-y-2">
                 {["Nike", "Adidas", "New Balance", "Puma"].map((brand) => (
@@ -39,15 +49,21 @@ const ProductFilterSidebar = ({ selectedSize, onChangeSize }) => {
             {/* Price Range */}
             <div>
               <h4 className="text-sm font-semibold mb-3 uppercase tracking-wider text-slate-400">
-                Price Range
+                Khoảng giá
               </h4>
               <input
                 type="range"
+                min={0}
+                max={sliderMax}
+                step={10000}
+                value={Number(priceMax ?? 0)}
+                disabled={sliderMax <= 0}
+                onChange={(e) => onChangePrice?.(Number(e.target.value))}
                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary"
               />
               <div className="flex justify-between mt-2 text-xs font-medium">
-                <span>$0</span>
-                <span>$500+</span>
+                <span>{formatVnd(0)}</span>
+                <span>{sliderMax > 0 ? formatVnd(sliderMax) : "-"}</span>
               </div>
             </div>
 

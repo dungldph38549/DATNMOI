@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const ColorController = require("../controller/ColorController");
+const ColorController = require("../controllers/ColorController");
 
 router.post("/create", ColorController.createColor);
 router.put("/update/:id", ColorController.updateColor);

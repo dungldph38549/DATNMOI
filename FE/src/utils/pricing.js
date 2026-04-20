@@ -9,6 +9,7 @@ const VIRTUAL_LIST_PRICE_MARKUP_PERCENT = 15;
 const buildPriceInfo = (originalRaw, effectiveRaw) => {
   let original = toNumber(originalRaw, 0);
   const effective = toNumber(effectiveRaw, 0);
+
   if (effective <= 0) {
     return {
       originalPrice: original,
@@ -17,12 +18,15 @@ const buildPriceInfo = (originalRaw, effectiveRaw) => {
       discountPercent: 0,
     };
   }
+
   if (original <= effective) {
     const factor = 1 + VIRTUAL_LIST_PRICE_MARKUP_PERCENT / 100;
     original = Math.round(effective * factor);
   }
+
   const discountPercent =
     original > 0 ? Math.round(((original - effective) / original) * 100) : 0;
+
   return {
     originalPrice: original,
     effectivePrice: effective,
@@ -65,5 +69,6 @@ export const getProductPriceInfo = (product, selectedVariant = null) => {
     product.effectivePrice ?? product.salePrice ?? product.priceRange?.min ?? product.price ?? 0,
     0,
   );
+
   return buildPriceInfo(original, effective);
 };

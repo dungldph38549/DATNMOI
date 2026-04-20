@@ -29,7 +29,6 @@ const Product = ({ product, ratingValue }) => {
   const [showQuickView, setShowQuickView] = useState(false);
   const [added, setAdded] = useState(false);
 
-
   // Back-end đôi khi không set `hasVariants` đúng như `variants` thực có.
   // Vì vậy suy ra biến thể dựa trên `variants.length`.
   const hasVariants = Array.isArray(product?.variants) && product.variants.length > 0;
@@ -45,9 +44,9 @@ const Product = ({ product, ratingValue }) => {
 
     const prices = Array.isArray(product?.variants)
       ? product.variants
-        .filter((v) => v && v.price != null)
-        .map((v) => Number(v.price))
-        .filter((n) => Number.isFinite(n))
+          .filter((v) => v && v.price != null)
+          .map((v) => Number(v.price))
+          .filter((n) => Number.isFinite(n))
       : [];
 
     if (prices.length > 0) {
@@ -60,6 +59,7 @@ const Product = ({ product, ratingValue }) => {
       maxPrice: Number.isFinite(single) ? single : 0,
     };
   }, [product]);
+
   const cardPriceInfo = useMemo(() => getProductPriceInfo(product), [product]);
 
   const { minOriginal, maxOriginal } = useMemo(() => {
@@ -83,15 +83,15 @@ const Product = ({ product, ratingValue }) => {
     }
     if (!Number.isFinite(raw)) return { value: 4, label: "4/5" };
     const v = Math.min(5, Math.max(0, raw));
-    const label =
-      v % 1 === 0 ? `${Math.round(v)}/5` : `${v.toFixed(1)}/5`;
+    const label = v % 1 === 0 ? `${Math.round(v)}/5` : `${v.toFixed(1)}/5`;
     return { value: v, label };
   }, [ratingValue, product?.rating]);
 
   if (!product) return null;
 
   const PLACEHOLDER =
-    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f3f4f6'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='28' font-family='Times New Roman'>No Image</text></svg>";
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f3f4f6'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='28' font-family='Plus Jakarta Sans'>No Image</text></svg>";
+
   const getImageUrl = (img) => {
     if (!img || typeof img !== "string") return PLACEHOLDER;
     if (img.startsWith("http://") || img.startsWith("https://")) return img;
@@ -99,6 +99,7 @@ const Product = ({ product, ratingValue }) => {
     if (img.startsWith("uploads/")) return `http://localhost:3002/${img}`;
     return `http://localhost:3002/uploads/${img}`;
   };
+
   const image1 = getImageUrl(product.image || product?.srcImages?.[0]);
   const image2 = getImageUrl(product.image2 || product?.srcImages?.[1]) || image1;
 
@@ -107,14 +108,12 @@ const Product = ({ product, ratingValue }) => {
     e.target.src = PLACEHOLDER;
   };
 
-  // WISHLIST
   const handleToggleWishlist = (e) => {
     e.preventDefault();
     e.stopPropagation();
     dispatch(toggleWishlist(product));
   };
 
-  // ADD CART
   const handleAddCart = async () => {
     if (!isLoggedIn) {
       notify.warning("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.");
@@ -176,7 +175,6 @@ const Product = ({ product, ratingValue }) => {
           className="pointer-events-none absolute inset-x-0 top-0 z-10 h-[3px] bg-gradient-to-r from-primary/0 via-primary/70 to-secondary/60 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
           aria-hidden
         />
-        {/* IMAGE */}
         <Link to={`/product/${product._id}`} className="relative block aspect-square overflow-hidden bg-gradient-to-br from-slate-100 to-slate-50">
           <img
             src={image1}
@@ -192,7 +190,6 @@ const Product = ({ product, ratingValue }) => {
             onError={onImageError}
           />
 
-          {/* OPTIONAL LIGHT OVERLAY ON HOVER */}
           <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
 
           {product?.sold > 50 && (
@@ -202,6 +199,7 @@ const Product = ({ product, ratingValue }) => {
               </span>
             </div>
           )}
+
           {cardPriceInfo.hasSale && (
             <div className="absolute top-3 left-3 z-10 translate-y-7">
               <span className="bg-red-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide shadow-md">
@@ -210,7 +208,6 @@ const Product = ({ product, ratingValue }) => {
             </div>
           )}
 
-          {/* QUICK VIEW ICON (Centered) */}
           <div className="absolute inset-0 z-20 flex translate-y-4 items-center justify-center opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
             <button
               type="button"
@@ -226,7 +223,6 @@ const Product = ({ product, ratingValue }) => {
           </div>
         </Link>
 
-        {/* WISHLIST (Floating) */}
         <button
           type="button"
           onClick={handleToggleWishlist}
@@ -240,7 +236,6 @@ const Product = ({ product, ratingValue }) => {
           )}
         </button>
 
-        {/* INFO */}
         <div className="flex flex-1 flex-col p-5">
           <Link to={`/product/${product._id}`}>
             <h3 className="mb-2 line-clamp-2 min-h-[40px] font-display text-sm font-semibold leading-snug text-slate-800 transition-colors group-hover:text-primary">
@@ -248,24 +243,18 @@ const Product = ({ product, ratingValue }) => {
             </h3>
           </Link>
 
-          {/* RATING — thang 5 sao */}
           <div className="mb-3 flex items-center text-[11px] text-amber-400">
             <div className="mr-1.5 flex gap-0.5">
               {[...Array(5)].map((_, i) => (
                 <FaStar
                   key={i}
-                  className={
-                    i < Math.round(ratingOutOf5.value) ? "drop-shadow-sm" : "text-slate-200"
-                  }
+                  className={i < Math.round(ratingOutOf5.value) ? "drop-shadow-sm" : "text-slate-200"}
                 />
               ))}
             </div>
-            <span className="text-slate-400 font-medium tabular-nums">
-              ({ratingOutOf5.label})
-            </span>
+            <span className="text-slate-400 font-medium tabular-nums">({ratingOutOf5.label})</span>
           </div>
 
-          {/* PRICE SECTON (Flexible height to keep buttons aligned) */}
           <div className="mb-5 flex-1 flex flex-col justify-end">
             <div className="flex flex-wrap items-baseline gap-1.5">
               {hasVariants && minPrice !== maxPrice ? (
@@ -299,14 +288,14 @@ const Product = ({ product, ratingValue }) => {
             </div>
           </div>
 
-          {/* ADD CART BUTTON (Aligned at bottom) */}
           <button
             type="button"
             onClick={handleAddCart}
-            className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white shadow-md transition-all duration-300 active:scale-[0.98] ${added
+            className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white shadow-md transition-all duration-300 active:scale-[0.98] ${
+              added
                 ? "bg-emerald-500 shadow-emerald-500/30"
                 : "bg-gradient-to-r from-slate-900 to-slate-800 shadow-slate-900/20 hover:from-primary hover:to-indigo-600 hover:shadow-primary/25"
-              }`}
+            }`}
           >
             {added ? <FaShoppingCart /> : null}
             <span className="uppercase tracking-wide">
@@ -316,7 +305,6 @@ const Product = ({ product, ratingValue }) => {
         </div>
       </div>
 
-      {/* QUICK VIEW MODAL */}
       {showQuickView && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
@@ -333,6 +321,7 @@ const Product = ({ product, ratingValue }) => {
             >
               ✕
             </button>
+
             <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100">
               <img
                 src={image1}
@@ -341,10 +330,12 @@ const Product = ({ product, ratingValue }) => {
                 onError={onImageError}
               />
             </div>
+
             <div className="p-6">
               <h3 id="quick-view-title" className="font-display text-lg font-bold text-slate-900">
                 {product.name}
               </h3>
+
               <div className="mt-2 flex flex-col gap-1">
                 {cardPriceInfo.hasSale && minOriginal > 0 && (
                   <span className="font-display text-base font-semibold text-slate-400 line-through tabular-nums">
@@ -363,6 +354,7 @@ const Product = ({ product, ratingValue }) => {
                     : `${cardPriceInfo.effectivePrice.toLocaleString("vi-VN")}₫`}
                 </p>
               </div>
+
               <button
                 type="button"
                 onClick={handleAddCart}

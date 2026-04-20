@@ -1,11 +1,43 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import "./User.css";
 
-const API = "http://localhost:3001/api/users";
+// Backend admin endpoints: /api/user/*
+const API_BASE = "http://localhost:3002/api/user";
+
+const getAdminToken = () => {
+  try {
+    const raw =
+      localStorage.getItem("admin_v1") || localStorage.getItem("admin");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return (
+      parsed?.token ||
+      parsed?.access_token ||
+      parsed?.accessToken ||
+      parsed?.user?.token ||
+      null
+    );
+  } catch {
+    return null;
+  }
+};
+
+const getStoredAdmin = () => {
+  try {
+    const raw =
+      localStorage.getItem("admin_v1") || localStorage.getItem("admin");
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
 
 function UserPage() {
+  const navigate = useNavigate();
   const [users, setUsers] = useState([]);
+  const [errorMsg, setErrorMsg] = useState("");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -18,11 +50,50 @@ function UserPage() {
 
   // lấy danh sách user
   const fetchUsers = async () => {
+    setErrorMsg("");
+
+    const storedAdmin = getStoredAdmin();
+    const isAdmin = !!storedAdmin?.isAdmin;
+    const token = getAdminToken();
+
+    // trang /admin/users chỉ dành cho admin
+    if (!storedAdmin?.login || !isAdmin) {
+      setErrorMsg("Bạn không có quyền truy cập trang quản lý người dùng.");
+      navigate("/", { replace: true });
+      return;
+    }
+    if (!token) {
+      setErrorMsg("Bạn cần đăng nhập để truy cập trang quản lý người dùng.");
+      navigate("/login");
+      return;
+    }
     try {
-      const res = await axios.get(API);
-      setUsers(res.data);
+      const res = await fetch(`${API_BASE}/all?page=0&limit=1000`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        const msg =
+          payload?.message || payload?.error || "Không thể tải danh sách người dùng";
+        if (res.status === 401 || res.status === 403) {
+          localStorage.removeItem("admin_v1");
+          localStorage.removeItem("admin");
+          setErrorMsg("Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.");
+          navigate("/login");
+          return;
+        }
+        throw new Error(msg);
+      }
+      // listUser: data = { data: [...], total, page, limit, pages }
+      // getAllUser: data = [...]
+      const list = Array.isArray(payload?.data)
+        ? payload.data
+        : payload?.data?.data || [];
+      setUsers(list);
     } catch (error) {
-      console.log("GET ERROR:", error);
+      setErrorMsg(error?.message || "Lỗi khi tải danh sách người dùng");
     }
   };
 
@@ -43,14 +114,40 @@ function UserPage() {
     e.preventDefault();
 
     try {
-      if (editingId) {
-        // UPDATE
-        await axios.put(`${API}/${editingId}`, form);
-        setEditingId(null);
-      } else {
-        // CREATE
-        await axios.post(API, form);
+      const token = getAdminToken();
+      if (!token) {
+        setErrorMsg("Bạn cần đăng nhập để thực hiện thao tác này.");
+        navigate("/login");
+        return;
       }
+      const options = {
+        method: editingId ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(form),
+      };
+
+      const url = editingId
+        ? `${API_BASE}/admin/${editingId}`
+        : `${API_BASE}/admin`;
+      const res = await fetch(url, options);
+
+      if (!res.ok) {
+        const raw = await res.json().catch(() => null);
+        const msg = raw?.message || "Không thể lưu thông tin người dùng";
+        if (res.status === 401 || res.status === 403) {
+          localStorage.removeItem("admin_v1");
+          localStorage.removeItem("admin");
+          setErrorMsg("Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.");
+          navigate("/login");
+          return;
+        }
+        throw new Error(msg);
+      }
+
+      setEditingId(null);
 
       // reset form
       setForm({
@@ -63,17 +160,40 @@ function UserPage() {
 
       fetchUsers();
     } catch (error) {
-      console.log("SUBMIT ERROR:", error);
+      setErrorMsg(error?.message || "Lỗi khi lưu thông tin người dùng");
     }
   };
 
   // xóa user
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`${API}/${id}`);
+      const token = getAdminToken();
+      if (!token) {
+        setErrorMsg("Bạn cần đăng nhập để thực hiện thao tác này.");
+        navigate("/login");
+        return;
+      }
+      const res = await fetch(`${API_BASE}/admin/${id}`, {
+        method: "DELETE",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) {
+        const raw = await res.json().catch(() => null);
+        const msg = raw?.message || "Không thể xóa người dùng";
+        if (res.status === 401 || res.status === 403) {
+          localStorage.removeItem("admin_v1");
+          localStorage.removeItem("admin");
+          setErrorMsg("Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.");
+          navigate("/login");
+          return;
+        }
+        throw new Error(msg);
+      }
       fetchUsers();
     } catch (error) {
-      console.log("DELETE ERROR:", error);
+      setErrorMsg(error?.message || "Lỗi khi xóa người dùng");
     }
   };
 
@@ -92,7 +212,12 @@ function UserPage() {
 
   return (
     <div className="admin-users">
-      <h2>Quản lý User</h2>
+      <h2>Quản lý người dùng</h2>
+      {errorMsg && (
+        <p className="role-user" style={{ color: "#dc2626", fontWeight: 600 }}>
+          {errorMsg}
+        </p>
+      )}
 
       <form onSubmit={handleSubmit} className="user-form">
         <input
@@ -128,8 +253,8 @@ function UserPage() {
         />
 
         <select name="role" value={form.role} onChange={handleChange}>
-          <option value="user">User</option>
-          <option value="admin">Admin</option>
+          <option value="user">Người dùng</option>
+          <option value="admin">Quản trị viên</option>
         </select>
 
         <button type="submit" className="btn-submit">
@@ -161,7 +286,7 @@ function UserPage() {
                     u.isAdmin ? "role-admin" : "role-user"
                   }`}
                 >
-                  {u.isAdmin ? "admin" : "user"}
+                  {u.isAdmin ? "Quản trị viên" : "Người dùng"}
                 </span>
               </td>
 

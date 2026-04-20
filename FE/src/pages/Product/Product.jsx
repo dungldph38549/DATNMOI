@@ -1,106 +1,56 @@
-import React, { useState } from "react";
+import React from "react";
+import { Link } from "react-router-dom";
+import { FaArrowRight } from "react-icons/fa";
 
-/* ================= DATA ================= */
-const productsData = [
-  {
-    id: 1,
-    name: "Air Max Velocity",
-    brand: "Nike • Running",
-    price: 145,
-    image: "https://images.unsplash.com/photo-1600185365926-3a2ce3cdb9eb",
-  },
-  {
-    id: 2,
-    name: "Classic Fusion",
-    brand: "Adidas • Lifestyle",
-    price: 95,
-    image: "https://images.unsplash.com/photo-1588361861040-ac9b1018f6d5",
-  },
-  {
-    id: 3,
-    name: "Cloud Stratus 3",
-    brand: "On Running • Pro",
-    price: 160,
-    image: "https://images.unsplash.com/photo-1608231387042-66d1773070a5",
-  },
-  {
-    id: 4,
-    name: "Retro Lo-Top",
-    brand: "Puma • Heritage",
-    price: 75,
-    image: "https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77",
-  },
-];
+const PLACEHOLDER_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='28' font-family='Plus Jakarta Sans'>No Image</text></svg>";
 
-/* ================= COMPONENT ================= */
+const getProductImageUrl = (p) => {
+  const candidate = (typeof p?.image === "string" && p.image.trim()) || (Array.isArray(p?.srcImages) && typeof p.srcImages[0] === "string" ? p.srcImages[0].trim() : "");
+  if (!candidate) return PLACEHOLDER_IMG;
+  if (candidate.startsWith("http")) return candidate;
+  return `http://localhost:3002/uploads/${candidate.startsWith("/") ? candidate.slice(1) : candidate}`;
+};
 
-const ProductCard = ({ product }) => {
+const getDisplayPrice = (p) => {
+  const singlePrice = Number(p?.price);
+  return Number.isFinite(singlePrice) ? `${singlePrice.toLocaleString("vi-VN")}đ` : "Liên hệ";
+};
+
+const Product = ({ product }) => {
+  const p = product;
+  const isHot = p.soldCount > 50;
+
   return (
-    <div className="flex flex-col gap-2 group">
-      <div className="relative w-full aspect-[4/5] bg-slate-200 rounded-2xl overflow-hidden shadow-sm">
-        <div
-          className="w-full h-full bg-center bg-cover transition-transform group-hover:scale-105"
-          style={{ backgroundImage: `url(${product.image})` }}
+    <Link to={`/product/${p._id}`} className="group relative rounded-3xl bg-surface overflow-hidden hover:shadow-2xl hover:shadow-primary/20 transition-all duration-500 border border-slate-100 flex flex-col h-[400px]">
+      <div className="relative aspect-[4/5] overflow-hidden bg-slate-50 flex items-center justify-center flex-shrink-0">
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10"></div>
+        <img
+          src={getProductImageUrl(p)}
+          alt={p.name}
+          onError={(e) => { e.target.onerror = null; e.target.src = PLACEHOLDER_IMG; }}
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
         />
-      </div>
-
-      <div className="px-1 flex justify-between items-start">
-        <div>
-          <h3 className="text-sm font-bold">{product.name}</h3>
-          <p className="text-xs text-slate-500">{product.brand}</p>
-          <p className="text-primary font-bold mt-1">
-            ${product.price.toFixed(2)}
-          </p>
+        <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
+          {isHot && <span className="bg-secondary text-white text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider backdrop-blur-md shadow-lg shadow-secondary/30">Hot Drop</span>}
+          {p.isNew && <span className="bg-primary text-white text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider backdrop-blur-md shadow-lg shadow-primary/30">New</span>}
         </div>
-
-        <button className="bg-primary/10 text-primary p-2 rounded-lg hover:bg-primary hover:text-white transition-colors">
-          +
-        </button>
       </div>
-    </div>
+
+      <div className="p-6 flex flex-col flex-1 bg-surface z-20">
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{p.brandId?.name || "Premium"}</p>
+        <h3 className="font-display font-bold text-lg text-slate-800 leading-snug line-clamp-2 mb-4 group-hover:text-primary transition-colors">{p.name}</h3>
+
+        <div className="mt-auto flex items-end justify-between">
+          <div>
+            <p className="text-secondary font-black text-xl">{getDisplayPrice(p)}</p>
+          </div>
+          <button className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-primary group-hover:text-white transition-all duration-300">
+            <FaArrowRight size={14} className="-rotate-45 group-hover:rotate-0 transition-transform duration-300" />
+          </button>
+        </div>
+      </div>
+    </Link>
   );
 };
 
-/* ================= PAGE ================= */
-
-const ShopPage = () => {
-  const [search, setSearch] = useState("");
-
-  const filteredProducts = productsData.filter((product) =>
-    product.name.toLowerCase().includes(search.toLowerCase()),
-  );
-
-  return (
-    <div className="relative flex min-h-screen flex-col max-w-md mx-auto bg-white shadow-xl">
-      {/* HEADER */}
-      <header className="sticky top-0 z-10 bg-white px-4 py-4 flex items-center justify-between border-b">
-        <h1 className="text-lg font-bold text-center flex-1">Premium Kicks</h1>
-      </header>
-
-      {/* SEARCH */}
-      <div className="px-4 py-4">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full h-12 px-4 bg-slate-100 rounded-xl focus:ring-2 focus:ring-orange-400"
-          placeholder="Search shoes..."
-        />
-      </div>
-
-      {/* PRODUCT GRID */}
-      <main className="grid grid-cols-2 gap-4 p-4 mb-20">
-        {filteredProducts.length > 0 ? (
-          filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))
-        ) : (
-          <p className="col-span-2 text-center text-slate-400">
-            No products found
-          </p>
-        )}
-      </main>
-    </div>
-  );
-};
-
-export default ShopPage;
+export default Product;

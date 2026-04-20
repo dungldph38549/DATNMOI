@@ -1,244 +1,393 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useDispatch } from "react-redux";
-import { addToCart } from "../../redux/cartSlice";
+import { useSelector } from "react-redux";
+import { FaFire, FaGem, FaArrowRight, FaFilter } from "react-icons/fa";
+import Product from "../../components/Product/Product";
+import {
+  getFeaturedProducts,
+  getBestSellers,
+  getNewArrivals,
+  getHomeRecommendations,
+  fetchProducts,
+  getAllCategories,
+} from "../../api";
+import notify from "../../utils/notify";
+
+/* Converse / Chuck Taylor — 6 ảnh hero */
+const banners = [
+  "https://images.unsplash.com/photo-1624636224909-d986525fb391?q=85&w=2000&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1603217192634-61068e4d4bf9?q=85&w=2000&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1578986175247-7d60c6df07c5?q=85&w=2000&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1595184922849-05643a9ea3ce?q=85&w=2000&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1551583014-7ed375daad83?q=85&w=2000&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1581186088584-154ef8def9b6?q=85&w=2000&auto=format&fit=crop",
+];
 
 const HomePage = () => {
-  const dispatch = useDispatch();
+  const user = useSelector((state) => state.user);
+  const isLoggedIn = !!(user?.login && (user?.token || user?.name || user?.email));
+
   const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [hotProducts, setHotProducts] = useState([]);
+  const [newProducts, setNewProducts] = useState([]);
+  const [recommendedProducts, setRecommendedProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [sort, setSort] = useState("new");
+  const [slide, setSlide] = useState(0);
+  const [newsletterEmail, setNewsletterEmail] = useState("");
+  const categoryBtnRefs = useRef({});
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const res = await fetch("/api/product");
-        const data = await res.json();
-
-        if (data.status !== "OK") {
-          throw new Error(data.message || "Failed to fetch products");
-        }
-
-        setProducts((data.data || []).slice(0, 8));
-      } catch (err) {
-        setError(err.message || "Có lỗi khi tải sản phẩm");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProducts();
+    const interval = setInterval(() => setSlide((prev) => (prev + 1) % banners.length), 5000);
+    return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [featuredRes, bestRes, newRes, recommendationRes] = await Promise.all([
+          getFeaturedProducts(8),
+          getBestSellers(8),
+          getNewArrivals(8),
+          getHomeRecommendations(8).catch(() => []),
+        ]);
+        const categoryRes = await getAllCategories("all");
+        setCategories(Array.isArray(categoryRes?.data) ? categoryRes.data : []);
+
+        const featured = featuredRes?.data ?? [];
+        const best = bestRes?.data ?? [];
+        const newArr = newRes?.data ?? [];
+
+        setHotProducts(best.length > 0 ? best : featured.length > 0 ? featured : newArr);
+        setNewProducts(newArr.length > 0 ? newArr : featured.length > 0 ? featured : best);
+        setRecommendedProducts(Array.isArray(recommendationRes) ? recommendationRes : []);
+
+        if (featured.length > 0 || best.length > 0 || newArr.length > 0) {
+          setProducts(
+            [...new Set([...best, ...featured, ...newArr].map((p) => p._id))]
+              .map((id) => [...best, ...featured, ...newArr].find((x) => x._id === id))
+              .filter(Boolean),
+          );
+        } else {
+          const allRes = await fetchProducts({ limit: 24, page: 0 });
+          const list = allRes?.data ?? [];
+          setProducts(list);
+          setHotProducts(list.slice(0, 8));
+          setNewProducts(list.slice(8, 16));
+        }
+      } catch (err) {
+        console.error("Load products error:", err);
+      }
+    };
+    load();
+  }, []);
+
+  let filterProducts = [...products];
+  if (selectedCategory) {
+    filterProducts = filterProducts.filter((p) => (p.categoryId?.name || p.category) === selectedCategory);
+  }
+  if (sort === "low") filterProducts.sort((a, b) => a.price - b.price);
+  if (sort === "high") filterProducts.sort((a, b) => b.price - a.price);
+  if (sort === "sold") filterProducts.sort((a, b) => (b.soldCount || b.sold || 0) - (a.soldCount || a.sold || 0));
+
+  const hotDisplay = filterProducts.length > 0 ? filterProducts.slice(0, 8) : hotProducts;
+  const newDisplay = filterProducts.length > 0 ? filterProducts.slice(8, 16) : newProducts;
+  const isFiltering = !!selectedCategory;
+
+  const scrollCategoryTabIntoView = (key) => {
+    requestAnimationFrame(() => {
+      const el = categoryBtnRefs.current[key];
+      el?.scrollIntoView({
+        behavior: "smooth",
+        inline: "center",
+        block: "nearest",
+      });
+    });
+  };
+
+  const selectCategory = (name, key) => {
+    setSelectedCategory(name);
+    scrollCategoryTabIntoView(key);
+  };
+
+  const onNewsletterSubmit = (e) => {
+    e.preventDefault();
+    const email = newsletterEmail.trim();
+    if (!email) {
+      notify.warning("Vui lòng nhập email.");
+      return;
+    }
+    const basic = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!basic.test(email)) {
+      notify.warning("Email không hợp lệ.");
+      return;
+    }
+    try {
+      const raw = localStorage.getItem("sh_newsletter_emails");
+      const list = raw ? JSON.parse(raw) : [];
+      if (!list.includes(email.toLowerCase())) {
+        list.push(email.toLowerCase());
+        localStorage.setItem("sh_newsletter_emails", JSON.stringify(list));
+      }
+    } catch {
+      /* ignore */
+    }
+    notify.success("Đăng ký thành công! Cảm ơn bạn đã đồng hành cùng Sneaker Converse.");
+    setNewsletterEmail("");
+  };
+
   return (
-    <main className="flex-1 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
-      {/* Hero Section */}
-      <section className="px-6 lg:px-20 py-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="relative min-h-[560px] flex flex-col justify-center overflow-hidden rounded-xl lg:rounded-xl p-8 lg:p-16 bg-slate-900 text-white group">
-            <div className="absolute inset-0 z-0 overflow-hidden">
-              <img
-                className="w-full h-full object-cover opacity-60 scale-105 group-hover:scale-100 transition-transform duration-700"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAByHuzHMnvd_c6UEq7pqpzJTrxMD9z9JIJKouQIoyk1cbx4QeiCkydo6hBRKkJ2uVvSAPPQZE1WrOfdK7bcax8dvc7dF6eL27KVHey-a62O58MyxnrSegKcPlEmHfajJLEx0iKCaBMgMDm6NsUosmSS8Z7lb6BfydR3lgLDyS4bedy52vNPI5xI8DLEoYf27buPwELW7luLayp0-PM_eu3fQSq7RObMunX9lLksLPt4e-Qp-mosurWDmmefd3-yozfEQReA-CkQnU"
-                alt="Premium orange and black sneakers"
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-background-dark/80 via-background-dark/40 to-transparent" />
-            </div>
-            <div className="relative z-10 max-w-xl space-y-6">
-              <span className="inline-block px-4 py-1 bg-primary text-background-dark text-xs font-bold uppercase tracking-widest rounded-full">
-                Exclusive Drop
-              </span>
-              <h1 className="text-5xl lg:text-7xl font-black leading-tight">
-                Elevate Your Every Step
-              </h1>
-              <p className="text-lg text-slate-200">
-                The limited edition Air Pulse series is finally here. Engineered
-                for performance, designed for the streets.
-              </p>
-              <div className="flex flex-wrap gap-4 pt-4">
-                <Link
-                  to="/product"
-                  className="px-8 py-4 bg-primary text-background-dark font-bold rounded-full hover:shadow-lg hover:shadow-primary/30 transition-all flex items-center gap-2"
-                >
-                  Shop Now
-                  <span className="material-symbols-outlined">
-                    arrow_forward
-                  </span>
-                </Link>
-                <Link
-                  to="/category"
-                  className="px-8 py-4 bg-white/10 backdrop-blur-md text-white font-bold rounded-full border border-white/20 hover:bg-white/20 transition-all"
-                >
-                  View Lookbook
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Featured Categories */}
-      <section className="px-6 lg:px-20 py-12">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-end justify-between mb-8">
-            <div>
-              <h2 className="text-3xl font-bold">Shop by Category</h2>
-              <p className="text-slate-500 mt-1">
-                Find the perfect pair for your lifestyle
-              </p>
-            </div>
-            <Link
-              to="/category"
-              className="text-primary font-bold flex items-center gap-1 hover:underline"
+    <main className="min-h-screen bg-convot-cream font-body text-convot-charcoal pb-16 md:pb-24">
+      {/* Hero — carousel ảnh, giữ khung bo góc */}
+      <section className="px-4 pt-6 md:pt-10 max-w-7xl mx-auto">
+        <div className="relative overflow-hidden rounded-[28px] md:rounded-[32px] min-h-[420px] md:min-h-[520px] shadow-lg shadow-teal-500/10 ring-1 ring-white/40">
+          {banners.map((img, index) => (
+            <div
+              key={index}
+              className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${slide === index ? "opacity-100 z-[1]" : "opacity-0 z-0 pointer-events-none"}`}
             >
-              See All Categories{" "}
-              <span className="material-symbols-outlined text-sm">
-                open_in_new
-              </span>
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Category Card 1 */}
-            <Link
-              to="/category?type=Running"
-              className="group relative aspect-[4/5] rounded-xl overflow-hidden cursor-pointer block"
-            >
-              <img
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDbtKp14mxnTdhy2GJG9uWRJcEgWpCU8ATDQEZF1tif4LVrtXTc-bWK2-DrpZlOpsCu3Ub7SoKdmR8e8LgJapBQs2044XxeCkqlBMhqiSoyiorQ76WCEUR-0fflMeXbllB0AYLviJxL9F3VY6OZdHC5BMfqFi820XGxvdNxYa6P6qUGmTfPK6cvpiVHwaMHMo8UHu2ELXyGZAbLWk5uIbDh1_wEsk4Y3SgdN196WNFnONhv9w-sMIYuXA5aYSPR8D1tLLSgx8s0RWo"
-                alt="Red performance running shoe close up"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-              <div className="absolute bottom-6 left-6">
-                <h3 className="text-2xl font-bold text-white mb-2">Running</h3>
-                <button className="text-white text-sm font-semibold py-2 px-4 bg-white/20 backdrop-blur-md rounded-lg hover:bg-primary hover:text-background-dark transition-colors">
-                  Explore
-                </button>
-              </div>
-            </Link>
-
-            {/* Category Card 2 */}
-            <Link
-              to="/category?type=Basketball"
-              className="group relative aspect-[4/5] rounded-xl overflow-hidden cursor-pointer block"
-            >
-              <img
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAMBkXX8P53hvH3Ml0MhVpf-6G9NwCPu1USfMz5s4qmjBLn8EbPZ6iiOmJwX6GI9DmjIChlkma8Tjy38JJ6Njhq0lx_EwC8fYyQlst-_XSUqwFL2jXjb5D4J0GwWarsNExUTPDiWxhmuj0pgJtQMLoVHwC7hHfDxDVZlQdk6J1mCAofoMkWzRAY1_01xbOHJd_H6uJo8PQinGVQerhukUJpJ1ilJ8IbudpVwCuePHpG9H1CZRQM3Ux-QGFhsE1rF9bZolsiSoyjCao"
-                alt="Modern high top basketball sneakers"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-              <div className="absolute bottom-6 left-6">
-                <h3 className="text-2xl font-bold text-white mb-2">
-                  Basketball
-                </h3>
-                <button className="text-white text-sm font-semibold py-2 px-4 bg-white/20 backdrop-blur-md rounded-lg hover:bg-primary hover:text-background-dark transition-colors">
-                  Explore
-                </button>
-              </div>
-            </Link>
-
-            {/* Category Card 3 */}
-            <Link
-              to="/category?type=Lifestyle"
-              className="group relative aspect-[4/5] rounded-xl overflow-hidden cursor-pointer block"
-            >
-              <img
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDgZicS_k_2tddPzM9kgzUuoG4NNTwGeQLpmm3nfXibtyWxs9jRb0Hn8leieLwbcvoP6L36CUsWIyvWBuf8ccJNK8YjdJk2ZGSfjhtD5ghBrwrcygPfKOCEcYx1JN6ixOOMfVhazXi20UMyFI434jMrnc4-GH5Js9gd8j06InFFSNwY4EvzesHfm4rEMOm7GUFbISR7D3g0JvaKwXNP3ZfnNa_AGmTBoD--awfOe-z6D4PgYF4gqtktbPLzKII82bqm4bXenSj5Kbk"
-                alt="Casual lifestyle sneakers on a minimalist background"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-              <div className="absolute bottom-6 left-6">
-                <h3 className="text-2xl font-bold text-white mb-2">
-                  Lifestyle
-                </h3>
-                <button className="text-white text-sm font-semibold py-2 px-4 bg-white/20 backdrop-blur-md rounded-lg hover:bg-primary hover:text-background-dark transition-colors">
-                  Explore
-                </button>
-              </div>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* New Arrivals Grid */}
-      <section className="px-6 lg:px-20 py-12 bg-primary/5">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold mb-10 text-center">Trending Now</h2>
-          {loading && (
-            <p className="text-sm text-slate-500 text-center">
-              Đang tải sản phẩm...
-            </p>
-          )}
-
-          {error && (
-            <p className="text-sm text-red-500 text-center mb-6">
-              Lỗi: {error}
-            </p>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {products.map((p) => (
+              {/* Lớp màu trẻ trung: cam / hồng / cyan nhẹ — vẫn đọc được chữ */}
               <div
-                key={p._id}
-                className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-primary/5 hover:shadow-xl transition-shadow group"
+                className="absolute inset-0 z-[5] bg-gradient-to-br from-orange-300/18 via-fuchsia-300/12 to-cyan-300/16 mix-blend-soft-light"
+                aria-hidden
+              />
+              <div
+                className="absolute inset-0 z-[6] bg-gradient-to-t from-neutral-900/40 via-neutral-900/10 to-white/15"
+                aria-hidden
+              />
+              <img
+                src={img}
+                alt=""
+                className="relative z-0 w-full h-full object-cover object-center min-h-[420px] md:min-h-[520px] saturate-[1.08] contrast-[1.02]"
+              />
+            </div>
+          ))}
+          <div className="relative z-20 flex flex-col items-center justify-center text-center px-6 py-16 md:py-24 min-h-[420px] md:min-h-[520px]">
+            {isLoggedIn && (
+              <p className="mb-4 text-base md:text-lg font-semibold text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
+                Xin chào, {user?.name || user?.email?.split("@")[0] || "bạn"} 👋
+              </p>
+            )}
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-display font-black tracking-tight max-w-4xl leading-[1.1] drop-shadow-lg">
+              <span className="bg-gradient-to-r from-amber-200 via-white to-cyan-200 bg-clip-text text-transparent">
+                GIÀY MỚI
+              </span>
+              <br />
+              <span className="text-white">— NĂNG ĐỘNG TỪNG BƯỚC</span>
+            </h1>
+            <p className="mt-5 md:mt-6 text-lg md:text-xl lg:text-2xl font-medium max-w-2xl text-white/95 drop-shadow-md leading-relaxed">
+              Converse hot, màu sắc bùng nổ — mang phố đi cùng bạn mỗi ngày.
+            </p>
+            <div className="mt-8 md:mt-10 flex flex-wrap justify-center gap-3">
+              <Link
+                to="/product"
+                className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-orange-500 to-fuchsia-600 px-9 py-4 text-base md:text-lg font-bold text-white shadow-lg shadow-orange-500/30 transition hover:brightness-110 hover:scale-[1.03] active:scale-[0.98]"
               >
-                <Link to={`/product/${p._id}`}>
-                  <div className="relative aspect-square bg-slate-100 dark:bg-slate-700 p-6">
-                    <img
-                      className="w-full h-full object-contain group-hover:scale-110 transition-transform"
-                      src={p.image}
-                      alt={p.name}
-                    />
-                  </div>
-                </Link>
-                <div className="p-4">
-                  <p className="text-xs text-slate-500 uppercase font-bold tracking-widest mb-1">
-                    {p.type}
-                  </p>
-                  <h4 className="font-bold text-lg mb-2 truncate">{p.name}</h4>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-black text-primary">
-                      ${Number(p.price || 0).toFixed(2)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        dispatch(
-                          addToCart({
-                            productId: p._id,
-                            name: p.name,
-                            image: p.image,
-                            price: p.price,
-                            qty: 1,
-                          }),
-                        )
-                      }
-                      className="bg-primary/20 hover:bg-primary p-2 rounded-lg transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-sm">
-                        add_shopping_cart
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+                Săn giày hot
+              </Link>
+              <Link
+                to="/product"
+                className="inline-flex items-center gap-2 rounded-full border-2 border-white/80 bg-white/15 px-7 py-4 text-base md:text-lg font-bold text-white backdrop-blur-md hover:bg-white/25 hover:scale-[1.02] transition-all"
+              >
+                Xem bộ sưu tập <FaArrowRight className="text-sm" />
+              </Link>
+            </div>
+            <div className="mt-8 flex flex-wrap justify-center gap-2 sm:gap-2.5 max-w-md mx-auto px-2">
+              {banners.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setSlide(i)}
+                  className={`h-2 sm:h-2.5 rounded-full transition-all duration-300 shrink-0 ${slide === i ? "w-8 sm:w-10 bg-gradient-to-r from-amber-300 to-cyan-300 shadow-[0_0_12px_rgba(250,204,21,0.6)]" : "w-2 sm:w-2.5 bg-white/50 hover:bg-white/80"}`}
+                  aria-label={`Ảnh ${i + 1}`}
+                />
+              ))}
+            </div>
           </div>
+        </div>
+      </section>
 
-          <div className="text-center mt-12">
-            <Link
-              to="/product"
-              className="inline-block px-10 py-3 border-2 border-primary text-primary font-bold rounded-full hover:bg-primary hover:text-background-dark transition-all"
+      {/* Danh mục */}
+      <section className="relative z-10 -mt-6 mb-12 md:mb-16">
+        <div className="container mx-auto px-4 max-w-7xl">
+          <div className="flex gap-3 overflow-x-auto no-scrollbar py-3 px-1 snap-x snap-mandatory scroll-smooth">
+            <button
+              ref={(el) => {
+                categoryBtnRefs.current.__all__ = el;
+              }}
+              type="button"
+              onClick={() => selectCategory("", "__all__")}
+              className={`snap-center shrink-0 whitespace-nowrap px-6 py-3 rounded-2xl text-sm font-bold transition-all shadow-sm border ${!selectedCategory ? "bg-convot-sage text-white border-convot-sage" : "bg-white text-convot-charcoal/80 border-convot-sage/20 hover:border-convot-sage/40"}`}
             >
-              Browse All Collection
-            </Link>
+              Tất cả
+            </button>
+            {categories.map((c) => {
+              const cid = String(c._id);
+              return (
+              <button
+                key={cid}
+                ref={(el) => {
+                  categoryBtnRefs.current[cid] = el;
+                }}
+                type="button"
+                onClick={() => selectCategory(c.name, cid)}
+                className={`snap-center shrink-0 whitespace-nowrap px-6 py-3 rounded-2xl text-sm font-bold transition-all shadow-sm border ${selectedCategory === c.name ? "bg-convot-sage text-white border-convot-sage" : "bg-white text-convot-charcoal/80 border-convot-sage/20 hover:border-convot-sage/40"}`}
+              >
+                {c.name}
+              </button>
+            );
+            })}
           </div>
+        </div>
+      </section>
+
+      {isFiltering && (
+        <section className="container mx-auto px-4 max-w-7xl mb-10">
+          <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-convot-sage/15 shadow-sm">
+            <div className="flex items-center gap-2 text-convot-charcoal font-bold text-sm md:text-base">
+              <FaFilter className="text-convot-sage" /> Lọc: {selectedCategory}
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs font-semibold">
+              {["new", "sold", "low", "high"].map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSort(s)}
+                  className={`px-4 py-2 rounded-xl transition-all ${sort === s ? "bg-convot-charcoal text-white" : "bg-convot-cream text-convot-charcoal/70 hover:bg-convot-sage/10"}`}
+                >
+                  {s === "new" ? "Mới nhất" : s === "sold" ? "Bán chạy" : s === "low" ? "Giá tăng" : "Giá giảm"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <div className="container mx-auto px-4 max-w-7xl space-y-16 md:space-y-20">
+        {(!isFiltering && newDisplay.length > 0) && (
+          <section>
+            <div className="flex items-end justify-between mb-8">
+              <div>
+                <span className="text-convot-sage font-bold tracking-widest uppercase text-xs mb-2 flex items-center gap-2">
+                  <FaGem /> Mới nhất
+                </span>
+                <h2 className="text-2xl md:text-3xl font-display font-bold text-convot-charcoal">Hàng mới về</h2>
+              </div>
+              <Link to="/product" className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-convot-sage hover:underline">
+                Xem tất cả <FaArrowRight className="text-xs" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {newDisplay.map((p) => (
+                <Product key={p._id} product={p} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!isFiltering && recommendedProducts.length > 0 && (
+          <section>
+            <div className="flex items-end justify-between mb-8">
+              <div>
+                <span className="text-convot-sage font-bold tracking-widest uppercase text-xs mb-2 flex items-center gap-2">
+                  <FaGem /> Gợi ý
+                </span>
+                <h2 className="text-2xl md:text-3xl font-display font-bold text-convot-charcoal">Dành cho bạn</h2>
+              </div>
+              <Link to="/product" className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-convot-sage hover:underline">
+                Xem tất cả <FaArrowRight className="text-xs" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {recommendedProducts.slice(0, 8).map((p) => (
+                <Product key={p._id} product={p} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section className="rounded-[28px] overflow-hidden border border-convot-sage/15 bg-white shadow-sm">
+          <div className="grid md:grid-cols-2 gap-0">
+            <div className="p-8 md:p-12 flex flex-col justify-center bg-gradient-to-br from-convot-cream to-white">
+              <h3 className="text-2xl md:text-4xl font-display font-bold text-convot-charcoal leading-tight">
+                Nâng tầm
+                <br />
+                hiệu suất
+              </h3>
+              <p className="mt-4 text-convot-charcoal/70 text-sm md:text-base leading-relaxed">
+                Công nghệ đệm và upper được chọn lọc — cho từng km bạn chạy thêm.
+              </p>
+              <Link
+                to="/product"
+                className="mt-8 inline-flex w-fit items-center rounded-full bg-convot-sage px-6 py-3 text-sm font-bold text-white hover:bg-[#7a9680] transition"
+              >
+                Xem bộ sưu tập chạy bộ
+              </Link>
+            </div>
+            <div className="relative min-h-[220px] md:min-h-[280px]">
+              <img
+                src="https://images.unsplash.com/photo-1556906781-9a412961c28c?q=80&w=1200&auto=format&fit=crop"
+                alt="Khuyến mãi"
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            </div>
+          </div>
+        </section>
+
+        {((!isFiltering && hotDisplay.length > 0) || isFiltering) && (
+          <section>
+            <div className="flex items-end justify-between mb-8">
+              <div>
+                {!isFiltering && (
+                  <span className="text-convot-sage font-bold tracking-widest uppercase text-xs mb-2 flex items-center gap-2">
+                    <FaFire /> Hot
+                  </span>
+                )}
+                <h2 className="text-2xl md:text-3xl font-display font-bold text-convot-charcoal">
+                  {isFiltering ? "Kết quả" : "Đang được quan tâm"}
+                </h2>
+              </div>
+              <Link to="/product" className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-convot-sage hover:underline">
+                Xem tất cả <FaArrowRight className="text-xs" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {(isFiltering ? filterProducts : hotDisplay).map((p) => (
+                <Product key={p._id} product={p} />
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+
+      {/* Đăng ký nhận tin */}
+      <section className="bg-white border-t border-neutral-100 py-14 md:py-20 px-4">
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="text-2xl md:text-3xl font-display font-bold text-neutral-900 tracking-tight">
+            Gia nhập Sneaker Converse
+          </h2>
+          <p className="mt-4 text-sm md:text-base text-neutral-600 leading-relaxed">
+            Đăng ký để nhận thông tin về các bộ sưu tập mới nhất và ưu đãi độc quyền dành riêng cho bạn.
+          </p>
+          <form onSubmit={onNewsletterSubmit} className="mt-8 md:mt-10 max-w-xl mx-auto">
+            <div className="flex flex-col sm:flex-row items-stretch gap-2 sm:gap-0 rounded-[28px] sm:rounded-full border border-neutral-200 bg-[#f7f7f7] p-1.5 sm:pl-5 sm:pr-1.5 shadow-sm focus-within:border-neutral-300 focus-within:ring-1 focus-within:ring-neutral-900/5 transition-shadow">
+              <input
+                type="email"
+                value={newsletterEmail}
+                onChange={(e) => setNewsletterEmail(e.target.value)}
+                placeholder="Email của bạn"
+                autoComplete="email"
+                className="flex-1 min-w-0 bg-transparent px-4 sm:px-2 py-3 sm:py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none rounded-[24px] sm:rounded-none"
+              />
+              <button
+                type="submit"
+                className="shrink-0 rounded-[24px] sm:rounded-full bg-neutral-900 px-8 py-3 text-sm font-bold text-white hover:bg-neutral-800 transition-colors"
+              >
+                Đăng ký
+              </button>
+            </div>
+          </form>
         </div>
       </section>
     </main>

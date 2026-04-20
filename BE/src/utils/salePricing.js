@@ -134,6 +134,7 @@ const enrichProductPricing = (rawProduct, now = new Date()) => {
       .filter((v) => v?.isActive !== false)
       .map((v) => toNumber(v?.originalPrice, 0))
       .filter((v) => Number.isFinite(v));
+
     if (effectivePrices.length > 0) {
       product.priceRange = {
         min: Math.min(...effectivePrices),
@@ -144,6 +145,7 @@ const enrichProductPricing = (rawProduct, now = new Date()) => {
         max: Math.max(...originalPrices),
       };
     }
+
     product.effectivePrice = product.priceRange?.min ?? toNumber(product.price, 0);
     product.originalPrice = product.originalPriceRange?.min ?? toNumber(product.price, 0);
     product.hasSale = product.variants.some(
@@ -161,6 +163,7 @@ const enrichProductPricing = (rawProduct, now = new Date()) => {
     basePrice: product?.price,
     saleRule: bestRule,
   });
+
   product.originalPrice = displayOriginalPrice(pricing);
   product.effectivePrice = pricing.effectivePrice;
   product.salePrice = pricing.effectivePrice;
@@ -185,6 +188,7 @@ const enrichProductPricing = (rawProduct, now = new Date()) => {
     min: product.originalPrice,
     max: product.originalPrice,
   };
+
   return product;
 };
 

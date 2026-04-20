@@ -6,7 +6,7 @@ import HomePages from "../pages/HomePages/HomePages.jsx";
 import Login from "../pages/Login/Login.jsx";
 import Register from "../pages/Register/Register.jsx";
 import CartPage from "../pages/CartPage/CartPage.jsx";
-import AdminPage from "../admin/AdminPage.jsx";
+import AdminPage from "../Admin/AdminPage.jsx";
 import CheckoutPage from "../pages/CheckOutPage/CheckOutPage.jsx";
 import OrderPage from "../pages/OrderPage/OrderPage.jsx";
 import OrderDetailPage from "../pages/OrderDetailPage/OrderDetailPage.jsx";
@@ -15,7 +15,6 @@ import ReturnPayment from "../pages/ReturnPayment/ReturnPayment.jsx";
 import CustommerPage from "../pages/CustommerPage/CustommerPage.jsx";
 import OrderHistoryPage from "../pages/OrderHistoryPage/OrderHistoryPage.jsx";
 import User from "../pages/User/index.jsx";
-
 export const routers = [
   {
     path: "/",
@@ -98,7 +97,6 @@ export const routers = [
     isShowHeader: true,
   },
 
-  
   {
     path: "*",
     page: NotFoundPage,
