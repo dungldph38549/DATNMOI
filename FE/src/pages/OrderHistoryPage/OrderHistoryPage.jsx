@@ -21,7 +21,7 @@ import {
   FaQuestionCircle,
 } from "react-icons/fa";
 import notify from "../../utils/notify";
-import { confirmShopee } from "../../utils/shopeeNotify";
+import { confirmShopee, pickCancelReasonShopee } from "../../utils/shopeeNotify";
 
 const SHOP_NAME = "SneakerConverse";
 
@@ -321,8 +321,15 @@ const OrderHistoryPage = () => {
       cancelText: "Đóng",
     });
     if (!ok) return;
+    const selectedReason = await pickCancelReasonShopee();
+    if (selectedReason == null) return;
+    const cancelReason = String(selectedReason).trim();
+    if (cancelReason.length < 5) {
+      notify.warning("Bạn cần nhập lý do hủy đơn (tối thiểu 5 ký tự).");
+      return;
+    }
     try {
-      await cancelOrderByUser(orderId);
+      await cancelOrderByUser(orderId, cancelReason);
       setOrders((prev) =>
         prev.map((o) =>
           String(o._id) === String(orderId) ? { ...o, status: "canceled" } : o,

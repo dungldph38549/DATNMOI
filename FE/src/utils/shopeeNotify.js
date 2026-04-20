@@ -143,3 +143,175 @@ export function confirmShopee({
     borderRadius: 12,
   }).then((r) => r.isConfirmed);
 }
+
+const DEFAULT_CANCEL_REASONS = [
+  "Tôi muốn cập nhật địa chỉ/sđt nhận hàng.",
+  "Tôi muốn thêm/thay đổi Mã giảm giá",
+  "Tôi muốn thay đổi sản phẩm (kích thước, màu sắc, số lượng...)",
+  "Thủ tục thanh toán rắc rối",
+  "Tôi tìm thấy chỗ mua khác tốt hơn (Rẻ hơn, uy tín hơn, giao nhanh hơn...)",
+  "Tôi không có nhu cầu mua nữa",
+  "Tôi không tìm thấy lý do hủy phù hợp",
+];
+
+export function pickCancelReasonShopee({
+  title = "Lý Do Hủy",
+  reasons = DEFAULT_CANCEL_REASONS,
+  confirmText = "Xác nhận",
+  cancelText = "Đóng",
+} = {}) {
+  const baseOptions = (Array.isArray(reasons) ? reasons : [])
+    .map((x) => String(x || "").trim())
+    .filter(Boolean)
+    .map((label) => ({ label, custom: false }));
+  const options = [
+    ...baseOptions,
+    { label: "Khác (vui lòng nhập lý do)", custom: true },
+  ];
+  if (!options.length) return Promise.resolve(null);
+
+  const html = `
+    <style>
+      .cancel-reason-radio {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 22px;
+        height: 22px;
+        min-width: 22px;
+        min-height: 22px;
+        max-width: 22px;
+        max-height: 22px;
+        margin: 0;
+        border: 2px solid #b9b9b9;
+        border-radius: 9999px;
+        background: #fff;
+        box-sizing: border-box;
+        display: inline-grid;
+        place-content: center;
+        flex: 0 0 22px;
+        cursor: pointer;
+      }
+      .cancel-reason-radio::before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        border-radius: 9999px;
+        transform: scale(0);
+        transition: transform 120ms ease-in-out;
+        background: #ee4d2d;
+      }
+      .cancel-reason-radio:checked {
+        border-color: #ee4d2d;
+      }
+      .cancel-reason-radio:checked::before {
+        transform: scale(1);
+      }
+      .cancel-reason-close-btn {
+        color: #9a9a9a !important;
+        font-size: 34px !important;
+        line-height: 1 !important;
+        right: 14px !important;
+        top: 10px !important;
+      }
+      .cancel-reason-close-btn:hover {
+        color: #666 !important;
+      }
+    </style>
+    <div class="cancel-reason-list" style="text-align:left;max-height:52vh;overflow:auto;">
+      ${options
+        .map(
+          (reason, idx) => `
+            <label style="display:flex;gap:12px;align-items:center;min-height:68px;padding:10px 0;border-bottom:1px solid #f1f1f1;cursor:pointer;box-sizing:border-box;">
+              <input type="radio" class="cancel-reason-radio" name="cancel_reason" value="${String(idx)}" />
+              <span style="font-size:18px;line-height:1.35;color:#222;">${reason.label}</span>
+            </label>
+          `,
+        )
+        .join("")}
+      <div id="cancel-reason-custom-wrap" style="display:none;padding:12px 0 6px;">
+        <textarea
+          id="cancel-reason-custom-input"
+          rows="3"
+          maxlength="500"
+          placeholder="Vui lòng nhập lý do khác..."
+          style="width:100%;border:1px solid #d9d9d9;border-radius:8px;padding:10px 12px;font-size:16px;line-height:1.4;resize:vertical;box-sizing:border-box;outline:none;"
+        ></textarea>
+        <div style="margin-top:6px;font-size:12px;color:#888;">Tối thiểu 5 ký tự</div>
+      </div>
+    </div>
+  `;
+
+  return Swal.fire({
+    title,
+    html,
+    showCancelButton: false,
+    showCloseButton: true,
+    closeButtonHtml: "&times;",
+    confirmButtonText: confirmText,
+    reverseButtons: false,
+    focusConfirm: false,
+    confirmButtonColor: "#ee4d2d",
+    color: "#222",
+    background: "#fff",
+    borderRadius: 12,
+    customClass: {
+      closeButton: "cancel-reason-close-btn",
+    },
+    didOpen: () => {
+      const popup = Swal.getPopup();
+      const confirmBtn = Swal.getConfirmButton();
+      if (!popup || !confirmBtn) return;
+      confirmBtn.disabled = true;
+      const radios = popup.querySelectorAll('input[name="cancel_reason"]');
+      const customWrap = popup.querySelector("#cancel-reason-custom-wrap");
+      const customInput = popup.querySelector("#cancel-reason-custom-input");
+      const syncCustomVisibility = () => {
+        const checked = popup.querySelector('input[name="cancel_reason"]:checked');
+        const idx = Number(checked?.value);
+        const isCustom =
+          Number.isInteger(idx) && idx >= 0 && idx < options.length
+            ? !!options[idx].custom
+            : false;
+        if (customWrap) customWrap.style.display = isCustom ? "block" : "none";
+        if (!isCustom && customInput) customInput.value = "";
+      };
+      radios.forEach((el) =>
+        el.addEventListener("change", () => {
+          confirmBtn.disabled = false;
+          syncCustomVisibility();
+        }),
+      );
+      if (customInput) {
+        customInput.addEventListener("input", () => {
+          customInput.style.borderColor = "#d9d9d9";
+        });
+      }
+    },
+    preConfirm: () => {
+      const popup = Swal.getPopup();
+      const checked = popup?.querySelector(
+        'input[name="cancel_reason"]:checked',
+      );
+      if (!checked) {
+        Swal.showValidationMessage("Vui lòng chọn lý do hủy.");
+        return null;
+      }
+      const idx = Number(checked.value);
+      if (!Number.isInteger(idx) || idx < 0 || idx >= options.length) {
+        Swal.showValidationMessage("Lý do hủy không hợp lệ.");
+        return null;
+      }
+      if (options[idx].custom) {
+        const customInput = popup?.querySelector("#cancel-reason-custom-input");
+        const customReason = String(customInput?.value || "").trim();
+        if (customReason.length < 5) {
+          if (customInput) customInput.style.borderColor = "#ff4d4f";
+          Swal.showValidationMessage("Vui lòng nhập lý do khác (tối thiểu 5 ký tự).");
+          return null;
+        }
+        return customReason;
+      }
+      return options[idx].label;
+    },
+  }).then((r) => (r.isConfirmed ? r.value : null));
+}

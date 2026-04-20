@@ -486,8 +486,11 @@ export const confirmDelivery = async (id) => {
   return res.data;
 };
 
-export const cancelOrderByUser = async (id) => {
-  const res = await axiosInstance.patch(`/order/${id}`, { status: "canceled" });
+export const cancelOrderByUser = async (id, cancelReason) => {
+  const res = await axiosInstance.patch(`/order/${id}`, {
+    status: "canceled",
+    cancelReason,
+  });
   return res.data;
 };
 

@@ -981,7 +981,7 @@ exports.updateOrder = async (req, res) => {
 // ================================================================
 exports.updateOrderById = async (req, res) => {
   const { id } = req.params;
-  const { fullName, email, phone, address, status } = req.body;
+  const { fullName, email, phone, address, status, cancelReason } = req.body;
   try {
     const order = await Order.findById(id);
     if (!order)
@@ -996,6 +996,15 @@ exports.updateOrderById = async (req, res) => {
     }
 
     if (status === "canceled" && order.status !== "canceled") {
+      const normalizedCancelReason =
+        typeof cancelReason === "string"
+          ? cancelReason.trim()
+          : String(cancelReason ?? "").trim();
+      if (normalizedCancelReason.length < 5) {
+        return res.status(422).json({
+          message: "Vui lòng nhập lý do hủy đơn (tối thiểu 5 ký tự).",
+        });
+      }
       const session = await mongoose.startSession();
       session.startTransaction();
       try {
@@ -1051,7 +1060,7 @@ exports.updateOrderById = async (req, res) => {
               oldStatus,
               newStatus: "canceled",
               orderId: o._id,
-              note: "Khách hàng hủy đơn hàng",
+              note: normalizedCancelReason,
             },
           ],
           { session },
