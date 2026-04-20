@@ -122,6 +122,15 @@ const ProductDetail = () => {
   }, [getVariantColorValue]);
 
   const hasVariants = Array.isArray(product?.variants) && product.variants.length > 0;
+    const isAccessoryProduct = String(
+  product?.categoryId?.slug ||
+  product?.categoryId?.name ||
+  product?.category ||
+  ""
+)
+  .toLowerCase()
+  .includes("phụ kiện");
+    console.log("Category check:", product?.categoryId?.slug, product?.categoryId?.name, product?.category, "isAccessory:", isAccessoryProduct);
 
   useEffect(() => {
     if (!id) return;
@@ -730,7 +739,7 @@ const ProductDetail = () => {
               </p>
             )}
 
-            {hasVariants && (
+            {hasVariants && !isAccessoryProduct && (
               <div className="mt-8">
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Kích cỡ</span>
@@ -1162,7 +1171,7 @@ const ProductDetail = () => {
 
       </div>
 
-      {showSizeGuide && (
+      {!isAccessoryProduct && showSizeGuide && (
         <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-[2px] flex items-center justify-center p-4" onClick={() => setShowSizeGuide(false)}>
           <div
             className="relative w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 font-body shadow-2xl md:p-8"
