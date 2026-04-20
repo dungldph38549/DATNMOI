@@ -11,6 +11,17 @@ const toNumber = (value, fallback = 0) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+/** Giá niêm yết ảo = giá bán + % khi không có giảm giá từ saleRules (chỉ ảnh hưởng hiển thị API). */
+const VIRTUAL_LIST_PRICE_MARKUP_PERCENT = 15;
+
+const displayOriginalPrice = (pricing) => {
+  const effective = Math.max(0, toNumber(pricing.effectivePrice, 0));
+  const hasRealSale = toNumber(pricing.discountAmount, 0) > 0;
+  if (hasRealSale) return Math.max(0, toNumber(pricing.basePrice, 0));
+  const factor = 1 + VIRTUAL_LIST_PRICE_MARKUP_PERCENT / 100;
+  return Math.max(0, Math.round(effective * factor));
+};
+
 const calculateDiscount = (basePrice, discountType, discountValue) => {
   const base = Math.max(0, toNumber(basePrice, 0));
   const value = Math.max(0, toNumber(discountValue, 0));
@@ -94,9 +105,10 @@ const enrichProductPricing = (rawProduct, now = new Date()) => {
         basePrice: variant?.price,
         saleRule: bestRule,
       });
+      const originalPrice = displayOriginalPrice(pricing);
       return {
         ...variant,
-        originalPrice: pricing.basePrice,
+        originalPrice,
         effectivePrice: pricing.effectivePrice,
         salePrice: pricing.effectivePrice,
         saleDiscountAmount: pricing.discountAmount,
@@ -122,6 +134,7 @@ const enrichProductPricing = (rawProduct, now = new Date()) => {
       .filter((v) => v?.isActive !== false)
       .map((v) => toNumber(v?.originalPrice, 0))
       .filter((v) => Number.isFinite(v));
+
     if (effectivePrices.length > 0) {
       product.priceRange = {
         min: Math.min(...effectivePrices),
@@ -132,9 +145,12 @@ const enrichProductPricing = (rawProduct, now = new Date()) => {
         max: Math.max(...originalPrices),
       };
     }
+
     product.effectivePrice = product.priceRange?.min ?? toNumber(product.price, 0);
     product.originalPrice = product.originalPriceRange?.min ?? toNumber(product.price, 0);
-    product.hasSale = product.variants.some((v) => toNumber(v?.saleDiscountAmount, 0) > 0);
+    product.hasSale = product.variants.some(
+      (v) => toNumber(v?.effectivePrice, 0) < toNumber(v?.originalPrice, 0),
+    );
     return product;
   }
 
@@ -147,12 +163,13 @@ const enrichProductPricing = (rawProduct, now = new Date()) => {
     basePrice: product?.price,
     saleRule: bestRule,
   });
-  product.originalPrice = pricing.basePrice;
+
+  product.originalPrice = displayOriginalPrice(pricing);
   product.effectivePrice = pricing.effectivePrice;
   product.salePrice = pricing.effectivePrice;
   product.saleDiscountAmount = pricing.discountAmount;
   product.saleDiscountPercent = pricing.discountPercent;
-  product.hasSale = pricing.discountAmount > 0;
+  product.hasSale = product.effectivePrice < product.originalPrice;
   product.saleMeta = pricing.saleRule
     ? {
         id: pricing.saleRule._id,
@@ -168,9 +185,10 @@ const enrichProductPricing = (rawProduct, now = new Date()) => {
     max: pricing.effectivePrice,
   };
   product.originalPriceRange = {
-    min: pricing.basePrice,
-    max: pricing.basePrice,
+    min: product.originalPrice,
+    max: product.originalPrice,
   };
+
   return product;
 };
 

@@ -39,13 +39,12 @@ const getProductColors = (product) => {
   return [...new Set(colors)];
 };
 
-const isProductOnSale = (p) => {
-  const info = getProductPriceInfo(p);
-  if (p?.hasSale === true) return true;
-  if (info.hasSale || info.discountPercent > 0) return true;
-  const original = Number(p?.originalPriceRange?.min ?? p?.originalPrice ?? 0);
-  const effective = Number(p?.priceRange?.min ?? p?.effectivePrice ?? p?.salePrice ?? p?.price ?? 0);
-  if (Number.isFinite(original) && original > 0 && Number.isFinite(effective) && effective < original) {
+/** Chỉ sale thật từ saleRules (bỏ qua giá niêm yết ảo +% trên FE/BE). */
+const isProductOnRealSale = (p) => {
+  if (!p) return false;
+  const amt = (v) => Number(v) || 0;
+  if (amt(p.saleDiscountAmount) > 0) return true;
+  if (Array.isArray(p.variants) && p.variants.some((v) => amt(v?.saleDiscountAmount) > 0)) {
     return true;
   }
   return false;
@@ -95,7 +94,7 @@ const SalePage = () => {
   }, []);
 
   const saleProducts = useMemo(
-    () => (products || []).filter((p) => isProductOnSale(p)),
+    () => (products || []).filter((p) => isProductOnRealSale(p)),
     [products],
   );
 
