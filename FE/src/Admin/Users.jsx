@@ -1,7 +1,18 @@
 import { useState } from "react";
 import { Form, Input, Switch } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getAllUser, updateUserById } from "../api/index";
+import { getAllUser, updateUserById, createUserByAdmin } from "../api/index";
+
+const getAdminSession = () => {
+  try {
+    const raw =
+      localStorage.getItem("admin_v1") || localStorage.getItem("admin");
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
 
 // ================================================================
 // Design tokens
@@ -23,9 +34,13 @@ const T = {
   blueBg: "rgba(59,130,246,0.10)",
 };
 
-// ── Role badge ─────────────────────────────────────────────────
-const RoleBadge = ({ isAdmin, isStaff }) => {
-  if (isAdmin)
+// ── Role badge (ưu tiên `role` từ API: admin / manager / staff / customer) ──
+const RoleBadge = ({ role, isAdmin, isStaff }) => {
+  const r =
+    role ||
+    (isAdmin ? "admin" : isStaff ? "staff" : "customer");
+
+  if (r === "admin") {
     return (
       <span
         style={{
@@ -42,7 +57,26 @@ const RoleBadge = ({ isAdmin, isStaff }) => {
         Quản trị viên
       </span>
     );
-  if (isStaff)
+  }
+  if (r === "manager") {
+    return (
+      <span
+        style={{
+          padding: "3px 10px",
+          borderRadius: 999,
+          fontSize: 11,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+          background: "rgba(124,58,237,0.10)",
+          color: "#7C3AED",
+        }}
+      >
+        Quản lý
+      </span>
+    );
+  }
+  if (r === "staff") {
     return (
       <span
         style={{
@@ -59,6 +93,7 @@ const RoleBadge = ({ isAdmin, isStaff }) => {
         Nhân viên
       </span>
     );
+  }
   return (
     <span
       style={{
@@ -145,7 +180,7 @@ const Avatar = ({ name, avatar }) => {
 };
 
 // ── Pagination ─────────────────────────────────────────────────
-const Pagination = ({ page, total, limit, onChange }) => {
+const Pagination = ({ page, total, limit, onChange, entityLabel = "người dùng" }) => {
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const pages = [];
 
@@ -196,7 +231,7 @@ const Pagination = ({ page, total, limit, onChange }) => {
           {Math.min((page - 1) * limit + 1, total)}–
           {Math.min(page * limit, total)}
         </b>{" "}
-        của <b style={{ color: T.text }}>{total}</b> người dùng
+        của <b style={{ color: T.text }}>{total}</b> {entityLabel}
       </p>
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
         <button
@@ -277,6 +312,13 @@ const ROLES = [
     color: T.blue,
   },
   {
+    key: "manager",
+    label: "Quản lý",
+    icon: "supervisor_account",
+    bg: "rgba(59,130,246,0.08)",
+    color: "#2563EB",
+  },
+  {
     key: "admin",
     label: "Quản trị",
     icon: "admin_panel_settings",
@@ -285,9 +327,16 @@ const ROLES = [
   },
 ];
 
-const RolePicker = ({ value, onChange }) => (
-  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-    {ROLES.map((r) => {
+const RolePicker = ({ value, onChange, variant = "all" }) => {
+  const roles =
+    variant === "staff"
+      ? ROLES.filter((r) => r.key !== "customer")
+      : ROLES;
+  const cols =
+    roles.length <= 3 ? "repeat(3, 1fr)" : "repeat(2, 1fr)";
+  return (
+  <div style={{ display: "grid", gridTemplateColumns: cols, gap: 8 }}>
+    {roles.map((r) => {
       const active = value === r.key;
       return (
         <button
@@ -331,24 +380,38 @@ const RolePicker = ({ value, onChange }) => (
       );
     })}
   </div>
-);
+  );
+};
 
 // ================================================================
 // Main Component
+// mode: "customers" — chỉ khách hàng | "staff" — chỉ nhân viên (staff/manager/admin)
 // ================================================================
-const Users = () => {
+const Users = ({ mode = "customers" }) => {
+  const listScope = mode === "staff" ? "staff" : "customers";
+  const isStaffPage = mode === "staff";
+  const canAddStaff = getAdminSession()?.role === "admin";
+
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
   const [roleValue, setRoleValue] = useState("customer");
+  const [showCreateStaff, setShowCreateStaff] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    phone: "",
+    role: "staff",
+  });
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
   const limit = 10;
 
   // ── Query ──────────────────────────────────────────────────
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["admin-user", page],
-    queryFn: () => getAllUser(page - 1, limit),
+    queryKey: ["admin-user", page, listScope],
+    queryFn: () => getAllUser(page - 1, limit, { scope: listScope }),
     keepPreviousData: true,
   });
 
@@ -363,6 +426,29 @@ const Users = () => {
     onError: () => showToast("Lỗi khi cập nhật người dùng", "error"),
   });
 
+  const { mutate: createStaff, isPending: createPending } = useMutation({
+    mutationFn: (payload) => createUserByAdmin(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-user"] });
+      setShowCreateStaff(false);
+      setCreateForm({
+        name: "",
+        email: "",
+        password: "",
+        phone: "",
+        role: "staff",
+      });
+      showToast("Đã tạo tài khoản nhân viên", "success");
+    },
+    onError: (err) => {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Không tạo được tài khoản";
+      showToast(msg, "error");
+    },
+  });
+
   // ── Toast đơn giản ────────────────────────────────────────
   const [toast, setToast] = useState(null);
   const showToast = (msg, type) => {
@@ -373,8 +459,12 @@ const Users = () => {
   // ── Mở modal edit ─────────────────────────────────────────
   const handleEdit = (user) => {
     setSelectedUser(user);
-    const role = user.isAdmin ? "admin" : user.isStaff ? "staff" : "customer";
-    setRoleValue(role);
+    const r = user.role;
+    if (["customer", "staff", "manager", "admin"].includes(r)) {
+      setRoleValue(r);
+    } else {
+      setRoleValue(user.isAdmin ? "admin" : user.isStaff ? "staff" : "customer");
+    }
     form.setFieldsValue({
       password: "",
       isBanned: user.isBanned || false,
@@ -402,8 +492,7 @@ const Users = () => {
       id: selectedUser._id,
       data: {
         ...(values.password ? { password: values.password } : {}),
-        isAdmin: roleValue === "admin",
-        isStaff: roleValue === "staff",
+        role: roleValue,
         isBanned: values.isBanned,
         voucherUsageLimit,
       },
@@ -412,15 +501,22 @@ const Users = () => {
 
   // ── Filter client-side theo search ───────────────────────
   // data = { status, data: { data: [...], total, page } }  ← cấu trúc từ successResponse
-  const users = (data?.data?.data || []).filter((u) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return (
-      u.name?.toLowerCase().includes(q) ||
-      u.email?.toLowerCase().includes(q) ||
-      u.phone?.toLowerCase().includes(q)
-    );
-  });
+  const STAFF_ROLES = new Set(["staff", "manager", "admin"]);
+  const users = (data?.data?.data || [])
+    .filter((u) => {
+      if (!isStaffPage) return true;
+      const r = u.role;
+      return r !== "customer" && (STAFF_ROLES.has(r) || u.isStaff || u.isAdmin);
+    })
+    .filter((u) => {
+      if (!search.trim()) return true;
+      const q = search.toLowerCase();
+      return (
+        u.name?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q) ||
+        u.phone?.toLowerCase().includes(q)
+      );
+    });
 
   // ── Loading / error states ────────────────────────────────
   if (isLoading)
@@ -567,38 +663,96 @@ const Users = () => {
                 letterSpacing: "-0.3px",
               }}
             >
-              Quản lý người dùng
+              {isStaffPage ? "Quản lý nhân viên" : "Quản lý khách hàng"}
             </h1>
             <p style={{ margin: "4px 0 0", fontSize: 13, color: T.textMuted }}>
-              Xem và quản trị danh sách thành viên trong hệ thống
+              {isStaffPage
+                ? "Gồm nhân viên, quản lý và quản trị viên — không hiển thị khách hàng"
+                : "Danh sách tài khoản khách hàng đăng ký trên shop"}
             </p>
           </div>
-          <button
+          {isStaffPage && canAddStaff && (
+            <button
+              type="button"
+              onClick={() => setShowCreateStaff(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                padding: "10px 20px",
+                borderRadius: 999,
+                border: "none",
+                background: T.primary,
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: "pointer",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                boxShadow: "0 4px 14px rgba(244,157,37,0.30)",
+              }}
+            >
+              <span
+                className="material-symbols-outlined"
+                style={{ fontSize: 18 }}
+              >
+                person_add
+              </span>
+              Thêm nhân viên
+            </button>
+          )}
+        </div>
+
+        {isStaffPage && (
+          <div
             style={{
               display: "flex",
+              flexWrap: "wrap",
               alignItems: "center",
-              gap: 7,
-              padding: "10px 20px",
-              borderRadius: 999,
-              border: "none",
-              background: T.primary,
-              color: "#fff",
-              fontWeight: 700,
-              fontSize: 13,
-              cursor: "pointer",
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              boxShadow: "0 4px 14px rgba(244,157,37,0.30)",
+              gap: 10,
+              marginBottom: 16,
             }}
           >
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: 18 }}
-            >
-              person_add
+            <span style={{ fontSize: 12, fontWeight: 600, color: T.textMuted }}>
+              Vai trò hiển thị:
             </span>
-            Thêm người dùng
-          </button>
-        </div>
+            <span
+              style={{
+                padding: "4px 10px",
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 700,
+                background: T.blueBg,
+                color: T.blue,
+              }}
+            >
+              Nhân viên
+            </span>
+            <span
+              style={{
+                padding: "4px 10px",
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 700,
+                background: "rgba(124,58,237,0.10)",
+                color: "#7C3AED",
+              }}
+            >
+              Quản lý
+            </span>
+            <span
+              style={{
+                padding: "4px 10px",
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 700,
+                background: "rgba(239,68,68,0.10)",
+                color: "#DC2626",
+              }}
+            >
+              Quản trị viên
+            </span>
+          </div>
+        )}
 
         {/* Search + filter bar */}
         <div
@@ -695,10 +849,12 @@ const Users = () => {
                   }}
                 >
                   {[
-                    "Người dùng",
+                    isStaffPage ? "Nhân sự" : "Người dùng",
                     "Email",
                     "SĐT",
-                    "Vai trò",
+                    isStaffPage
+                      ? "Vai trò (nhân viên · quản lý · quản trị)"
+                      : "Vai trò",
                     "Giới hạn voucher",
                     "Ngày tham gia",
                     "Trạng thái",
@@ -748,7 +904,9 @@ const Users = () => {
                         >
                           person_off
                         </span>
-                        Không tìm thấy người dùng
+                        {isStaffPage
+                          ? "Không tìm thấy nhân viên"
+                          : "Không tìm thấy khách hàng"}
                       </div>
                     </td>
                   </tr>
@@ -800,9 +958,10 @@ const Users = () => {
                       >
                         {user.phone || "—"}
                       </td>
-                      {/* Vai trò */}
+                      {/* Vai trò — nhân viên / quản lý / quản trị (theo role) */}
                       <td style={{ padding: "14px 18px" }}>
                         <RoleBadge
+                          role={user.role}
                           isAdmin={user.isAdmin}
                           isStaff={user.isStaff}
                         />
@@ -890,6 +1049,7 @@ const Users = () => {
               total={data?.data?.total || 0}
               limit={limit}
               onChange={setPage}
+              entityLabel={isStaffPage ? "nhân viên" : "khách hàng"}
             />
           </div>
         </div>
@@ -990,7 +1150,11 @@ const Users = () => {
                   >
                     Vai trò người dùng
                   </div>
-                  <RolePicker value={roleValue} onChange={setRoleValue} />
+                  <RolePicker
+                    value={roleValue}
+                    onChange={setRoleValue}
+                    variant={isStaffPage ? "staff" : "all"}
+                  />
                 </div>
 
                 <div
@@ -1163,6 +1327,205 @@ const Users = () => {
                 </div>
               </div>
             </Form>
+          </div>
+        </div>
+      )}
+
+      {/* Tạo nhân viên — chỉ admin */}
+      {showCreateStaff && canAddStaff && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0,0,0,0.35)",
+            backdropFilter: "blur(2px)",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowCreateStaff(false);
+          }}
+        >
+          <div
+            style={{
+              background: T.card,
+              borderRadius: 20,
+              border: `1px solid ${T.border}`,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+              width: "100%",
+              maxWidth: 440,
+              padding: 28,
+              animation: "slideUp 0.2s ease",
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 18,
+              }}
+            >
+              <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>
+                Thêm nhân viên
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateStaff(false)}
+                style={{
+                  background: "#F1F5F9",
+                  border: "none",
+                  borderRadius: 8,
+                  width: 32,
+                  height: 32,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: T.textMid,
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                  close
+                </span>
+              </button>
+            </div>
+            <p style={{ fontSize: 12, color: T.textMuted, margin: "0 0 16px" }}>
+              Chỉ tài khoản quản trị viên (admin) mới tạo được. Khách hàng đăng ký qua trang chủ, không thêm tại đây.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: T.textMid, marginBottom: 6 }}>
+                  Họ tên
+                </div>
+                <Input
+                  value={createForm.name}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({ ...f, name: e.target.value }))
+                  }
+                  placeholder="Nguyễn Văn A"
+                  style={{ borderRadius: 10, fontSize: 13 }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: T.textMid, marginBottom: 6 }}>
+                  Email
+                </div>
+                <Input
+                  type="email"
+                  value={createForm.email}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({ ...f, email: e.target.value }))
+                  }
+                  placeholder="email@company.com"
+                  style={{ borderRadius: 10, fontSize: 13 }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: T.textMid, marginBottom: 6 }}>
+                  Mật khẩu
+                </div>
+                <Input.Password
+                  value={createForm.password}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({ ...f, password: e.target.value }))
+                  }
+                  placeholder="Tối thiểu 6 ký tự"
+                  style={{ borderRadius: 10, fontSize: 13 }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: T.textMid, marginBottom: 6 }}>
+                  Số điện thoại
+                </div>
+                <Input
+                  value={createForm.phone}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({ ...f, phone: e.target.value }))
+                  }
+                  placeholder="09xxxxxxxx"
+                  style={{ borderRadius: 10, fontSize: 13 }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: T.textMid, marginBottom: 8 }}>
+                  Vai trò
+                </div>
+                <RolePicker
+                  value={createForm.role}
+                  onChange={(key) =>
+                    setCreateForm((f) => ({ ...f, role: key }))
+                  }
+                  variant="staff"
+                />
+              </div>
+              <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateStaff(false)}
+                  style={{
+                    flex: 1,
+                    padding: "10px",
+                    borderRadius: 10,
+                    border: `1.5px solid ${T.border}`,
+                    background: "#fff",
+                    color: T.textMid,
+                    fontWeight: 600,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={createPending}
+                  onClick={() => {
+                    const { name, email, password, phone, role } = createForm;
+                    if (
+                      !String(name || "").trim() ||
+                      !String(email || "").trim() ||
+                      !password ||
+                      !String(phone || "").trim()
+                    ) {
+                      showToast("Vui lòng điền đủ họ tên, email, mật khẩu và SĐT", "error");
+                      return;
+                    }
+                    if (String(password).length < 6) {
+                      showToast("Mật khẩu ít nhất 6 ký tự", "error");
+                      return;
+                    }
+                    createStaff({
+                      name: String(name).trim(),
+                      email: String(email).trim(),
+                      password,
+                      phone: String(phone).trim(),
+                      role,
+                    });
+                  }}
+                  style={{
+                    flex: 2,
+                    padding: "10px",
+                    borderRadius: 10,
+                    border: "none",
+                    background: T.primary,
+                    color: "#fff",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    opacity: createPending ? 0.7 : 1,
+                  }}
+                >
+                  {createPending ? "Đang tạo…" : "Tạo tài khoản"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

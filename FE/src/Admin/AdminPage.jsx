@@ -283,7 +283,7 @@ const AdminPage = () => {
           <Order mode="all" />
         );
       case "users":
-        return <Users />;
+        return <Users mode="customers" />;
       case "vouchers":
         return <Vouchers />;
       case "wallet-topups":
@@ -305,7 +305,7 @@ const AdminPage = () => {
       case "comments":
         return <Reviews />;
       case "staff":
-        return <Users />;
+        return <Users mode="staff" />;
       default:
         return (
           <div

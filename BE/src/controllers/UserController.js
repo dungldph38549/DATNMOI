@@ -154,8 +154,28 @@ exports.updateCustomer = async (req, res) => {
 exports.listUser = async (req, res) => {
   try {
     const { page = 0, limit = 10 } = req.query;
-    const result = await UserService.listUser(Number(page), Number(limit));
+    const allowed = ["all", "customers", "staff"];
+    const raw = req.query.scope;
+    const safeScope =
+      raw != null && raw !== "" && allowed.includes(String(raw))
+        ? String(raw)
+        : "customers";
+    const result = await UserService.listUser(Number(page), Number(limit), {
+      scope: safeScope,
+    });
     return successResponse({ res, data: result });
+  } catch (err) {
+    handleError(res, err);
+  }
+};
+
+/**
+ * POST /user/admin — chỉ role admin (JWT), tạo tài khoản nhân viên
+ */
+exports.adminCreateUser = async (req, res) => {
+  try {
+    const user = await UserService.createUserByAdmin(req.body);
+    return successResponse({ res, data: user, statusCode: 201 });
   } catch (err) {
     handleError(res, err);
   }

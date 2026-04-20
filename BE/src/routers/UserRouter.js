@@ -65,12 +65,12 @@ router.get(
   handle(UserController.getAllUser),
 );
 
-// Tạo user mới từ trang quản trị
+// Tạo tài khoản nhân viên từ trang quản trị (chỉ admin)
 router.post(
   "/admin",
   protect,
   restrictTo("admin"),
-  handle(UserController.createUser),
+  handle(UserController.adminCreateUser),
 );
 
 // Cập nhật user bất kỳ theo ID
