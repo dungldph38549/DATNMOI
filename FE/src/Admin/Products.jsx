@@ -264,6 +264,51 @@ const getAdminStockCount = (record) => {
   return Number.isFinite(singleStock) ? singleStock : null;
 };
 
+/** Ảnh đại diện danh sách admin — đồng bộ field `image` / `srcImages` từ API (không dùng `mainImage`). */
+const getAdminProductListImageUrl = (record) => {
+  const candidate =
+    (typeof record?.image === "string" && record.image.trim()) ||
+    (Array.isArray(record?.srcImages) &&
+      typeof record.srcImages[0] === "string" &&
+      record.srcImages[0].trim()) ||
+    "";
+  if (!candidate) return "";
+  if (candidate.startsWith("http")) return candidate;
+  const base = (
+    process.env.REACT_APP_API_URL_BACKEND || "http://localhost:3002/api"
+  )
+    .replace(/\/api\/?$/, "")
+    .replace(/localhost:\d+/, "localhost:3002");
+  const path = candidate.startsWith("/") ? candidate.slice(1) : candidate;
+  return `${base}/uploads/${path}`;
+};
+
+const AdminProductThumb = ({ record, src }) => {
+  const [broken, setBroken] = useState(false);
+  const url = (src != null && src !== "" ? src : null) || getAdminProductListImageUrl(record);
+  const fallback = (
+    <span
+      className="material-symbols-outlined"
+      style={{ fontSize: 18, color: T.primary, opacity: 0.5 }}
+    >
+      inventory_2
+    </span>
+  );
+  if (!url || broken) return fallback;
+  return (
+    <img
+      src={url}
+      alt={record.name || ""}
+      onError={() => setBroken(true)}
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+      }}
+    />
+  );
+};
+
 // ── Pagination ─────────────────────────────────────────────────
 const Pagination = ({ page, total, limit, onChange }) => {
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -898,6 +943,7 @@ export default function Products() {
                     products.map((record) => {
                       const isExpanded = expandedRow === record._id;
                       const stockCount = getAdminStockCount(record);
+                      const listImageUrl = getAdminProductListImageUrl(record);
                       return (
                         <React.Fragment key={record._id}>
                           <tr
@@ -968,28 +1014,10 @@ export default function Products() {
                                     flexShrink: 0,
                                   }}
                                 >
-                                  {record.mainImage ? (
-                                    <img
-                                      src={record.mainImage}
-                                      alt={record.name}
-                                      style={{
-                                        width: "100%",
-                                        height: "100%",
-                                        objectFit: "cover",
-                                      }}
-                                    />
-                                  ) : (
-                                    <span
-                                      className="material-symbols-outlined"
-                                      style={{
-                                        fontSize: 18,
-                                        color: T.primary,
-                                        opacity: 0.5,
-                                      }}
-                                    >
-                                      shoe
-                                    </span>
-                                  )}
+                                  <AdminProductThumb
+                                    record={record}
+                                    src={listImageUrl}
+                                  />
                                 </div>
                                 <div>
                                   <p
