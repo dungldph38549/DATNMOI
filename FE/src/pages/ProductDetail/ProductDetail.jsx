@@ -246,6 +246,11 @@ const ProductDetail = () => {
     return Array.from(new Set(colors.map((c) => String(c))));
   }, [product, hasVariants, getVariantColorLabel]);
 
+  useEffect(() => {
+    if (!hasVariants || !availableColors.length || selectedColor) return;
+    setSelectedColor(String(availableColors[0]));
+  }, [hasVariants, availableColors, selectedColor]);
+
   /** 
    * Logic chọn size: Ưu tiên giữ màu hiện tại. 
    * Nếu màu hiện tại không có trong size mới, chọn màu đầu tiên có sẵn của size đó.
@@ -779,10 +784,14 @@ const ProductDetail = () => {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {availableSizes.map((size) => {
-                    const allVariantsInSize = product.variants.filter((vv) => String(getVariantSizeLabel(vv)) === String(size));
+                    const allVariantsInSize = product.variants.filter(
+                      (vv) => String(getVariantSizeLabel(vv)) === String(size),
+                    );
                     const isTotalOutOfStock = allVariantsInSize.every((vv) => (vv.stock ?? 0) <= 0);
 
-                    const variantWithCurrentColor = allVariantsInSize.find((vv) => String(getVariantColorLabel(vv)) === String(selectedColor));
+                    const variantWithCurrentColor = allVariantsInSize.find(
+                      (vv) => String(getVariantColorLabel(vv)) === String(selectedColor),
+                    );
                     const isUnavailableInCurrentColor = !variantWithCurrentColor || (variantWithCurrentColor.stock ?? 0) <= 0;
 
                     const isSelected = String(selectedSize) === String(size);
@@ -818,36 +827,29 @@ const ProductDetail = () => {
                     {selectedColor || availableColors[0]}
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {availableColors.map((color) => {
-                    const allVariantsInColor = product.variants.filter((vv) => String(getVariantColorLabel(vv)) === String(color));
-                    const isTotalOutOfStock = allVariantsInColor.every((vv) => (vv.stock ?? 0) <= 0);
-
-                    const variantWithCurrentSize = allVariantsInColor.find((vv) => String(getVariantSizeLabel(vv)) === String(selectedSize));
-                    const isUnavailableInCurrentSize = !variantWithCurrentSize || (variantWithCurrentSize.stock ?? 0) <= 0;
-
-                    const isSelected = String(selectedColor || "") === String(color);
-                    return (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => handleColorClick(String(color))}
-                        disabled={isTotalOutOfStock}
-                        className={`inline-flex h-11 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-all ${
-                          isSelected
-                            ? "border-convot-charcoal bg-convot-charcoal text-white"
-                            : isTotalOutOfStock
-                              ? "cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-200 line-through opacity-50"
-                              : isUnavailableInCurrentSize
-                                ? "border-neutral-200 bg-white text-neutral-400 opacity-60 hover:border-convot-charcoal"
-                                : "border-neutral-300 bg-white text-neutral-700 hover:border-convot-charcoal"
-                        }`}
-                      >
-                        <span className={`h-2 w-2 rounded-full ${isSelected ? "bg-white" : isUnavailableInCurrentSize ? "bg-neutral-300" : "bg-neutral-400"}`} />
-                        {formatVariantButtonLabel(color, "color")}
-                      </button>
-                    );
-                  })}
+                <div className="relative">
+                  <select
+                    value={selectedColor ?? ""}
+                    onChange={(e) => handleColorClick(String(e.target.value))}
+                    className="h-11 w-full appearance-none rounded-full border border-neutral-300 bg-white px-4 pr-10 text-sm font-semibold text-neutral-800 outline-none transition focus:border-convot-charcoal"
+                  >
+                    <option value="" disabled>
+                      Chọn màu
+                    </option>
+                    {availableColors.map((color) => {
+                      const allVariantsInColor = product.variants.filter(
+                        (vv) => String(getVariantColorLabel(vv)) === String(color),
+                      );
+                      const isTotalOutOfStock = allVariantsInColor.every((vv) => (vv.stock ?? 0) <= 0);
+                      return (
+                        <option key={color} value={String(color)} disabled={isTotalOutOfStock}>
+                          {formatVariantButtonLabel(color, "color")}
+                          {isTotalOutOfStock ? " — Hết hàng" : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <FaChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-neutral-500" />
                 </div>
               </div>
             )}
