@@ -104,6 +104,12 @@ const Product = ({ product, ratingValue }) => {
     e.target.src = PLACEHOLDER;
   };
 
+  const formatPrice = (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "0";
+    return n.toLocaleString("vi-VN");
+  };
+
   const handleToggleWishlist = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -177,11 +183,11 @@ const Product = ({ product, ratingValue }) => {
         <div className="mt-2">
           {cardPriceInfo.hasSale && (
             <span className="line-through text-gray-400 mr-2">
-              {cardPriceInfo.originalPrice}₫
+              {formatPrice(cardPriceInfo.originalPrice)}₫
             </span>
           )}
           <span className="text-red-500 font-bold">
-            {cardPriceInfo.effectivePrice}₫
+            {formatPrice(cardPriceInfo.effectivePrice)}₫
           </span>
         </div>
 
