@@ -22,9 +22,9 @@ const MIN_ADMIN_CANCEL_NOTE_LEN = 5;
 const TRANSITIONS = {
   pending: ["confirmed", "canceled"],
   confirmed: ["shipped", "canceled"],
-  shipped: ["delivered"],
-  delivered: ["return-request"],
-  received: ["return-request"],
+  shipped: [],
+  delivered: [],
+  received: [],
   canceled: [],
   "return-request": ["accepted", "rejected"],
   accepted: [],
@@ -33,7 +33,7 @@ const TRANSITIONS = {
 
 const FLOW = ["pending", "confirmed", "shipped", "delivered", "received"];
 const RETURN_REASON_LABELS = {
-  wrong_size: "Sai size / không vừa",
+  wrong_size: "Không đúng size / không vừa",
   wrong_item: "Giao sai mẫu / sai màu",
   defective: "Lỗi sản xuất",
   damaged_shipping: "Hư hỏng khi vận chuyển",
@@ -213,7 +213,7 @@ export default function AdminOrderDetailModern() {
   const onCancelOrderLine = async (lineIndex) => {
     if (!order?._id) return;
     const ok = await confirmShopee({
-      text: `Hủy dòng này (#${lineIndex + 1}) khỏi đơn?`,
+      text: `Hủy  (#${lineIndex + 1}) khỏi đơn?`,
       confirmText: "Đồng ý",
       cancelText: "Đóng",
     });
@@ -397,7 +397,7 @@ export default function AdminOrderDetailModern() {
             <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
               <div className="border-b border-slate-100 px-6 py-4">
                 <h3 className="text-lg font-bold text-slate-900">
-                  Chi tiết đơn — {products.length} dòng sản phẩm
+                  Chi tiết đơn — {products.length}  sản phẩm
                 </h3>
                 <p className="mt-2 text-xs leading-relaxed text-slate-600">
                   <span className="font-semibold text-slate-800">Một đơn duy nhất</span>
@@ -435,7 +435,7 @@ export default function AdminOrderDetailModern() {
                         />
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                            Dòng {idx + 1}/{products.length}
+                            Sản phẩm {idx + 1}/{products.length}
                           </p>
                           <p className="text-sm font-bold text-slate-900">
                             {p?.productId?.name || p?.name || "Sản phẩm"}
@@ -461,7 +461,7 @@ export default function AdminOrderDetailModern() {
                           </div>
                           {lineDisc > 0 ? (
                             <p className="mt-2 text-xs font-semibold text-emerald-700">
-                              Giảm dòng: −{formatMoney(lineDisc)}
+                              Giảm : −{formatMoney(lineDisc)}
                             </p>
                           ) : null}
                           {saleName ? (
@@ -479,7 +479,7 @@ export default function AdminOrderDetailModern() {
                           ) : null}
                           {!lineLive && (
                             <p className="mt-2 text-xs font-bold text-red-600">
-                              Đã hủy dòng
+                              Đã hủy 
                               {p.canceledBy === "user" ? " (khách)" : ""}
                             </p>
                           )}
@@ -491,13 +491,13 @@ export default function AdminOrderDetailModern() {
                               loading={lineCanceling === idx}
                               onClick={() => onCancelOrderLine(idx)}
                             >
-                              Hủy dòng này
+                              Hủy 
                             </Button>
                           ) : null}
                         </div>
                         <div className="shrink-0 text-right sm:min-w-[140px]">
                           <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                            Thành tiền dòng
+                            Thành tiền 
                           </p>
                           <p className="text-lg font-black text-[#874e00]">
                             {formatMoney(lineTotal)}

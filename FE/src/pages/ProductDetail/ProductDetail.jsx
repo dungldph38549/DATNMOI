@@ -8,7 +8,7 @@ import {
 } from "../../api";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 import { FaStar, FaStarHalfAlt, FaShoppingCart, FaCheckCircle, FaShippingFast, FaShieldAlt, FaHeart, FaRegHeart, FaRulerCombined, FaTimes, FaThumbsUp, FaChevronDown } from "react-icons/fa";
-import { getProductPriceInfo } from "../../utils/pricing";
+import { getProductPriceInfo } from "../../utils/pricing.js";
 import notify from "../../utils/notify";
 import {
   getOrderStatusLabelForReview,
@@ -455,11 +455,11 @@ const ProductDetail = () => {
     const skuToSave = hasVariants ? selectedSku : null;
 
     if (hasVariants && !skuToSave) { notify.warning("Vui lòng chọn kích cỡ!"); return false; }
-    if (stockInfo?.available === false) { notify.warning("Sản phẩm đã hết hàng với phân loại đã chọn."); return false; }
+    if (stockInfo?.available === false) { notify.warning("Sản phẩm đã hết, vui lòng mua sản phẩm khác."); return false; }
 
     const maxStock = Number(stockInfo?.countInStock ?? 0);
     if (!Number.isFinite(maxStock) || maxStock <= 0) {
-      notify.warning("Sản phẩm đã hết hàng.");
+      notify.warning("Sản phẩm đã hết, vui lòng mua sản phẩm khác.");
       return false;
     }
 
@@ -531,13 +531,13 @@ const ProductDetail = () => {
       return;
     }
     if (stockInfo?.available === false) {
-      notify.warning("Sản phẩm đã hết hàng với phân loại đã chọn.");
+      notify.warning("Sản phẩm đã hết, vui lòng mua sản phẩm khác.");
       return;
     }
 
     const maxStock = Number(stockInfo?.countInStock ?? 0);
     if (!Number.isFinite(maxStock) || maxStock <= 0) {
-      notify.warning("Sản phẩm đã hết hàng.");
+      notify.warning("Sản phẩm đã hết, vui lòng mua sản phẩm khác.");
       return;
     }
 

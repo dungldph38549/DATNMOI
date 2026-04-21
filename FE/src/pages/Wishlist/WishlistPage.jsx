@@ -84,7 +84,11 @@ const WishlistPage = () => {
 
         const remaining = Math.max(0, maxStock - alreadyInCart);
         if (remaining <= 0) {
-            notify.warning("Sản phẩm đã hết hàng hoặc đã đạt số lượng tối đa trong kho.");
+            notify.warning(
+                maxStock <= 0
+                    ? "Sản phẩm đã hết, vui lòng mua sản phẩm khác."
+                    : "Đã đạt số lượng tối đa trong kho.",
+            );
             return;
         }
 

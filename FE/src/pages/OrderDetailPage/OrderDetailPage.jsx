@@ -15,7 +15,7 @@ import {
 } from "../../api";
 import { FaBoxOpen, FaCheckCircle, FaTruck, FaTimesCircle, FaChevronLeft, FaUndoAlt, FaShieldAlt, FaTimes, FaStar, FaImage, FaVideo, FaChevronDown, FaCoins, FaPrint, FaGlobe, FaCreditCard } from "react-icons/fa";
 import notify from "../../utils/notify";
-import { confirmShopee } from "../../utils/shopeeNotify";
+import { confirmShopee, pickCancelReasonShopee } from "../../utils/shopeeNotify";
 
 const STATUS_LABELS = {
   pending: "Chờ xử lý", confirmed: "Đã xác nhận", shipped: "Đang giao", delivered: "Đã giao",
@@ -393,8 +393,15 @@ const OrderDetailPage = () => {
       cancelText: "Đóng",
     });
     if (!ok) return;
+    const selectedReason = await pickCancelReasonShopee();
+    if (selectedReason == null) return;
+    const cancelReason = String(selectedReason).trim();
+    if (cancelReason.length < 5) {
+      notify.warning("Bạn cần nhập lý do hủy đơn (tối thiểu 5 ký tự).");
+      return;
+    }
     try {
-      await cancelOrderByUser(id);
+      await cancelOrderByUser(id, cancelReason);
       setOrder((o) => (o ? { ...o, status: "canceled" } : o));
       notify.success("Đã hủy đơn hàng.");
     } catch (err) { notify.error(err?.response?.data?.message || "Không thể hủy đơn hàng."); }

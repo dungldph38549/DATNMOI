@@ -21,7 +21,7 @@ import {
   FaQuestionCircle,
 } from "react-icons/fa";
 import notify from "../../utils/notify";
-import { confirmShopee } from "../../utils/shopeeNotify";
+import { confirmShopee, pickCancelReasonShopee } from "../../utils/shopeeNotify";
 
 const SHOP_NAME = "SneakerConverse";
 
@@ -321,8 +321,15 @@ const OrderHistoryPage = () => {
       cancelText: "Đóng",
     });
     if (!ok) return;
+    const selectedReason = await pickCancelReasonShopee();
+    if (selectedReason == null) return;
+    const cancelReason = String(selectedReason).trim();
+    if (cancelReason.length < 5) {
+      notify.warning("Bạn cần nhập lý do hủy đơn (tối thiểu 5 ký tự).");
+      return;
+    }
     try {
-      await cancelOrderByUser(orderId);
+      await cancelOrderByUser(orderId, cancelReason);
       setOrders((prev) =>
         prev.map((o) =>
           String(o._id) === String(orderId) ? { ...o, status: "canceled" } : o,
@@ -600,7 +607,7 @@ const OrderHistoryPage = () => {
                                 </p>
                                 {!lineLive && (
                                   <p className="mt-2 text-sm font-semibold text-red-600">
-                                    Đã hủy dòng
+                                    Đã hủy 
                                     {p.canceledBy === "admin" ? " (admin)" : ""}
                                   </p>
                                 )}
@@ -631,7 +638,7 @@ const OrderHistoryPage = () => {
                                     }
                                     className="inline-flex min-h-[40px] items-center justify-center rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
                                   >
-                                    Hủy dòng này
+                                    Hủy
                                   </button>
                                 )}
                               </div>
@@ -679,7 +686,7 @@ const OrderHistoryPage = () => {
                         Đánh giá
                       </Link>
                     )}
-                    {(st === "delivered" || st === "received") && (
+                    {(st === "shipped" || st === "delivered") && (
                       <>
                         {isLoggedIn ? (
                           <>

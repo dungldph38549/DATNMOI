@@ -76,6 +76,7 @@ const Header = () => {
   const isAccessoriesNav = location.pathname === "/phu-kien";
   const isSaleNav = location.pathname === "/sale";
   const isVoucherNav = location.pathname === "/voucher";
+  const isContactNav = location.pathname === "/contact";
 
   const breadcrumbTrail = (() => {
     const path = location.pathname;
@@ -178,6 +179,9 @@ const Header = () => {
       </Link>
       <Link to="/voucher" className={navActive(isVoucherNav)}>
         VOUCHER
+      </Link>
+      <Link to="/contact" className={navActive(isContactNav)}>
+        LIÊN HỆ
       </Link>
     </>
   );
@@ -331,6 +335,9 @@ const Header = () => {
           </Link>
           <Link to="/voucher" className={`${navActive(isVoucherNav)} whitespace-nowrap`}>
             VOUCHER
+          </Link>
+          <Link to="/contact" className={`${navActive(isContactNav)} whitespace-nowrap`}>
+            LIÊN HỆ
           </Link>
         </div>
 

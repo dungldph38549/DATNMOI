@@ -87,8 +87,41 @@ const ShoppingCartPage = () => {
   const allSelected = cartItems.length > 0 && selectedItemKeys.length === cartItems.length;
   const selectedCount = selectedItemKeys.length;
 
+  const getStockIssueForItem = (item) => {
+    if (!item) return null;
+    const key = getItemKey(item);
+    const stock = Number(stockByItemKey[key]);
+    if (!Number.isFinite(stock)) return null;
+    const qty = Number(item?.qty || 0);
+    if (qty <= stock) return null;
+    return {
+      name: String(item?.name || "Sản phẩm"),
+      available: Math.max(0, stock),
+    };
+  };
+
+  const buildStockIssueMessage = (issue) => {
+    if (!issue) return "Sản phẩm trong giỏ không đủ tồn kho.";
+    if (issue.available <= 0) {
+      return `${issue.name} đã hết hàng. Vui lòng chọn sản phẩm khác.`;
+    }
+    return `${issue.name} chỉ còn ${issue.available} sản phẩm trong kho. Vui lòng giảm số lượng.`;
+  };
+
   const toggleSelectAll = () => {
     if (allSelected) { setSelectedItemKeys([]); return; }
+    const invalid = cartItems
+      .map((item) => ({ item, issue: getStockIssueForItem(item) }))
+      .filter((x) => x.issue);
+    if (invalid.length > 0) {
+      const firstIssue = invalid[0].issue;
+      notify.error(buildStockIssueMessage(firstIssue));
+      const validKeys = cartItems
+        .filter((item) => !getStockIssueForItem(item))
+        .map((i) => getItemKey(i));
+      setSelectedItemKeys(validKeys);
+      return;
+    }
     setSelectedItemKeys(cartItems.map((i) => getItemKey(i)));
   };
 
@@ -96,13 +129,68 @@ const ShoppingCartPage = () => {
     setSelectedItemKeys((prev) => {
       const exists = prev.some((id) => String(id) === String(itemKey));
       if (exists) return prev.filter((id) => String(id) !== String(itemKey));
+      const item = cartItems.find(
+        (it) => String(getItemKey(it)) === String(itemKey),
+      );
+      const issue = getStockIssueForItem(item);
+      if (issue) {
+        notify.error(buildStockIssueMessage(issue));
+        return prev;
+      }
       return [...prev, itemKey];
     });
   };
 
-  const goCheckoutWithSelected = () => {
-    if (selectedItemKeys.length === 0) { notify.warning("Vui lòng chọn ít nhất 1 sản phẩm để thanh toán."); return; }
-    navigate("/checkout", { state: { selectedItemKeys } });
+  const goCheckoutWithSelected = async () => {
+    if (selectedItemKeys.length === 0) {
+      notify.warning("Vui lòng chọn ít nhất 1 sản phẩm để thanh toán.");
+      return;
+    }
+
+    const selectedKeySet = new Set(selectedItemKeys.map((k) => String(k)));
+    const selectedItems = cartItems.filter((item) =>
+      selectedKeySet.has(String(getItemKey(item))),
+    );
+    if (!selectedItems.length) {
+      notify.warning("Không tìm thấy sản phẩm đã chọn để thanh toán.");
+      return;
+    }
+
+    try {
+      const payload = selectedItems.map((i) =>
+        i?.sku ? { productId: i.productId, sku: i.sku } : { productId: i.productId },
+      );
+      const stocks = await getStocks(payload);
+      const rows = Array.isArray(stocks) ? stocks : [];
+
+      const invalidItems = selectedItems
+        .map((item, idx) => {
+          const row = rows[idx];
+          const available = Number(row?.countInStock ?? row?.stock ?? 0);
+          const qty = Number(item?.qty || 0);
+          if (!Number.isFinite(available)) return null;
+          if (qty > available) {
+            return {
+              name: String(item?.name || "Sản phẩm"),
+              available: Math.max(0, available),
+            };
+          }
+          return null;
+        })
+        .filter(Boolean);
+
+      if (invalidItems.length > 0) {
+        const first = invalidItems[0];
+        notify.warning(buildStockIssueMessage(first));
+        return;
+      }
+
+      navigate("/checkout", { state: { selectedItemKeys } });
+    } catch {
+      notify.warning(
+        "Không kiểm tra được tồn kho hiện tại. Vui lòng thử lại sau.",
+      );
+    }
   };
 
   const loadVariantOptions = async (productId) => {
@@ -272,7 +360,7 @@ const ShoppingCartPage = () => {
                               <div className="flex items-center h-10 w-28 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                                 <button onClick={() => dispatch(setQty({ cartKey: itemKey, qty: qty - 1 }))} disabled={qty <= 1} className="w-9 h-full flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors disabled:opacity-50 font-medium">-</button>
                                 <div className="flex-1 h-full border-x border-slate-100 flex items-center justify-center font-bold text-sm text-slate-900 bg-slate-50">{qty}</div>
-                                <button onClick={() => { if (canIncrease) { dispatch(setQty({ cartKey: itemKey, qty: qty + 1 })); } else { setStockNoticeKey(String(itemKey)); setTimeout(() => setStockNoticeKey(""), 2500); if (hasStockData) { notify.warning(safeMaxStock === 0 ? "Sản phẩm đã hết hàng." : `Đã đạt số lượng tối đa trong kho (${safeMaxStock}).`); } else { notify.warning("Không thể tăng số lượng."); } } }} className="w-9 h-full flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors font-medium">+</button>
+                                <button onClick={() => { if (canIncrease) { dispatch(setQty({ cartKey: itemKey, qty: qty + 1 })); } else { setStockNoticeKey(String(itemKey)); setTimeout(() => setStockNoticeKey(""), 2500); if (hasStockData) { notify.warning(safeMaxStock === 0 ? "Sản phẩm đã hết, vui lòng mua sản phẩm khác." : `Đã đạt số lượng tối đa trong kho (${safeMaxStock}).`); } else { notify.warning("Không thể tăng số lượng."); } } }} className="w-9 h-full flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors font-medium">+</button>
                               </div>
                               {stockNoticeKey === String(itemKey) && <span className="text-xs font-bold text-red-500 animate-pulse">{safeMaxStock === 0 ? "Hết hàng" : `Tối đa ${safeMaxStock}`}</span>}
                             </div>

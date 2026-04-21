@@ -734,9 +734,9 @@ exports.updateOrder = async (req, res) => {
     const TRANSITIONS = {
       pending: ["confirmed", "canceled"],
       confirmed: ["shipped", "canceled"],
-      shipped: ["delivered"],
-      delivered: ["return-request"],
-      received: ["return-request"],
+      shipped: [],
+      delivered: [],
+      received: [],
       canceled: [],
       "return-request": ["accepted", "rejected"],
       accepted: [],
@@ -876,8 +876,7 @@ exports.updateOrder = async (req, res) => {
       });
     }
 
-    // Admin UI dùng PUT /order/:id (updateOrder) để chuyển return-request → accepted,
-    // không gọi accept-return — cần cùng logic hoàn tồn + hoàn ví như acceptOrRejectReturn.
+    // Khi Admin chấp nhận hoàn (accepted từ trạng thái return-request)
     if (status === "accepted" && order.status === "return-request") {
       const orderPop = await Order.findById(order._id)
         .populate("products.productId")
@@ -889,6 +888,7 @@ exports.updateOrder = async (req, res) => {
       );
       Object.assign(updateFields, walletReturnPatch);
     }
+
 
     if (Object.keys(updateFields).length === 0) {
       await session.abortTransaction();
@@ -981,7 +981,7 @@ exports.updateOrder = async (req, res) => {
 // ================================================================
 exports.updateOrderById = async (req, res) => {
   const { id } = req.params;
-  const { fullName, email, phone, address, status } = req.body;
+  const { fullName, email, phone, address, status, cancelReason } = req.body;
   try {
     const order = await Order.findById(id);
     if (!order)
@@ -996,6 +996,15 @@ exports.updateOrderById = async (req, res) => {
     }
 
     if (status === "canceled" && order.status !== "canceled") {
+      const normalizedCancelReason =
+        typeof cancelReason === "string"
+          ? cancelReason.trim()
+          : String(cancelReason ?? "").trim();
+      if (normalizedCancelReason.length < 5) {
+        return res.status(422).json({
+          message: "Vui lòng nhập lý do hủy đơn (tối thiểu 5 ký tự).",
+        });
+      }
       const session = await mongoose.startSession();
       session.startTransaction();
       try {
@@ -1051,7 +1060,7 @@ exports.updateOrderById = async (req, res) => {
               oldStatus,
               newStatus: "canceled",
               orderId: o._id,
-              note: "Khách hàng hủy đơn hàng",
+              note: normalizedCancelReason,
             },
           ],
           { session },
@@ -1303,8 +1312,9 @@ exports.comfirmDelivery = async (req, res) => {
     if (!order)
       return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
 
-    // Chỉ bấm xác nhận khi đơn đã ở trạng thái "đã giao"
-    if (order.status === "delivered") {
+    // Chỉ bấm xác nhận khi đơn đã ở trạng thái "đang giao" hoặc "đã giao"
+    if (order.status === "delivered" || order.status === "shipped") {
+      const oldStatus = order.status;
       const patch =
         order.paymentMethod === "cod" && order.paymentStatus !== "paid"
           ? { status: "received", paymentStatus: "paid" }
@@ -1314,7 +1324,7 @@ exports.comfirmDelivery = async (req, res) => {
       }).populate("products.productId");
 
       await OrderStatusHistory.create({
-        oldStatus: "delivered",
+        oldStatus: oldStatus,
         newStatus: "received",
         orderId: order._id,
         paymentStatus:
