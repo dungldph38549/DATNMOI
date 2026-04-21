@@ -128,13 +128,20 @@ export const updateCustomerById = async (payload) => {
   return res.data;
 };
 
-export const getAllUser = async (page, limit) => {
-  // Backend staff list (có phân trang): GET /api/user/list?page=&limit=
+/** @param {{ scope?: "all" | "customers" | "staff" }} options */
+export const getAllUser = async (page, limit, options = {}) => {
+  const scope = options.scope ?? "customers";
+  const params = new URLSearchParams();
+  params.set("page", String(page ?? 0));
+  params.set("limit", String(limit ?? 10));
+  params.set("scope", scope);
+  const res = await axiosInstance.get(`/user/list?${params.toString()}`);
+  return res.data;
+};
 
-  // Admin: danh sách user có phân trang
-  // Backend: GET /api/user/list?page=&limit=
-  const res = await axiosInstance.get(`/user/list?page=${page}&limit=${limit}`);
-
+/** Chỉ admin (JWT) — tạo tài khoản nhân viên POST /api/user/admin */
+export const createUserByAdmin = async (payload) => {
+  const res = await axiosInstance.post("/user/admin", payload);
   return res.data;
 };
 // ================== Product API ==================

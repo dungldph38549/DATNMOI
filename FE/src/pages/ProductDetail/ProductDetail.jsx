@@ -8,7 +8,7 @@ import {
 } from "../../api";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 import { FaStar, FaStarHalfAlt, FaShoppingCart, FaCheckCircle, FaShippingFast, FaShieldAlt, FaHeart, FaRegHeart, FaRulerCombined, FaTimes, FaThumbsUp, FaChevronDown } from "react-icons/fa";
-import { getProductPriceInfo } from "../../utils/pricing";
+import { getProductPriceInfo } from "../../utils/pricing.js";
 import notify from "../../utils/notify";
 import {
   getOrderStatusLabelForReview,

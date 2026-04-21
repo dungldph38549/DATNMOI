@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { FaHeart, FaRegHeart } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProducts } from "../../api";
-import { getProductPriceInfo } from "../../utils/pricing";
+import { getProductPriceInfo } from "../../utils/pricing.js";
 import { getVariantColorValue } from "../../utils/variantAttributes";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 

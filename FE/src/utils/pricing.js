@@ -1,12 +1,12 @@
-export const toNumber = (value, fallback = 0) => {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
-};
-
 /** Đồng bộ với BE `salePricing.js` — giá niêm yết ảo khi không có giảm giá thật (% trên giá bán). */
 const VIRTUAL_LIST_PRICE_MARKUP_PERCENT = 15;
 
-const buildPriceInfo = (originalRaw, effectiveRaw) => {
+export function toNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function buildPriceInfo(originalRaw, effectiveRaw) {
   let original = toNumber(originalRaw, 0);
   const effective = toNumber(effectiveRaw, 0);
 
@@ -33,9 +33,9 @@ const buildPriceInfo = (originalRaw, effectiveRaw) => {
     hasSale: effective < original,
     discountPercent: Math.max(0, discountPercent),
   };
-};
+}
 
-export const getProductPriceInfo = (product, selectedVariant = null) => {
+export function getProductPriceInfo(product, selectedVariant = null) {
   if (!product) {
     return {
       originalPrice: 0,
@@ -48,11 +48,14 @@ export const getProductPriceInfo = (product, selectedVariant = null) => {
   if (selectedVariant) {
     const original = toNumber(
       selectedVariant.originalPrice ?? selectedVariant.price ?? 0,
-      0,
+      0
     );
     const effective = toNumber(
-      selectedVariant.effectivePrice ?? selectedVariant.salePrice ?? selectedVariant.price ?? 0,
-      0,
+      selectedVariant.effectivePrice ??
+        selectedVariant.salePrice ??
+        selectedVariant.price ??
+        0,
+      0
     );
     return buildPriceInfo(original, effective);
   }
@@ -63,12 +66,17 @@ export const getProductPriceInfo = (product, selectedVariant = null) => {
       product.price ??
       product.priceRange?.min ??
       0,
-    0,
+    0
   );
+
   const effective = toNumber(
-    product.effectivePrice ?? product.salePrice ?? product.priceRange?.min ?? product.price ?? 0,
-    0,
+    product.effectivePrice ??
+      product.salePrice ??
+      product.priceRange?.min ??
+      product.price ??
+      0,
+    0
   );
 
   return buildPriceInfo(original, effective);
-};
+}

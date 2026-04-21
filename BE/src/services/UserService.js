@@ -307,8 +307,16 @@ const updateUser = async (id, payload) => {
 };
 
 // Admin: danh sách user có phân trang
-const listUser = async (page = 0, limit = 10) => {
+// scope: "all" | "customers" | "staff"
+// staff = chỉ nhân viên / quản lý / quản trị — không bao gồm khách hàng (customer)
+const listUser = async (page = 0, limit = 10, { scope = "all" } = {}) => {
   const filter = { deletedAt: null };
+  if (scope === "customers") {
+    filter.role = "customer";
+  } else if (scope === "staff") {
+    filter.role = { $in: ["staff", "manager", "admin"] };
+  }
+
   const [users, total] = await Promise.all([
     User.find(filter)
       .select("-password -refresh_token")
@@ -319,6 +327,42 @@ const listUser = async (page = 0, limit = 10) => {
   ]);
 
   return { data: users, total, page, limit, pages: Math.ceil(total / limit) };
+};
+
+/**
+ * Admin tạo tài khoản nhân viên (staff / manager / admin) — không dùng cho khách hàng.
+ */
+const createUserByAdmin = async (body) => {
+  const { name, email, password, phone, role = "staff" } = body || {};
+  const allowedRoles = ["staff", "manager", "admin"];
+  if (!name || !email || !password || !phone) {
+    throw { status: 422, message: "Vui lòng điền đầy đủ họ tên, email, mật khẩu và SĐT" };
+  }
+  if (!allowedRoles.includes(role)) {
+    throw {
+      status: 400,
+      message: "Chỉ được tạo tài khoản nhân viên (staff, manager hoặc admin)",
+    };
+  }
+
+  const normalizedEmail = normalizeEmail(email);
+  const existingUser = await User.findOne({
+    email: normalizedEmail,
+    deletedAt: null,
+  });
+  if (existingUser) {
+    throw { status: 409, message: "Email này đã được sử dụng!" };
+  }
+
+  const createdUser = await User.create({
+    name: String(name).trim(),
+    email: normalizedEmail,
+    password,
+    phone: String(phone).trim(),
+    role,
+  });
+
+  return sanitize(createdUser);
 };
 
 // Admin: lấy toàn bộ user (không phân trang)
@@ -343,6 +387,7 @@ const deleteUser = async (id) => {
 module.exports = {
   registerUser,
   createUser,
+  createUserByAdmin,
   loginUser,
   googleLoginOrRegister,
   refreshTokenService,

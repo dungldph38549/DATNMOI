@@ -133,6 +133,12 @@ const MENU = [
     desc: "Xử lý yêu cầu hoàn trả",
   },
   {
+    key: "orders-completed",
+    icon: "task_alt",
+    label: "Đã hoàn tất",
+    desc: "Đơn hàng đã giao & thành công",
+  },
+  {
     key: "comments",
     icon: "star",
     label: "Đánh giá",
@@ -283,7 +289,7 @@ const AdminPage = () => {
           <Order mode="all" />
         );
       case "users":
-        return <Users />;
+        return <Users mode="customers" />;
       case "vouchers":
         return <Vouchers />;
       case "wallet-topups":
@@ -302,10 +308,12 @@ const AdminPage = () => {
         return <Categories />;
       case "order-returns":
         return <Order mode="returns" />;
+      case "orders-completed":
+        return <Order mode="completed" />;
       case "comments":
         return <Reviews />;
       case "staff":
-        return <Users />;
+        return <Users mode="staff" />;
       default:
         return (
           <div
