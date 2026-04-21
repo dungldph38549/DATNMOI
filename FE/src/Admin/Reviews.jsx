@@ -127,7 +127,6 @@ export default function Reviews() {
         const p = r.productId;
         const name = snap?.name || p?.name || "—";
         const imgRaw = snap?.image || p?.image || (Array.isArray(p?.srcImages) ? p.srcImages[0] : null);
-        const brand = snap?.brandName || p?.brandId?.name;
         const cat = snap?.categoryName || p?.categoryId?.name;
         const { dateStr, sizeLine } = reviewDateAndSizeLine(r);
         return (
@@ -159,7 +158,7 @@ export default function Reviews() {
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontWeight: 700, fontSize: 13, lineHeight: 1.35 }}>{name}</div>
               <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-                {[brand, cat].filter(Boolean).join(" · ") || "—"}
+                {cat || "—"}
               </div>
               {dateStr ? (
                 <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>{dateStr}</div>
@@ -309,7 +308,6 @@ export default function Reviews() {
           const p = r.productId || {};
           const name = snap?.name || p?.name || "—";
           const imgRaw = snap?.image || p?.image || (Array.isArray(p?.srcImages) ? p.srcImages[0] : null);
-          const brand = snap?.brandName || p?.brandId?.name;
           const cat = snap?.categoryName || p?.categoryId?.name;
           const priceSnap = snap?.price != null ? snap.price : p?.price;
           const shortDesc = (snap?.shortDescription || p?.shortDescription || "").trim();
@@ -376,7 +374,6 @@ export default function Reviews() {
                   )}
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontWeight: 800, fontSize: 16, color: "#0f172a", lineHeight: 1.35 }}>{name}</div>
-                    {row("Thương hiệu", brand)}
                     {row("Danh mục", cat)}
                     {row("Giá (theo snapshot / SP)", formatVnd(priceSnap))}
                     {row("Biến thể / phân loại đặt mua", variantFull, { multiline: true })}

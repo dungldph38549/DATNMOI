@@ -9,7 +9,6 @@ import {
   updateProduct,
   uploadImage,
   uploadImages,
-  getAllBrands,
   getAllCategories,
   getAllSizes,
 } from "./../api/index";
@@ -179,6 +178,12 @@ const variantAttributesSignature = (attrsObj) => {
   return JSON.stringify(entries);
 };
 
+/** Gợi ý thuộc tính biến thể — chỉ Size & Color; vẫn có thể gõ thêm (mode tags) cho SP cũ */
+const VARIANT_ATTRIBUTE_PRESET_OPTIONS = [
+  { value: "Size", label: "Size — Kích cỡ" },
+  { value: "Color", label: "Color — Màu sắc" },
+];
+
 // ================================================================
 // ProductDetail — Card only (no Sidebar / header / layout wrapper)
 // ================================================================
@@ -196,11 +201,6 @@ const ProductDetail = ({ productId = null, onClose }) => {
     enabled: productId !== null && productId !== "create",
   });
 
-  const { data: brands } = useQuery({
-    queryKey: ["admin-brands"],
-    queryFn: () => getAllBrands("all"),
-    keepPreviousData: true,
-  });
   const { data: categories } = useQuery({
     queryKey: ["admin-categories"],
     queryFn: () => getAllCategories("all"),
@@ -259,10 +259,11 @@ const ProductDetail = ({ productId = null, onClose }) => {
       // Khi edit sản phẩm, nếu không map lại thì payload gửi lên có thể thiếu `countInStock`
       // và backend sẽ fail validation.
       const isHasVariants = !!productData.hasVariants;
+      const { brandId: _ignoreBrand, categoryId: _ignoreCat, ...productFormRest } =
+        productData;
       form.setFieldsValue({
-        ...productData,
+        ...productFormRest,
         categoryId: productData?.categoryId?._id || productData?.categoryId || undefined,
-        brandId: productData?.brandId?._id || productData?.brandId || undefined,
         countInStock: productData.stock ?? productData.countInStock,
         attributes: productData.attributes || [],
         variants: productData.variants || [],
@@ -318,8 +319,9 @@ const ProductDetail = ({ productId = null, onClose }) => {
   };
 
   const onFinish = (values) => {
+    const { brandId: _omitBrand, ...restValues } = values;
     const payload = {
-      ...values,
+      ...restValues,
       hasVariants: hasVar,
       isVisible: visible,
       isFeatured: featured,
@@ -558,39 +560,18 @@ const ProductDetail = ({ productId = null, onClose }) => {
                     </Form.Item>
                   </div>
 
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 16,
-                    }}
-                  >
-                    <div>
-                      <FieldLabel>Danh mục</FieldLabel>
-                      <Form.Item name="categoryId" rules={[{ required: true }]}>
-                        <Select
-                          placeholder="Chọn danh mục"
-                          style={{ width: "100%" }}
-                          options={categories?.data?.map((c) => ({
-                            label: c.name,
-                            value: c._id,
-                          }))}
-                        />
-                      </Form.Item>
-                    </div>
-                    <div>
-                      <FieldLabel>Thương hiệu</FieldLabel>
-                      <Form.Item name="brandId" rules={[{ required: true }]}>
-                        <Select
-                          placeholder="Chọn thương hiệu"
-                          style={{ width: "100%" }}
-                          options={brands?.data?.map((b) => ({
-                            label: b.name,
-                            value: b._id,
-                          }))}
-                        />
-                      </Form.Item>
-                    </div>
+                  <div>
+                    <FieldLabel>Danh mục</FieldLabel>
+                    <Form.Item name="categoryId" rules={[{ required: true }]}>
+                      <Select
+                        placeholder="Chọn danh mục"
+                        style={{ width: "100%" }}
+                        options={categories?.data?.map((c) => ({
+                          label: c.name,
+                          value: c._id,
+                        }))}
+                      />
+                    </Form.Item>
                   </div>
 
                   <div>
@@ -687,8 +668,19 @@ const ProductDetail = ({ productId = null, onClose }) => {
                       <Form.Item name="attributes">
                         <Select
                           mode="tags"
-                          placeholder="VD: Color, Size"
+                          placeholder="Chọn từ danh sách hoặc gõ tên thuộc tính"
                           style={{ width: "100%" }}
+                          options={VARIANT_ATTRIBUTE_PRESET_OPTIONS}
+                          showSearch
+                          optionFilterProp="label"
+                          filterOption={(input, option) => {
+                            const q = String(input || "").trim().toLowerCase();
+                            if (!q) return true;
+                            const label = String(option?.label ?? "").toLowerCase();
+                            const value = String(option?.value ?? "").toLowerCase();
+                            return label.includes(q) || value.includes(q);
+                          }}
+                          maxTagCount="responsive"
                           tokenSeparators={[","]}
                           onChange={(vals) => {
                             const normalized = (vals || [])

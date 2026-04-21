@@ -30,6 +30,17 @@ module.exports = {
       boxShadow: {
         'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
       },
+      keyframes: {
+        sizePickZoom: {
+          "0%": { transform: "scale(1)" },
+          "40%": { transform: "scale(1.08)" },
+          "100%": { transform: "scale(1)" },
+        },
+      },
+      animation: {
+        sizePickZoom:
+          "sizePickZoom 0.55s cubic-bezier(0.22, 1, 0.36, 1) 1 both",
+      },
     },
   },
   plugins: [],

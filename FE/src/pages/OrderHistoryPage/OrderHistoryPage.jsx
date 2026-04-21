@@ -607,7 +607,7 @@ const OrderHistoryPage = () => {
                                 </p>
                                 {!lineLive && (
                                   <p className="mt-2 text-sm font-semibold text-red-600">
-                                    Đã hủy dòng
+                                    Đã hủy 
                                     {p.canceledBy === "admin" ? " (admin)" : ""}
                                   </p>
                                 )}
@@ -638,7 +638,7 @@ const OrderHistoryPage = () => {
                                     }
                                     className="inline-flex min-h-[40px] items-center justify-center rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
                                   >
-                                    Hủy dòng này
+                                    Hủy
                                   </button>
                                 )}
                               </div>
@@ -686,7 +686,7 @@ const OrderHistoryPage = () => {
                         Đánh giá
                       </Link>
                     )}
-                    {(st === "delivered" || st === "received") && (
+                    {(st === "shipped" || st === "delivered") && (
                       <>
                         {isLoggedIn ? (
                           <>

@@ -7,7 +7,6 @@ import {
   getAllProducts,
   restoreProductById,
   getAllCategories,
-  getAllBrands,
 } from "./../api/index";
 
 // ── Design tokens ──────────────────────────────────────────────
@@ -265,6 +264,51 @@ const getAdminStockCount = (record) => {
   return Number.isFinite(singleStock) ? singleStock : null;
 };
 
+/** Ảnh đại diện danh sách admin — đồng bộ field `image` / `srcImages` từ API (không dùng `mainImage`). */
+const getAdminProductListImageUrl = (record) => {
+  const candidate =
+    (typeof record?.image === "string" && record.image.trim()) ||
+    (Array.isArray(record?.srcImages) &&
+      typeof record.srcImages[0] === "string" &&
+      record.srcImages[0].trim()) ||
+    "";
+  if (!candidate) return "";
+  if (candidate.startsWith("http")) return candidate;
+  const base = (
+    process.env.REACT_APP_API_URL_BACKEND || "http://localhost:3002/api"
+  )
+    .replace(/\/api\/?$/, "")
+    .replace(/localhost:\d+/, "localhost:3002");
+  const path = candidate.startsWith("/") ? candidate.slice(1) : candidate;
+  return `${base}/uploads/${path}`;
+};
+
+const AdminProductThumb = ({ record, src }) => {
+  const [broken, setBroken] = useState(false);
+  const url = (src != null && src !== "" ? src : null) || getAdminProductListImageUrl(record);
+  const fallback = (
+    <span
+      className="material-symbols-outlined"
+      style={{ fontSize: 18, color: T.primary, opacity: 0.5 }}
+    >
+      inventory_2
+    </span>
+  );
+  if (!url || broken) return fallback;
+  return (
+    <img
+      src={url}
+      alt={record.name || ""}
+      onError={() => setBroken(true)}
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+      }}
+    />
+  );
+};
+
 // ── Pagination ─────────────────────────────────────────────────
 const Pagination = ({ page, total, limit, onChange }) => {
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -399,11 +443,6 @@ export default function Products() {
   const limit = 10;
 
   // ── Queries ────────────────────────────────────────────────
-  const { data: brands } = useQuery({
-    queryKey: ["admin-brands"],
-    queryFn: () => getAllBrands("all"),
-    keepPreviousData: true,
-  });
   const { data: categories } = useQuery({
     queryKey: ["admin-categories"],
     queryFn: () => getAllCategories("all"),
@@ -447,7 +486,6 @@ export default function Products() {
     setFilter({
       name: values.name || undefined,
       categoryId: values.categoryId || undefined,
-      brandId: values.brandId || undefined,
       priceFrom: values.priceFrom,
       priceTo: values.priceTo,
     });
@@ -719,19 +757,6 @@ export default function Products() {
                       ))}
                     </Select>
                   </Form.Item>
-                  <Form.Item name="brandId" style={{ margin: 0 }}>
-                    <Select
-                      placeholder="Thương hiệu"
-                      style={{ width: 140 }}
-                      allowClear
-                    >
-                      {brands?.data?.map((b) => (
-                        <Select.Option key={b._id} value={b._id}>
-                          {b.name}
-                        </Select.Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
                   <Form.Item name="priceFrom" style={{ margin: 0 }}>
                     <InputNumber
                       placeholder="Giá từ"
@@ -859,7 +884,6 @@ export default function Products() {
                       "",
                       "Sản phẩm",
                       "Danh mục",
-                      "Thương hiệu",
                       "Giá",
                       "Tồn kho",
                       "Trạng thái",
@@ -888,7 +912,7 @@ export default function Products() {
                   {products.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={9}
+                        colSpan={8}
                         style={{
                           padding: 48,
                           textAlign: "center",
@@ -919,6 +943,7 @@ export default function Products() {
                     products.map((record) => {
                       const isExpanded = expandedRow === record._id;
                       const stockCount = getAdminStockCount(record);
+                      const listImageUrl = getAdminProductListImageUrl(record);
                       return (
                         <React.Fragment key={record._id}>
                           <tr
@@ -989,28 +1014,10 @@ export default function Products() {
                                     flexShrink: 0,
                                   }}
                                 >
-                                  {record.mainImage ? (
-                                    <img
-                                      src={record.mainImage}
-                                      alt={record.name}
-                                      style={{
-                                        width: "100%",
-                                        height: "100%",
-                                        objectFit: "cover",
-                                      }}
-                                    />
-                                  ) : (
-                                    <span
-                                      className="material-symbols-outlined"
-                                      style={{
-                                        fontSize: 18,
-                                        color: T.primary,
-                                        opacity: 0.5,
-                                      }}
-                                    >
-                                      shoe
-                                    </span>
-                                  )}
+                                  <AdminProductThumb
+                                    record={record}
+                                    src={listImageUrl}
+                                  />
                                 </div>
                                 <div>
                                   <p
@@ -1049,16 +1056,6 @@ export default function Products() {
                               }}
                             >
                               {record.categoryId?.name || "—"}
-                            </td>
-                            {/* Brand */}
-                            <td
-                              style={{
-                                padding: "12px 16px",
-                                fontSize: 13,
-                                color: T.textMid,
-                              }}
-                            >
-                              {record.brandId?.name || "—"}
                             </td>
                             {/* Price */}
                             <td
@@ -1177,7 +1174,7 @@ export default function Products() {
                               style={{ background: "#FFFBF5" }}
                             >
                               <td
-                                colSpan={9}
+                                colSpan={8}
                                 style={{
                                   padding: "0 16px 12px 56px",
                                   borderBottom: `1px solid ${T.border}`,
