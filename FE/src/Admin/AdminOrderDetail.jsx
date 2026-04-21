@@ -10,7 +10,7 @@ const STATUS_OPTIONS = [
   { value: "confirmed", label: "Đã xác nhận" },
   { value: "shipped", label: "Đang giao" },
   { value: "delivered", label: "Đã giao" },
-  { value: "received", label: "Giao hàng thành công" },
+  { value: "received", label: "Đã giao hàng" },
   { value: "canceled", label: "Đã hủy" },
   { value: "return-request", label: "Yêu cầu hoàn hàng" },
   { value: "accepted", label: "Chấp nhận hoàn hàng" },

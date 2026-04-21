@@ -10,7 +10,7 @@ const STATUS_OPTIONS = [
   { value: "confirmed", label: "Đã xác nhận" },
   { value: "shipped", label: "Đang giao" },
   { value: "delivered", label: "Đã giao" },
-  { value: "received", label: "Giao hàng thành công" },
+  { value: "received", label: "Đã giao hàng" },
   { value: "canceled", label: "Đã hủy" },
   { value: "return-request", label: "Yêu cầu hoàn hàng" },
   { value: "accepted", label: "Chấp nhận hoàn hàng" },
@@ -29,6 +29,12 @@ const RETURN_REASON_LABELS = RETURN_REASON_OPTIONS.reduce((acc, x) => {
   if (x.value !== "all") acc[x.value] = x.label;
   return acc;
 }, {});
+
+const toImageArray = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (!value) return [];
+  return [value];
+};
 
 const MIN_ADMIN_CANCEL_NOTE_LEN = 5;
 
@@ -476,6 +482,32 @@ export default function Order({ mode = "all" }) {
                 <span style={{ fontSize: 12, color: "#4B5563", fontWeight: 600 }}>
                   {label}
                 </span>
+              );
+            },
+          },
+          {
+            title: "Chi tiết hoàn",
+            key: "returnDetail",
+            width: 260,
+            render: (_, record) => {
+              const order = record?.order || {};
+              const note = String(order?.returnRequestReason || order?.note || "").trim();
+              const imgs = toImageArray(order?.returnRequestImages);
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: "#6B7280", lineHeight: 1.45 }}>
+                    {note || "Chưa có mô tả chi tiết. Mở chi tiết đơn để xem lịch sử hoàn hàng."}
+                  </span>
+                  <span style={{ fontSize: 11, color: "#9CA3AF" }}>
+                    Ảnh minh chứng: {imgs.length}
+                  </span>
+                  <Link
+                    to={`/admin/orders/${String(order?._id || "").trim()}`}
+                    style={{ fontSize: 12, fontWeight: 700 }}
+                  >
+                    Xem chi tiết hoàn hàng
+                  </Link>
+                </div>
               );
             },
           },
