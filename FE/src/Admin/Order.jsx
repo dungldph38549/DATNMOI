@@ -35,9 +35,9 @@ const MIN_ADMIN_CANCEL_NOTE_LEN = 5;
 const TRANSITIONS = {
   pending: ["confirmed", "canceled"],
   confirmed: ["shipped", "canceled"],
-  shipped: ["delivered"],
-  delivered: ["return-request"],
-  received: ["return-request"],
+  shipped: [],
+  delivered: [],
+  received: [],
   canceled: [],
   "return-request": ["accepted", "rejected"],
   accepted: [],
@@ -49,6 +49,7 @@ const STATUS_STYLE = {
   confirmed: { bg: "#E6F7FF", color: "#096DD9", border: "#91D5FF" },
   shipped: { bg: "#F9F0FF", color: "#722ED1", border: "#D3ADF7" },
   delivered: { bg: "#F6FFED", color: "#389E0D", border: "#B7EB8F" },
+  received: { bg: "#E6FFFB", color: "#08979C", border: "#87E8DE" },
   canceled: { bg: "#FFF1F0", color: "#CF1322", border: "#FFA39E" },
   "return-request": { bg: "#FFFBE6", color: "#D48806", border: "#FFE58F" },
   accepted: { bg: "#F6FFED", color: "#237804", border: "#95DE64" },
@@ -59,9 +60,6 @@ const STATUS_STYLE = {
 
 /** Nhãn bước tiếp theo trong Select (giữ nguyên value gửi API). */
 const labelForNextStatus = (fromNormalized, toValue) => {
-  if (fromNormalized === "delivered" && toValue === "return-request") {
-    return "Giao hàng thành công";
-  }
   return STATUS_OPTIONS.find((o) => o.value === toValue)?.label || toValue;
 };
 
@@ -151,12 +149,22 @@ export default function Order({ mode = "all" }) {
   });
 
   const rawOrders = data?.data || [];
-  const orders =
-    mode === "returns"
-      ? rawOrders.filter((o) =>
-          ["return-request", "accepted", "rejected"].includes(o.status),
-        )
-      : rawOrders;
+  const orders = useMemo(() => {
+    const returnStatuses = ["return-request", "accepted", "rejected"];
+    const finishedStatuses = ["delivered", "received"];
+    if (mode === "returns") {
+      return rawOrders.filter((o) => returnStatuses.includes(o.status));
+    }
+    if (mode === "completed") {
+      return rawOrders.filter((o) => finishedStatuses.includes(o.status));
+    }
+    // mode === "all" -> Ẩn các đơn liên quan đến hoàn hàng + các đơn đã xong (vận chuyển/khách xác nhận)
+    return rawOrders.filter(
+      (o) =>
+        !returnStatuses.includes(o.status) &&
+        !finishedStatuses.includes(o.status),
+    );
+  }, [rawOrders, mode]);
   const filteredOrders = useMemo(() => {
     const keywordNormalized = keyword.trim().toLowerCase();
     return orders.filter((o) => {
@@ -703,8 +711,14 @@ export default function Order({ mode = "all" }) {
           value={statusFilter}
           style={{ flex: "1 1 160px", minWidth: 150 }}
           options={[
-            { value: "all", label: "Tất cả trạng thái đơn" },
-            ...STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label })),
+            { value: "all", label: "Tất cả trạng thái" },
+            ...STATUS_OPTIONS.filter((s) => {
+              const isRet = ["return-request", "accepted", "rejected"].includes(s.value);
+              const isFin = ["delivered", "received"].includes(s.value);
+              if (mode === "returns") return isRet;
+              if (mode === "completed") return isFin;
+              return !isRet && !isFin;
+            }).map((s) => ({ value: s.value, label: s.label })),
           ]}
           onChange={setStatusFilter}
         />

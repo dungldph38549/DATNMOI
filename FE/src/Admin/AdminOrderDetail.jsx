@@ -22,9 +22,9 @@ const MIN_ADMIN_CANCEL_NOTE_LEN = 5;
 const TRANSITIONS = {
   pending: ["confirmed", "canceled"],
   confirmed: ["shipped", "canceled"],
-  shipped: ["delivered"],
-  delivered: ["return-request"],
-  received: ["return-request"],
+  shipped: [],
+  delivered: [],
+  received: [],
   canceled: [],
   "return-request": ["accepted", "rejected"],
   accepted: [],
@@ -143,14 +143,7 @@ export default function AdminOrderDetail() {
       }
       const data = await updateOrderStatus(order._id, body);
       setOrder((prev) => ({ ...prev, ...data, status: newStatus }));
-      if (newStatus === "accepted" && prevStatus === "return-request") {
-        const amt = Number(data?.walletRefundAmount);
-        notify.success(
-          amt > 0
-            ? `Đã chuyển ${amt.toLocaleString("vi-VN")}đ về ví tài khoản khách hàng.`
-            : "Đã chấp nhận hoàn hàng.",
-        );
-      } else if (newStatus === "canceled") {
+      if (newStatus === "canceled") {
         notify.success("Đã hủy đơn hàng.");
       } else {
         notify.success("Cập nhật trạng thái thành công.");
