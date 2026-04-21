@@ -7,7 +7,6 @@ import {
   getAllProducts,
   restoreProductById,
   getAllCategories,
-  getAllBrands,
 } from "./../api/index";
 
 // ── Design tokens ──────────────────────────────────────────────
@@ -399,11 +398,6 @@ export default function Products() {
   const limit = 10;
 
   // ── Queries ────────────────────────────────────────────────
-  const { data: brands } = useQuery({
-    queryKey: ["admin-brands"],
-    queryFn: () => getAllBrands("all"),
-    keepPreviousData: true,
-  });
   const { data: categories } = useQuery({
     queryKey: ["admin-categories"],
     queryFn: () => getAllCategories("all"),
@@ -447,7 +441,6 @@ export default function Products() {
     setFilter({
       name: values.name || undefined,
       categoryId: values.categoryId || undefined,
-      brandId: values.brandId || undefined,
       priceFrom: values.priceFrom,
       priceTo: values.priceTo,
     });
@@ -719,19 +712,6 @@ export default function Products() {
                       ))}
                     </Select>
                   </Form.Item>
-                  <Form.Item name="brandId" style={{ margin: 0 }}>
-                    <Select
-                      placeholder="Thương hiệu"
-                      style={{ width: 140 }}
-                      allowClear
-                    >
-                      {brands?.data?.map((b) => (
-                        <Select.Option key={b._id} value={b._id}>
-                          {b.name}
-                        </Select.Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
                   <Form.Item name="priceFrom" style={{ margin: 0 }}>
                     <InputNumber
                       placeholder="Giá từ"
@@ -859,7 +839,6 @@ export default function Products() {
                       "",
                       "Sản phẩm",
                       "Danh mục",
-                      "Thương hiệu",
                       "Giá",
                       "Tồn kho",
                       "Trạng thái",
@@ -888,7 +867,7 @@ export default function Products() {
                   {products.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={9}
+                        colSpan={8}
                         style={{
                           padding: 48,
                           textAlign: "center",
@@ -1050,16 +1029,6 @@ export default function Products() {
                             >
                               {record.categoryId?.name || "—"}
                             </td>
-                            {/* Brand */}
-                            <td
-                              style={{
-                                padding: "12px 16px",
-                                fontSize: 13,
-                                color: T.textMid,
-                              }}
-                            >
-                              {record.brandId?.name || "—"}
-                            </td>
                             {/* Price */}
                             <td
                               style={{
@@ -1177,7 +1146,7 @@ export default function Products() {
                               style={{ background: "#FFFBF5" }}
                             >
                               <td
-                                colSpan={9}
+                                colSpan={8}
                                 style={{
                                   padding: "0 16px 12px 56px",
                                   borderBottom: `1px solid ${T.border}`,

@@ -3,7 +3,6 @@ import { useDispatch } from "react-redux";
 import Order from "./Order";
 import Products from "./Products";
 import Categories from "./Categories";
-import Brands from "./Brands";
 import Dashboard from "./Dashboard";
 import Users from "./Users";
 import Vouchers from "./Vouchers";
@@ -119,12 +118,6 @@ const MENU = [
     icon: "category",
     label: "Danh mục",
     desc: "Phân loại sản phẩm",
-  },
-  {
-    key: "brands",
-    icon: "verified",
-    label: "Thương hiệu",
-    desc: "Nike, Adidas, Jordan...",
   },
   {
     key: "order-returns",
@@ -302,8 +295,6 @@ const AdminPage = () => {
         return <Colors />;
       case "chat":
         return <ChatAdmin />;
-      case "brands":
-        return <Brands />;
       case "categories":
         return <Categories />;
       case "order-returns":

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
@@ -59,9 +59,9 @@ const ProductDetail = () => {
   const [selectedColor, setSelectedColor] = useState(null);
   const [activeTab, setActiveTab] = useState("story");
   const [mainImage, setMainImage] = useState("");
+  /** Tăng mỗi khi đổi size để chạy animation phóng ảnh một lần */
+  const [sizeZoomNonce, setSizeZoomNonce] = useState(0);
   const [showSizeGuide, setShowSizeGuide] = useState(false);
-  const [isMainImagePopping, setIsMainImagePopping] = useState(false);
-  const shakeTimeoutRef = useRef(null);
 
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
@@ -124,15 +124,14 @@ const ProductDetail = () => {
   }, [getVariantColorValue]);
 
   const hasVariants = Array.isArray(product?.variants) && product.variants.length > 0;
-    const isAccessoryProduct = String(
-  product?.categoryId?.slug ||
-  product?.categoryId?.name ||
-  product?.category ||
-  ""
-)
-  .toLowerCase()
-  .includes("phụ kiện");
-    console.log("Category check:", product?.categoryId?.slug, product?.categoryId?.name, product?.category, "isAccessory:", isAccessoryProduct);
+  const isAccessoryProduct = String(
+    product?.categoryId?.slug ||
+      product?.categoryId?.name ||
+      product?.category ||
+      "",
+  )
+    .toLowerCase()
+    .includes("phụ kiện");
 
   useEffect(() => {
     if (!id) return;
@@ -227,9 +226,25 @@ const ProductDetail = () => {
 
   const thumbnails = useMemo(() => {
     if (!product) return [];
-    const imgs = [product.image, ...(Array.isArray(product.srcImages) ? product.srcImages : [])].filter(Boolean);
-    return Array.from(new Set(imgs));
-  }, [product]);
+    const fromProduct = [
+      product.image,
+      ...(Array.isArray(product.srcImages) ? product.srcImages : []),
+    ].filter(Boolean);
+    const fromVariant =
+      selectedVariant && Array.isArray(selectedVariant.images)
+        ? selectedVariant.images.filter(Boolean)
+        : [];
+    const merged = [...fromVariant, ...fromProduct];
+    return Array.from(new Set(merged));
+  }, [product, selectedVariant]);
+
+  /** Khi đổi size/màu (SKU), cập nhật ảnh chính theo gallery biến thể; giữ ảnh đang xem nếu vẫn còn trong danh sách. */
+  useEffect(() => {
+    if (!product || thumbnails.length === 0) return;
+    setMainImage((prev) =>
+      prev && thumbnails.includes(prev) ? prev : thumbnails[0],
+    );
+  }, [product, thumbnails, selectedSku]);
 
   useEffect(() => {
     if (!hasVariants || !availableSizes.length || selectedSize) return;
@@ -246,16 +261,15 @@ const ProductDetail = () => {
     return Array.from(new Set(colors.map((c) => String(c))));
   }, [product, hasVariants, getVariantColorLabel]);
 
-  useEffect(() => {
-    if (!hasVariants || !availableColors.length || selectedColor) return;
-    setSelectedColor(String(availableColors[0]));
-  }, [hasVariants, availableColors, selectedColor]);
-
   /** 
    * Logic chọn size: Ưu tiên giữ màu hiện tại. 
    * Nếu màu hiện tại không có trong size mới, chọn màu đầu tiên có sẵn của size đó.
    */
   const handleSizeClick = (size) => {
+    const next = String(size);
+    if (String(selectedSize ?? "") !== next) {
+      setSizeZoomNonce((n) => n + 1);
+    }
     setSelectedSize(size);
     const variantsInSize = product.variants.filter(v => String(getVariantSizeLabel(v)) === String(size));
     const hasCurrentColor = variantsInSize.some(v => String(getVariantColorLabel(v)) === String(selectedColor));
@@ -264,9 +278,6 @@ const ProductDetail = () => {
       const firstInStock = variantsInSize.find(v => (v.stock ?? 0) > 0) || variantsInSize[0];
       setSelectedColor(String(getVariantColorLabel(firstInStock) || ""));
     }
-    if (shakeTimeoutRef.current) clearTimeout(shakeTimeoutRef.current);
-    setIsMainImagePopping(true);
-    shakeTimeoutRef.current = setTimeout(() => setIsMainImagePopping(false), 220);
   };
 
   /** 
@@ -282,16 +293,7 @@ const ProductDetail = () => {
       const firstInStock = variantsInColor.find(v => (v.stock ?? 0) > 0) || variantsInColor[0];
       setSelectedSize(String(getVariantSizeLabel(firstInStock) || ""));
     }
-    if (shakeTimeoutRef.current) clearTimeout(shakeTimeoutRef.current);
-    setIsMainImagePopping(true);
-    shakeTimeoutRef.current = setTimeout(() => setIsMainImagePopping(false), 220);
   };
-
-  useEffect(() => {
-    return () => {
-      if (shakeTimeoutRef.current) clearTimeout(shakeTimeoutRef.current);
-    };
-  }, []);
 
   useEffect(() => {
     const run = async () => {
@@ -645,17 +647,6 @@ const ProductDetail = () => {
 
   return (
     <div className="min-h-screen bg-convot-cream font-body pb-16 pt-16 md:pt-20">
-      <style>{`
-        @keyframes pd-main-image-pop {
-          0% { transform: scale(1); }
-          60% { transform: scale(1.035); }
-          100% { transform: scale(1); }
-        }
-        .pd-main-image-pop {
-          animation: pd-main-image-pop 220ms ease-out 1;
-          will-change: transform;
-        }
-      `}</style>
       <div className="container mx-auto max-w-7xl px-4 md:px-6">
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-10 xl:gap-14">
           <div className="lg:col-span-7">
@@ -700,14 +691,19 @@ const ProductDetail = () => {
               </div>
 
               <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-neutral-100">
-                <img
-                  src={getImage(mainImage)}
-                  onError={(e) => {
-                    e.target.src = PLACEHOLDER_IMG;
-                  }}
-                  className={`h-full w-full object-cover transition duration-700 ease-out hover:scale-[1.02] ${isMainImagePopping ? "pd-main-image-pop" : ""}`}
-                  alt={product.name}
-                />
+                <div
+                  key={sizeZoomNonce}
+                  className={`h-full w-full origin-center${sizeZoomNonce > 0 ? " animate-sizePickZoom" : ""}`}
+                >
+                  <img
+                    src={getImage(mainImage)}
+                    onError={(e) => {
+                      e.target.src = PLACEHOLDER_IMG;
+                    }}
+                    className="h-full w-full object-cover transition duration-700 ease-out hover:scale-[1.02]"
+                    alt={product.name}
+                  />
+                </div>
                 {product.isNew && (
                   <span className="absolute left-5 top-5 rounded-full bg-convot-charcoal px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white">
                     Mới
@@ -827,29 +823,43 @@ const ProductDetail = () => {
                     {selectedColor || availableColors[0]}
                   </span>
                 </div>
-                <div className="relative">
-                  <select
-                    value={selectedColor ?? ""}
-                    onChange={(e) => handleColorClick(String(e.target.value))}
-                    className="h-11 w-full appearance-none rounded-full border border-neutral-300 bg-white px-4 pr-10 text-sm font-semibold text-neutral-800 outline-none transition focus:border-convot-charcoal"
-                  >
-                    <option value="" disabled>
-                      Chọn màu
-                    </option>
-                    {availableColors.map((color) => {
-                      const allVariantsInColor = product.variants.filter(
-                        (vv) => String(getVariantColorLabel(vv)) === String(color),
-                      );
-                      const isTotalOutOfStock = allVariantsInColor.every((vv) => (vv.stock ?? 0) <= 0);
-                      return (
-                        <option key={color} value={String(color)} disabled={isTotalOutOfStock}>
-                          {formatVariantButtonLabel(color, "color")}
-                          {isTotalOutOfStock ? " — Hết hàng" : ""}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  <FaChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-neutral-500" />
+                <div className="flex flex-wrap gap-2">
+                  {availableColors.map((color) => {
+                    const allVariantsInColor = product.variants.filter(
+                      (vv) => String(getVariantColorLabel(vv)) === String(color),
+                    );
+                    const isTotalOutOfStock = allVariantsInColor.every((vv) => (vv.stock ?? 0) <= 0);
+
+                    const variantWithCurrentSize = allVariantsInColor.find(
+                      (vv) => String(getVariantSizeLabel(vv)) === String(selectedSize),
+                    );
+                    const isUnavailableInCurrentSize =
+                      !variantWithCurrentSize || (variantWithCurrentSize.stock ?? 0) <= 0;
+
+                    const isSelected = String(selectedColor || "") === String(color);
+                    return (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => handleColorClick(String(color))}
+                        disabled={isTotalOutOfStock}
+                        className={`inline-flex h-11 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-all ${
+                          isSelected
+                            ? "border-convot-charcoal bg-convot-charcoal text-white"
+                            : isTotalOutOfStock
+                              ? "cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-200 line-through opacity-50"
+                              : isUnavailableInCurrentSize
+                                ? "border-neutral-200 bg-white text-neutral-400 opacity-60 hover:border-convot-charcoal"
+                                : "border-neutral-300 bg-white text-neutral-700 hover:border-convot-charcoal"
+                        }`}
+                      >
+                        <span
+                          className={`h-2 w-2 rounded-full ${isSelected ? "bg-white" : isUnavailableInCurrentSize ? "bg-neutral-300" : "bg-neutral-400"}`}
+                        />
+                        {formatVariantButtonLabel(color, "color")}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}

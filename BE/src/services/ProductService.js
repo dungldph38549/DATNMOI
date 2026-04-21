@@ -65,7 +65,11 @@ const computeSimilarityScore = (base, candidate) => {
   if (String(base.categoryId) === String(candidate.categoryId)) {
     score += CATEGORY_WEIGHT;
   }
-  if (String(base.brandId) === String(candidate.brandId)) {
+  if (
+    base.brandId &&
+    candidate.brandId &&
+    String(base.brandId) === String(candidate.brandId)
+  ) {
     score += BRAND_WEIGHT;
   }
 
@@ -195,8 +199,7 @@ const createProduct = async (newProduct) => {
   } = newProduct;
 
   if (!name || !description) throw new Error("Thiếu tên hoặc mô tả sản phẩm");
-  if (!brandId || !categoryId)
-    throw new Error("Thương hiệu và danh mục là bắt buộc");
+  if (!categoryId) throw new Error("Danh mục là bắt buộc");
   if (!image) throw new Error("Ảnh chính là bắt buộc");
 
   const hasVar = !!hasVariants;
@@ -214,7 +217,7 @@ const createProduct = async (newProduct) => {
     name,
     description,
     shortDescription: shortDescription || "",
-    brandId,
+    brandId: brandId || null,
     categoryId,
     image,
     srcImages: Array.isArray(srcImages) ? srcImages : [],
@@ -279,7 +282,7 @@ const updateProduct = async (productId, updateData) => {
   if (description !== undefined) payload.description = description;
   if (shortDescription !== undefined)
     payload.shortDescription = shortDescription;
-  if (brandId !== undefined) payload.brandId = brandId;
+  if (brandId !== undefined) payload.brandId = brandId || null;
   if (categoryId !== undefined) payload.categoryId = categoryId;
   if (gender !== undefined) payload.gender = gender;
   if (style !== undefined) payload.style = style;
@@ -435,13 +438,14 @@ const getRecommendations = async (productId, limit = 4) => {
     .lean();
   if (!baseProduct) return [];
 
+  const orRec = [{ categoryId: baseProduct.categoryId }];
+  if (baseProduct.brandId) {
+    orRec.push({ brandId: baseProduct.brandId });
+  }
   const candidates = await Product.find({
     ...baseProductQuery,
     _id: { $ne: productId },
-    $or: [
-      { categoryId: baseProduct.categoryId },
-      { brandId: baseProduct.brandId },
-    ],
+    $or: orRec,
   })
     .populate("brandId", "name logo")
     .populate("categoryId", "name")
@@ -551,15 +555,24 @@ const getHomeRecommendations = async ({ userId, limit = 8 } = {}) => {
   }
 
   const categoryIds = [...new Set(viewedProducts.map((p) => String(p.categoryId)))];
-  const brandIds = [...new Set(viewedProducts.map((p) => String(p.brandId)))];
+  const brandIds = [
+    ...new Set(
+      viewedProducts
+        .map((p) => p.brandId)
+        .filter((id) => id != null && mongoose.Types.ObjectId.isValid(id))
+        .map(String),
+    ),
+  ];
+
+  const orHome = [{ categoryId: { $in: categoryIds } }];
+  if (brandIds.length) {
+    orHome.push({ brandId: { $in: brandIds } });
+  }
 
   const candidates = await Product.find({
     ...baseProductQuery,
     _id: { $nin: viewedIds },
-    $or: [
-      { categoryId: { $in: categoryIds } },
-      { brandId: { $in: brandIds } },
-    ],
+    $or: orHome,
   })
     .populate("brandId", "name logo")
     .populate("categoryId", "name")
