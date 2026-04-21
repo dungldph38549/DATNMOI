@@ -502,11 +502,12 @@ const Users = ({ mode = "customers" }) => {
   // ── Filter client-side theo search ───────────────────────
   // data = { status, data: { data: [...], total, page } }  ← cấu trúc từ successResponse
   const STAFF_ROLES = new Set(["staff", "manager", "admin"]);
+  const ROLE_PRIORITY = { admin: 0, manager: 1, staff: 2 };
   const users = (data?.data?.data || [])
     .filter((u) => {
       if (!isStaffPage) return true;
-      const r = u.role;
-      return r !== "customer" && (STAFF_ROLES.has(r) || u.isStaff || u.isAdmin);
+      const r = String(u?.role || "").toLowerCase();
+      return STAFF_ROLES.has(r) || u.isStaff || u.isAdmin;
     })
     .filter((u) => {
       if (!search.trim()) return true;
@@ -516,6 +517,17 @@ const Users = ({ mode = "customers" }) => {
         u.email?.toLowerCase().includes(q) ||
         u.phone?.toLowerCase().includes(q)
       );
+    })
+    .sort((a, b) => {
+      if (!isStaffPage) return 0;
+      const ra = String(a?.role || "").toLowerCase();
+      const rb = String(b?.role || "").toLowerCase();
+      const pa = ROLE_PRIORITY[ra] ?? 99;
+      const pb = ROLE_PRIORITY[rb] ?? 99;
+      if (pa !== pb) return pa - pb;
+      const ta = new Date(a?.createdAt || 0).getTime();
+      const tb = new Date(b?.createdAt || 0).getTime();
+      return tb - ta;
     });
 
   // ── Loading / error states ────────────────────────────────
@@ -905,7 +917,7 @@ const Users = ({ mode = "customers" }) => {
                           person_off
                         </span>
                         {isStaffPage
-                          ? "Không tìm thấy nhân viên"
+                          ? "Không tìm thấy nhân viên hoặc quản lý"
                           : "Không tìm thấy khách hàng"}
                       </div>
                     </td>

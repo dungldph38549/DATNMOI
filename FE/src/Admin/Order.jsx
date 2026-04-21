@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Table, Select, Button, Input, Pagination, Modal } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -10,7 +10,7 @@ const STATUS_OPTIONS = [
   { value: "confirmed", label: "Đã xác nhận" },
   { value: "shipped", label: "Đang giao" },
   { value: "delivered", label: "Đã giao" },
-  { value: "received", label: "Giao hàng thành công" },
+  { value: "received", label: "Đã giao thành công" },
   { value: "canceled", label: "Đã hủy" },
   { value: "return-request", label: "Yêu cầu hoàn hàng" },
   { value: "accepted", label: "Chấp nhận hoàn hàng" },
@@ -30,7 +30,20 @@ const RETURN_REASON_LABELS = RETURN_REASON_OPTIONS.reduce((acc, x) => {
   return acc;
 }, {});
 
+const toImageArray = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (!value) return [];
+  return [value];
+};
+const toUploadUrl = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+  return `http://localhost:3002/uploads/${raw.replace(/^\/+/, "")}`;
+};
+
 const MIN_ADMIN_CANCEL_NOTE_LEN = 5;
+const FETCH_LIMIT = 50;
 
 const TRANSITIONS = {
   pending: ["confirmed", "canceled"],
@@ -112,15 +125,29 @@ export default function Order({ mode = "all" }) {
   const [returnReasonFilter, setReturnReasonFilter] = useState("all");
   const [cancelReasonFlow, setCancelReasonFlow] = useState(null);
   const [cancelReasonText, setCancelReasonText] = useState("");
+  const [returnDetailOrder, setReturnDetailOrder] = useState(null);
+  const [previewImage, setPreviewImage] = useState("");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-orders", page, limit],
-    queryFn: () => getAllOrders(page, limit),
+    queryKey: ["admin-orders-all"],
+    queryFn: async () => {
+      let cursor = 0;
+      let totalPage = 1;
+      const all = [];
+      do {
+        const res = await getAllOrders(cursor, FETCH_LIMIT);
+        const rows = Array.isArray(res?.data) ? res.data : [];
+        all.push(...rows);
+        totalPage = Number(res?.totalPage || 1);
+        cursor += 1;
+      } while (cursor < totalPage);
+      return { orders: all };
+    },
     refetchInterval: 15000,
     refetchOnWindowFocus: true,
   });
 
-  const totalOrdersInDb = data?.total ?? 0;
+  const totalOrdersInDb = Array.isArray(data?.orders) ? data.orders.length : 0;
 
   const updateMutation = useMutation({
     mutationFn: ({ id, body }) => updateOrderStatus(id, body),
@@ -148,7 +175,7 @@ export default function Order({ mode = "all" }) {
     },
   });
 
-  const rawOrders = data?.data || [];
+  const rawOrders = data?.orders || [];
   const orders = useMemo(() => {
     const returnStatuses = ["return-request", "accepted", "rejected"];
     const finishedStatuses = ["delivered", "received"];
@@ -197,16 +224,23 @@ export default function Order({ mode = "all" }) {
       return byKeyword && byPaymentStatus && byStatus && byMethod && byReturnReason;
     });
   }, [orders, keyword, paymentFilter, statusFilter, methodFilter, mode, returnReasonFilter]);
+  useEffect(() => {
+    setPage(0);
+  }, [mode, keyword, paymentFilter, statusFilter, methodFilter, returnReasonFilter]);
   const allowedNext = (current) => TRANSITIONS[current] || [];
+  const pagedOrders = useMemo(
+    () => filteredOrders.slice(page * limit, (page + 1) * limit),
+    [filteredOrders, page, limit],
+  );
 
   /** Một dòng = một đơn; sản phẩm hiển thị dạng danh sách con trong ô. */
   const tableRows = useMemo(
     () =>
-      filteredOrders.map((order, idx) => ({
+      pagedOrders.map((order, idx) => ({
         key: `order-${String(order?._id ?? idx)}`,
         order,
       })),
-    [filteredOrders],
+    [pagedOrders],
   );
 
   const productLineCount = useMemo(
@@ -479,6 +513,33 @@ export default function Order({ mode = "all" }) {
               );
             },
           },
+          {
+            title: "Chi tiết hoàn",
+            key: "returnDetail",
+            width: 260,
+            render: (_, record) => {
+              const order = record?.order || {};
+              const note = String(order?.returnRequestReason || order?.note || "").trim();
+              const imgs = toImageArray(order?.returnRequestImages);
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: "#6B7280", lineHeight: 1.45 }}>
+                    {note || "Chưa có mô tả chi tiết. Mở chi tiết đơn để xem lịch sử hoàn hàng."}
+                  </span>
+                  <span style={{ fontSize: 11, color: "#9CA3AF" }}>
+                    Ảnh minh chứng: {imgs.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setReturnDetailOrder(order)}
+                    style={{ fontSize: 12, fontWeight: 700 }}
+                  >
+                    Xem chi tiết đơn hoàn
+                  </button>
+                </div>
+              );
+            },
+          },
         ]
       : []),
     {
@@ -571,6 +632,88 @@ export default function Order({ mode = "all" }) {
 
   return (
     <div style={{ padding: "12px 16px 20px", width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
+      <Modal
+        title="Xem ảnh minh chứng"
+        open={!!previewImage}
+        onCancel={() => setPreviewImage("")}
+        footer={null}
+        width={840}
+      >
+        {previewImage ? (
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <img
+              src={previewImage}
+              alt="return-proof-preview"
+              style={{
+                maxWidth: "100%",
+                maxHeight: "70vh",
+                objectFit: "contain",
+                borderRadius: 8,
+                border: "1px solid #E5E7EB",
+              }}
+            />
+          </div>
+        ) : null}
+      </Modal>
+      <Modal
+        title={`Chi tiết đơn hoàn #${String(returnDetailOrder?._id || "").slice(-8).toUpperCase()}`}
+        open={!!returnDetailOrder}
+        footer={null}
+        onCancel={() => setReturnDetailOrder(null)}
+        width={760}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <b>Lý do hoàn:</b>{" "}
+            {String(returnDetailOrder?.returnRequestReason || "").trim() || "Chưa có mô tả"}
+          </div>
+          <div>
+            <b>Danh mục lý do:</b>{" "}
+            {RETURN_REASON_LABELS[
+              String(returnDetailOrder?.returnRequestReasonCode || "").trim().toLowerCase()
+            ] || "—"}
+          </div>
+          <div>
+            <b>Ảnh minh chứng:</b>
+            {toImageArray(returnDetailOrder?.returnRequestImages).length === 0 ? (
+              <div style={{ marginTop: 6, color: "#6B7280" }}>Không có ảnh.</div>
+            ) : (
+              <div
+                style={{
+                  marginTop: 8,
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+                  gap: 8,
+                }}
+              >
+                {toImageArray(returnDetailOrder?.returnRequestImages).map((img, idx) => {
+                  const src = toUploadUrl(img);
+                  return (
+                    <button
+                      key={`${src}-${idx}`}
+                      type="button"
+                      onClick={() => setPreviewImage(src)}
+                      style={{ padding: 0, background: "transparent", border: "none" }}
+                    >
+                      <img
+                        src={src}
+                        alt={`return-proof-${idx + 1}`}
+                        style={{
+                          width: "100%",
+                          height: 120,
+                          objectFit: "cover",
+                          borderRadius: 8,
+                          border: "1px solid #E5E7EB",
+                        }}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal>
       <Modal
         title="Lý do hủy đơn (bắt buộc)"
         open={!!cancelReasonFlow}
@@ -802,11 +945,11 @@ export default function Order({ mode = "all" }) {
         </span>
         <Pagination
           current={page + 1}
-          total={totalOrdersInDb}
+          total={filteredOrders.length}
           pageSize={limit}
           onChange={(p) => setPage(p - 1)}
           showSizeChanger={false}
-          showTotal={(t) => `Tổng ${t} đơn trong hệ thống`}
+          showTotal={(t) => `Tổng ${t} đơn (theo bộ lọc hiện tại)`}
         />
       </div>
     </div>

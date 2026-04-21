@@ -16,7 +16,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const queryClient = new QueryClient();
 
 const googleSans =
-  '"Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"';
+  '"Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"';
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(

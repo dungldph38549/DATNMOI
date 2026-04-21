@@ -40,6 +40,7 @@ const STATUS_LABELS = {
 const RETURN_STATUSES = new Set(["return-request", "accepted", "rejected"]);
 const REVIEWABLE_STATUSES = new Set(["delivered", "received"]);
 const PAGE_SIZE = 10;
+const FETCH_LIMIT = 50;
 const RETURN_REASON_OPTIONS = [
   { value: "wrong_size", label: "Sai size / không vừa", requireImage: false },
   { value: "wrong_item", label: "Giao sai mẫu / sai màu", requireImage: true },
@@ -52,8 +53,8 @@ const RETURN_REASON_OPTIONS = [
 const TABS = [
   { id: "all", label: "Tất cả" },
   { id: "pending_payment", label: "Chờ thanh toán" },
-  { id: "shipping", label: "Vận chuyển" },
   { id: "awaiting_delivery", label: "Chờ giao hàng" },
+  { id: "shipping", label: "Vận chuyển" },
   { id: "completed", label: "Hoàn thành" },
   { id: "canceled", label: "Đã hủy" },
   { id: "return_refund", label: "Trả hàng/Hoàn tiền" },
@@ -83,7 +84,7 @@ function orderMatchesTab(order, tabId) {
 
   if (tabId === "shipping") {
     if (st === "canceled" || RETURN_STATUSES.has(st)) return false;
-    if (st === "confirmed" || st === "shipped") return true;
+    if (st === "shipped") return true;
     if (st === "pending") {
       if (pay === "unpaid" && (method === "vnpay" || method === "wallet"))
         return false;
@@ -92,7 +93,7 @@ function orderMatchesTab(order, tabId) {
     return false;
   }
 
-  if (tabId === "awaiting_delivery") return st === "delivered";
+  if (tabId === "awaiting_delivery") return st === "confirmed" || st === "delivered";
   if (tabId === "completed") return st === "received";
   if (tabId === "canceled") return st === "canceled";
   if (tabId === "return_refund") return RETURN_STATUSES.has(st);
@@ -134,7 +135,7 @@ function statusSubline(st) {
   if (st === "delivered")
     return { text: "Đang giao đến bạn", icon: "truck" };
   if (st === "shipped") return { text: "Đang vận chuyển", icon: "truck" };
-  if (st === "confirmed") return { text: "Shop đã xác nhận", icon: "ok" };
+  if (st === "confirmed") return { text: "Đang chờ lấy hàng", icon: "box" };
   if (st === "pending") return { text: "Chờ shop xác nhận", icon: "box" };
   if (st === "canceled") return { text: "Đơn đã hủy", icon: "x" };
   if (RETURN_STATUSES.has(st))
@@ -166,19 +167,34 @@ const OrderHistoryPage = () => {
       return;
     }
     let mounted = true;
+    const fetchAllOrders = async (identity) => {
+      const all = [];
+      let pageCursor = 1;
+      let totalPage = 1;
+      do {
+        const res = await getOrdersByUserOrGuest({
+          ...identity,
+          page: pageCursor,
+          limit: FETCH_LIMIT,
+        });
+        const rows = Array.isArray(res?.data) ? res.data : [];
+        all.push(...rows);
+        totalPage = Number(res?.totalPage || 1);
+        pageCursor += 1;
+      } while (pageCursor <= totalPage);
+      return all;
+    };
     const load = async (showLoading = true) => {
       if (showLoading) setLoading(true);
       try {
         const requests = [];
         if (userId)
-          requests.push(getOrdersByUserOrGuest({ userId, page: 1, limit: 100 }));
+          requests.push(fetchAllOrders({ userId }));
         if (guestId && guestId !== userId)
-          requests.push(
-            getOrdersByUserOrGuest({ guestId, page: 1, limit: 100 }),
-          );
+          requests.push(fetchAllOrders({ guestId }));
         const responses = await Promise.all(requests);
         const mergedOrders = responses
-          .flatMap((res) => (Array.isArray(res?.data) ? res.data : []))
+          .flatMap((rows) => (Array.isArray(rows) ? rows : []))
           .reduce((acc, order) => {
             if (!acc.some((x) => String(x._id) === String(order._id)))
               acc.push(order);
@@ -203,6 +219,17 @@ const OrderHistoryPage = () => {
   const filteredOrders = useMemo(
     () => orders.filter((o) => orderMatchesTab(o, activeTab)),
     [orders, activeTab],
+  );
+  const tabCounts = useMemo(
+    () =>
+      TABS.reduce((acc, tab) => {
+        acc[tab.id] = orders.reduce(
+          (sum, order) => sum + (orderMatchesTab(order, tab.id) ? 1 : 0),
+          0,
+        );
+        return acc;
+      }, {}),
+    [orders],
   );
 
   const totalPage = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
@@ -404,6 +431,7 @@ const OrderHistoryPage = () => {
             >
               {TABS.map((tab) => {
                 const active = activeTab === tab.id;
+                const count = Number(tabCounts?.[tab.id] || 0);
                 return (
                   <button
                     key={tab.id}
@@ -418,6 +446,17 @@ const OrderHistoryPage = () => {
                     <span className="inline-block max-w-[8rem] leading-tight sm:max-w-none">
                       {tab.label}
                     </span>
+                    {count > 0 && (
+                      <span
+                        className={`ml-1.5 inline-flex min-w-[22px] items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-semibold ${
+                          active
+                            ? "bg-primary text-white"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    )}
                     {active && (
                       <span className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-primary sm:left-3 sm:right-3" />
                     )}
@@ -472,8 +511,10 @@ const OrderHistoryPage = () => {
                       ? "ĐÃ HỦY"
                       : RETURN_STATUSES.has(st)
                         ? "TRẢ HÀNG"
-                        : st === "shipped" || st === "confirmed"
+                        : st === "shipped"
                           ? "ĐANG GIAO"
+                          : st === "confirmed"
+                            ? "CHỜ LẤY HÀNG"
                           : st === "pending"
                             ? "CHỜ XÁC NHẬN"
                             : (STATUS_LABELS[st] || String(st)).toUpperCase();
@@ -667,13 +708,13 @@ const OrderHistoryPage = () => {
                   <div className="flex flex-wrap justify-end gap-2.5 px-4 pb-4 pt-0.5">
                     <Link
                       to="/chat"
-                      className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-neutral-200 bg-white px-4 py-2 text-base font-medium text-slate-800 transition-colors hover:border-convot-sage/40"
+                      className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-sky-200 bg-sky-50 px-4 py-2 text-base font-semibold text-sky-700 transition-colors hover:bg-sky-100"
                     >
                       Liên hệ Người Bán
                     </Link>
                     <Link
                       to={`/orders/${order._id}`}
-                      className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-neutral-200 bg-white px-4 py-2 text-base font-medium text-slate-800 transition-colors hover:border-convot-sage/40"
+                      className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-indigo-200 bg-indigo-50 px-4 py-2 text-base font-semibold text-indigo-700 transition-colors hover:bg-indigo-100"
                     >
                       Chi tiết
                     </Link>
@@ -686,41 +727,47 @@ const OrderHistoryPage = () => {
                         Đánh giá
                       </Link>
                     )}
-                    {(st === "shipped" || st === "delivered") && (
-                      <>
-                        {isLoggedIn ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleConfirmDelivery(
-                                  order._id,
-                                  order.paymentStatus === "paid",
-                                )
-                              }
-                              className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-emerald-600 px-5 py-2 text-base font-semibold text-white hover:bg-emerald-700"
-                            >
-                              Đã nhận hàng
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openReturnModal(order._id)}
-                              className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-neutral-200 px-4 py-2 text-base font-medium"
-                            >
-                              Yêu cầu hoàn hàng
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => navigate("/login")}
-                            className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-neutral-200 bg-slate-100 px-4 py-2 text-base font-medium"
-                          >
-                            Đăng nhập
-                          </button>
-                        )}
-                      </>
-                    )}
+                    {(st === "shipped" || st === "delivered") &&
+                      (isLoggedIn ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleConfirmDelivery(
+                              order._id,
+                              order.paymentStatus === "paid",
+                            )
+                          }
+                          className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-emerald-600 px-5 py-2 text-base font-semibold text-white hover:bg-emerald-700"
+                        >
+                          Đã nhận hàng
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => navigate("/login")}
+                          className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-neutral-200 bg-slate-100 px-4 py-2 text-base font-medium"
+                        >
+                          Đăng nhập
+                        </button>
+                      ))}
+                    {(st === "delivered" || st === "received") &&
+                      (isLoggedIn ? (
+                        <button
+                          type="button"
+                          onClick={() => openReturnModal(order._id)}
+                          className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-2 text-base font-semibold text-white shadow-sm hover:from-orange-600 hover:to-amber-600"
+                        >
+                          Yêu cầu hoàn hàng
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => navigate("/login")}
+                          className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-neutral-200 bg-slate-100 px-4 py-2 text-base font-medium"
+                        >
+                          Đăng nhập
+                        </button>
+                      ))}
                     {(st === "pending" || st === "confirmed") && (
                       <button
                         type="button"

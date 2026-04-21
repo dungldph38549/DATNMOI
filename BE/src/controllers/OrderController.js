@@ -705,7 +705,7 @@ const statusLabels = {
   confirmed: "Đã xác nhận",
   shipped: "Đang giao",
   delivered: "Đã giao",
-  received: "Giao hàng thành công",
+  received: "Đã giao thành công",
   canceled: "Đã hủy",
   "return-request": "Yêu cầu hoàn hàng",
   accepted: "Chấp nhận hoàn hàng",
@@ -1313,8 +1313,9 @@ exports.comfirmDelivery = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
 
     // Chỉ bấm xác nhận khi đơn đã ở trạng thái "đang giao" hoặc "đã giao"
-    if (order.status === "delivered" || order.status === "shipped") {
-      const oldStatus = order.status;
+    const currentStatus = String(order.status || "").trim().toLowerCase();
+    if (currentStatus === "delivered" || currentStatus === "shipped") {
+      const oldStatus = currentStatus;
       const patch =
         order.paymentMethod === "cod" && order.paymentStatus !== "paid"
           ? { status: "received", paymentStatus: "paid" }
@@ -1338,7 +1339,7 @@ exports.comfirmDelivery = async (req, res) => {
     }
 
     return res.status(400).json({
-      message: "Chỉ có thể xác nhận khi đơn đã giao.",
+      message: "Chỉ có thể xác nhận khi đơn đang giao hoặc đã giao.",
     });
   } catch (err) {
     const statusCode = err?.status || err?.statusCode || 500;
