@@ -1,10 +1,12 @@
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   html {
-    font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif,
+    font-family: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif,
       "Apple Color Emoji", "Segoe UI Emoji";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -30,24 +32,29 @@
 }
 
 body {
-  font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif,
+  font-family: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji";
   @apply bg-convot-cream text-convot-charcoal;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
 }
 
 .material-symbols-outlined {
   font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
 }
 
-/* Mô tả HTML: cùng bộ Google Fonts với site (Plus Jakarta + Outfit); !important để thắng inline từ CMS/Word */
+/* Đồng bộ toàn site về Be Vietnam Pro; giữ nguyên icon fonts */
+*:not(.material-symbols-outlined):not(.fa):not([class^="fa-"]):not([class*=" fa-"]) {
+  font-family: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif !important;
+}
+
+/* Mô tả HTML dùng chung font toàn site; !important để thắng inline từ CMS/Word */
 @layer components {
   .product-description,
   .product-description * {
-    font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif !important;
+    font-family: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif !important;
   }
 
   .product-description h1,
@@ -56,7 +63,7 @@ h1, h2, h3, h4, h5, h6 {
   .product-description h4,
   .product-description h5,
   .product-description h6 {
-    font-family: "Outfit", ui-sans-serif, system-ui, sans-serif !important;
+    font-family: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif !important;
   }
 
   .product-description {
