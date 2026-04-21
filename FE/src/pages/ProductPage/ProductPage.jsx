@@ -196,6 +196,13 @@ const ProductPage = () => {
     if (!products.length) return 0;
     return Math.max(...products.map((p) => getProductMinPrice(p)));
   }, [products]);
+  const priceRangePercent = useMemo(() => {
+    const max = Number(maxAvailablePrice || 0);
+    const val = Number(maxPriceFilter || 0);
+    if (!Number.isFinite(max) || max <= 0) return 0;
+    const clamped = Math.min(Math.max(0, val), max);
+    return Math.round((clamped / max) * 100);
+  }, [maxAvailablePrice, maxPriceFilter]);
 
   useEffect(() => {
     setMaxPriceFilter(maxAvailablePrice || 0);
@@ -303,6 +310,42 @@ const ProductPage = () => {
 
   return (
     <main className="min-h-screen bg-[#f5f5f4] pt-12 pb-10 text-neutral-900">
+      <style>{`
+        .price-range-input {
+          -webkit-appearance: none;
+          appearance: none;
+          height: 8px;
+          border-radius: 999px;
+          background: linear-gradient(
+            to right,
+            #8ca587 0%,
+            #8ca587 var(--range-pct),
+            #e5e7eb var(--range-pct),
+            #e5e7eb 100%
+          );
+          outline: none;
+        }
+        .price-range-input::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 18px;
+          height: 18px;
+          border-radius: 999px;
+          background: #8ca587;
+          border: 2px solid #ffffff;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+          cursor: pointer;
+        }
+        .price-range-input::-moz-range-thumb {
+          width: 18px;
+          height: 18px;
+          border-radius: 999px;
+          background: #8ca587;
+          border: 2px solid #ffffff;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+          cursor: pointer;
+        }
+      `}</style>
       <section className="container mx-auto max-w-7xl px-4">
         <div className="mb-3 border-b border-neutral-200 pb-2">
           <h1 className="font-display text-3xl font-bold leading-[1.15] tracking-tight text-black md:text-5xl lg:text-[2.75rem]">
@@ -347,7 +390,8 @@ const ProductPage = () => {
                 max={maxAvailablePrice || 1}
                 value={maxPriceFilter}
                 onChange={(e) => setMaxPriceFilter(Number(e.target.value))}
-                className="w-full accent-[#8ca587]"
+                className="price-range-input w-full"
+                style={{ "--range-pct": `${priceRangePercent}%` }}
               />
               <div className="mt-2 flex items-center justify-between text-xs text-neutral-600">
                 <span>0đ</span>
