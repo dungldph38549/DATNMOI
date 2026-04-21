@@ -583,12 +583,12 @@ const ProductDetail = () => {
       sku: skuToSave,
       size: sizeToSave,
     };
-    dispatch(
-      addToCart({
-        ...buyNowItem,
-        noMerge: true,
-      }),
-    );
+    const buyNowAction = addToCart({
+      ...buyNowItem,
+      noMerge: true,
+    });
+    buyNowAction.meta = { notify: false };
+    dispatch(buyNowAction);
 
     navigate("/checkout", {
       state: {

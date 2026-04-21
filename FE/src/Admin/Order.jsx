@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Table, Select, Button, Input, Pagination, Modal } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -10,7 +10,7 @@ const STATUS_OPTIONS = [
   { value: "confirmed", label: "Đã xác nhận" },
   { value: "shipped", label: "Đang giao" },
   { value: "delivered", label: "Đã giao" },
-  { value: "received", label: "Đã giao hàng" },
+  { value: "received", label: "Đã giao thành công" },
   { value: "canceled", label: "Đã hủy" },
   { value: "return-request", label: "Yêu cầu hoàn hàng" },
   { value: "accepted", label: "Chấp nhận hoàn hàng" },
@@ -37,6 +37,7 @@ const toImageArray = (value) => {
 };
 
 const MIN_ADMIN_CANCEL_NOTE_LEN = 5;
+const FETCH_LIMIT = 50;
 
 const TRANSITIONS = {
   pending: ["confirmed", "canceled"],
@@ -120,13 +121,25 @@ export default function Order({ mode = "all" }) {
   const [cancelReasonText, setCancelReasonText] = useState("");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-orders", page, limit],
-    queryFn: () => getAllOrders(page, limit),
+    queryKey: ["admin-orders-all"],
+    queryFn: async () => {
+      let cursor = 0;
+      let totalPage = 1;
+      const all = [];
+      do {
+        const res = await getAllOrders(cursor, FETCH_LIMIT);
+        const rows = Array.isArray(res?.data) ? res.data : [];
+        all.push(...rows);
+        totalPage = Number(res?.totalPage || 1);
+        cursor += 1;
+      } while (cursor < totalPage);
+      return { orders: all };
+    },
     refetchInterval: 15000,
     refetchOnWindowFocus: true,
   });
 
-  const totalOrdersInDb = data?.total ?? 0;
+  const totalOrdersInDb = Array.isArray(data?.orders) ? data.orders.length : 0;
 
   const updateMutation = useMutation({
     mutationFn: ({ id, body }) => updateOrderStatus(id, body),
@@ -154,7 +167,7 @@ export default function Order({ mode = "all" }) {
     },
   });
 
-  const rawOrders = data?.data || [];
+  const rawOrders = data?.orders || [];
   const orders = useMemo(() => {
     const returnStatuses = ["return-request", "accepted", "rejected"];
     const finishedStatuses = ["delivered", "received"];
@@ -203,16 +216,23 @@ export default function Order({ mode = "all" }) {
       return byKeyword && byPaymentStatus && byStatus && byMethod && byReturnReason;
     });
   }, [orders, keyword, paymentFilter, statusFilter, methodFilter, mode, returnReasonFilter]);
+  useEffect(() => {
+    setPage(0);
+  }, [mode, keyword, paymentFilter, statusFilter, methodFilter, returnReasonFilter]);
   const allowedNext = (current) => TRANSITIONS[current] || [];
+  const pagedOrders = useMemo(
+    () => filteredOrders.slice(page * limit, (page + 1) * limit),
+    [filteredOrders, page, limit],
+  );
 
   /** Một dòng = một đơn; sản phẩm hiển thị dạng danh sách con trong ô. */
   const tableRows = useMemo(
     () =>
-      filteredOrders.map((order, idx) => ({
+      pagedOrders.map((order, idx) => ({
         key: `order-${String(order?._id ?? idx)}`,
         order,
       })),
-    [filteredOrders],
+    [pagedOrders],
   );
 
   const productLineCount = useMemo(
@@ -834,11 +854,11 @@ export default function Order({ mode = "all" }) {
         </span>
         <Pagination
           current={page + 1}
-          total={totalOrdersInDb}
+          total={filteredOrders.length}
           pageSize={limit}
           onChange={(p) => setPage(p - 1)}
           showSizeChanger={false}
-          showTotal={(t) => `Tổng ${t} đơn trong hệ thống`}
+          showTotal={(t) => `Tổng ${t} đơn (theo bộ lọc hiện tại)`}
         />
       </div>
     </div>
