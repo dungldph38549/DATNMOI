@@ -178,6 +178,12 @@ const variantAttributesSignature = (attrsObj) => {
   return JSON.stringify(entries);
 };
 
+/** Gợi ý thuộc tính biến thể — chỉ Size & Color; vẫn có thể gõ thêm (mode tags) cho SP cũ */
+const VARIANT_ATTRIBUTE_PRESET_OPTIONS = [
+  { value: "Size", label: "Size — Kích cỡ" },
+  { value: "Color", label: "Color — Màu sắc" },
+];
+
 // ================================================================
 // ProductDetail — Card only (no Sidebar / header / layout wrapper)
 // ================================================================
@@ -662,8 +668,19 @@ const ProductDetail = ({ productId = null, onClose }) => {
                       <Form.Item name="attributes">
                         <Select
                           mode="tags"
-                          placeholder="VD: Color, Size"
+                          placeholder="Chọn từ danh sách hoặc gõ tên thuộc tính"
                           style={{ width: "100%" }}
+                          options={VARIANT_ATTRIBUTE_PRESET_OPTIONS}
+                          showSearch
+                          optionFilterProp="label"
+                          filterOption={(input, option) => {
+                            const q = String(input || "").trim().toLowerCase();
+                            if (!q) return true;
+                            const label = String(option?.label ?? "").toLowerCase();
+                            const value = String(option?.value ?? "").toLowerCase();
+                            return label.includes(q) || value.includes(q);
+                          }}
+                          maxTagCount="responsive"
                           tokenSeparators={[","]}
                           onChange={(vals) => {
                             const normalized = (vals || [])
