@@ -204,6 +204,17 @@ const OrderHistoryPage = () => {
     () => orders.filter((o) => orderMatchesTab(o, activeTab)),
     [orders, activeTab],
   );
+  const tabCounts = useMemo(
+    () =>
+      TABS.reduce((acc, tab) => {
+        acc[tab.id] = orders.reduce(
+          (sum, order) => sum + (orderMatchesTab(order, tab.id) ? 1 : 0),
+          0,
+        );
+        return acc;
+      }, {}),
+    [orders],
+  );
 
   const totalPage = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
   const currentOrders = filteredOrders.slice(
@@ -404,6 +415,7 @@ const OrderHistoryPage = () => {
             >
               {TABS.map((tab) => {
                 const active = activeTab === tab.id;
+                const count = Number(tabCounts?.[tab.id] || 0);
                 return (
                   <button
                     key={tab.id}
@@ -418,6 +430,17 @@ const OrderHistoryPage = () => {
                     <span className="inline-block max-w-[8rem] leading-tight sm:max-w-none">
                       {tab.label}
                     </span>
+                    {count > 0 && (
+                      <span
+                        className={`ml-1.5 inline-flex min-w-[22px] items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-semibold ${
+                          active
+                            ? "bg-primary text-white"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    )}
                     {active && (
                       <span className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-primary sm:left-3 sm:right-3" />
                     )}
