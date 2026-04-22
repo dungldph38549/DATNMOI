@@ -94,6 +94,7 @@ const ProductPage = () => {
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
   const [rating, setRating] = useState("");
+  const [minPriceFilter, setMinPriceFilter] = useState(0);
   const [maxPriceFilter, setMaxPriceFilter] = useState(0);
 
   const categorySlug = useMemo(() => {
@@ -196,7 +197,14 @@ const ProductPage = () => {
     if (!products.length) return 0;
     return Math.max(...products.map((p) => getProductMinPrice(p)));
   }, [products]);
-  const priceRangePercent = useMemo(() => {
+  const minRangePercent = useMemo(() => {
+    const max = Number(maxAvailablePrice || 0);
+    const val = Number(minPriceFilter || 0);
+    if (!Number.isFinite(max) || max <= 0) return 0;
+    const clamped = Math.min(Math.max(0, val), max);
+    return Math.round((clamped / max) * 100);
+  }, [maxAvailablePrice, minPriceFilter]);
+  const maxRangePercent = useMemo(() => {
     const max = Number(maxAvailablePrice || 0);
     const val = Number(maxPriceFilter || 0);
     if (!Number.isFinite(max) || max <= 0) return 0;
@@ -205,6 +213,7 @@ const ProductPage = () => {
   }, [maxAvailablePrice, maxPriceFilter]);
 
   useEffect(() => {
+    setMinPriceFilter(0);
     setMaxPriceFilter(maxAvailablePrice || 0);
   }, [maxAvailablePrice]);
 
@@ -252,7 +261,10 @@ const ProductPage = () => {
     }
 
     if (maxPriceFilter > 0) {
-      data = data.filter((p) => getProductMinPrice(p) <= maxPriceFilter);
+      data = data.filter((p) => {
+        const price = getProductMinPrice(p);
+        return price >= minPriceFilter && price <= maxPriceFilter;
+      });
     }
 
     if (sort === "priceAsc") data.sort((a, b) => getProductMinPrice(a) - getProductMinPrice(b));
@@ -267,13 +279,14 @@ const ProductPage = () => {
     selectedSize,
     selectedColor,
     rating,
+    minPriceFilter,
     maxPriceFilter,
     sort,
   ]);
 
   useEffect(() => {
     setPage(1);
-  }, [sort, categoryFilter, selectedSize, selectedColor, rating, maxPriceFilter]);
+  }, [sort, categoryFilter, selectedSize, selectedColor, rating, minPriceFilter, maxPriceFilter]);
 
   const totalPage = Math.ceil(filteredProducts.length / PAGE_SIZE);
   const showProducts = filteredProducts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -284,6 +297,7 @@ const ProductPage = () => {
     setSelectedSize("");
     setSelectedColor("");
     setRating("");
+    setMinPriceFilter(0);
     setMaxPriceFilter(maxAvailablePrice || 0);
   };
 
@@ -311,19 +325,43 @@ const ProductPage = () => {
   return (
     <main className="min-h-screen bg-[#f5f5f4] pt-12 pb-10 text-neutral-900">
       <style>{`
-        .price-range-input {
-          -webkit-appearance: none;
-          appearance: none;
+        .price-range-slider {
+          position: relative;
+          height: 18px;
+        }
+        .price-range-track {
+          position: absolute;
+          top: 50%;
+          left: 0;
+          right: 0;
           height: 8px;
           border-radius: 999px;
-          background: linear-gradient(
-            to right,
-            #8ca587 0%,
-            #8ca587 var(--range-pct),
-            #e5e7eb var(--range-pct),
-            #e5e7eb 100%
-          );
+          background: linear-gradient(90deg, #dfe5e1 0%, #d3dbd5 100%);
+          transform: translateY(-50%);
+        }
+        .price-range-selected {
+          position: absolute;
+          top: 50%;
+          height: 8px;
+          border-radius: 999px;
+          background: linear-gradient(90deg, #4f6758 0%, #647d6d 100%);
+          box-shadow: 0 2px 6px rgba(56, 73, 63, 0.22);
+          transform: translateY(-50%);
+          left: var(--min-pct);
+          right: calc(100% - var(--max-pct));
+        }
+        .price-range-input {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          -webkit-appearance: none;
+          appearance: none;
+          height: 18px;
+          border-radius: 999px;
+          background: transparent;
           outline: none;
+          pointer-events: none;
         }
         .price-range-input::-webkit-slider-thumb {
           -webkit-appearance: none;
@@ -331,19 +369,24 @@ const ProductPage = () => {
           width: 18px;
           height: 18px;
           border-radius: 999px;
-          background: #8ca587;
+          background: #546d5d;
           border: 2px solid #ffffff;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+          box-shadow: 0 2px 8px rgba(40, 55, 47, 0.22), 0 0 0 2px rgba(255, 255, 255, 0.68);
           cursor: pointer;
+          pointer-events: auto;
         }
         .price-range-input::-moz-range-thumb {
           width: 18px;
           height: 18px;
           border-radius: 999px;
-          background: #8ca587;
+          background: #546d5d;
           border: 2px solid #ffffff;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+          box-shadow: 0 2px 8px rgba(40, 55, 47, 0.22), 0 0 0 2px rgba(255, 255, 255, 0.68);
           cursor: pointer;
+          pointer-events: auto;
+        }
+        .price-range-input::-moz-range-track {
+          background: transparent;
         }
       `}</style>
       <section className="container mx-auto max-w-7xl px-4">
@@ -384,18 +427,49 @@ const ProductPage = () => {
 
             <div>
               <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Giá</h3>
-              <input
-                type="range"
-                min={0}
-                max={maxAvailablePrice || 1}
-                value={maxPriceFilter}
-                onChange={(e) => setMaxPriceFilter(Number(e.target.value))}
-                className="price-range-input w-full"
-                style={{ "--range-pct": `${priceRangePercent}%` }}
-              />
-              <div className="mt-2 flex items-center justify-between text-xs text-neutral-600">
-                <span>0đ</span>
-                <span>{Number(maxPriceFilter || 0).toLocaleString("vi-VN")}đ</span>
+              <div className="mb-2 ml-auto w-fit rounded-lg border border-[#d9e0da] bg-[#f7faf8] px-2.5 py-1.5 text-right">
+                <p className="text-[10px] font-medium tracking-[0.08em] text-[#708276]">Khoảng tiền</p>
+                <p className="mt-0.5 text-xs font-semibold text-[#3f5648]">
+                  {Number(minPriceFilter || 0).toLocaleString("vi-VN")}đ -{" "}
+                  {Number(maxPriceFilter || 0).toLocaleString("vi-VN")}đ
+                </p>
+              </div>
+              <div
+                className="price-range-slider"
+                style={{ "--min-pct": `${minRangePercent}%`, "--max-pct": `${maxRangePercent}%` }}
+              >
+                <div className="price-range-track" />
+                <div className="price-range-selected" />
+                <input
+                  type="range"
+                  min={0}
+                  max={maxAvailablePrice || 1}
+                  value={minPriceFilter}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setMinPriceFilter(Math.min(next, maxPriceFilter));
+                  }}
+                  className="price-range-input"
+                />
+                <input
+                  type="range"
+                  min={0}
+                  max={maxAvailablePrice || 1}
+                  value={maxPriceFilter}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setMaxPriceFilter(Math.max(next, minPriceFilter));
+                  }}
+                  className="price-range-input"
+                />
+              </div>
+              <div className="mt-2 flex items-center justify-between text-xs font-semibold text-[#3f5648]">
+                <span className="rounded-full border border-[#d9e0da] bg-[#f7faf8] px-2.5 py-1">
+                  {Number(minPriceFilter || 0).toLocaleString("vi-VN")}đ
+                </span>
+                <span className="rounded-full border border-[#d9e0da] bg-[#f7faf8] px-2.5 py-1">
+                  {Number(maxPriceFilter || 0).toLocaleString("vi-VN")}đ
+                </span>
               </div>
             </div>
 

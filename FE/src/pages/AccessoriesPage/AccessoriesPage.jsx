@@ -164,14 +164,6 @@ const colorToHex = (name) => {
   return `hsl(${h} 35% 45%)`;
 };
 
-const PRICE_OPTIONS = [
-  { id: "", label: "Tất cả mức giá" },
-  { id: "under200", label: "Dưới 200.000đ" },
-  { id: "200-500", label: "200.000đ – 500.000đ" },
-  { id: "500-1000", label: "500.000đ – 1.000.000đ" },
-  { id: "over1000", label: "Trên 1.000.000đ" },
-];
-
 const FILTER_LABELS = {
   lengthSection: "\u0110\u1ed9 d\u00e0i d\u00e2y",
   allLengths: "T\u1ea5t c\u1ea3 \u0111\u1ed9 d\u00e0i",
@@ -225,7 +217,8 @@ const AccessoriesPage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [categoryFilterId, setCategoryFilterId] = useState("");
-  const [priceBracket, setPriceBracket] = useState("");
+  const [minPriceFilter, setMinPriceFilter] = useState(0);
+  const [maxPriceFilter, setMaxPriceFilter] = useState(0);
   const [colorFilter, setColorFilter] = useState("");
   const [lengthFilter, setLengthFilter] = useState("");
   const [soleFilter, setSoleFilter] = useState("");
@@ -345,6 +338,32 @@ const AccessoriesPage = () => {
   const colorSectionTitle =
     selectedAccessoryKind === "shoelace" ? FILTER_LABELS.laceColor : FILTER_LABELS.genericColor;
 
+  const maxAvailablePrice = useMemo(() => {
+    if (!products.length) return 0;
+    return Math.max(...products.map((p) => getProductMinPrice(p)));
+  }, [products]);
+
+  const minRangePercent = useMemo(() => {
+    const max = Number(maxAvailablePrice || 0);
+    const val = Number(minPriceFilter || 0);
+    if (!Number.isFinite(max) || max <= 0) return 0;
+    const clamped = Math.min(Math.max(0, val), max);
+    return Math.round((clamped / max) * 100);
+  }, [maxAvailablePrice, minPriceFilter]);
+
+  const maxRangePercent = useMemo(() => {
+    const max = Number(maxAvailablePrice || 0);
+    const val = Number(maxPriceFilter || 0);
+    if (!Number.isFinite(max) || max <= 0) return 0;
+    const clamped = Math.min(Math.max(0, val), max);
+    return Math.round((clamped / max) * 100);
+  }, [maxAvailablePrice, maxPriceFilter]);
+
+  useEffect(() => {
+    setMinPriceFilter(0);
+    setMaxPriceFilter(maxAvailablePrice || 0);
+  }, [maxAvailablePrice]);
+
   const filteredProducts = useMemo(() => {
     let data = [...products];
 
@@ -354,20 +373,11 @@ const AccessoriesPage = () => {
       );
     }
 
-    if (priceBracket === "under200") {
-      data = data.filter((p) => getProductMinPrice(p) < 200_000);
-    } else if (priceBracket === "200-500") {
+    if (maxPriceFilter > 0) {
       data = data.filter((p) => {
-        const x = getProductMinPrice(p);
-        return x >= 200_000 && x <= 500_000;
+        const price = getProductMinPrice(p);
+        return price >= minPriceFilter && price <= maxPriceFilter;
       });
-    } else if (priceBracket === "500-1000") {
-      data = data.filter((p) => {
-        const x = getProductMinPrice(p);
-        return x >= 500_000 && x <= 1_000_000;
-      });
-    } else if (priceBracket === "over1000") {
-      data = data.filter((p) => getProductMinPrice(p) > 1_000_000);
     }
 
     if (colorFilter) {
@@ -403,7 +413,8 @@ const AccessoriesPage = () => {
   }, [
     products,
     categoryFilterId,
-    priceBracket,
+    minPriceFilter,
+    maxPriceFilter,
     colorFilter,
     lengthFilter,
     soleFilter,
@@ -432,7 +443,8 @@ const AccessoriesPage = () => {
   const clearFilters = () => {
     setSort("");
     setCategoryFilterId("");
-    setPriceBracket("");
+    setMinPriceFilter(0);
+    setMaxPriceFilter(maxAvailablePrice || 0);
     setColorFilter("");
     // setLengthFilter("");
     // setSoleFilter("");
@@ -446,6 +458,71 @@ const AccessoriesPage = () => {
 
   return (
     <main className="min-h-screen bg-[#f5f5f4] pt-12 pb-10 text-neutral-900">
+      <style>{`
+        .price-range-slider {
+          position: relative;
+          height: 18px;
+        }
+        .price-range-track {
+          position: absolute;
+          top: 50%;
+          left: 0;
+          right: 0;
+          height: 8px;
+          border-radius: 999px;
+          background: linear-gradient(90deg, #dfe5e1 0%, #d3dbd5 100%);
+          transform: translateY(-50%);
+        }
+        .price-range-selected {
+          position: absolute;
+          top: 50%;
+          height: 8px;
+          border-radius: 999px;
+          background: linear-gradient(90deg, #4f6758 0%, #647d6d 100%);
+          box-shadow: 0 2px 6px rgba(56, 73, 63, 0.22);
+          transform: translateY(-50%);
+          left: var(--min-pct);
+          right: calc(100% - var(--max-pct));
+        }
+        .price-range-input {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          -webkit-appearance: none;
+          appearance: none;
+          height: 18px;
+          border-radius: 999px;
+          background: transparent;
+          outline: none;
+          pointer-events: none;
+        }
+        .price-range-input::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 18px;
+          height: 18px;
+          border-radius: 999px;
+          background: #546d5d;
+          border: 2px solid #ffffff;
+          box-shadow: 0 2px 8px rgba(40, 55, 47, 0.22), 0 0 0 2px rgba(255, 255, 255, 0.68);
+          cursor: pointer;
+          pointer-events: auto;
+        }
+        .price-range-input::-moz-range-thumb {
+          width: 18px;
+          height: 18px;
+          border-radius: 999px;
+          background: #546d5d;
+          border: 2px solid #ffffff;
+          box-shadow: 0 2px 8px rgba(40, 55, 47, 0.22), 0 0 0 2px rgba(255, 255, 255, 0.68);
+          cursor: pointer;
+          pointer-events: auto;
+        }
+        .price-range-input::-moz-range-track {
+          background: transparent;
+        }
+      `}</style>
       <section className="container mx-auto max-w-7xl px-4">
         <div className="mb-3 border-b border-neutral-200 pb-2">
           <h1 className="font-display text-3xl font-bold leading-[1.15] tracking-tight text-black md:text-5xl lg:text-[2.75rem]">
@@ -518,22 +595,49 @@ const AccessoriesPage = () => {
 
             <div>
               <h3 className={filterHeadingClass}>Khoảng giá</h3>
-              <div className="space-y-3">
-                {PRICE_OPTIONS.map((opt) => (
-                  <label
-                    key={opt.id || "all-price"}
-                    className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700"
-                  >
-                    <input
-                      type="radio"
-                      name="priceBracket"
-                      checked={priceBracket === opt.id}
-                      onChange={() => setPriceBracket(opt.id)}
-                      className="h-4 w-4 accent-[#8ca587]"
-                    />
-                    {opt.label}
-                  </label>
-                ))}
+              <div className="mb-2 ml-auto w-fit rounded-lg border border-[#d9e0da] bg-[#f7faf8] px-2.5 py-1.5 text-right">
+                <p className="text-[10px] font-medium tracking-[0.08em] text-[#708276]">Khoảng tiền</p>
+                <p className="mt-0.5 text-xs font-semibold text-[#3f5648]">
+                  {Number(minPriceFilter || 0).toLocaleString("vi-VN")}đ -{" "}
+                  {Number(maxPriceFilter || 0).toLocaleString("vi-VN")}đ
+                </p>
+              </div>
+              <div
+                className="price-range-slider"
+                style={{ "--min-pct": `${minRangePercent}%`, "--max-pct": `${maxRangePercent}%` }}
+              >
+                <div className="price-range-track" />
+                <div className="price-range-selected" />
+                <input
+                  type="range"
+                  min={0}
+                  max={maxAvailablePrice || 1}
+                  value={minPriceFilter}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setMinPriceFilter(Math.min(next, maxPriceFilter));
+                  }}
+                  className="price-range-input"
+                />
+                <input
+                  type="range"
+                  min={0}
+                  max={maxAvailablePrice || 1}
+                  value={maxPriceFilter}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setMaxPriceFilter(Math.max(next, minPriceFilter));
+                  }}
+                  className="price-range-input"
+                />
+              </div>
+              <div className="mt-2 flex items-center justify-between text-xs font-semibold text-[#3f5648]">
+                <span className="rounded-full border border-[#d9e0da] bg-[#f7faf8] px-2.5 py-1">
+                  {Number(minPriceFilter || 0).toLocaleString("vi-VN")}đ
+                </span>
+                <span className="rounded-full border border-[#d9e0da] bg-[#f7faf8] px-2.5 py-1">
+                  {Number(maxPriceFilter || 0).toLocaleString("vi-VN")}đ
+                </span>
               </div>
             </div>
 
