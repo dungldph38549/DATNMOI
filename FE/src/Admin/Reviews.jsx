@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Table, Button, Modal, Input, Tag, message } from "antd";
+import { EyeOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAdminReviews, approveAdminReview, rejectAdminReview } from "../api/index";
 import {
@@ -246,9 +247,42 @@ export default function Reviews() {
       fixed: "right",
       render: (_, r) => (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
-          <Button type="link" size="small" style={{ padding: 0, height: "auto" }} onClick={() => setDetailReview(r)}>
+          <button
+            type="button"
+            onClick={() => setDetailReview(r)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "7px 14px",
+              borderRadius: 10,
+              border: "1.5px solid #E2E8F0",
+              background: "#fff",
+              color: "#475569",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily:
+                "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif",
+              boxShadow: "0 1px 2px rgba(15,23,42,0.05)",
+              transition: "border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = "rgba(244,157,37,0.55)";
+              e.currentTarget.style.color = "#c2410c";
+              e.currentTarget.style.boxShadow =
+                "0 2px 10px rgba(244,157,37,0.16)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = "#E2E8F0";
+              e.currentTarget.style.color = "#475569";
+              e.currentTarget.style.boxShadow =
+                "0 1px 2px rgba(15,23,42,0.05)";
+            }}
+          >
+            <EyeOutlined style={{ fontSize: 13, opacity: 0.9 }} />
             Xem chi tiết
-          </Button>
+          </button>
           {r.status === "pending" && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Button size="small" onClick={() => approveMutation.mutate(r._id)} loading={approveMutation.isPending}>
