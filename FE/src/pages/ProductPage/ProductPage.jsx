@@ -41,7 +41,7 @@ const getProductMinPrice = (product) => {
   return 0;
 };
 
-const normalizeValue = (value) => String(value || "").trim().toLowerCase();
+const normalizeValue = (value) => String(value || "").trim().toLowerCase().normalize("NFC");
 
 const getProductSizes = (product) => {
   const sizes = [];
@@ -213,8 +213,10 @@ const ProductPage = () => {
   }, [maxAvailablePrice, maxPriceFilter]);
 
   useEffect(() => {
-    setMinPriceFilter(0);
-    setMaxPriceFilter(maxAvailablePrice || 0);
+    if (maxAvailablePrice > 0) {
+      setMinPriceFilter(0);
+      setMaxPriceFilter(maxAvailablePrice);
+    }
   }, [maxAvailablePrice]);
 
   const availableSizes = useMemo(() => {
@@ -244,16 +246,31 @@ const ProductPage = () => {
       );
     }
 
-    if (selectedSize) {
-      data = data.filter((p) =>
-        getProductSizes(p).some((size) => normalizeValue(size) === normalizeValue(selectedSize)),
-      );
-    }
-
-    if (selectedColor) {
-      data = data.filter((p) =>
-        getProductColors(p).some((color) => normalizeValue(color) === normalizeValue(selectedColor)),
-      );
+    if (selectedSize || selectedColor) {
+      data = data.filter((p) => {
+        if (selectedSize && selectedColor) {
+          const hasMatchingVar = (p.variants || []).some((v) => {
+            const vSize = getVariantSizeValue(v) || v.size || v.sizeName;
+            const vColor = getVariantColorValue(v) || v.color || v.colorName;
+            return (
+              normalizeValue(vSize) === normalizeValue(selectedSize) &&
+              normalizeValue(vColor) === normalizeValue(selectedColor)
+            );
+          });
+          if (hasMatchingVar) return true;
+          return (
+            normalizeValue(p.size) === normalizeValue(selectedSize) &&
+            normalizeValue(p.color) === normalizeValue(selectedColor)
+          );
+        }
+        if (selectedSize) {
+          return getProductSizes(p).some((s) => normalizeValue(s) === normalizeValue(selectedSize));
+        }
+        if (selectedColor) {
+          return getProductColors(p).some((c) => normalizeValue(c) === normalizeValue(selectedColor));
+        }
+        return true;
+      });
     }
 
     if (rating) {
@@ -263,6 +280,7 @@ const ProductPage = () => {
     if (maxPriceFilter > 0) {
       data = data.filter((p) => {
         const price = getProductMinPrice(p);
+        if (minPriceFilter === 0 && maxPriceFilter >= maxAvailablePrice) return true;
         return price >= minPriceFilter && price <= maxPriceFilter;
       });
     }
@@ -411,11 +429,11 @@ const ProductPage = () => {
                     return (
                       <label key={value} className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer">
                         <input
-                          type="radio"
+                          type="checkbox"
                           name="category"
                           checked={checked}
                           onChange={() => setCategoryFilter((prev) => (prev === value ? "" : value))}
-                          className="h-4 w-4 accent-[#8ca587]"
+                          className="h-4 w-4 appearance-none rounded-full border-2 border-neutral-300 checked:border-[#8ca587] checked:bg-[#8ca587] transition-all cursor-pointer relative after:content-[''] after:absolute after:hidden checked:after:block after:left-1 after:top-0.5 after:w-1 after:h-2 after:border-white after:border-b-2 after:border-r-2 after:rotate-45"
                         />
                         {c?.name || "Danh mục"}
                       </label>
@@ -502,11 +520,11 @@ const ProductPage = () => {
                   {availableColors.slice(0, 6).map((color) => (
                     <label key={color} className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer">
                       <input
-                        type="radio"
+                        type="checkbox"
                         name="color"
                         checked={selectedColor === color}
                         onChange={() => setSelectedColor((prev) => (prev === color ? "" : color))}
-                        className="h-4 w-4 accent-[#8ca587]"
+                        className="h-4 w-4 appearance-none rounded-full border-2 border-neutral-300 checked:border-[#8ca587] checked:bg-[#8ca587] transition-all cursor-pointer relative after:content-[''] after:absolute after:hidden checked:after:block after:left-1 after:top-0.5 after:w-1 after:h-2 after:border-white after:border-b-2 after:border-r-2 after:rotate-45"
                       />
                       {color}
                     </label>
@@ -524,11 +542,11 @@ const ProductPage = () => {
                 ].map((item) => (
                   <label key={item.id} className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer">
                     <input
-                      type="radio"
+                      type="checkbox"
                       name="rating"
                       checked={rating === item.id}
                       onChange={() => setRating((prev) => (prev === item.id ? "" : item.id))}
-                      className="h-4 w-4 accent-[#8ca587]"
+                      className="h-4 w-4 appearance-none rounded-full border-2 border-neutral-300 checked:border-[#8ca587] checked:bg-[#8ca587] transition-all cursor-pointer relative after:content-[''] after:absolute after:hidden checked:after:block after:left-1 after:top-0.5 after:w-1 after:h-2 after:border-white after:border-b-2 after:border-r-2 after:rotate-45"
                     />
                     {item.label}
                   </label>
