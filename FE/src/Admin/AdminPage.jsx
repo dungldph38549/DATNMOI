@@ -16,6 +16,8 @@ import WalletTopups from "./WalletTopups";
 // import Comments from "./Comments";
 // import StaffManagement from "./StaffManagement";
 import { Link, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { getAllOrders, adminListBankPendingTopups } from "../api/index";
 import { clearUser } from "../redux/user";
 
 const getAdminSession = () => {
@@ -187,7 +189,25 @@ const SideItem = ({ item, active, onClick }) => (
     <span style={{ fontSize: 13, fontWeight: active ? 700 : 500 }}>
       {item.label}
     </span>
-    {active && (
+    {item.count > 0 && (
+      <span
+        style={{
+          marginLeft: "auto",
+          background: T.red,
+          color: "#fff",
+          fontSize: 10,
+          fontWeight: 800,
+          padding: "2px 6px",
+          borderRadius: 10,
+          lineHeight: 1,
+          minWidth: 16,
+          textAlign: "center",
+        }}
+      >
+        {item.count > 99 ? "99+" : item.count}
+      </span>
+    )}
+    {active && !item.count && (
       <div
         style={{
           marginLeft: "auto",
@@ -221,6 +241,46 @@ const AdminPage = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
     typeof window !== "undefined" ? getMobileMatch() : false,
   );
+
+  // ── fetch data for badges ────────────────────────────────────
+  const { data: orderData } = useQuery({
+    queryKey: ["admin-orders-badges"],
+    queryFn: async () => {
+      // Logic lấy 50 đơn gần nhất để đếm badge (hoặc lấy toàn bộ nếu cần chính xác tuyệt đối)
+      // Ở đây ta dùng 50 để cân bằng hiệu năng khởi động Admin
+      const res = await getAllOrders(0, 50);
+      return res?.data || [];
+    },
+    refetchInterval: 15000,
+  });
+
+  const { data: topupData } = useQuery({
+    queryKey: ["admin-topups-badges"],
+    queryFn: adminListBankPendingTopups,
+    refetchInterval: 15000,
+  });
+
+  const orders = Array.isArray(orderData) ? orderData : [];
+  const topups = Array.isArray(topupData?.data) ? topupData.data : [];
+
+  const pendingOrdersCount = orders.filter((o) =>
+    ["pending", "confirmed", "shipped", "delivered"].includes(o.status),
+  ).length;
+
+  const returnRequestsCount = orders.filter(
+    (o) => o.status === "return-request",
+  ).length;
+
+  const pendingTopupsCount = topups.length;
+
+  const menuWithBadges = MENU.map((item) => {
+    if (item.key === "orders") return { ...item, count: pendingOrdersCount };
+    if (item.key === "order-returns")
+      return { ...item, count: returnRequestsCount };
+    if (item.key === "wallet-topups")
+      return { ...item, count: pendingTopupsCount };
+    return item;
+  });
 
   // ── mobile / desktop (matchMedia ổn định hơn innerWidth khi zoom / DevTools) ──
   useEffect(() => {
@@ -605,7 +665,7 @@ const AdminPage = () => {
               gap: 2,
             }}
           >
-            {MENU.map((item) => (
+            {menuWithBadges.map((item) => (
               <SideItem
                 key={item.key}
                 item={item}
