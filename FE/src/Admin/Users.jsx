@@ -570,7 +570,9 @@ const Users = ({ mode = "customers" }) => {
             }}
           />
           <p style={{ color: T.textMuted, fontSize: 13 }}>
-            Đang tải danh sách người dùng...
+            {isStaffPage
+              ? "Đang tải danh sách nhân viên..."
+              : "Đang tải danh sách người dùng..."}
           </p>
         </div>
       </div>
@@ -629,14 +631,26 @@ const Users = ({ mode = "customers" }) => {
           box-shadow: 0 0 0 3px rgba(244,157,37,0.10) !important;
         }
         .sh-form .ant-switch-checked { background: #f49d25 !important; }
+        .staff-add-btn { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .staff-add-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 22px rgba(244,157,37,0.28) !important;
+        }
+        .staff-add-btn:active { transform: translateY(0); }
+        .staff-admin-root .sh-row:hover td {
+          background: #fff8f0 !important;
+        }
       `}</style>
 
       <div
+        className={isStaffPage ? "staff-admin-root" : undefined}
         style={{
           padding: 28,
           fontFamily: "'Plus Jakarta Sans', sans-serif",
           minHeight: "100vh",
-          background: T.bg,
+          background: isStaffPage
+            ? "linear-gradient(165deg, #FFFCF9 0%, #FAF6F0 38%, #F5F0E8 100%)"
+            : T.bg,
         }}
       >
         {/* Toast */}
@@ -675,47 +689,95 @@ const Users = ({ mode = "customers" }) => {
         <div
           style={{
             display: "flex",
-            alignItems: "center",
+            alignItems: isStaffPage ? "flex-start" : "center",
             justifyContent: "space-between",
-            marginBottom: 24,
+            marginBottom: isStaffPage ? 20 : 24,
+            gap: 16,
+            flexWrap: "wrap",
           }}
         >
-          <div>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: 22,
-                fontWeight: 800,
-                color: T.text,
-                letterSpacing: "-0.3px",
-              }}
-            >
-              {isStaffPage ? "Quản lý nhân viên" : "Quản lý khách hàng"}
-            </h1>
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: T.textMuted }}>
-              {isStaffPage
-                ? "Gồm nhân viên, quản lý và quản trị viên — không hiển thị khách hàng"
-                : "Danh sách tài khoản khách hàng đăng ký trên shop"}
-            </p>
+          <div
+            style={{
+              display: "flex",
+              gap: isStaffPage ? 14 : 0,
+              alignItems: "flex-start",
+              minWidth: 0,
+            }}
+          >
+            {isStaffPage && (
+              <div
+                aria-hidden
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 16,
+                  flexShrink: 0,
+                  background:
+                    "linear-gradient(150deg, rgba(244,157,37,0.2) 0%, rgba(244,157,37,0.06) 100%)",
+                  border: "1px solid rgba(244,157,37,0.22)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow:
+                    "0 3px 12px rgba(244,157,37,0.12), inset 0 1px 0 rgba(255,255,255,0.75)",
+                }}
+              >
+                <span
+                  className="material-symbols-outlined"
+                  style={{ fontSize: 28, color: "#C2410C" }}
+                >
+                  groups
+                </span>
+              </div>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <h1
+                style={{
+                  margin: 0,
+                  fontSize: isStaffPage ? 24 : 22,
+                  fontWeight: 800,
+                  color: T.text,
+                  letterSpacing: "-0.35px",
+                  lineHeight: 1.2,
+                }}
+              >
+                {isStaffPage ? "Quản lý nhân viên" : "Quản lý khách hàng"}
+              </h1>
+              <p
+                style={{
+                  margin: "6px 0 0",
+                  fontSize: 13,
+                  color: T.textMuted,
+                  lineHeight: 1.45,
+                  maxWidth: isStaffPage ? 540 : undefined,
+                }}
+              >
+                {isStaffPage
+                  ? "Gồm nhân viên, quản lý và quản trị viên — không hiển thị khách hàng"
+                  : "Danh sách tài khoản khách hàng đăng ký trên shop"}
+              </p>
+            </div>
           </div>
           {isStaffPage && canAddStaff && (
             <button
               type="button"
+              className="staff-add-btn"
               onClick={() => setShowCreateStaff(true)}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 7,
-                padding: "10px 20px",
+                padding: "11px 22px",
                 borderRadius: 999,
                 border: "none",
-                background: T.primary,
+                background:
+                  "linear-gradient(180deg, #f6b356 0%, #f49d25 55%, #ea8e18 100%)",
                 color: "#fff",
                 fontWeight: 700,
                 fontSize: 13,
                 cursor: "pointer",
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
-                boxShadow: "0 4px 14px rgba(244,157,37,0.30)",
+                boxShadow: "0 4px 16px rgba(244,157,37,0.28)",
               }}
             >
               <span
@@ -732,52 +794,105 @@ const Users = ({ mode = "customers" }) => {
         {isStaffPage && (
           <div
             style={{
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: 10,
-              marginBottom: 16,
+              marginBottom: 18,
+              borderRadius: 14,
+              overflow: "hidden",
+              background: "#fff",
+              border: `1px solid ${T.border}`,
+              boxShadow: "0 4px 20px rgba(15,23,42,0.06)",
             }}
           >
-            <span style={{ fontSize: 12, fontWeight: 600, color: T.textMuted }}>
-              Vai trò hiển thị:
-            </span>
-            <span
+            <div
+              aria-hidden
               style={{
-                padding: "4px 10px",
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 700,
-                background: T.blueBg,
-                color: T.blue,
+                height: 3,
+                background:
+                  "linear-gradient(90deg, #f49d25 0%, #fbbf24 50%, #f97316 100%)",
+              }}
+            />
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 11,
+                padding: "14px 17px 15px",
               }}
             >
-              Nhân viên
-            </span>
-            <span
-              style={{
-                padding: "4px 10px",
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 700,
-                background: "rgba(124,58,237,0.10)",
-                color: "#7C3AED",
-              }}
-            >
-              Quản lý
-            </span>
-            <span
-              style={{
-                padding: "4px 10px",
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 700,
-                background: "rgba(239,68,68,0.10)",
-                color: "#DC2626",
-              }}
-            >
-              Quản trị viên
-            </span>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: T.textMid,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                <span
+                  className="material-symbols-outlined"
+                  style={{ fontSize: 19, color: T.primary }}
+                >
+                  label
+                </span>
+                Vai trò hiển thị
+              </span>
+              <span
+                style={{
+                  width: 1,
+                  height: 22,
+                  background: T.border,
+                  alignSelf: "center",
+                  flexShrink: 0,
+                  display: "inline-block",
+                }}
+                aria-hidden
+              />
+              <span
+                style={{
+                  padding: "5px 12px",
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background: T.blueBg,
+                  color: T.blue,
+                  border: "1px solid rgba(59,130,246,0.25)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Nhân viên
+              </span>
+              <span
+                style={{
+                  padding: "5px 12px",
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background: "rgba(124,58,237,0.10)",
+                  color: "#7C3AED",
+                  border: "1px solid rgba(124,58,237,0.25)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Quản lý
+              </span>
+              <span
+                style={{
+                  padding: "5px 12px",
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background: "rgba(239,68,68,0.10)",
+                  color: "#DC2626",
+                  border: "1px solid rgba(239,68,68,0.22)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Quản trị viên
+              </span>
+            </div>
           </div>
         )}
 
@@ -786,8 +901,12 @@ const Users = ({ mode = "customers" }) => {
           style={{
             background: T.card,
             borderRadius: 14,
-            border: `1px solid ${T.border}`,
-            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+            border: isStaffPage
+              ? "1px solid rgba(244,157,37,0.18)"
+              : `1px solid ${T.border}`,
+            boxShadow: isStaffPage
+              ? "0 2px 14px rgba(244,157,37,0.08), 0 1px 3px rgba(0,0,0,0.03)"
+              : "0 1px 3px rgba(0,0,0,0.04)",
             padding: "14px 16px",
             marginBottom: 20,
             display: "flex",
@@ -822,12 +941,21 @@ const Users = ({ mode = "customers" }) => {
                 fontSize: 13,
                 color: T.text,
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
-                background: "#F8FAFC",
+                background: isStaffPage ? "#FFFCF9" : "#F8FAFC",
                 boxSizing: "border-box",
-                transition: "border-color 0.15s",
+                transition: "border-color 0.15s, box-shadow 0.15s",
               }}
-              onFocus={(e) => (e.target.style.borderColor = T.primary)}
-              onBlur={(e) => (e.target.style.borderColor = T.border)}
+              onFocus={(e) => {
+                e.target.style.borderColor = T.primary;
+                if (isStaffPage) {
+                  e.target.style.boxShadow =
+                    "0 0 0 3px rgba(244,157,37,0.12)";
+                }
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = T.border;
+                if (isStaffPage) e.target.style.boxShadow = "none";
+              }}
             />
           </div>
           <button
@@ -861,8 +989,12 @@ const Users = ({ mode = "customers" }) => {
           style={{
             background: T.card,
             borderRadius: 14,
-            border: `1px solid ${T.border}`,
-            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+            border: isStaffPage
+              ? "1px solid rgba(244,157,37,0.14)"
+              : `1px solid ${T.border}`,
+            boxShadow: isStaffPage
+              ? "0 4px 22px rgba(15,23,42,0.07), 0 0 0 1px rgba(244,157,37,0.04)"
+              : "0 1px 3px rgba(0,0,0,0.04)",
             overflow: "hidden",
           }}
         >
@@ -871,7 +1003,9 @@ const Users = ({ mode = "customers" }) => {
               <thead>
                 <tr
                   style={{
-                    background: "#F8FAFC",
+                    background: isStaffPage
+                      ? "linear-gradient(180deg, #FFF9F3 0%, #F8FAFC 55%, #F1F5F9 100%)"
+                      : "#F8FAFC",
                     borderBottom: `1.5px solid ${T.border}`,
                   }}
                 >
@@ -1075,7 +1209,13 @@ const Users = ({ mode = "customers" }) => {
 
           {/* Pagination */}
           <div
-            style={{ padding: "16px 20px", borderTop: `1px solid ${T.border}` }}
+            style={{
+              padding: "16px 20px",
+              borderTop: `1px solid ${T.border}`,
+              background: isStaffPage
+                ? "linear-gradient(180deg, #FFFCF9 0%, #ffffff 100%)"
+                : undefined,
+            }}
           >
             <Pagination
               page={page}
