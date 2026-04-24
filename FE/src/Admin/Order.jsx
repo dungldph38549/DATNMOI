@@ -182,15 +182,8 @@ export default function Order({ mode = "all" }) {
     if (mode === "returns") {
       return rawOrders.filter((o) => returnStatuses.includes(o.status));
     }
-    if (mode === "completed") {
-      return rawOrders.filter((o) => finishedStatuses.includes(o.status));
-    }
-    // mode === "all" -> Ẩn các đơn liên quan đến hoàn hàng + các đơn đã xong (vận chuyển/khách xác nhận)
-    return rawOrders.filter(
-      (o) =>
-        !returnStatuses.includes(o.status) &&
-        !finishedStatuses.includes(o.status),
-    );
+    // mode === "all" -> Giờ đây bao gồm cả đơn đã xong, chỉ ẩn đơn hoàn (đã có mục riêng)
+    return rawOrders.filter((o) => !returnStatuses.includes(o.status));
   }, [rawOrders, mode]);
   const filteredOrders = useMemo(() => {
     const keywordNormalized = keyword.trim().toLowerCase();
