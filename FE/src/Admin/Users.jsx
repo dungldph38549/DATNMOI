@@ -34,6 +34,16 @@ const T = {
   blueBg: "rgba(59,130,246,0.10)",
 };
 
+const roleBadgeBase = {
+  padding: "3px 10px",
+  borderRadius: 999,
+  fontSize: 11,
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  whiteSpace: "nowrap",
+};
+
 // ── Role badge (ưu tiên `role` từ API: admin / manager / staff / customer) ──
 const RoleBadge = ({ role, isAdmin, isStaff }) => {
   const r =
@@ -44,12 +54,7 @@ const RoleBadge = ({ role, isAdmin, isStaff }) => {
     return (
       <span
         style={{
-          padding: "3px 10px",
-          borderRadius: 999,
-          fontSize: 11,
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
+          ...roleBadgeBase,
           background: "rgba(239,68,68,0.10)",
           color: "#DC2626",
         }}
@@ -62,12 +67,7 @@ const RoleBadge = ({ role, isAdmin, isStaff }) => {
     return (
       <span
         style={{
-          padding: "3px 10px",
-          borderRadius: 999,
-          fontSize: 11,
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
+          ...roleBadgeBase,
           background: "rgba(124,58,237,0.10)",
           color: "#7C3AED",
         }}
@@ -80,12 +80,7 @@ const RoleBadge = ({ role, isAdmin, isStaff }) => {
     return (
       <span
         style={{
-          padding: "3px 10px",
-          borderRadius: 999,
-          fontSize: 11,
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
+          ...roleBadgeBase,
           background: T.blueBg,
           color: T.blue,
         }}
@@ -97,16 +92,36 @@ const RoleBadge = ({ role, isAdmin, isStaff }) => {
   return (
     <span
       style={{
-        padding: "3px 10px",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "6px 14px",
         borderRadius: 999,
-        fontSize: 11,
-        fontWeight: 700,
-        textTransform: "uppercase",
-        letterSpacing: "0.04em",
-        background: "#F1F5F9",
-        color: "#64748B",
+        fontSize: 12,
+        fontWeight: 600,
+        letterSpacing: "-0.015em",
+        lineHeight: 1.25,
+        textTransform: "none",
+        whiteSpace: "nowrap",
+        color: "#9A3412",
+        background:
+          "linear-gradient(180deg, #FFFCF9 0%, #FFF7ED 45%, #FFEDD5 100%)",
+        border: "1px solid rgba(251, 146, 60, 0.42)",
+        boxShadow:
+          "0 1px 2px rgba(154, 52, 18, 0.06), inset 0 1px 0 rgba(255,255,255,0.92)",
       }}
     >
+      <span
+        aria-hidden
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: "50%",
+          flexShrink: 0,
+          background: "#F59E0B",
+          boxShadow: "0 0 0 2px rgba(251, 191, 36, 0.4)",
+        }}
+      />
       Khách hàng
     </span>
   );
@@ -971,7 +986,13 @@ const Users = ({ mode = "customers" }) => {
                         {user.phone || "—"}
                       </td>
                       {/* Vai trò — nhân viên / quản lý / quản trị (theo role) */}
-                      <td style={{ padding: "14px 18px" }}>
+                      <td
+                        style={{
+                          padding: "14px 18px",
+                          verticalAlign: "middle",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         <RoleBadge
                           role={user.role}
                           isAdmin={user.isAdmin}
