@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { FaChevronLeft, FaChevronRight, FaHeart, FaRegHeart } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaHeart, FaRegHeart, FaEye } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProducts, getAllCategories, getVoucherByCode } from "../../api";
 import { getProductPriceInfo } from "../../utils/pricing.js";
@@ -636,11 +636,18 @@ const ProductPage = () => {
                             )}
                           </button>
                           {image ? (
-                            <img
-                              src={image}
-                              alt={item?.name || "Sản phẩm"}
-                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                            />
+                            <>
+                              <img
+                                src={image}
+                                alt={item?.name || "Sản phẩm"}
+                                className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                              />
+                              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-slate-800 shadow-md">
+                                  <FaEye size={16} />
+                                </span>
+                              </div>
+                            </>
                           ) : (
                             <div className="h-full w-full bg-neutral-200" />
                           )}
