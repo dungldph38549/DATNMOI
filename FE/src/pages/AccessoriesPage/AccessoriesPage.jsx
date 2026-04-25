@@ -82,6 +82,14 @@ const getProductMinPrice = (product) => {
 
 const normalizeValue = (value) => String(value || "").trim().toLowerCase();
 
+const normalizeLooseValue = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9]/g, "");
+
 const getProductLaceColors = (product) => {
   const colors = [];
   if (Array.isArray(product?.variants)) {
@@ -130,6 +138,20 @@ const getProductVariantSizes = (product) => {
     });
   }
   return [...new Set(vals)];
+};
+
+const detectProductAccessoryKind = (product) => {
+  const textHint = `${product?.name || ""} ${product?.categoryId?.name || ""} ${product?.categoryId?.slug || ""} ${
+    product?.description || ""
+  }`;
+  const byText = inferAccessorySubKind(textHint, textHint);
+  if (byText === "shoelace" || byText === "insole") return byText;
+
+  if (getProductShoelaceLengths(product).length > 0) return "shoelace";
+  if (getProductSoleValues(product).length > 0) return "insole";
+  if (getProductVariantSizes(product).length > 0) return "insole";
+
+  return "other";
 };
 
 /** Sort length labels: numeric first (120, 120cm), then locale. */
@@ -190,7 +212,8 @@ const VerticalOptionFilter = ({ title, allLabel, options, value, onChange, radio
             type="radio"
             name={name}
             checked={value === ""}
-            onChange={() => onChange("")}
+            onClick={() => onChange("")}
+            onChange={() => {}}
             className="h-4 w-4 accent-[#8ca587]"
           />
           {allLabel}
@@ -201,7 +224,8 @@ const VerticalOptionFilter = ({ title, allLabel, options, value, onChange, radio
               type="radio"
               name={name}
               checked={value === opt}
-              onChange={() => onChange(opt)}
+              onClick={() => onChange(value === opt ? "" : opt)}
+              onChange={() => {}}
               className="h-4 w-4 accent-[#8ca587]"
             />
             {opt}
@@ -217,13 +241,13 @@ const AccessoriesPage = () => {
   const wishlistItems = useSelector((state) => state.wishlist.items || []);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [categoryFilterId, setCategoryFilterId] = useState("");
+  const [accessoryTypeFilter, setAccessoryTypeFilter] = useState("all");
   const [minPriceFilter, setMinPriceFilter] = useState(0);
   const [maxPriceFilter, setMaxPriceFilter] = useState(0);
   const [colorFilter, setColorFilter] = useState("");
   const [lengthFilter, setLengthFilter] = useState("");
   const [soleFilter, setSoleFilter] = useState("");
-  // const [sizeFilter, setSizeFilter] = useState("");
+  const [sizeFilter, setSizeFilter] = useState("");
   const [sort, setSort] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_STEP);
 
@@ -263,43 +287,21 @@ const AccessoriesPage = () => {
     load();
   }, []);
 
-  const categoryOptions = useMemo(() => {
-    const map = new Map();
-    products.forEach((p) => {
-      const id = String(p?.categoryId?._id ?? p?.categoryId ?? "");
-      const cat = p?.categoryId;
-      const name = cat?.name || p?.category || "";
-      const slug = cat?.slug != null && String(cat.slug).trim() !== "" ? String(cat.slug).trim() : "";
-      if (id && name && !map.has(id)) map.set(id, { name, slug });
-    });
-    return [
-      { id: "", label: "TẤT CẢ PHỤ KIỆN", name: "", slug: "" },
-      ...[...map.entries()].map(([id, meta]) => ({
-        id,
-        label: String(meta.name).toUpperCase(),
-        name: meta.name,
-        slug: meta.slug,
-      })),
-    ];
-  }, [products]);
-
   const selectedAccessoryKind = useMemo(() => {
-    if (!categoryFilterId) return "all";
-    const opt = categoryOptions.find((o) => o.id === categoryFilterId);
-    return inferAccessorySubKind(opt?.name || "", opt?.slug || "");
-  }, [categoryFilterId, categoryOptions]);
+    return accessoryTypeFilter || "all";
+  }, [accessoryTypeFilter]);
 
   const productsForFilterOptions = useMemo(() => {
-    if (!categoryFilterId) return products;
-    return products.filter((p) => String(p?.categoryId?._id ?? p?.categoryId ?? "") === categoryFilterId);
-  }, [products, categoryFilterId]);
+    if (!accessoryTypeFilter || accessoryTypeFilter === "all") return products;
+    return products.filter((p) => detectProductAccessoryKind(p) === accessoryTypeFilter);
+  }, [products, accessoryTypeFilter]);
 
   useEffect(() => {
     if (selectedAccessoryKind === "insole") setLengthFilter("");
-    // if (selectedAccessoryKind === "shoelace") {
-    //   setSizeFilter("");
-    //   setSoleFilter("");
-    // }
+    if (selectedAccessoryKind === "shoelace") {
+      setSizeFilter("");
+      setSoleFilter("");
+    }
   }, [selectedAccessoryKind]);
 
   const colorOptions = useMemo(() => {
@@ -320,18 +322,18 @@ const AccessoriesPage = () => {
     return [...set].sort((a, b) => a.localeCompare(b, "vi"));
   }, [productsForFilterOptions]);
 
-  // const sizeOptions = useMemo(() => {
-  //   const set = new Set();
-  //   productsForFilterOptions.forEach((p) => getProductVariantSizes(p).forEach((v) => set.add(v)));
-  //   return [...set].sort(sortLengthLabels);
-  // }, [productsForFilterOptions]);
+  const sizeOptions = useMemo(() => {
+    const set = new Set();
+    productsForFilterOptions.forEach((p) => getProductVariantSizes(p).forEach((v) => set.add(v)));
+    return [...set].sort(sortLengthLabels);
+  }, [productsForFilterOptions]);
 
   const showLengthFilter =
     (selectedAccessoryKind === "all" || selectedAccessoryKind === "other" || selectedAccessoryKind === "shoelace") &&
     lengthOptions.length > 0;
-  // const showSizeFilter =
-  //   (selectedAccessoryKind === "all" || selectedAccessoryKind === "other" || selectedAccessoryKind === "insole") &&
-  //   sizeOptions.length > 0;
+  const showSizeFilter =
+    (selectedAccessoryKind === "all" || selectedAccessoryKind === "other" || selectedAccessoryKind === "insole") &&
+    sizeOptions.length > 0;
   const showSoleFilter =
     (selectedAccessoryKind === "all" || selectedAccessoryKind === "other" || selectedAccessoryKind === "insole") &&
     soleOptions.length > 0;
@@ -368,10 +370,8 @@ const AccessoriesPage = () => {
   const filteredProducts = useMemo(() => {
     let data = [...products];
 
-    if (categoryFilterId) {
-      data = data.filter(
-        (p) => String(p?.categoryId?._id ?? p?.categoryId ?? "") === categoryFilterId,
-      );
+    if (accessoryTypeFilter && accessoryTypeFilter !== "all") {
+      data = data.filter((p) => detectProductAccessoryKind(p) === accessoryTypeFilter);
     }
 
     if (maxPriceFilter > 0) {
@@ -383,7 +383,11 @@ const AccessoriesPage = () => {
 
     if (colorFilter) {
       data = data.filter((p) =>
-        getProductLaceColors(p).some((c) => normalizeValue(c) === normalizeValue(colorFilter)),
+        getProductLaceColors(p).some((c) => {
+          const a = normalizeLooseValue(c);
+          const b = normalizeLooseValue(colorFilter);
+          return a === b || a.includes(b) || b.includes(a);
+        }),
       );
     }
 
@@ -399,11 +403,11 @@ const AccessoriesPage = () => {
       );
     }
 
-    // if (sizeFilter && showSizeFilter) {
-    //   data = data.filter((p) =>
-    //     getProductVariantSizes(p).some((v) => normalizeValue(v) === normalizeValue(sizeFilter)),
-    //   );
-    // }
+    if (sizeFilter && showSizeFilter) {
+      data = data.filter((p) =>
+        getProductVariantSizes(p).some((v) => normalizeValue(v) === normalizeValue(sizeFilter)),
+      );
+    }
 
     if (sort === "priceAsc") data.sort((a, b) => getProductMinPrice(a) - getProductMinPrice(b));
     else if (sort === "priceDesc") data.sort((a, b) => getProductMinPrice(b) - getProductMinPrice(a));
@@ -413,20 +417,22 @@ const AccessoriesPage = () => {
     return data;
   }, [
     products,
-    categoryFilterId,
+    accessoryTypeFilter,
     minPriceFilter,
     maxPriceFilter,
     colorFilter,
     lengthFilter,
     soleFilter,
+    sizeFilter,
     showLengthFilter,
     showSoleFilter,
+    showSizeFilter,
     sort,
   ]);
 
   // useEffect(() => {
   //   setVisibleCount(PAGE_STEP);
-  // }, [categoryFilterId, priceBracket, colorFilter, lengthFilter, soleFilter, sizeFilter, sort]);
+  // }, [accessoryTypeFilter, colorFilter, lengthFilter, soleFilter, sizeFilter, sort]);
 
   const visibleList = useMemo(
     () => filteredProducts.slice(0, visibleCount),
@@ -443,13 +449,13 @@ const AccessoriesPage = () => {
 
   const clearFilters = () => {
     setSort("");
-    setCategoryFilterId("");
+    setAccessoryTypeFilter("all");
     setMinPriceFilter(0);
     setMaxPriceFilter(maxAvailablePrice || 0);
     setColorFilter("");
-    // setLengthFilter("");
-    // setSoleFilter("");
-    // setSizeFilter("");
+    setLengthFilter("");
+    setSoleFilter("");
+    setSizeFilter("");
   };
 
   const wishlistIds = useMemo(
@@ -537,27 +543,45 @@ const AccessoriesPage = () => {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
           <aside className="w-full lg:w-[248px] lg:shrink-0 space-y-6">
             <div>
-              <h3 className={filterHeadingClass}>Danh mục</h3>
+              <h3 className={filterHeadingClass}>Loại phụ kiện</h3>
               <div className="space-y-3">
-                {categoryOptions.map((opt) => {
-                  const value = opt.id;
-                  const checked = categoryFilterId === value;
-                  return (
-                    <label
-                      key={opt.id || "all-cat"}
-                      className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700"
-                    >
-                      <input
-                        type="radio"
-                        name="accessory-category"
-                        checked={checked}
-                        onChange={() => setCategoryFilterId(value)}
-                        className="h-4 w-4 accent-[#8ca587]"
-                      />
-                      {opt.label}
-                    </label>
-                  );
-                })}
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
+                  <input
+                    type="radio"
+                    name="accessory-type"
+                    checked={accessoryTypeFilter === "all"}
+                    onClick={() => setAccessoryTypeFilter("all")}
+                    onChange={() => {}}
+                    className="h-4 w-4 accent-[#8ca587]"
+                  />
+                  TẤT CẢ PHỤ KIỆN
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
+                  <input
+                    type="radio"
+                    name="accessory-type"
+                    checked={accessoryTypeFilter === "shoelace"}
+                    onClick={() =>
+                      setAccessoryTypeFilter((prev) => (prev === "shoelace" ? "all" : "shoelace"))
+                    }
+                    onChange={() => {}}
+                    className="h-4 w-4 accent-[#8ca587]"
+                  />
+                  DÂY GIÀY
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
+                  <input
+                    type="radio"
+                    name="accessory-type"
+                    checked={accessoryTypeFilter === "insole"}
+                    onClick={() =>
+                      setAccessoryTypeFilter((prev) => (prev === "insole" ? "all" : "insole"))
+                    }
+                    onChange={() => {}}
+                    className="h-4 w-4 accent-[#8ca587]"
+                  />
+                  LÓT GIÀY
+                </label>
               </div>
             </div>
 
@@ -583,7 +607,7 @@ const AccessoriesPage = () => {
               />
             )}
 
-            {/* {showSizeFilter && (
+            {showSizeFilter && (
               <VerticalOptionFilter
                 title={FILTER_LABELS.sizeSection}
                 allLabel={FILTER_LABELS.allSizes}
@@ -592,7 +616,7 @@ const AccessoriesPage = () => {
                 onChange={setSizeFilter}
                 radioName="accessory-size"
               />
-            )} */}
+            )}
 
             <div>
               <h3 className={filterHeadingClass}>Khoảng giá</h3>
@@ -651,7 +675,8 @@ const AccessoriesPage = () => {
                       type="radio"
                       name="accessory-color"
                       checked={colorFilter === ""}
-                      onChange={() => setColorFilter("")}
+                      onClick={() => setColorFilter("")}
+                      onChange={() => {}}
                       className="h-4 w-4 accent-[#8ca587]"
                     />
                     Tất cả màu
@@ -662,7 +687,8 @@ const AccessoriesPage = () => {
                         type="radio"
                         name="accessory-color"
                         checked={colorFilter === c}
-                        onChange={() => setColorFilter(c)}
+                        onClick={() => setColorFilter((prev) => (prev === c ? "" : c))}
+                        onChange={() => {}}
                         className="h-4 w-4 accent-[#8ca587]"
                       />
                       <span className="inline-flex items-center gap-2">
