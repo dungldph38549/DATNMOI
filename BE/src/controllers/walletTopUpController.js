@@ -9,6 +9,7 @@ const {
   IpnUnknownError,
 } = require("vnpay");
 const WalletTopUp = require("../models/WalletTopUpModel.js");
+const WalletTransaction = require("../models/WalletTransactionModel.js");
 const { creditWalletForTopUp } = require("../services/walletService.js");
 
 const vnpayEnv = (key, fallback) => {
@@ -52,6 +53,23 @@ const mergeVnpayIpnParams = (req) => {
   return out;
 };
 
+const isTopupAmountMatched = (expectedAmountVnd, receivedVnpAmount) => {
+  const expected = Math.round(Number(expectedAmountVnd) || 0);
+  const received = Math.round(Number(receivedVnpAmount) || 0);
+  if (expected <= 0 || received <= 0) return false;
+  // Tùy thư viện VNPay có thể trả số tiền theo VND hoặc x100.
+  return received === expected || received === expected * 100;
+};
+
+const isVnpaySuccessResult = (result = {}) => {
+  const responseCode = String(result.vnp_ResponseCode ?? "").trim();
+  const txStatus = String(result.vnp_TransactionStatus ?? "").trim();
+  // Mặc định thành công khi responseCode=00; một số cấu hình trả thêm TransactionStatus=00.
+  if (responseCode !== "00") return false;
+  if (txStatus && txStatus !== "00") return false;
+  return true;
+};
+
 /** Nối thêm query khi base đã có ?... (tránh /profile?tab=wallet?topup=1). */
 const appendQuery = (baseUrl, queryWithoutQuestion) => {
   const b = String(baseUrl || "");
@@ -65,6 +83,41 @@ const maxTopup = () =>
     500_000_000,
     Math.max(MIN_TOPUP, Number(process.env.WALLET_TOPUP_MAX || 50_000_000)),
   );
+
+const isTransactionUnsupportedError = (err) => {
+  const msg = String(err?.message || "").toLowerCase();
+  return (
+    msg.includes("replica set") ||
+    msg.includes("transaction numbers are only allowed") ||
+    msg.includes("transactions are not supported")
+  );
+};
+
+const creditTopupWithOptionalTransaction = async (topUpId) => {
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const fresh = await WalletTopUp.findById(topUpId).session(session);
+    if (!fresh) throw new Error("Không tìm thấy yêu cầu nạp ví");
+    await creditWalletForTopUp(fresh, session);
+    await session.commitTransaction();
+  } catch (err) {
+    try {
+      await session.abortTransaction();
+    } catch {
+      // ignore abort errors
+    }
+    if (!isTransactionUnsupportedError(err)) {
+      throw err;
+    }
+    // Fallback cho Mongo standalone (không bật replica set).
+    const fresh = await WalletTopUp.findById(topUpId);
+    if (!fresh) throw new Error("Không tìm thấy yêu cầu nạp ví");
+    await creditWalletForTopUp(fresh, null);
+  } finally {
+    session.endSession();
+  }
+};
 
 exports.createVnpayTopupUrl = async (req, res) => {
   try {
@@ -148,8 +201,7 @@ exports.vnpayTopupReturn = async (req, res) => {
       return res.redirect(appendQuery(cancelUrl, "topup=0&reason=invalid"));
     }
 
-    const ok =
-      result.isVerified && result.isSuccess && String(result.vnp_ResponseCode ?? "") === "00";
+    const ok = result.isVerified && isVnpaySuccessResult(result);
     if (!ok) {
       await WalletTopUp.findOneAndUpdate(
         { _id: topUpId, status: { $ne: "completed" } },
@@ -158,9 +210,7 @@ exports.vnpayTopupReturn = async (req, res) => {
       return res.redirect(appendQuery(cancelUrl, "topup=0"));
     }
 
-    const expected = Math.round(Number(topUp.amount) * 100);
-    const received = Number(result.vnp_Amount);
-    if (expected !== received) {
+    if (!isTopupAmountMatched(topUp.amount, result.vnp_Amount)) {
       await WalletTopUp.findOneAndUpdate(
         { _id: topUpId, status: { $ne: "completed" } },
         { status: "failed" },
@@ -168,18 +218,7 @@ exports.vnpayTopupReturn = async (req, res) => {
       return res.redirect(appendQuery(cancelUrl, "topup=0&reason=amount"));
     }
 
-    const session = await mongoose.startSession();
-    try {
-      session.startTransaction();
-      const fresh = await WalletTopUp.findById(topUpId).session(session);
-      await creditWalletForTopUp(fresh, session);
-      await session.commitTransaction();
-    } catch (e) {
-      await session.abortTransaction();
-      throw e;
-    } finally {
-      session.endSession();
-    }
+    await creditTopupWithOptionalTransaction(topUpId);
 
     return res.redirect(
       appendQuery(successUrl, `topup=1&amount=${encodeURIComponent(topUp.amount)}`),
@@ -207,30 +246,16 @@ exports.vnpayTopupIpn = async (req, res) => {
       return res.status(200).json(IpnOrderNotFound);
     }
 
-    const expected = Math.round(Number(topUp.amount) * 100);
-    const received = Number(result.vnp_Amount);
-    if (expected !== received) {
+    if (!isTopupAmountMatched(topUp.amount, result.vnp_Amount)) {
       return res.status(200).json(IpnInvalidAmount);
     }
 
-    const ok =
-      result.isSuccess && String(result.vnp_ResponseCode ?? "") === "00";
+    const ok = isVnpaySuccessResult(result);
     if (ok) {
       if (topUp.status === "completed") {
         return res.status(200).json(InpOrderAlreadyConfirmed);
       }
-      const session = await mongoose.startSession();
-      try {
-        session.startTransaction();
-        const fresh = await WalletTopUp.findById(topUpId).session(session);
-        await creditWalletForTopUp(fresh, session);
-        await session.commitTransaction();
-      } catch (e) {
-        await session.abortTransaction();
-        throw e;
-      } finally {
-        session.endSession();
-      }
+      await creditTopupWithOptionalTransaction(topUpId);
     } else {
       await WalletTopUp.findOneAndUpdate(
         { _id: topUpId, status: { $ne: "completed" } },
@@ -242,101 +267,6 @@ exports.vnpayTopupIpn = async (req, res) => {
   } catch (err) {
     console.error("[VNPay topup IPN]", err?.message || err);
     return res.status(200).json(IpnUnknownError);
-  }
-};
-
-exports.getBankInfo = async (req, res) => {
-  try {
-    res.status(200).json({
-      bankName: process.env.WALLET_BANK_NAME || "",
-      accountNumber: process.env.WALLET_BANK_ACCOUNT || "",
-      accountOwner: process.env.WALLET_BANK_OWNER || "",
-      branch: process.env.WALLET_BANK_BRANCH || "",
-      note:
-        process.env.WALLET_BANK_NOTE ||
-        "Ghi đúng nội dung chuyển khoản để được xử lý nhanh.",
-    });
-  } catch (err) {
-    res.status(500).json({ message: err?.message || "Internal server error" });
-  }
-};
-
-exports.createBankTopupRequest = async (req, res) => {
-  try {
-    const amount = Math.round(Number(req.body?.amount));
-    const hi = maxTopup();
-    if (!Number.isFinite(amount) || amount < MIN_TOPUP || amount > hi) {
-      return res.status(422).json({
-        message: `Số tiền từ ${MIN_TOPUP.toLocaleString("vi-VN")}đ đến ${hi.toLocaleString("vi-VN")}đ`,
-      });
-    }
-
-    const referenceCode = WalletTopUp.generateReferenceCode(req.user.id);
-    const topUp = await WalletTopUp.create({
-      userId: req.user.id,
-      amount,
-      method: "bank_transfer",
-      status: "awaiting_transfer",
-      referenceCode,
-    });
-
-    const bank = {
-      bankName: process.env.WALLET_BANK_NAME || "",
-      accountNumber: process.env.WALLET_BANK_ACCOUNT || "",
-      accountOwner: process.env.WALLET_BANK_OWNER || "",
-      branch: process.env.WALLET_BANK_BRANCH || "",
-      note:
-        process.env.WALLET_BANK_NOTE ||
-        "Ghi đúng nội dung chuyển khoản.",
-    };
-
-    res.status(201).json({ topUp, bank });
-  } catch (err) {
-    const statusCode = err?.statusCode || 500;
-    res.status(statusCode).json({
-      message: err?.message || err?.error || "Internal server error",
-    });
-  }
-};
-
-exports.markBankTopupSent = async (req, res) => {
-  const { id } = req.params;
-  const session = await mongoose.startSession();
-  try {
-    session.startTransaction();
-    const topUp = await WalletTopUp.findOne({
-      _id: id,
-      userId: req.user.id,
-      method: "bank_transfer",
-      status: "awaiting_transfer",
-    }).session(session);
-
-    if (!topUp) {
-      await session.abortTransaction();
-      return res.status(400).json({
-        message: "Không tìm thấy yêu cầu hoặc đã xử lý",
-      });
-    }
-
-    const uid = req.user?.id || req.user?._id;
-    const confirmedBy =
-      uid && mongoose.Types.ObjectId.isValid(String(uid))
-        ? new mongoose.Types.ObjectId(String(uid))
-        : undefined;
-
-    await creditWalletForTopUp(topUp, session, {
-      ...(confirmedBy ? { confirmedBy } : {}),
-      patchTopUp: { userMarkedSentAt: new Date() },
-    });
-
-    await session.commitTransaction();
-    const out = await WalletTopUp.findById(id).lean();
-    res.status(200).json(out);
-  } catch (err) {
-    await session.abortTransaction();
-    res.status(500).json({ message: err?.message || "Internal server error" });
-  } finally {
-    session.endSession();
   }
 };
 
@@ -365,76 +295,37 @@ exports.listMyTopups = async (req, res) => {
   }
 };
 
-exports.adminListBankPending = async (req, res) => {
+exports.adminListTopupTransactions = async (req, res) => {
   try {
-    const items = await WalletTopUp.find({
-      method: "bank_transfer",
-      status: { $in: ["awaiting_transfer", "awaiting_admin"] },
-    })
-      .sort({ createdAt: -1 })
-      .populate("userId", "name email phone")
-      .limit(200)
-      .lean();
-    res.status(200).json({ data: items });
-  } catch (err) {
-    res.status(500).json({ message: err?.message || "Internal server error" });
-  }
-};
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const skip = (page - 1) * limit;
+    const topupTypes = ["topup_vnpay", "topup_bank"];
+    const typeScope = String(req.query.type || "all").trim().toLowerCase();
+    const filter =
+      typeScope === "topup"
+        ? { type: { $in: topupTypes } }
+        : {};
 
-exports.adminConfirmBankTopup = async (req, res) => {
-  const session = await mongoose.startSession();
-  try {
-    session.startTransaction();
-    const { id } = req.params;
-    const topUp = await WalletTopUp.findById(id).session(session);
-    if (!topUp || topUp.method !== "bank_transfer") {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(404).json({ message: "Không tìm thấy yêu cầu nạp CK" });
-    }
-    if (topUp.status !== "awaiting_admin") {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        message: "Chỉ xác nhận được khi khách đã bấm 'Tôi đã chuyển khoản'",
-      });
-    }
+    const [items, total] = await Promise.all([
+      WalletTransaction.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("userId", "name email phone")
+        .populate("topUpId", "amount method status referenceCode createdAt")
+        .populate("orderId", "_id totalAmount status paymentMethod createdAt")
+        .lean(),
+      WalletTransaction.countDocuments(filter),
+    ]);
 
-    const adminId = req.user?.id || req.user?._id;
-    const conf =
-      adminId && mongoose.Types.ObjectId.isValid(String(adminId))
-        ? new mongoose.Types.ObjectId(String(adminId))
-        : undefined;
-    await creditWalletForTopUp(topUp, session, conf ? { confirmedBy: conf } : {});
-
-    await session.commitTransaction();
-    session.endSession();
-    const out = await WalletTopUp.findById(id).lean();
-    res.status(200).json(out);
-  } catch (err) {
-    await session.abortTransaction();
-    session.endSession();
-    res.status(500).json({ message: err?.message || "Internal server error" });
-  }
-};
-
-exports.adminRejectBankTopup = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const note = String(req.body?.note || "").trim();
-    const updated = await WalletTopUp.findOneAndUpdate(
-      {
-        _id: id,
-        method: "bank_transfer",
-        status: { $in: ["awaiting_transfer", "awaiting_admin"] },
-      },
-      { status: "rejected", adminNote: note },
-      { new: true },
-    );
-    if (!updated) {
-      return res.status(400).json({ message: "Không thể từ chối yêu cầu này" });
-    }
-    res.status(200).json(updated);
+    res.status(200).json({
+      data: items,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit) || 0,
+    });
   } catch (err) {
     res.status(500).json({ message: err?.message || "Internal server error" });
   }

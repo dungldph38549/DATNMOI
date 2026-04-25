@@ -86,8 +86,8 @@ const MENU = [
   {
     key: "wallet-topups",
     icon: "account_balance_wallet",
-    label: "Nạp ví (CK)",
-    desc: "Xác nhận chuyển khoản nạp ví",
+    label: "Giao dịch nạp ví",
+    desc: "Xem lịch sử nạp ví",
   },
   {
     key: "sizes",
