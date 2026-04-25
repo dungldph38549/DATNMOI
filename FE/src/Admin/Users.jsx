@@ -39,6 +39,21 @@ const toSingleLine = (value = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
+const toAvatarUrl = (avatar) => {
+  if (!avatar || typeof avatar !== "string") return "";
+  if (
+    avatar.startsWith("http://") ||
+    avatar.startsWith("https://") ||
+    avatar.startsWith("data:") ||
+    avatar.startsWith("blob:")
+  ) {
+    return avatar;
+  }
+  // Backend serves uploaded files from /uploads
+  const normalized = avatar.startsWith("/") ? avatar.slice(1) : avatar;
+  return `http://localhost:3002/uploads/${normalized}`;
+};
+
 const roleBadgeBase = {
   padding: "3px 10px",
   borderRadius: 999,
@@ -166,9 +181,10 @@ const Avatar = ({ name, avatar }) => {
     .slice(0, 2)
     .join("")
     .toUpperCase();
-  return avatar ? (
+  const avatarUrl = toAvatarUrl(avatar);
+  return avatarUrl ? (
     <img
-      src={avatar}
+      src={avatarUrl}
       alt={name}
       style={{
         width: 38,
