@@ -31,6 +31,11 @@ const getAdminSession = () => {
   }
 };
 
+const toSingleLine = (value = "") =>
+  String(value)
+    .replace(/\s+/g, " ")
+    .trim();
+
 // ================================================================
 // Design tokens — SneakerConverse
 // ================================================================
@@ -165,7 +170,17 @@ const SideItem = ({
       </span>
     )}
     <span style={{ fontSize: asSection ? 13 : 13, fontWeight: asSection ? 800 : active ? 700 : 500 }}>
-      {item.label}
+      <span
+        style={{
+          display: "block",
+          minWidth: 0,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {item.label}
+      </span>
     </span>
     {item.count > 0 && (
       <span
@@ -413,7 +428,10 @@ const AdminPage = () => {
     );
   }
 
-  const initials = (adminSession.name || adminSession.email || "A")
+  const adminDisplayName = toSingleLine(adminSession.name || "Admin");
+  const adminDisplayEmail = toSingleLine(adminSession.email || "");
+
+  const initials = (adminDisplayName || adminDisplayEmail || "A")
     .split(" ")
     .map((w) => w[0])
     .slice(0, 2)
@@ -438,9 +456,51 @@ const AdminPage = () => {
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
         .sh-content-anim { animation: fadeIn 0.2s ease; }
+        .admin-shell,
+        .admin-shell * {
+          box-sizing: border-box;
+        }
+        .admin-shell {
+          width: 100%;
+          max-width: 100%;
+          font-size: 14px;
+        }
+        .admin-main {
+          width: 100%;
+          max-width: 100%;
+          overflow-x: hidden;
+        }
+        .admin-content {
+          width: 100%;
+          max-width: 100%;
+          padding: 16px;
+        }
+        @media (min-width: 1024px) {
+          .admin-content {
+            padding: 20px;
+          }
+        }
+        .admin-shell .ant-table-wrapper {
+          width: 100%;
+          max-width: 100%;
+          overflow-x: auto;
+        }
+        .admin-shell .ant-table-cell {
+          vertical-align: middle;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .admin-shell .admin-allow-wrap,
+        .admin-shell .admin-allow-wrap * {
+          white-space: normal !important;
+          overflow: visible !important;
+          text-overflow: clip !important;
+        }
       `}</style>
 
       <div
+        className="admin-shell"
         style={{
           display: "flex",
           minHeight: "100vh",
@@ -601,23 +661,27 @@ const AdminPage = () => {
                     fontSize: 13,
                     fontWeight: 700,
                     color: T.text,
+                    display: "block",
+                    width: "100%",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {adminSession.name || "Admin"}
+                  {adminDisplayName}
                 </div>
                 <div
                   style={{
                     fontSize: 11,
                     color: T.textMuted,
+                    display: "block",
+                    width: "100%",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {adminSession.email}
+                  {adminDisplayEmail}
                 </div>
               </div>
               <div
@@ -682,7 +746,17 @@ const AdminPage = () => {
                       borderRadius: 10,
                     }}
                   >
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        minWidth: 0,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
                       <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
                         {group.icon || "folder"}
                       </span>
@@ -800,6 +874,7 @@ const AdminPage = () => {
 
         {/* ── MAIN ─────────────────────────────────────────────── */}
         <div
+          className="admin-main"
           style={{
             flex: 1,
             display: "flex",
@@ -844,7 +919,7 @@ const AdminPage = () => {
             className="sh-content-anim"
             style={{ flex: 1, overflowY: "auto" }}
           >
-            {renderContent()}
+            <div className="admin-content">{renderContent()}</div>
           </main>
         </div>
       </div>

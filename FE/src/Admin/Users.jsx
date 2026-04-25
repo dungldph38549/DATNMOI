@@ -34,6 +34,11 @@ const T = {
   blueBg: "rgba(59,130,246,0.10)",
 };
 
+const toSingleLine = (value = "") =>
+  String(value)
+    .replace(/\s+/g, " ")
+    .trim();
+
 const roleBadgeBase = {
   padding: "3px 10px",
   borderRadius: 999,
@@ -1093,9 +1098,16 @@ const Users = ({ mode = "customers" }) => {
                               fontSize: 13,
                               fontWeight: 600,
                               color: T.text,
+                              display: "block",
+                              minWidth: 0,
+                              maxWidth: 180,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
                             }}
+                            title={toSingleLine(user.name || "—")}
                           >
-                            {user.name || "—"}
+                            {toSingleLine(user.name || "—")}
                           </span>
                         </div>
                       </td>
@@ -1267,14 +1279,35 @@ const Users = ({ mode = "customers" }) => {
                 marginBottom: 22,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
                 <Avatar name={selectedUser.name} avatar={selectedUser.avatar} />
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: T.text }}>
-                    {selectedUser.name}
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 15,
+                      fontWeight: 700,
+                      color: T.text,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      maxWidth: 240,
+                    }}
+                    title={toSingleLine(selectedUser.name)}
+                  >
+                    {toSingleLine(selectedUser.name)}
                   </div>
-                  <div style={{ fontSize: 12, color: T.textMuted }}>
-                    {selectedUser.email}
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: T.textMuted,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      maxWidth: 240,
+                    }}
+                    title={toSingleLine(selectedUser.email)}
+                  >
+                    {toSingleLine(selectedUser.email)}
                   </div>
                 </div>
               </div>
