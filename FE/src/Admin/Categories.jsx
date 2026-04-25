@@ -1,1103 +1,14 @@
-// import { useState } from "react";
-// import { Form } from "antd";
-// import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-// import {
-//   getAllCategories,
-//   updateCategory,
-//   createCategory,
-//   uploadImage,
-// } from "../api/index";
-
-// // ── Design tokens ──────────────────────────────────────────────
-// const T = {
-//   primary: "#f49d25",
-//   primaryBg: "rgba(244,157,37,0.08)",
-//   border: "#E2E8F0",
-//   text: "#0F172A",
-//   textMid: "#475569",
-//   textMuted: "#94A3B8",
-//   card: "#ffffff",
-//   bg: "#F8F7F5",
-//   red: "#EF4444",
-//   redBg: "rgba(239,68,68,0.08)",
-//   green: "#22C55E",
-//   greenBg: "rgba(34,197,94,0.10)",
-// };
-
-// // ── Toast ──────────────────────────────────────────────────────
-// const useToast = () => {
-//   const [toast, setToast] = useState(null);
-//   const show = (msg, type = "success") => {
-//     setToast({ msg, type });
-//     setTimeout(() => setToast(null), 3000);
-//   };
-//   return { toast, show };
-// };
-
-// // ── Status badge ───────────────────────────────────────────────
-// const StatusBadge = ({ status }) => {
-//   const active = status === "active";
-//   return (
-//     <span
-//       style={{
-//         display: "inline-flex",
-//         alignItems: "center",
-//         gap: 6,
-//         padding: "4px 12px",
-//         borderRadius: 999,
-//         fontSize: 11,
-//         fontWeight: 700,
-//         background: active ? T.greenBg : "#F1F5F9",
-//         color: active ? "#16A34A" : T.textMuted,
-//       }}
-//     >
-//       <span
-//         style={{
-//           width: 6,
-//           height: 6,
-//           borderRadius: "50%",
-//           background: active ? T.green : "#CBD5E1",
-//           flexShrink: 0,
-//         }}
-//       />
-//       {active ? "Đang hoạt động" : "Ngừng hoạt động"}
-//     </span>
-//   );
-// };
-
-// // ── Modal wrapper ──────────────────────────────────────────────
-// const SHModal = ({ open, title, onClose, children }) => {
-//   if (!open) return null;
-//   return (
-//     <div
-//       onClick={(e) => {
-//         if (e.target === e.currentTarget) onClose();
-//       }}
-//       style={{
-//         position: "fixed",
-//         inset: 0,
-//         zIndex: 1000,
-//         display: "flex",
-//         alignItems: "center",
-//         justifyContent: "center",
-//         background: "rgba(15,23,42,0.40)",
-//         backdropFilter: "blur(3px)",
-//       }}
-//     >
-//       <div
-//         style={{
-//           background: T.card,
-//           borderRadius: 20,
-//           border: `1px solid ${T.border}`,
-//           boxShadow: "0 24px 64px rgba(0,0,0,0.18)",
-//           width: "100%",
-//           maxWidth: 420,
-//           padding: "28px 28px 24px",
-//           fontFamily: "'Plus Jakarta Sans', sans-serif",
-//           animation: "slideUp 0.2s ease",
-//         }}
-//       >
-//         <div
-//           style={{
-//             display: "flex",
-//             alignItems: "center",
-//             justifyContent: "space-between",
-//             marginBottom: 24,
-//           }}
-//         >
-//           <h3
-//             style={{ margin: 0, fontSize: 16, fontWeight: 800, color: T.text }}
-//           >
-//             {title}
-//           </h3>
-//           <button
-//             onClick={onClose}
-//             style={{
-//               width: 30,
-//               height: 30,
-//               borderRadius: 8,
-//               border: "none",
-//               background: "#F1F5F9",
-//               cursor: "pointer",
-//               display: "flex",
-//               alignItems: "center",
-//               justifyContent: "center",
-//               color: T.textMid,
-//             }}
-//           >
-//             <span
-//               className="material-symbols-outlined"
-//               style={{ fontSize: 16 }}
-//             >
-//               close
-//             </span>
-//           </button>
-//         </div>
-//         {children}
-//       </div>
-//     </div>
-//   );
-// };
-
-// // ── Confirm delete modal ───────────────────────────────────────
-// const ConfirmModal = ({ open, name, loading, onConfirm, onCancel }) => {
-//   if (!open) return null;
-//   return (
-//     <div
-//       style={{
-//         position: "fixed",
-//         inset: 0,
-//         zIndex: 1100,
-//         display: "flex",
-//         alignItems: "center",
-//         justifyContent: "center",
-//         background: "rgba(15,23,42,0.40)",
-//         backdropFilter: "blur(3px)",
-//       }}
-//     >
-//       <div
-//         style={{
-//           background: T.card,
-//           borderRadius: 20,
-//           border: `1px solid ${T.border}`,
-//           boxShadow: "0 24px 64px rgba(0,0,0,0.18)",
-//           width: "100%",
-//           maxWidth: 360,
-//           padding: 28,
-//           fontFamily: "'Plus Jakarta Sans', sans-serif",
-//           animation: "slideUp 0.15s ease",
-//           textAlign: "center",
-//         }}
-//       >
-//         <div
-//           style={{
-//             width: 52,
-//             height: 52,
-//             borderRadius: "50%",
-//             background: T.redBg,
-//             display: "flex",
-//             alignItems: "center",
-//             justifyContent: "center",
-//             margin: "0 auto 16px",
-//           }}
-//         >
-//           <span
-//             className="material-symbols-outlined"
-//             style={{ fontSize: 24, color: T.red }}
-//           >
-//             delete_forever
-//           </span>
-//         </div>
-//         <h3
-//           style={{
-//             margin: "0 0 8px",
-//             fontSize: 15,
-//             fontWeight: 800,
-//             color: T.text,
-//           }}
-//         >
-//           Xác nhận xoá?
-//         </h3>
-//         <p
-//           style={{
-//             margin: "0 0 24px",
-//             fontSize: 13,
-//             color: T.textMuted,
-//             lineHeight: 1.6,
-//           }}
-//         >
-//           Bạn có chắc muốn xoá danh mục{" "}
-//           <b style={{ color: T.text }}>"{name}"</b>?<br />
-//           Danh mục sẽ bị ngừng hoạt động.
-//         </p>
-//         <div style={{ display: "flex", gap: 10 }}>
-//           <button
-//             onClick={onCancel}
-//             style={{
-//               flex: 1,
-//               padding: "10px",
-//               borderRadius: 999,
-//               border: `1.5px solid ${T.border}`,
-//               background: "#fff",
-//               color: T.textMid,
-//               fontWeight: 600,
-//               fontSize: 13,
-//               cursor: "pointer",
-//               fontFamily: "'Plus Jakarta Sans',sans-serif",
-//             }}
-//           >
-//             Huỷ
-//           </button>
-//           <button
-//             onClick={onConfirm}
-//             disabled={loading}
-//             style={{
-//               flex: 1,
-//               padding: "10px",
-//               borderRadius: 999,
-//               border: "none",
-//               background: T.red,
-//               color: "#fff",
-//               fontWeight: 700,
-//               fontSize: 13,
-//               cursor: "pointer",
-//               fontFamily: "'Plus Jakarta Sans',sans-serif",
-//               opacity: loading ? 0.7 : 1,
-//             }}
-//           >
-//             {loading ? "Đang xoá..." : "Xoá"}
-//           </button>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// // ── Category form body ─────────────────────────────────────────
-// const CategoryFormBody = ({
-//   form,
-//   imgPreview,
-//   onUpload,
-//   loading,
-//   submitLabel,
-// }) => {
-//   const inp = {
-//     width: "100%",
-//     padding: "10px 14px",
-//     borderRadius: 10,
-//     border: `1.5px solid ${T.border}`,
-//     outline: "none",
-//     fontSize: 13,
-//     fontFamily: "'Plus Jakarta Sans',sans-serif",
-//     background: "#F8FAFC",
-//     boxSizing: "border-box",
-//     color: T.text,
-//   };
-//   return (
-//     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-//       {/* Name */}
-//       <div>
-//         <label
-//           style={{
-//             fontSize: 12,
-//             fontWeight: 600,
-//             color: T.textMid,
-//             display: "block",
-//             marginBottom: 6,
-//           }}
-//         >
-//           Tên danh mục *
-//         </label>
-//         <Form.Item
-//           name="name"
-//           rules={[{ required: true, message: "Vui lòng nhập tên" }]}
-//           style={{ margin: 0 }}
-//         >
-//           <input
-//             style={inp}
-//             placeholder="VD: Giày chạy bộ"
-//             onFocus={(e) => (e.target.style.borderColor = T.primary)}
-//             onBlur={(e) => (e.target.style.borderColor = T.border)}
-//             onChange={(e) => form.setFieldValue("name", e.target.value)}
-//           />
-//         </Form.Item>
-//       </div>
-
-//       {/* Image */}
-//       <div>
-//         <label
-//           style={{
-//             fontSize: 12,
-//             fontWeight: 600,
-//             color: T.textMid,
-//             display: "block",
-//             marginBottom: 8,
-//           }}
-//         >
-//           Hình ảnh
-//         </label>
-//         <Form.Item name="image" noStyle>
-//           <input type="hidden" />
-//         </Form.Item>
-//         <label
-//           style={{
-//             display: "flex",
-//             flexDirection: "column",
-//             alignItems: "center",
-//             justifyContent: "center",
-//             border: `2px dashed ${T.border}`,
-//             borderRadius: 14,
-//             padding: 20,
-//             background: "#F8FAFC",
-//             cursor: "pointer",
-//             transition: "all 0.15s",
-//             gap: 8,
-//             minHeight: 110,
-//           }}
-//           onMouseEnter={(e) => {
-//             e.currentTarget.style.borderColor = T.primary;
-//             e.currentTarget.style.background = "#FFFBF5";
-//           }}
-//           onMouseLeave={(e) => {
-//             e.currentTarget.style.borderColor = T.border;
-//             e.currentTarget.style.background = "#F8FAFC";
-//           }}
-//         >
-//           {imgPreview ? (
-//             <>
-//               <img
-//                 src={`${process.env.REACT_APP_API_URL_BACKEND}/image/${imgPreview}`}
-//                 alt="preview"
-//                 style={{
-//                   width: 72,
-//                   height: 72,
-//                   objectFit: "cover",
-//                   borderRadius: 10,
-//                   border: `1.5px solid ${T.border}`,
-//                 }}
-//               />
-//               <span
-//                 style={{ fontSize: 11, color: T.textMuted, fontWeight: 500 }}
-//               >
-//                 Nhấn để thay đổi
-//               </span>
-//             </>
-//           ) : (
-//             <>
-//               <span
-//                 className="material-symbols-outlined"
-//                 style={{ fontSize: 30, color: "#CBD5E1" }}
-//               >
-//                 add_photo_alternate
-//               </span>
-//               <span
-//                 style={{ fontSize: 12, color: T.textMuted, fontWeight: 500 }}
-//               >
-//                 Chọn ảnh hoặc kéo thả
-//               </span>
-//             </>
-//           )}
-//           <input
-//             type="file"
-//             accept=".jpg,.jpeg,.png,.webp,.gif"
-//             style={{ display: "none" }}
-//             onChange={onUpload}
-//           />
-//         </label>
-//       </div>
-
-//       {/* Submit */}
-//       <button
-//         type="button"
-//         onClick={() => form.submit()}
-//         disabled={loading}
-//         style={{
-//           padding: "11px",
-//           borderRadius: 999,
-//           border: "none",
-//           background: T.primary,
-//           color: "#fff",
-//           fontWeight: 700,
-//           fontSize: 13,
-//           cursor: "pointer",
-//           fontFamily: "'Plus Jakarta Sans',sans-serif",
-//           boxShadow: "0 4px 14px rgba(244,157,37,0.28)",
-//           opacity: loading ? 0.7 : 1,
-//           marginTop: 4,
-//         }}
-//       >
-//         {loading ? "Đang lưu..." : submitLabel}
-//       </button>
-//     </div>
-//   );
-// };
-
-// // ================================================================
-// // Main component
-// // ================================================================
-// export default function Categories() {
-//   const queryClient = useQueryClient();
-//   const { toast, show: showToast } = useToast();
-
-//   const [selected, setSelected] = useState(null);
-//   const [editOpen, setEditOpen] = useState(false);
-//   const [createOpen, setCreateOpen] = useState(false);
-//   const [deleteTarget, setDeleteTarget] = useState(null);
-//   const [editPreview, setEditPreview] = useState("");
-//   const [createPreview, setCreatePreview] = useState("");
-//   const [search, setSearch] = useState("");
-
-//   const [form] = Form.useForm();
-//   const [createForm] = Form.useForm();
-
-//   // ── Queries ────────────────────────────────────────────────
-//   const { data, isLoading, isError } = useQuery({
-//     queryKey: ["admin-categories"],
-//     queryFn: () => getAllCategories("all"),
-//     keepPreviousData: true,
-//   });
-
-//   // ── Mutations ──────────────────────────────────────────────
-//   const transformFormValues = (values) => ({
-//     ...values,
-//     status:
-//       values.status === undefined
-//         ? "active"
-//         : values.status
-//           ? "active"
-//           : "inactive",
-//   });
-
-//   const updateMutation = useMutation({
-//     mutationFn: ({ id, data }) => updateCategory({ id, ...data }),
-//     onSuccess: () => {
-//       showToast("Cập nhật thành công!");
-//       queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
-//       setEditOpen(false);
-//     },
-//     onError: (err) =>
-//       showToast(err?.response?.data?.message || "Lỗi khi cập nhật", "error"),
-//   });
-
-//   const createMutation = useMutation({
-//     mutationFn: createCategory,
-//     onSuccess: () => {
-//       showToast("Tạo danh mục thành công!");
-//       queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
-//       setCreateOpen(false);
-//     },
-//     onError: (err) =>
-//       showToast(err?.response?.data?.message || "Lỗi khi tạo mới", "error"),
-//   });
-
-//   const deleteMutation = useMutation({
-//     mutationFn: ({ id }) => updateCategory({ id, status: "inactive" }),
-//     onSuccess: () => {
-//       showToast("Đã xoá danh mục");
-//       queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
-//       setDeleteTarget(null);
-//     },
-//     onError: (err) =>
-//       showToast(err?.response?.data?.message || "Lỗi khi xoá", "error"),
-//   });
-
-//   // ── Upload image ───────────────────────────────────────────
-//   const handleUpload = async (e, targetForm, setPreview) => {
-//     const file = e.target.files[0];
-//     if (!file) return;
-//     const fd = new FormData();
-//     fd.append("file", file);
-//     try {
-//       const result = await uploadImage(fd);
-//       targetForm.setFieldsValue({ image: result.path });
-//       setPreview(result.path);
-//       showToast("Tải ảnh thành công");
-//     } catch {
-//       showToast("Upload ảnh thất bại", "error");
-//     }
-//   };
-
-//   // ── Open edit ──────────────────────────────────────────────
-//   const handleEdit = (record) => {
-//     setSelected(record);
-//     setEditPreview(record.image || "");
-//     form.setFieldsValue({
-//       name: record.name,
-//       image: record.image,
-//       status: record.status === "active",
-//     });
-//     setEditOpen(true);
-//   };
-
-//   // ── Filter ─────────────────────────────────────────────────
-//   const categories = (data?.data || []).filter(
-//     (c) =>
-//       !search.trim() || c.name?.toLowerCase().includes(search.toLowerCase()),
-//   );
-
-//   // ── States ─────────────────────────────────────────────────
-//   if (isLoading)
-//     return (
-//       <div
-//         style={{
-//           display: "flex",
-//           flexDirection: "column",
-//           alignItems: "center",
-//           justifyContent: "center",
-//           height: 300,
-//           gap: 12,
-//           fontFamily: "'Plus Jakarta Sans',sans-serif",
-//         }}
-//       >
-//         <div
-//           style={{
-//             width: 34,
-//             height: 34,
-//             border: `3px solid #E2E8F0`,
-//             borderTopColor: T.primary,
-//             borderRadius: "50%",
-//             animation: "spin 0.8s linear infinite",
-//           }}
-//         />
-//         <p style={{ fontSize: 13, color: T.textMuted }}>
-//           Đang tải danh sách...
-//         </p>
-//       </div>
-//     );
-
-//   if (isError || !data)
-//     return (
-//       <div
-//         style={{
-//           display: "flex",
-//           flexDirection: "column",
-//           alignItems: "center",
-//           justifyContent: "center",
-//           height: 240,
-//           gap: 8,
-//           color: T.textMuted,
-//           fontFamily: "'Plus Jakarta Sans',sans-serif",
-//         }}
-//       >
-//         <span
-//           className="material-symbols-outlined"
-//           style={{ fontSize: 36, color: T.red }}
-//         >
-//           error_outline
-//         </span>
-//         <p style={{ fontSize: 13, fontWeight: 500 }}>Lỗi khi tải danh sách</p>
-//       </div>
-//     );
-
-//   // ================================================================
-//   // RENDER
-//   // ================================================================
-//   return (
-//     <>
-//       <style>{`
-//         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
-//         .material-symbols-outlined{font-family:'Material Symbols Outlined';font-style:normal;line-height:1;display:inline-block;white-space:nowrap;}
-//         @keyframes spin    { to{transform:rotate(360deg)} }
-//         @keyframes fadeIn  { from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)} }
-//         @keyframes slideUp { from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)} }
-//         .sh-row:hover td { background:#FFFBF5 !important; }
-//         .ant-form-item{margin-bottom:0!important;}
-//         .ant-form-item-explain-error{display:none!important;}
-//       `}</style>
-
-//       <div
-//         style={{
-//           padding: 28,
-//           fontFamily: "'Plus Jakarta Sans',sans-serif",
-//           background: T.bg,
-//           minHeight: "100vh",
-//         }}
-//       >
-//         {/* Toast */}
-//         {toast && (
-//           <div
-//             style={{
-//               position: "fixed",
-//               top: 20,
-//               right: 24,
-//               zIndex: 9999,
-//               padding: "11px 18px",
-//               borderRadius: 12,
-//               animation: "fadeIn 0.2s ease",
-//               background: toast.type === "error" ? T.redBg : T.greenBg,
-//               border: `1.5px solid ${toast.type === "error" ? T.red : T.green}`,
-//               color: toast.type === "error" ? T.red : "#16A34A",
-//               fontWeight: 600,
-//               fontSize: 13,
-//               display: "flex",
-//               alignItems: "center",
-//               gap: 8,
-//               boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-//             }}
-//           >
-//             <span
-//               className="material-symbols-outlined"
-//               style={{ fontSize: 17 }}
-//             >
-//               {toast.type === "error" ? "error" : "check_circle"}
-//             </span>
-//             {toast.msg}
-//           </div>
-//         )}
-
-//         {/* Header */}
-//         <header
-//           style={{
-//             display: "flex",
-//             alignItems: "flex-start",
-//             justifyContent: "space-between",
-//             marginBottom: 24,
-//           }}
-//         >
-//           <div>
-//             <h2
-//               style={{
-//                 margin: 0,
-//                 fontSize: 26,
-//                 fontWeight: 900,
-//                 color: T.text,
-//                 letterSpacing: "-0.5px",
-//               }}
-//             >
-//               Quản lý danh mục
-//             </h2>
-//             <p style={{ margin: "4px 0 0", fontSize: 13, color: T.textMuted }}>
-//               Xem và quản lý danh sách danh mục sản phẩm.
-//             </p>
-//           </div>
-//           <button
-//             onClick={() => {
-//               setCreatePreview("");
-//               createForm.resetFields();
-//               setCreateOpen(true);
-//             }}
-//             style={{
-//               display: "flex",
-//               alignItems: "center",
-//               gap: 6,
-//               padding: "10px 22px",
-//               borderRadius: 999,
-//               border: "none",
-//               background: T.primary,
-//               color: "#fff",
-//               fontWeight: 700,
-//               fontSize: 13,
-//               cursor: "pointer",
-//               fontFamily: "'Plus Jakarta Sans',sans-serif",
-//               boxShadow: "0 4px 16px rgba(244,157,37,0.30)",
-//             }}
-//           >
-//             <span
-//               className="material-symbols-outlined"
-//               style={{ fontSize: 19 }}
-//             >
-//               add_circle
-//             </span>
-//             Thêm danh mục mới
-//           </button>
-//         </header>
-
-//         {/* Search & filter bar */}
-//         <div
-//           style={{
-//             background: T.card,
-//             borderRadius: 14,
-//             border: `1px solid ${T.border}`,
-//             boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-//             padding: "12px 16px",
-//             display: "flex",
-//             gap: 10,
-//             alignItems: "center",
-//             marginBottom: 18,
-//           }}
-//         >
-//           <div style={{ position: "relative", flex: 1 }}>
-//             <span
-//               className="material-symbols-outlined"
-//               style={{
-//                 position: "absolute",
-//                 left: 14,
-//                 top: "50%",
-//                 transform: "translateY(-50%)",
-//                 fontSize: 18,
-//                 color: T.textMuted,
-//               }}
-//             >
-//               search
-//             </span>
-//             <input
-//               placeholder="Tìm kiếm danh mục..."
-//               value={search}
-//               onChange={(e) => setSearch(e.target.value)}
-//               style={{
-//                 width: "100%",
-//                 padding: "10px 14px 10px 42px",
-//                 borderRadius: 999,
-//                 border: "none",
-//                 outline: "none",
-//                 background: "#F1F5F9",
-//                 fontSize: 13,
-//                 color: T.text,
-//                 fontFamily: "'Plus Jakarta Sans',sans-serif",
-//                 boxSizing: "border-box",
-//               }}
-//             />
-//           </div>
-//           {["filter_list:Trạng thái", "sort:Sắp xếp"].map((s) => {
-//             const [icon, label] = s.split(":");
-//             return (
-//               <button
-//                 key={label}
-//                 style={{
-//                   display: "flex",
-//                   alignItems: "center",
-//                   gap: 6,
-//                   padding: "10px 16px",
-//                   borderRadius: 999,
-//                   border: "none",
-//                   background: "#F1F5F9",
-//                   color: T.textMid,
-//                   fontSize: 13,
-//                   fontWeight: 500,
-//                   cursor: "pointer",
-//                   fontFamily: "'Plus Jakarta Sans',sans-serif",
-//                   whiteSpace: "nowrap",
-//                 }}
-//               >
-//                 <span
-//                   className="material-symbols-outlined"
-//                   style={{ fontSize: 18 }}
-//                 >
-//                   {icon}
-//                 </span>
-//                 {label}
-//                 <span
-//                   className="material-symbols-outlined"
-//                   style={{ fontSize: 16 }}
-//                 >
-//                   expand_more
-//                 </span>
-//               </button>
-//             );
-//           })}
-//         </div>
-
-//         {/* Table */}
-//         <div
-//           style={{
-//             background: T.card,
-//             borderRadius: 14,
-//             border: `1px solid ${T.border}`,
-//             boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
-//             overflow: "hidden",
-//           }}
-//         >
-//           <div style={{ overflowX: "auto" }}>
-//             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-//               <thead>
-//                 <tr
-//                   style={{
-//                     background: "#F8FAFC",
-//                     borderBottom: `1.5px solid ${T.border}`,
-//                   }}
-//                 >
-//                   {["Danh mục", "Ngày tạo", "Trạng thái", "Thao tác"].map(
-//                     (h) => (
-//                       <th
-//                         key={h}
-//                         style={{
-//                           padding: "12px 20px",
-//                           textAlign: h === "Thao tác" ? "right" : "left",
-//                           fontSize: 10,
-//                           fontWeight: 700,
-//                           color: T.textMuted,
-//                           textTransform: "uppercase",
-//                           letterSpacing: "0.06em",
-//                           whiteSpace: "nowrap",
-//                         }}
-//                       >
-//                         {h}
-//                       </th>
-//                     ),
-//                   )}
-//                 </tr>
-//               </thead>
-//               <tbody>
-//                 {categories.length === 0 ? (
-//                   <tr>
-//                     <td
-//                       colSpan={4}
-//                       style={{ padding: 56, textAlign: "center" }}
-//                     >
-//                       <div
-//                         style={{
-//                           display: "flex",
-//                           flexDirection: "column",
-//                           alignItems: "center",
-//                           gap: 10,
-//                           color: T.textMuted,
-//                         }}
-//                       >
-//                         <span
-//                           className="material-symbols-outlined"
-//                           style={{ fontSize: 40, opacity: 0.25 }}
-//                         >
-//                           category
-//                         </span>
-//                         <p style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>
-//                           Không tìm thấy danh mục nào
-//                         </p>
-//                       </div>
-//                     </td>
-//                   </tr>
-//                 ) : (
-//                   categories.map((record) => (
-//                     <tr
-//                       key={record._id}
-//                       className="sh-row"
-//                       style={{ borderBottom: `1px solid #F1F5F9` }}
-//                     >
-//                       {/* Tên + ảnh */}
-//                       <td style={{ padding: "14px 20px" }}>
-//                         <div
-//                           style={{
-//                             display: "flex",
-//                             alignItems: "center",
-//                             gap: 14,
-//                           }}
-//                         >
-//                           <div
-//                             style={{
-//                               width: 48,
-//                               height: 48,
-//                               borderRadius: 12,
-//                               background: "#F1F5F9",
-//                               border: `1px solid ${T.border}`,
-//                               overflow: "hidden",
-//                               flexShrink: 0,
-//                               display: "flex",
-//                               alignItems: "center",
-//                               justifyContent: "center",
-//                             }}
-//                           >
-//                             {record.image ? (
-//                               <img
-//                                 src={`${process.env.REACT_APP_API_URL_BACKEND}/image/${record.image}`}
-//                                 alt={record.name}
-//                                 style={{
-//                                   width: "100%",
-//                                   height: "100%",
-//                                   objectFit: "cover",
-//                                 }}
-//                               />
-//                             ) : (
-//                               <span
-//                                 className="material-symbols-outlined"
-//                                 style={{ fontSize: 22, color: "#CBD5E1" }}
-//                               >
-//                                 category
-//                               </span>
-//                             )}
-//                           </div>
-//                           <div>
-//                             <p
-//                               style={{
-//                                 margin: 0,
-//                                 fontSize: 14,
-//                                 fontWeight: 700,
-//                                 color: T.text,
-//                               }}
-//                             >
-//                               {record.name}
-//                             </p>
-//                             <p
-//                               style={{
-//                                 margin: "2px 0 0",
-//                                 fontSize: 11,
-//                                 color: T.textMuted,
-//                               }}
-//                             >
-//                               ID: {record._id?.slice(-6)}
-//                             </p>
-//                           </div>
-//                         </div>
-//                       </td>
-//                       {/* Ngày tạo */}
-//                       <td
-//                         style={{
-//                           padding: "14px 20px",
-//                           fontSize: 13,
-//                           color: T.textMuted,
-//                           whiteSpace: "nowrap",
-//                         }}
-//                       >
-//                         {new Date(record.createdAt).toLocaleDateString(
-//                           "vi-VN",
-//                           { year: "numeric", month: "2-digit", day: "2-digit" },
-//                         )}
-//                       </td>
-//                       {/* Trạng thái */}
-//                       <td style={{ padding: "14px 20px" }}>
-//                         <StatusBadge status={record.status} />
-//                       </td>
-//                       {/* Thao tác */}
-//                       <td style={{ padding: "14px 20px" }}>
-//                         <div
-//                           style={{
-//                             display: "flex",
-//                             gap: 6,
-//                             justifyContent: "flex-end",
-//                           }}
-//                         >
-//                           <button
-//                             onClick={() => handleEdit(record)}
-//                             style={{
-//                               width: 36,
-//                               height: 36,
-//                               borderRadius: "50%",
-//                               border: `1.5px solid ${T.border}`,
-//                               background: "#fff",
-//                               color: T.textMuted,
-//                               cursor: "pointer",
-//                               display: "flex",
-//                               alignItems: "center",
-//                               justifyContent: "center",
-//                               transition: "all 0.15s",
-//                             }}
-//                             onMouseEnter={(e) => {
-//                               e.currentTarget.style.borderColor = T.primary;
-//                               e.currentTarget.style.color = T.primary;
-//                               e.currentTarget.style.background = T.primaryBg;
-//                             }}
-//                             onMouseLeave={(e) => {
-//                               e.currentTarget.style.borderColor = T.border;
-//                               e.currentTarget.style.color = T.textMuted;
-//                               e.currentTarget.style.background = "#fff";
-//                             }}
-//                           >
-//                             <span
-//                               className="material-symbols-outlined"
-//                               style={{ fontSize: 17 }}
-//                             >
-//                               edit
-//                             </span>
-//                           </button>
-//                           <button
-//                             onClick={() => setDeleteTarget(record)}
-//                             style={{
-//                               width: 36,
-//                               height: 36,
-//                               borderRadius: "50%",
-//                               border: `1.5px solid ${T.border}`,
-//                               background: "#fff",
-//                               color: T.textMuted,
-//                               cursor: "pointer",
-//                               display: "flex",
-//                               alignItems: "center",
-//                               justifyContent: "center",
-//                               transition: "all 0.15s",
-//                             }}
-//                             onMouseEnter={(e) => {
-//                               e.currentTarget.style.borderColor = T.red;
-//                               e.currentTarget.style.color = T.red;
-//                               e.currentTarget.style.background = T.redBg;
-//                             }}
-//                             onMouseLeave={(e) => {
-//                               e.currentTarget.style.borderColor = T.border;
-//                               e.currentTarget.style.color = T.textMuted;
-//                               e.currentTarget.style.background = "#fff";
-//                             }}
-//                           >
-//                             <span
-//                               className="material-symbols-outlined"
-//                               style={{ fontSize: 17 }}
-//                             >
-//                               delete
-//                             </span>
-//                           </button>
-//                         </div>
-//                       </td>
-//                     </tr>
-//                   ))
-//                 )}
-//               </tbody>
-//             </table>
-//           </div>
-
-//           {/* Footer */}
-//           <div
-//             style={{
-//               padding: "12px 20px",
-//               borderTop: `1px solid ${T.border}`,
-//               background: "#F8FAFC",
-//             }}
-//           >
-//             <p style={{ margin: 0, fontSize: 13, color: T.textMuted }}>
-//               Hiển thị <b style={{ color: T.text }}>{categories.length}</b> /{" "}
-//               {data?.data?.length || 0} danh mục
-//             </p>
-//           </div>
-//         </div>
-//       </div>
-
-//       {/* Edit modal */}
-//       <SHModal
-//         open={editOpen}
-//         title="Chỉnh sửa danh mục"
-//         onClose={() => setEditOpen(false)}
-//       >
-//         <Form
-//           form={form}
-//           layout="vertical"
-//           onFinish={(values) =>
-//             updateMutation.mutate({
-//               id: selected._id,
-//               data: transformFormValues(values),
-//             })
-//           }
-//         >
-//           <CategoryFormBody
-//             form={form}
-//             imgPreview={editPreview}
-//             onUpload={(e) => handleUpload(e, form, setEditPreview)}
-//             loading={updateMutation.isPending}
-//             submitLabel="Lưu thay đổi"
-//           />
-//         </Form>
-//       </SHModal>
-
-//       {/* Create modal */}
-//       <SHModal
-//         open={createOpen}
-//         title="Thêm danh mục mới"
-//         onClose={() => setCreateOpen(false)}
-//       >
-//         <Form
-//           form={createForm}
-//           layout="vertical"
-//           initialValues={{ name: "", image: "", status: true }}
-//           onFinish={(values) =>
-//             createMutation.mutate(transformFormValues(values))
-//           }
-//         >
-//           <CategoryFormBody
-//             form={createForm}
-//             imgPreview={createPreview}
-//             onUpload={(e) => handleUpload(e, createForm, setCreatePreview)}
-//             loading={createMutation.isPending}
-//             submitLabel="Tạo danh mục"
-//           />
-//         </Form>
-//       </SHModal>
-
-//       {/* Confirm delete */}
-//       <ConfirmModal
-//         open={!!deleteTarget}
-//         name={deleteTarget?.name}
-//         loading={deleteMutation.isPending}
-//         onConfirm={() => deleteMutation.mutate({ id: deleteTarget._id })}
-//         onCancel={() => setDeleteTarget(null)}
-//       />
-//     </>
-//   );
-// }
-
-import { useState } from "react";
-import { Form } from "antd";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { Form, Radio } from "antd";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  createCategory,
+  deleteCategories,
   getAllCategories,
   updateCategory,
-  createCategory,
   uploadImage,
 } from "../api/index";
 
-// Backend đang chạy tại 3002. Ép base URL đúng port để ảnh luôn load được (tránh dính 3001 -> ERR_CONNECTION_REFUSED).
 const BACKEND_BASE_URL = (
   process.env.REACT_APP_API_URL_BACKEND || "http://localhost:3002/api"
 )
@@ -1105,130 +16,51 @@ const BACKEND_BASE_URL = (
   .replace(/localhost:\d+/, "localhost:3002")
   .replace(/127\.0\.0\.1:\d+/, "127.0.0.1:3002");
 
-// ── Design tokens ──────────────────────────────────────────────
 const T = {
   primary: "#f49d25",
-  primaryBg: "rgba(244,157,37,0.08)",
-  border: "#E2E8F0",
+  primarySoft: "rgba(244,157,37,0.1)",
   text: "#0F172A",
-  textMid: "#475569",
-  textMuted: "#94A3B8",
-  card: "#ffffff",
-  bg: "#F8F7F5",
-  red: "#EF4444",
-  redBg: "rgba(239,68,68,0.08)",
-  green: "#22C55E",
-  greenBg: "rgba(34,197,94,0.10)",
+  textMuted: "#64748B",
+  border: "#E2E8F0",
+  card: "#FFFFFF",
+  bg: "#F6F7FB",
+  active: "#16A34A",
+  activeBg: "rgba(22,163,74,0.12)",
+  danger: "#EF4444",
+  dangerSoft: "rgba(239,68,68,0.1)",
 };
 
-// ── Toast ──────────────────────────────────────────────────────
 const useToast = () => {
   const [toast, setToast] = useState(null);
   const show = (msg, type = "success") => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 2500);
   };
   return { toast, show };
 };
 
-// ── Status badge ───────────────────────────────────────────────
 const StatusBadge = ({ status }) => {
-  const active = status === "active";
+  const isActive = status === "active";
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "4px 12px",
-        borderRadius: 999,
-        fontSize: 11,
-        fontWeight: 700,
-        background: active ? T.greenBg : "#F1F5F9",
-        color: active ? "#16A34A" : T.textMuted,
-      }}
-    >
-      <span
-        style={{
-          width: 6,
-          height: 6,
-          borderRadius: "50%",
-          background: active ? T.green : "#CBD5E1",
-          flexShrink: 0,
-        }}
-      />
-      {active ? "Đang hoạt động" : "Ngừng hoạt động"}
+    <span className={`cate-status ${isActive ? "active" : "inactive"}`}>
+      <span className="dot" />
+      {isActive ? "Đang hoạt động" : "Ngừng hoạt động"}
     </span>
   );
 };
 
-// ── Modal wrapper ──────────────────────────────────────────────
 const SHModal = ({ open, title, onClose, children }) => {
   if (!open) return null;
   return (
     <div
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1000,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "rgba(15,23,42,0.40)",
-        backdropFilter: "blur(3px)",
-      }}
+      className="cate-modal-overlay"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div
-        style={{
-          background: T.card,
-          borderRadius: 20,
-          border: `1px solid ${T.border}`,
-          boxShadow: "0 24px 64px rgba(0,0,0,0.18)",
-          width: "100%",
-          maxWidth: 420,
-          padding: "28px 28px 24px",
-          fontFamily: "'Plus Jakarta Sans', sans-serif",
-          animation: "slideUp 0.2s ease",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 24,
-          }}
-        >
-          <h3
-            style={{ margin: 0, fontSize: 16, fontWeight: 800, color: T.text }}
-          >
-            {title}
-          </h3>
-          <button
-            onClick={onClose}
-            type="button"
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: 8,
-              border: "none",
-              background: "#F1F5F9",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: T.textMid,
-            }}
-          >
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: 16 }}
-            >
-              close
-            </span>
+      <div className="cate-modal">
+        <div className="cate-modal-header">
+          <h3>{title}</h3>
+          <button type="button" onClick={onClose}>
+            <span className="material-symbols-outlined">close</span>
           </button>
         </div>
         {children}
@@ -1237,168 +69,112 @@ const SHModal = ({ open, title, onClose, children }) => {
   );
 };
 
-// ── Category form body ─────────────────────────────────────────
+const ConfirmDeleteModal = ({ open, item, loading, onCancel, onConfirm }) => {
+  if (!open || !item) return null;
+  return (
+    <div
+      className="cate-modal-overlay"
+      onClick={(e) => e.target === e.currentTarget && onCancel()}
+    >
+      <div className="cate-confirm-modal">
+        <div className="cate-confirm-icon">
+          <span className="material-symbols-outlined">delete</span>
+        </div>
+        <h3>Xóa danh mục</h3>
+        <p>
+          Bạn có chắc muốn xóa danh mục <b>"{item.name}"</b>?
+          <br />
+          Hành động này sẽ xóa vĩnh viễn và không thể khôi phục.
+        </p>
+        <div className="cate-confirm-actions">
+          <button type="button" className="ghost" onClick={onCancel}>
+            Hủy
+          </button>
+          <button type="button" className="danger" onClick={onConfirm} disabled={loading}>
+            {loading ? "Đang xử lý..." : "Xác nhận xóa"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const CategoryFormBody = ({
   form,
   imgPreview,
   onUpload,
   loading,
   submitLabel,
-}) => {
-  const inp = {
-    width: "100%",
-    padding: "10px 14px",
-    borderRadius: 10,
-    border: `1.5px solid ${T.border}`,
-    outline: "none",
-    fontSize: 13,
-    fontFamily: "'Plus Jakarta Sans',sans-serif",
-    background: "#F8FAFC",
-    boxSizing: "border-box",
-    color: T.text,
-  };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      {/* Name */}
-      <div>
-        <label
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: T.textMid,
-            display: "block",
-            marginBottom: 6,
-          }}
-        >
-          Tên danh mục *
-        </label>
-        <Form.Item
-          name="name"
-          rules={[{ required: true, message: "Vui lòng nhập tên" }]}
-          style={{ margin: 0 }}
-        >
-          <input
-            style={inp}
-            placeholder="VD: Giày chạy bộ"
-            onFocus={(e) => (e.target.style.borderColor = T.primary)}
-            onBlur={(e) => (e.target.style.borderColor = T.border)}
-          />
-        </Form.Item>
-      </div>
-
-      {/* Image */}
-      <div>
-        <label
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: T.textMid,
-            display: "block",
-            marginBottom: 8,
-          }}
-        >
-          Hình ảnh
-        </label>
-        <Form.Item name="image" noStyle>
-          <input type="hidden" />
-        </Form.Item>
-        <label
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            border: `2px dashed ${T.border}`,
-            borderRadius: 14,
-            padding: 20,
-            background: "#F8FAFC",
-            cursor: "pointer",
-            transition: "all 0.15s",
-            gap: 8,
-            minHeight: 110,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = T.primary;
-            e.currentTarget.style.background = "#FFFBF5";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = T.border;
-            e.currentTarget.style.background = "#F8FAFC";
-          }}
-        >
-          {imgPreview ? (
-            <>
-              <img
-                src={`${BACKEND_BASE_URL}/uploads/${imgPreview}`}
-                alt="preview"
-                style={{
-                  width: 72,
-                  height: 72,
-                  objectFit: "cover",
-                  borderRadius: 10,
-                  border: `1.5px solid ${T.border}`,
-                }}
-              />
-              <span
-                style={{ fontSize: 11, color: T.textMuted, fontWeight: 500 }}
-              >
-                Nhấn để thay đổi
-              </span>
-            </>
-          ) : (
-            <>
-              <span
-                className="material-symbols-outlined"
-                style={{ fontSize: 30, color: "#CBD5E1" }}
-              >
-                add_photo_alternate
-              </span>
-              <span
-                style={{ fontSize: 12, color: T.textMuted, fontWeight: 500 }}
-              >
-                Chọn ảnh hoặc kéo thả
-              </span>
-            </>
-          )}
-          <input
-            type="file"
-            accept=".jpg,.jpeg,.png,.webp,.gif"
-            style={{ display: "none" }}
-            onChange={onUpload}
-          />
-        </label>
-      </div>
-
-      {/* Submit */}
-      <button
-        type="button"
-        onClick={() => form.submit()}
-        disabled={loading}
-        style={{
-          padding: "11px",
-          borderRadius: 999,
-          border: "none",
-          background: T.primary,
-          color: "#fff",
-          fontWeight: 700,
-          fontSize: 13,
-          cursor: "pointer",
-          fontFamily: "'Plus Jakarta Sans',sans-serif",
-          boxShadow: "0 4px 14px rgba(244,157,37,0.28)",
-          opacity: loading ? 0.7 : 1,
-          marginTop: 4,
-        }}
+}) => (
+  <div className="cate-form-wrap">
+    <div>
+      <label>Tên danh mục *</label>
+      <Form.Item
+        name="name"
+        rules={[{ required: true, message: "Vui lòng nhập tên danh mục" }]}
+        style={{ margin: 0 }}
       >
-        {loading ? "Đang lưu..." : submitLabel}
-      </button>
+        <input className="cate-input" placeholder="VD: Giày chạy bộ" />
+      </Form.Item>
     </div>
-  );
-};
 
-// ================================================================
-// Main component
-// ================================================================
+    <div>
+      <label>Hình ảnh</label>
+      <Form.Item name="image" noStyle>
+        <input type="hidden" />
+      </Form.Item>
+      <label className="cate-upload-box">
+        {imgPreview ? (
+          <div className="cate-upload-content has-image">
+            <img
+              src={`${BACKEND_BASE_URL}/uploads/${imgPreview}`}
+              alt="preview"
+              className="cate-upload-preview"
+            />
+            <span>Nhấn để thay đổi ảnh</span>
+          </div>
+        ) : (
+          <div className="cate-upload-content">
+            <span className="material-symbols-outlined upload-icon">
+              add_photo_alternate
+            </span>
+            <span>Chọn ảnh hoặc kéo thả vào đây</span>
+          </div>
+        )}
+        <input
+          type="file"
+          accept=".jpg,.jpeg,.png,.webp,.gif"
+          onChange={onUpload}
+          hidden
+        />
+      </label>
+    </div>
+
+    <div>
+      <label>Trạng thái</label>
+      <Form.Item
+        name="status"
+        rules={[{ required: true, message: "Vui lòng chọn trạng thái" }]}
+        style={{ margin: 0 }}
+      >
+        <Radio.Group className="cate-status-choice">
+          <Radio.Button value="active">Đang hoạt động</Radio.Button>
+          <Radio.Button value="inactive">Ngừng hoạt động</Radio.Button>
+        </Radio.Group>
+      </Form.Item>
+    </div>
+
+    <button
+      type="button"
+      className="cate-submit-btn"
+      onClick={() => form.submit()}
+      disabled={loading}
+    >
+      {loading ? "Đang lưu..." : submitLabel}
+    </button>
+  </div>
+);
+
 export default function Categories() {
   const queryClient = useQueryClient();
   const { toast, show: showToast } = useToast();
@@ -1409,32 +185,31 @@ export default function Categories() {
   const [editPreview, setEditPreview] = useState("");
   const [createPreview, setCreatePreview] = useState("");
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("newest");
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const [form] = Form.useForm();
   const [createForm] = Form.useForm();
 
-  // ── Queries ────────────────────────────────────────────────
   const { data, isLoading, isError } = useQuery({
     queryKey: ["admin-categories"],
     queryFn: () => getAllCategories("all"),
     keepPreviousData: true,
   });
 
-  // ── Mutations ──────────────────────────────────────────────
   const transformFormValues = (values) => ({
     ...values,
     status:
-      values.status === undefined
-        ? "active"
-        : values.status
-          ? "active"
-          : "inactive",
+      values.status === "inactive" || values.status === false
+        ? "inactive"
+        : "active",
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => updateCategory({ id, ...data }),
+    mutationFn: ({ id, data: payload }) => updateCategory({ id, ...payload }),
     onSuccess: () => {
-      showToast("Cập nhật thành công!");
+      showToast("Cập nhật danh mục thành công");
       queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
       setEditOpen(false);
     },
@@ -1445,7 +220,7 @@ export default function Categories() {
   const createMutation = useMutation({
     mutationFn: createCategory,
     onSuccess: () => {
-      showToast("Tạo danh mục thành công!");
+      showToast("Tạo danh mục thành công");
       queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
       setCreateOpen(false);
     },
@@ -1453,7 +228,17 @@ export default function Categories() {
       showToast(err?.response?.data?.message || "Lỗi khi tạo mới", "error"),
   });
 
-  // ── Upload image ───────────────────────────────────────────
+  const deleteMutation = useMutation({
+    mutationFn: ({ id }) => deleteCategories([id]),
+    onSuccess: () => {
+      showToast("Đã xóa danh mục");
+      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
+      setDeleteTarget(null);
+    },
+    onError: (err) =>
+      showToast(err?.response?.data?.message || "Lỗi khi xóa danh mục", "error"),
+  });
+
   const handleUpload = async (e, targetForm, setPreview) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1469,479 +254,266 @@ export default function Categories() {
     }
   };
 
-  // ── Open edit ──────────────────────────────────────────────
+  const categories = useMemo(() => {
+    const source = [...(data?.data || [])];
+    const q = search.trim().toLowerCase();
+
+    const filtered = source.filter((item) => {
+      const bySearch = !q || item?.name?.toLowerCase().includes(q);
+      const byStatus =
+        statusFilter === "all" ? true : item.status === statusFilter;
+      return bySearch && byStatus;
+    });
+
+    filtered.sort((a, b) => {
+      if (sortBy === "a-z") return (a.name || "").localeCompare(b.name || "");
+      if (sortBy === "z-a") return (b.name || "").localeCompare(a.name || "");
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return sortBy === "oldest" ? dateA - dateB : dateB - dateA;
+    });
+
+    return filtered;
+  }, [data?.data, search, statusFilter, sortBy]);
+
   const handleEdit = (record) => {
     setSelected(record);
     setEditPreview(record.image || "");
-    setEditOpen(true); // Mở modal lên trước để Form kịp render
+    setEditOpen(true);
     setTimeout(() => {
       form.setFieldsValue({
         name: record.name,
         image: record.image,
-        status: record.status === "active",
+        status: record.status === "inactive" ? "inactive" : "active",
       });
-    }, 50);
+    }, 0);
   };
 
-  // ── Filter ─────────────────────────────────────────────────
-  const categories = (data?.data || []).filter(
-    (c) =>
-      !search.trim() || c.name?.toLowerCase().includes(search.toLowerCase()),
-  );
+  const handleDelete = (record) => {
+    setDeleteTarget(record);
+  };
 
-  // ================================================================
-  // RENDER (Không dùng early return chặn bên ngoài nữa)
-  // ================================================================
   return (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
-        .material-symbols-outlined{font-family:'Material Symbols Outlined';font-style:normal;line-height:1;display:inline-block;white-space:nowrap;}
-        @keyframes spin    { to{transform:rotate(360deg)} }
-        @keyframes fadeIn  { from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)} }
-        @keyframes slideUp { from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)} }
-        .sh-row:hover td { background:#FFFBF5 !important; }
-        .ant-form-item{margin-bottom:0!important;}
-        .ant-form-item-explain-error{display:none!important;}
+        .material-symbols-outlined{font-family:'Material Symbols Outlined';font-style:normal;line-height:1;display:inline-block;white-space:nowrap}
+        .ant-form-item{margin-bottom:0!important}
+        .ant-form-item-explain-error{display:none!important}
+        .cate-page{padding:24px;background:${T.bg};min-height:100vh;font-family:"Plus Jakarta Sans",sans-serif}
+        .cate-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+        .cate-header h2{margin:0;font-size:28px;color:${T.text};font-weight:900;letter-spacing:-.02em}
+        .cate-header p{margin:4px 0 0;color:${T.textMuted};font-size:13px}
+        .cate-btn-primary{height:42px;border:0;border-radius:999px;background:${T.primary};color:#fff;font-weight:700;padding:0 18px;display:flex;align-items:center;gap:6px;cursor:pointer;box-shadow:0 8px 20px rgba(244,157,37,.3)}
+        .cate-toolbar{display:flex;align-items:center;gap:10px;background:${T.card};border:1px solid ${T.border};border-radius:16px;padding:12px;margin-bottom:14px;flex-wrap:wrap}
+        .cate-search{flex:1;min-width:220px;position:relative}
+        .cate-search .material-symbols-outlined{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#94A3B8}
+        .cate-search input{width:100%;height:40px;background:#F8FAFC;border:1px solid transparent;border-radius:999px;padding:0 12px 0 38px;color:${T.text};outline:none}
+        .cate-search input:focus{border-color:${T.primary};background:#fff}
+        .cate-select{height:40px;border-radius:999px;border:1px solid ${T.border};background:#fff;padding:0 14px;color:#334155;font-size:13px;outline:none}
+        .cate-table-wrap{background:${T.card};border:1px solid ${T.border};border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(15,23,42,.05)}
+        .cate-table-scroll{overflow-x:auto}
+        .cate-table{width:100%;border-collapse:collapse}
+        .cate-table thead tr{background:#F8FAFC;border-bottom:1px solid ${T.border}}
+        .cate-table th{padding:12px 18px;text-transform:uppercase;letter-spacing:.07em;font-size:10px;color:#94A3B8;text-align:left}
+        .cate-table th:last-child,.cate-table td:last-child{text-align:right}
+        .cate-table td{padding:14px 18px;border-bottom:1px solid #F1F5F9}
+        .cate-row:hover td{background:#FFFBF5}
+        .cate-cell-info{display:flex;align-items:center;gap:12px}
+        .cate-avatar{width:46px;height:46px;border-radius:12px;border:1px solid ${T.border};background:#F8FAFC;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}
+        .cate-avatar img{width:100%;height:100%;object-fit:cover}
+        .cate-name{margin:0;color:${T.text};font-size:14px;font-weight:700}
+        .cate-id{margin:2px 0 0;font-size:11px;color:${T.textMuted}}
+        .cate-date{font-size:13px;color:${T.textMuted};white-space:nowrap}
+        .cate-status{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;font-size:11px;font-weight:700}
+        .cate-status .dot{width:6px;height:6px;border-radius:50%}
+        .cate-status.active{background:${T.activeBg};color:${T.active}}
+        .cate-status.active .dot{background:${T.active}}
+        .cate-status.inactive{background:#F1F5F9;color:#64748B}
+        .cate-status.inactive .dot{background:#94A3B8}
+        .cate-row-actions{display:flex;justify-content:flex-end;gap:8px}
+        .cate-icon-btn{width:36px;height:36px;border-radius:50%;border:1px solid ${T.border};background:#fff;color:#64748B;display:flex;align-items:center;justify-content:center;cursor:pointer}
+        .cate-icon-btn:hover{border-color:${T.primary};background:${T.primarySoft};color:${T.primary}}
+        .cate-icon-btn.delete:hover{border-color:${T.danger};background:${T.dangerSoft};color:${T.danger}}
+        .cate-table-footer{padding:12px 18px;background:#F8FAFC;color:${T.textMuted};font-size:13px}
+        .cate-empty{padding:56px 12px;text-align:center;color:${T.textMuted}}
+        .cate-empty .material-symbols-outlined{font-size:40px;opacity:.35}
+        .cate-modal-overlay{position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.45);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;padding:16px}
+        .cate-modal{width:100%;max-width:520px;background:#fff;border-radius:18px;border:1px solid #E5E7EB;padding:22px;box-shadow:0 20px 50px rgba(0,0,0,.2)}
+        .cate-modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+        .cate-modal-header h3{margin:0;color:${T.text};font-size:18px;font-weight:800}
+        .cate-modal-header button{width:38px;height:38px;border:0;border-radius:50%;background:#EEF2F7;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#64748B}
+        .cate-modal-header button .material-symbols-outlined{font-size:22px}
+        .cate-form-wrap{display:flex;flex-direction:column;gap:14px}
+        .cate-form-wrap label{display:block;margin-bottom:6px;color:#475569;font-size:14px;font-weight:700}
+        .cate-input{width:100%;height:52px;border:1px solid #D6DEE8;border-radius:14px;padding:0 14px;background:#F6F8FB;outline:none;color:${T.text};font-size:16px}
+        .cate-input:focus{border-color:${T.primary};background:#fff}
+        .cate-upload-box{display:flex;border:2px dashed #D5DDE8;background:#F8FAFC;border-radius:14px;padding:14px;cursor:pointer;min-height:130px;color:${T.textMuted}}
+        .cate-upload-box:hover{border-color:${T.primary};background:#FFFBF5}
+        .cate-upload-content{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%}
+        .cate-upload-content.has-image{align-items:flex-start}
+        .cate-upload-preview{width:86px;height:86px;border-radius:14px;object-fit:cover;border:1px solid ${T.border}}
+        .upload-icon{font-size:30px;color:#94A3B8}
+        .cate-upload-content span{font-size:14px;font-weight:600;color:#475569}
+        .cate-status-choice{display:grid!important;grid-template-columns:1fr 1fr;gap:10px}
+        .cate-status-choice .ant-radio-button-wrapper{height:46px;border:1px solid #D6DEE8;border-radius:12px!important;background:#F6F8FB;color:#334155;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center}
+        .cate-status-choice .ant-radio-button-wrapper::before{display:none!important}
+        .cate-status-choice .ant-radio-button-wrapper-checked{border-color:${T.primary}!important;background:${T.primarySoft}!important;color:${T.primary}!important;box-shadow:none!important}
+        .cate-submit-btn{height:52px;border:0;border-radius:999px;background:${T.primary};color:#fff;font-size:16px;font-weight:700;cursor:pointer;margin-top:4px}
+        .cate-submit-btn:disabled{opacity:.7;cursor:not-allowed}
+        .cate-confirm-modal{width:100%;max-width:430px;background:#fff;border:1px solid #E5E7EB;border-radius:18px;padding:22px;box-shadow:0 25px 60px rgba(0,0,0,.22)}
+        .cate-confirm-icon{width:46px;height:46px;border-radius:50%;background:${T.dangerSoft};display:flex;align-items:center;justify-content:center;color:${T.danger};margin:0 auto 10px}
+        .cate-confirm-modal h3{margin:0 0 8px;text-align:center;font-size:20px;color:${T.text};font-weight:800}
+        .cate-confirm-modal p{margin:0 0 18px;text-align:center;font-size:14px;line-height:1.5;color:#475569}
+        .cate-confirm-actions{display:flex;gap:10px}
+        .cate-confirm-actions button{flex:1;height:44px;border-radius:999px;font-weight:700;font-size:14px;cursor:pointer}
+        .cate-confirm-actions .ghost{border:1px solid ${T.border};background:#fff;color:#475569}
+        .cate-confirm-actions .danger{border:0;background:${T.danger};color:#fff}
+        .cate-confirm-actions .danger:disabled{opacity:.7;cursor:not-allowed}
+        .cate-toast{position:fixed;top:16px;right:16px;z-index:1200;padding:10px 14px;border-radius:12px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
+        .cate-toast.success{background:rgba(22,163,74,.12);border:1px solid rgba(22,163,74,.4);color:#15803D}
+        .cate-toast.error{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#B91C1C}
       `}</style>
 
-      <div
-        style={{
-          padding: 28,
-          fontFamily: "'Plus Jakarta Sans',sans-serif",
-          background: T.bg,
-          minHeight: "100vh",
-        }}
-      >
-        {/* Toast */}
-        {toast && (
-          <div
-            style={{
-              position: "fixed",
-              top: 20,
-              right: 24,
-              zIndex: 9999,
-              padding: "11px 18px",
-              borderRadius: 12,
-              animation: "fadeIn 0.2s ease",
-              background: toast.type === "error" ? T.redBg : T.greenBg,
-              border: `1.5px solid ${toast.type === "error" ? T.red : T.green}`,
-              color: toast.type === "error" ? T.red : "#16A34A",
-              fontWeight: 600,
-              fontSize: 13,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-            }}
-          >
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: 17 }}
-            >
-              {toast.type === "error" ? "error" : "check_circle"}
-            </span>
-            {toast.msg}
-          </div>
-        )}
+      {toast && (
+        <div className={`cate-toast ${toast.type === "error" ? "error" : "success"}`}>
+          <span className="material-symbols-outlined">
+            {toast.type === "error" ? "error" : "check_circle"}
+          </span>
+          {toast.msg}
+        </div>
+      )}
 
-        {/* Header */}
-        <header
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            marginBottom: 24,
-          }}
-        >
+      <div className="cate-page">
+        <header className="cate-header">
           <div>
-            <h2
-              style={{
-                margin: 0,
-                fontSize: 26,
-                fontWeight: 900,
-                color: T.text,
-                letterSpacing: "-0.5px",
-              }}
-            >
-              Quản lý danh mục
-            </h2>
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: T.textMuted }}>
-              Xem và quản lý danh sách danh mục sản phẩm.
-            </p>
+            <h2>Quản lý danh mục</h2>
+            <p>Quản trị danh sách danh mục sản phẩm theo giao diện mới.</p>
           </div>
           <button
+            type="button"
+            className="cate-btn-primary"
             onClick={() => {
               setCreatePreview("");
-              setCreateOpen(true); // Mở form lên trước
-              setTimeout(() => createForm.resetFields(), 50); // Reset trắng ô nhập liệu sau 1 chút
-            }}
-            type="button"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "10px 22px",
-              borderRadius: 999,
-              border: "none",
-              background: T.primary,
-              color: "#fff",
-              fontWeight: 700,
-              fontSize: 13,
-              cursor: "pointer",
-              fontFamily: "'Plus Jakarta Sans',sans-serif",
-              boxShadow: "0 4px 16px rgba(244,157,37,0.30)",
+              setCreateOpen(true);
+              setTimeout(() => createForm.resetFields(), 0);
             }}
           >
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: 19 }}
-            >
-              add_circle
-            </span>
-            Thêm danh mục mới
+            <span className="material-symbols-outlined">add_circle</span>
+            Thêm danh mục
           </button>
         </header>
 
-        {/* Search & filter bar */}
-        <div
-          style={{
-            background: T.card,
-            borderRadius: 14,
-            border: `1px solid ${T.border}`,
-            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-            padding: "12px 16px",
-            display: "flex",
-            gap: 10,
-            alignItems: "center",
-            marginBottom: 18,
-          }}
-        >
-          <div style={{ position: "relative", flex: 1 }}>
-            <span
-              className="material-symbols-outlined"
-              style={{
-                position: "absolute",
-                left: 14,
-                top: "50%",
-                transform: "translateY(-50%)",
-                fontSize: 18,
-                color: T.textMuted,
-              }}
-            >
-              search
-            </span>
+        <section className="cate-toolbar">
+          <div className="cate-search">
+            <span className="material-symbols-outlined">search</span>
             <input
               placeholder="Tìm kiếm danh mục..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "10px 14px 10px 42px",
-                borderRadius: 999,
-                border: "none",
-                outline: "none",
-                background: "#F1F5F9",
-                fontSize: 13,
-                color: T.text,
-                fontFamily: "'Plus Jakarta Sans',sans-serif",
-                boxSizing: "border-box",
-              }}
             />
           </div>
-          {["filter_list:Trạng thái", "sort:Sắp xếp"].map((s) => {
-            const [icon, label] = s.split(":");
-            return (
-              <button
-                key={label}
-                type="button"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "10px 16px",
-                  borderRadius: 999,
-                  border: "none",
-                  background: "#F1F5F9",
-                  color: T.textMid,
-                  fontSize: 13,
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  fontFamily: "'Plus Jakarta Sans',sans-serif",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: 18 }}
-                >
-                  {icon}
-                </span>
-                {label}
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: 16 }}
-                >
-                  expand_more
-                </span>
-              </button>
-            );
-          })}
-        </div>
 
-        {/* Table */}
-        <div
-          style={{
-            background: T.card,
-            borderRadius: 14,
-            border: `1px solid ${T.border}`,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
-            overflow: "hidden",
-          }}
-        >
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <select
+            className="cate-select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="all">Trạng thái: Tất cả</option>
+            <option value="active">Trạng thái: Đang hoạt động</option>
+            <option value="inactive">Trạng thái: Ngừng hoạt động</option>
+          </select>
+
+          <select
+            className="cate-select"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+          >
+            <option value="newest">Sắp xếp: Mới nhất</option>
+            <option value="oldest">Sắp xếp: Cũ nhất</option>
+            <option value="a-z">Sắp xếp: A - Z</option>
+            <option value="z-a">Sắp xếp: Z - A</option>
+          </select>
+        </section>
+
+        <section className="cate-table-wrap">
+          <div className="cate-table-scroll">
+            <table className="cate-table">
               <thead>
-                <tr
-                  style={{
-                    background: "#F8FAFC",
-                    borderBottom: `1.5px solid ${T.border}`,
-                  }}
-                >
-                  {["Danh mục", "Ngày tạo", "Trạng thái", "Thao tác"].map(
-                    (h) => (
-                      <th
-                        key={h}
-                        style={{
-                          padding: "12px 20px",
-                          textAlign: h === "Thao tác" ? "right" : "left",
-                          fontSize: 10,
-                          fontWeight: 700,
-                          color: T.textMuted,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.06em",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ),
-                  )}
+                <tr>
+                  <th>Danh mục</th>
+                  <th>Ngày tạo</th>
+                  <th>Trạng thái</th>
+                  <th>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td
-                      colSpan={4}
-                      style={{ padding: 56, textAlign: "center" }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: 12,
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 34,
-                            height: 34,
-                            border: `3px solid #E2E8F0`,
-                            borderTopColor: T.primary,
-                            borderRadius: "50%",
-                            animation: "spin 0.8s linear infinite",
-                          }}
-                        />
-                        <p style={{ fontSize: 13, color: T.textMuted }}>
-                          Đang tải danh sách...
-                        </p>
-                      </div>
+                    <td colSpan={4} className="cate-empty">
+                      Đang tải danh sách danh mục...
                     </td>
                   </tr>
-                ) : isError || !data ? (
+                ) : isError ? (
                   <tr>
-                    <td
-                      colSpan={4}
-                      style={{ padding: 56, textAlign: "center" }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: 8,
-                          color: T.textMuted,
-                        }}
-                      >
-                        <span
-                          className="material-symbols-outlined"
-                          style={{ fontSize: 36, color: T.red }}
-                        >
-                          error_outline
-                        </span>
-                        <p style={{ fontSize: 13, fontWeight: 500 }}>
-                          Lỗi khi tải danh sách
-                        </p>
-                      </div>
+                    <td colSpan={4} className="cate-empty">
+                      Tải dữ liệu thất bại, vui lòng thử lại.
                     </td>
                   </tr>
                 ) : categories.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={4}
-                      style={{ padding: 56, textAlign: "center" }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: 10,
-                          color: T.textMuted,
-                        }}
-                      >
-                        <span
-                          className="material-symbols-outlined"
-                          style={{ fontSize: 40, opacity: 0.25 }}
-                        >
-                          category
-                        </span>
-                        <p style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>
-                          Không tìm thấy danh mục nào
-                        </p>
-                      </div>
+                    <td colSpan={4} className="cate-empty">
+                      <span className="material-symbols-outlined">category</span>
+                      <p>Không có danh mục phù hợp bộ lọc.</p>
                     </td>
                   </tr>
                 ) : (
                   categories.map((record) => (
-                    <tr
-                      key={record._id}
-                      className="sh-row"
-                      style={{ borderBottom: `1px solid #F1F5F9` }}
-                    >
-                      <td style={{ padding: "14px 20px" }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 14,
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: 48,
-                              height: 48,
-                              borderRadius: 12,
-                              background: "#F1F5F9",
-                              border: `1px solid ${T.border}`,
-                              overflow: "hidden",
-                              flexShrink: 0,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
+                    <tr key={record._id} className="cate-row">
+                      <td>
+                        <div className="cate-cell-info">
+                          <div className="cate-avatar">
                             {record.image ? (
                               <img
                                 src={`${BACKEND_BASE_URL}/uploads/${record.image}`}
                                 alt={record.name}
-                                style={{
-                                  width: "100%",
-                                  height: "100%",
-                                  objectFit: "cover",
-                                }}
                               />
                             ) : (
-                              <span
-                                className="material-symbols-outlined"
-                                style={{ fontSize: 22, color: "#CBD5E1" }}
-                              >
+                              <span className="material-symbols-outlined">
                                 category
                               </span>
                             )}
                           </div>
                           <div>
-                            <p
-                              style={{
-                                margin: 0,
-                                fontSize: 14,
-                                fontWeight: 700,
-                                color: T.text,
-                              }}
-                            >
-                              {record.name}
-                            </p>
-                            <p
-                              style={{
-                                margin: "2px 0 0",
-                                fontSize: 11,
-                                color: T.textMuted,
-                              }}
-                            >
-                              ID: {record._id?.slice(-6)}
-                            </p>
+                            <p className="cate-name">{record.name}</p>
+                            <p className="cate-id">ID: {record._id?.slice(-6)}</p>
                           </div>
                         </div>
                       </td>
-                      <td
-                        style={{
-                          padding: "14px 20px",
-                          fontSize: 13,
-                          color: T.textMuted,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {new Date(record.createdAt).toLocaleDateString(
-                          "vi-VN",
-                          { year: "numeric", month: "2-digit", day: "2-digit" },
-                        )}
+                      <td className="cate-date">
+                        {new Date(record.createdAt).toLocaleDateString("vi-VN")}
                       </td>
-                      <td style={{ padding: "14px 20px" }}>
+                      <td>
                         <StatusBadge status={record.status} />
                       </td>
-                      <td style={{ padding: "14px 20px" }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 6,
-                            justifyContent: "flex-end",
-                          }}
-                        >
+                      <td>
+                        <div className="cate-row-actions">
                           <button
                             type="button"
+                            className="cate-icon-btn"
                             onClick={() => handleEdit(record)}
-                            style={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: "50%",
-                              border: `1.5px solid ${T.border}`,
-                              background: "#fff",
-                              color: T.textMuted,
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              transition: "all 0.15s",
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.borderColor = T.primary;
-                              e.currentTarget.style.color = T.primary;
-                              e.currentTarget.style.background = T.primaryBg;
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.borderColor = T.border;
-                              e.currentTarget.style.color = T.textMuted;
-                              e.currentTarget.style.background = "#fff";
-                            }}
+                            title="Chỉnh sửa"
                           >
-                            <span
-                              className="material-symbols-outlined"
-                              style={{ fontSize: 17 }}
-                            >
-                              edit
-                            </span>
+                            <span className="material-symbols-outlined">edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="cate-icon-btn delete"
+                            onClick={() => handleDelete(record)}
+                            title="Xóa danh mục"
+                            disabled={deleteMutation.isPending}
+                          >
+                            <span className="material-symbols-outlined">delete</span>
                           </button>
                         </div>
                       </td>
@@ -1951,24 +523,12 @@ export default function Categories() {
               </tbody>
             </table>
           </div>
-
-          {/* Footer */}
-          <div
-            style={{
-              padding: "12px 20px",
-              borderTop: `1px solid ${T.border}`,
-              background: "#F8FAFC",
-            }}
-          >
-            <p style={{ margin: 0, fontSize: 13, color: T.textMuted }}>
-              Hiển thị <b style={{ color: T.text }}>{categories.length}</b> /{" "}
-              {data?.data?.length || 0} danh mục
-            </p>
+          <div className="cate-table-footer">
+            Hiển thị <b>{categories.length}</b> / {data?.data?.length || 0} danh mục
           </div>
-        </div>
+        </section>
       </div>
 
-      {/* Edit modal */}
       <SHModal
         open={editOpen}
         title="Chỉnh sửa danh mục"
@@ -1979,7 +539,7 @@ export default function Categories() {
           layout="vertical"
           onFinish={(values) =>
             updateMutation.mutate({
-              id: selected._id,
+              id: selected?._id,
               data: transformFormValues(values),
             })
           }
@@ -1994,7 +554,6 @@ export default function Categories() {
         </Form>
       </SHModal>
 
-      {/* Create modal */}
       <SHModal
         open={createOpen}
         title="Thêm danh mục mới"
@@ -2003,7 +562,7 @@ export default function Categories() {
         <Form
           form={createForm}
           layout="vertical"
-          initialValues={{ name: "", image: "", status: true }}
+          initialValues={{ name: "", image: "" }}
           onFinish={(values) =>
             createMutation.mutate(transformFormValues(values))
           }
@@ -2018,6 +577,13 @@ export default function Categories() {
         </Form>
       </SHModal>
 
+      <ConfirmDeleteModal
+        open={!!deleteTarget}
+        item={deleteTarget}
+        loading={deleteMutation.isPending}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => deleteMutation.mutate({ id: deleteTarget?._id })}
+      />
     </>
   );
 }

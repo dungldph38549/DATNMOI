@@ -11,7 +11,6 @@ import {
   fetchProducts,
   getAllCategories,
 } from "../../api";
-import notify from "../../utils/notify";
 
 /* Converse / Chuck Taylor — 6 ảnh hero */
 const banners = [
@@ -23,6 +22,72 @@ const banners = [
   "https://images.unsplash.com/photo-1581186088584-154ef8def9b6?q=85&w=2000&auto=format&fit=crop",
 ];
 
+const normalizeText = (value = "") =>
+  String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const isAccessoryProduct = (product) => {
+  const categoryName = normalizeText(product?.categoryId?.name || product?.category || "");
+  return (
+    categoryName.includes("phu kien") ||
+    categoryName.includes("phukien") ||
+    categoryName.includes("accessor")
+  );
+};
+
+const prioritizeShoes = (items = [], limit = 8) => {
+  const list = Array.isArray(items) ? items : [];
+  const shoes = list.filter((p) => !isAccessoryProduct(p));
+  const accessories = list.filter((p) => isAccessoryProduct(p));
+  return [...shoes, ...accessories].slice(0, limit);
+};
+
+const pickForRecommendation = ({
+  recommendations = [],
+  best = [],
+  featured = [],
+  newest = [],
+  limit = 8,
+  minShoes = 6,
+}) => {
+  const pools = [recommendations, best, featured, newest].map((arr) =>
+    Array.isArray(arr) ? arr : [],
+  );
+
+  const seen = new Set();
+  const unique = [];
+  for (const pool of pools) {
+    for (const item of pool) {
+      const id = String(item?._id || "");
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      unique.push(item);
+    }
+  }
+
+  const shoes = unique.filter((p) => !isAccessoryProduct(p));
+  const accessories = unique.filter((p) => isAccessoryProduct(p));
+  const selectedShoes = shoes.slice(0, Math.min(minShoes, limit));
+  const selectedAccessories = accessories.slice(0, Math.max(0, limit - selectedShoes.length));
+  const mixed = [...selectedShoes, ...selectedAccessories];
+
+  if (mixed.length < limit) {
+    const selectedIds = new Set(mixed.map((p) => String(p?._id || "")));
+    for (const item of unique) {
+      const id = String(item?._id || "");
+      if (!id || selectedIds.has(id)) continue;
+      mixed.push(item);
+      selectedIds.add(id);
+      if (mixed.length >= limit) break;
+    }
+  }
+
+  return mixed.slice(0, limit);
+};
+
 const HomePage = () => {
   const user = useSelector((state) => state.user);
   const isLoggedIn = !!(user?.login && (user?.token || user?.name || user?.email));
@@ -30,12 +95,12 @@ const HomePage = () => {
   const [products, setProducts] = useState([]);
   const [hotProducts, setHotProducts] = useState([]);
   const [newProducts, setNewProducts] = useState([]);
+  const [accessoryProducts, setAccessoryProducts] = useState([]);
   const [recommendedProducts, setRecommendedProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [sort, setSort] = useState("new");
   const [slide, setSlide] = useState(0);
-  const [newsletterEmail, setNewsletterEmail] = useState("");
   const categoryBtnRefs = useRef({});
 
   useEffect(() => {
@@ -46,11 +111,12 @@ const HomePage = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [featuredRes, bestRes, newRes, recommendationRes] = await Promise.all([
+        const [featuredRes, bestRes, newRes, recommendationRes, allProductRes] = await Promise.all([
           getFeaturedProducts(8),
           getBestSellers(8),
           getNewArrivals(8),
           getHomeRecommendations(8).catch(() => []),
+          fetchProducts({ limit: 120, page: 0 }).catch(() => ({ data: [] })),
         ]);
         const categoryRes = await getAllCategories("all");
         setCategories(Array.isArray(categoryRes?.data) ? categoryRes.data : []);
@@ -60,21 +126,52 @@ const HomePage = () => {
         const newArr = newRes?.data ?? [];
 
         setHotProducts(best.length > 0 ? best : featured.length > 0 ? featured : newArr);
-        setNewProducts(newArr.length > 0 ? newArr : featured.length > 0 ? featured : best);
-        setRecommendedProducts(Array.isArray(recommendationRes) ? recommendationRes : []);
+        setRecommendedProducts(
+          pickForRecommendation({
+            recommendations: recommendationRes,
+            best,
+            featured,
+            newest: newArr,
+            limit: 8,
+            minShoes: 6,
+          }),
+        );
+
+        const allProducts = Array.isArray(allProductRes?.data) ? allProductRes.data : [];
+        const accessoryFromAll = allProducts.filter(isAccessoryProduct);
+        const newestNonAccessory = allProducts
+          .filter((p) => !isAccessoryProduct(p))
+          .sort((a, b) => {
+            const tA = new Date(a?.createdAt || a?.updatedAt || 0).getTime();
+            const tB = new Date(b?.createdAt || b?.updatedAt || 0).getTime();
+            return tB - tA;
+          })
+          .slice(0, 8);
+        setNewProducts(
+          newestNonAccessory.length > 0
+            ? newestNonAccessory
+            : newArr.filter((p) => !isAccessoryProduct(p)).length > 0
+              ? newArr.filter((p) => !isAccessoryProduct(p))
+              : featured.length > 0
+                ? featured
+                : best,
+        );
+        setAccessoryProducts(accessoryFromAll.slice(0, 8));
 
         if (featured.length > 0 || best.length > 0 || newArr.length > 0) {
-          setProducts(
-            [...new Set([...best, ...featured, ...newArr].map((p) => p._id))]
-              .map((id) => [...best, ...featured, ...newArr].find((x) => x._id === id))
-              .filter(Boolean),
-          );
+          const mergedProducts = [...new Set([...best, ...featured, ...newArr].map((p) => p._id))]
+            .map((id) => [...best, ...featured, ...newArr].find((x) => x._id === id))
+            .filter(Boolean);
+          setProducts(mergedProducts);
         } else {
           const allRes = await fetchProducts({ limit: 24, page: 0 });
           const list = allRes?.data ?? [];
           setProducts(list);
           setHotProducts(list.slice(0, 8));
           setNewProducts(list.slice(8, 16));
+          if (!allProducts.length) {
+            setAccessoryProducts(list.filter(isAccessoryProduct).slice(0, 8));
+          }
         }
       } catch (err) {
         console.error("Load products error:", err);
@@ -91,9 +188,9 @@ const HomePage = () => {
   if (sort === "high") filterProducts.sort((a, b) => b.price - a.price);
   if (sort === "sold") filterProducts.sort((a, b) => (b.soldCount || b.sold || 0) - (a.soldCount || a.sold || 0));
 
-  const hotDisplay = filterProducts.length > 0 ? filterProducts.slice(0, 8) : hotProducts;
-  const newDisplay = filterProducts.length > 0 ? filterProducts.slice(8, 16) : newProducts;
   const isFiltering = !!selectedCategory;
+  const hotDisplay = isFiltering ? filterProducts : hotProducts;
+  const newDisplay = newProducts;
 
   const scrollCategoryTabIntoView = (key) => {
     requestAnimationFrame(() => {
@@ -109,32 +206,6 @@ const HomePage = () => {
   const selectCategory = (name, key) => {
     setSelectedCategory(name);
     scrollCategoryTabIntoView(key);
-  };
-
-  const onNewsletterSubmit = (e) => {
-    e.preventDefault();
-    const email = newsletterEmail.trim();
-    if (!email) {
-      notify.warning("Vui lòng nhập email.");
-      return;
-    }
-    const basic = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!basic.test(email)) {
-      notify.warning("Email không hợp lệ.");
-      return;
-    }
-    try {
-      const raw = localStorage.getItem("sh_newsletter_emails");
-      const list = raw ? JSON.parse(raw) : [];
-      if (!list.includes(email.toLowerCase())) {
-        list.push(email.toLowerCase());
-        localStorage.setItem("sh_newsletter_emails", JSON.stringify(list));
-      }
-    } catch {
-      /* ignore */
-    }
-    notify.success("Đăng ký thành công! Cảm ơn bạn đã đồng hành cùng Sneaker Converse.");
-    setNewsletterEmail("");
   };
 
   return (
@@ -272,7 +343,7 @@ const HomePage = () => {
                 <span className="text-convot-sage font-bold tracking-widest uppercase text-xs mb-2 flex items-center gap-2">
                   <FaGem /> Mới nhất
                 </span>
-                <h2 className="text-2xl md:text-3xl font-display font-bold text-convot-charcoal">Hàng mới về</h2>
+                <h2 className="text-2xl md:text-3xl font-display font-bold text-convot-charcoal">Hàng mới nhất</h2>
               </div>
               <Link to="/product" className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-convot-sage hover:underline">
                 Xem tất cả <FaArrowRight className="text-xs" />
@@ -280,7 +351,7 @@ const HomePage = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {newDisplay.map((p) => (
-                <Product key={p._id} product={p} />
+                <Product key={p._id} product={p} compactCartCta hoverStyle="catalog" />
               ))}
             </div>
           </section>
@@ -301,7 +372,7 @@ const HomePage = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {recommendedProducts.slice(0, 8).map((p) => (
-                <Product key={p._id} product={p} />
+                <Product key={p._id} product={p} compactCartCta hoverStyle="catalog" />
               ))}
             </div>
           </section>
@@ -345,7 +416,7 @@ const HomePage = () => {
                   </span>
                 )}
                 <h2 className="text-2xl md:text-3xl font-display font-bold text-convot-charcoal">
-                  {isFiltering ? "Kết quả" : "Đang được quan tâm"}
+                  {isFiltering ? "Kết quả" : "Sản phẩm hot"}
                 </h2>
               </div>
               <Link to="/product" className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-convot-sage hover:underline">
@@ -353,43 +424,34 @@ const HomePage = () => {
               </Link>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {(isFiltering ? filterProducts : hotDisplay).map((p) => (
-                <Product key={p._id} product={p} />
+              {hotDisplay.map((p) => (
+                <Product key={p._id} product={p} compactCartCta hoverStyle="catalog" />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!isFiltering && accessoryProducts.length > 0 && (
+          <section>
+            <div className="flex items-end justify-between mb-8">
+              <div>
+                <span className="text-convot-sage font-bold tracking-widest uppercase text-xs mb-2 flex items-center gap-2">
+                  <FaGem /> Khác
+                </span>
+                <h2 className="text-2xl md:text-3xl font-display font-bold text-convot-charcoal">Sản phẩm khác</h2>
+              </div>
+              <Link to="/accessories" className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-convot-sage hover:underline">
+                Xem tất cả <FaArrowRight className="text-xs" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {accessoryProducts.map((p) => (
+                <Product key={p._id} product={p} compactCartCta hoverStyle="catalog" />
               ))}
             </div>
           </section>
         )}
       </div>
-
-      {/* Đăng ký nhận tin */}
-      <section className="bg-white border-t border-neutral-100 py-14 md:py-20 px-4">
-        <div className="max-w-2xl mx-auto text-center">
-          <h2 className="text-2xl md:text-3xl font-display font-bold text-neutral-900 tracking-tight">
-            Gia nhập Sneaker Converse
-          </h2>
-          <p className="mt-4 text-sm md:text-base text-neutral-600 leading-relaxed">
-            Đăng ký để nhận thông tin về các bộ sưu tập mới nhất và ưu đãi độc quyền dành riêng cho bạn.
-          </p>
-          <form onSubmit={onNewsletterSubmit} className="mt-8 md:mt-10 max-w-xl mx-auto">
-            <div className="flex flex-col sm:flex-row items-stretch gap-2 sm:gap-0 rounded-[28px] sm:rounded-full border border-neutral-200 bg-[#f7f7f7] p-1.5 sm:pl-5 sm:pr-1.5 shadow-sm focus-within:border-neutral-300 focus-within:ring-1 focus-within:ring-neutral-900/5 transition-shadow">
-              <input
-                type="email"
-                value={newsletterEmail}
-                onChange={(e) => setNewsletterEmail(e.target.value)}
-                placeholder="Email của bạn"
-                autoComplete="email"
-                className="flex-1 min-w-0 bg-transparent px-4 sm:px-2 py-3 sm:py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none rounded-[24px] sm:rounded-none"
-              />
-              <button
-                type="submit"
-                className="shrink-0 rounded-[24px] sm:rounded-full bg-neutral-900 px-8 py-3 text-sm font-bold text-white hover:bg-neutral-800 transition-colors"
-              >
-                Đăng ký
-              </button>
-            </div>
-          </form>
-        </div>
-      </section>
     </main>
   );
 };

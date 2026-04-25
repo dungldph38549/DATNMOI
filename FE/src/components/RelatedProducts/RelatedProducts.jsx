@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { getProductPriceInfo } from "../../utils/pricing.js";
+import { isProductOutOfStock } from "../../utils/stock.js";
 
 const PLACEHOLDER_IMG =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='28' font-family='Plus Jakarta Sans'>No Image</text></svg>";
@@ -34,6 +35,7 @@ export default function RelatedProducts({
           {(products || []).slice(0, 4).map((p) => {
             const img = p?.image || p?.srcImages?.[0] || "";
             const priceInfo = getProductPriceInfo(p);
+            const outOfStock = isProductOutOfStock(p);
             return (
               <Link
                 key={p._id}
@@ -41,12 +43,21 @@ export default function RelatedProducts({
                 className="group bg-white rounded-3xl border border-slate-100 p-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
               >
                 <div className="aspect-square bg-slate-50 rounded-2xl mb-4 overflow-hidden flex items-center justify-center p-2 relative">
-                  <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity z-10" />
+                  {!outOfStock && (
+                    <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity z-10" />
+                  )}
                   <img
                     src={getImage(img)}
                     alt={p.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
+                  {outOfStock && (
+                    <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/20">
+                      <span className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-black/65 px-2 text-center text-sm font-semibold text-white shadow-lg">
+                        Bán hết
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-800 line-clamp-1 group-hover:text-primary transition-colors mb-2">

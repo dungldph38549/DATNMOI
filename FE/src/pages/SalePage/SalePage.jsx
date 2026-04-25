@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { FaHeart, FaRegHeart } from "react-icons/fa";
+import { FaEye, FaHeart, FaRegHeart } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProducts } from "../../api";
 import { getProductPriceInfo } from "../../utils/pricing.js";
+import { isProductOutOfStock } from "../../utils/stock.js";
 import { getVariantColorValue } from "../../utils/variantAttributes";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 
@@ -185,6 +186,7 @@ const SalePage = () => {
                   const priceInfo = getProductPriceInfo(item);
                   const eff = Number(priceInfo.effectivePrice ?? 0) || getProductMinPrice(item);
                   const orig = Number(priceInfo.originalPrice ?? 0);
+                  const outOfStock = isProductOutOfStock(item);
                   return (
                     <Link key={item._id} to={`/product/${item._id}`} className="group block">
                       <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-neutral-100">
@@ -205,11 +207,27 @@ const SalePage = () => {
                           )}
                         </button>
                         {image ? (
-                          <img
-                            src={image}
-                            alt={item.name}
-                            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]"
-                          />
+                          <>
+                            <img
+                              src={image}
+                              alt={item.name}
+                              className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]"
+                            />
+                            {!outOfStock && (
+                              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-slate-800 shadow-md">
+                                  <FaEye size={16} />
+                                </span>
+                              </div>
+                            )}
+                            {outOfStock && (
+                              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
+                                <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-black/65 px-3 text-center text-lg font-semibold text-white shadow-lg">
+                                  Bán hết
+                                </span>
+                              </div>
+                            )}
+                          </>
                         ) : (
                           <div className="h-full w-full bg-neutral-200" />
                         )}

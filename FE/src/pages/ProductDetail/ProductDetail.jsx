@@ -1225,7 +1225,7 @@ const ProductDetail = () => {
             <div className="pr-14">
               <SizeGuideInner />
             </div>
-          </div>
+           </div>
         </div>
       )}
     </div>

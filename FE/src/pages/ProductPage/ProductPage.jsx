@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { FaChevronLeft, FaChevronRight, FaHeart, FaRegHeart } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaHeart, FaRegHeart, FaEye } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProducts, getAllCategories, getVoucherByCode } from "../../api";
 import { getProductPriceInfo } from "../../utils/pricing.js";
 import { getVariantColorValue, getVariantSizeValue } from "../../utils/variantAttributes";
+import { isProductOutOfStock } from "../../utils/stock.js";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 
 const PAGE_SIZE = 12;
@@ -41,7 +42,7 @@ const getProductMinPrice = (product) => {
   return 0;
 };
 
-const normalizeValue = (value) => String(value || "").trim().toLowerCase();
+const normalizeValue = (value) => String(value || "").trim().toLowerCase().normalize("NFC");
 
 const getProductSizes = (product) => {
   const sizes = [];
@@ -94,6 +95,7 @@ const ProductPage = () => {
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
   const [rating, setRating] = useState("");
+  const [minPriceFilter, setMinPriceFilter] = useState(0);
   const [maxPriceFilter, setMaxPriceFilter] = useState(0);
 
   const categorySlug = useMemo(() => {
@@ -117,6 +119,7 @@ const ProductPage = () => {
     const load = async () => {
       try {
         setLoading(true);
+        if (categorySlug) setCategoryFilter("");
         const payload = { limit: 200, page: 0 };
         const catRes = await getAllCategories("active");
         const categories = Array.isArray(catRes?.data) ? catRes.data : [];
@@ -196,7 +199,14 @@ const ProductPage = () => {
     if (!products.length) return 0;
     return Math.max(...products.map((p) => getProductMinPrice(p)));
   }, [products]);
-  const priceRangePercent = useMemo(() => {
+  const minRangePercent = useMemo(() => {
+    const max = Number(maxAvailablePrice || 0);
+    const val = Number(minPriceFilter || 0);
+    if (!Number.isFinite(max) || max <= 0) return 0;
+    const clamped = Math.min(Math.max(0, val), max);
+    return Math.round((clamped / max) * 100);
+  }, [maxAvailablePrice, minPriceFilter]);
+  const maxRangePercent = useMemo(() => {
     const max = Number(maxAvailablePrice || 0);
     const val = Number(maxPriceFilter || 0);
     if (!Number.isFinite(max) || max <= 0) return 0;
@@ -205,7 +215,10 @@ const ProductPage = () => {
   }, [maxAvailablePrice, maxPriceFilter]);
 
   useEffect(() => {
-    setMaxPriceFilter(maxAvailablePrice || 0);
+    if (maxAvailablePrice > 0) {
+      setMinPriceFilter(0);
+      setMaxPriceFilter(maxAvailablePrice);
+    }
   }, [maxAvailablePrice]);
 
   const availableSizes = useMemo(() => {
@@ -235,16 +248,31 @@ const ProductPage = () => {
       );
     }
 
-    if (selectedSize) {
-      data = data.filter((p) =>
-        getProductSizes(p).some((size) => normalizeValue(size) === normalizeValue(selectedSize)),
-      );
-    }
-
-    if (selectedColor) {
-      data = data.filter((p) =>
-        getProductColors(p).some((color) => normalizeValue(color) === normalizeValue(selectedColor)),
-      );
+    if (selectedSize || selectedColor) {
+      data = data.filter((p) => {
+        if (selectedSize && selectedColor) {
+          const hasMatchingVar = (p.variants || []).some((v) => {
+            const vSize = getVariantSizeValue(v) || v.size || v.sizeName;
+            const vColor = getVariantColorValue(v) || v.color || v.colorName;
+            return (
+              normalizeValue(vSize) === normalizeValue(selectedSize) &&
+              normalizeValue(vColor) === normalizeValue(selectedColor)
+            );
+          });
+          if (hasMatchingVar) return true;
+          return (
+            normalizeValue(p.size) === normalizeValue(selectedSize) &&
+            normalizeValue(p.color) === normalizeValue(selectedColor)
+          );
+        }
+        if (selectedSize) {
+          return getProductSizes(p).some((s) => normalizeValue(s) === normalizeValue(selectedSize));
+        }
+        if (selectedColor) {
+          return getProductColors(p).some((c) => normalizeValue(c) === normalizeValue(selectedColor));
+        }
+        return true;
+      });
     }
 
     if (rating) {
@@ -252,7 +280,11 @@ const ProductPage = () => {
     }
 
     if (maxPriceFilter > 0) {
-      data = data.filter((p) => getProductMinPrice(p) <= maxPriceFilter);
+      data = data.filter((p) => {
+        const price = getProductMinPrice(p);
+        if (minPriceFilter === 0 && maxPriceFilter >= maxAvailablePrice) return true;
+        return price >= minPriceFilter && price <= maxPriceFilter;
+      });
     }
 
     if (sort === "priceAsc") data.sort((a, b) => getProductMinPrice(a) - getProductMinPrice(b));
@@ -267,13 +299,14 @@ const ProductPage = () => {
     selectedSize,
     selectedColor,
     rating,
+    minPriceFilter,
     maxPriceFilter,
     sort,
   ]);
 
   useEffect(() => {
     setPage(1);
-  }, [sort, categoryFilter, selectedSize, selectedColor, rating, maxPriceFilter]);
+  }, [sort, categoryFilter, selectedSize, selectedColor, rating, minPriceFilter, maxPriceFilter]);
 
   const totalPage = Math.ceil(filteredProducts.length / PAGE_SIZE);
   const showProducts = filteredProducts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -284,6 +317,7 @@ const ProductPage = () => {
     setSelectedSize("");
     setSelectedColor("");
     setRating("");
+    setMinPriceFilter(0);
     setMaxPriceFilter(maxAvailablePrice || 0);
   };
 
@@ -311,19 +345,43 @@ const ProductPage = () => {
   return (
     <main className="min-h-screen bg-[#f5f5f4] pt-12 pb-10 text-neutral-900">
       <style>{`
-        .price-range-input {
-          -webkit-appearance: none;
-          appearance: none;
+        .price-range-slider {
+          position: relative;
+          height: 18px;
+        }
+        .price-range-track {
+          position: absolute;
+          top: 50%;
+          left: 0;
+          right: 0;
           height: 8px;
           border-radius: 999px;
-          background: linear-gradient(
-            to right,
-            #8ca587 0%,
-            #8ca587 var(--range-pct),
-            #e5e7eb var(--range-pct),
-            #e5e7eb 100%
-          );
+          background: linear-gradient(90deg, #dfe5e1 0%, #d3dbd5 100%);
+          transform: translateY(-50%);
+        }
+        .price-range-selected {
+          position: absolute;
+          top: 50%;
+          height: 8px;
+          border-radius: 999px;
+          background: linear-gradient(90deg, #4f6758 0%, #647d6d 100%);
+          box-shadow: 0 2px 6px rgba(56, 73, 63, 0.22);
+          transform: translateY(-50%);
+          left: var(--min-pct);
+          right: calc(100% - var(--max-pct));
+        }
+        .price-range-input {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          -webkit-appearance: none;
+          appearance: none;
+          height: 18px;
+          border-radius: 999px;
+          background: transparent;
           outline: none;
+          pointer-events: none;
         }
         .price-range-input::-webkit-slider-thumb {
           -webkit-appearance: none;
@@ -331,19 +389,24 @@ const ProductPage = () => {
           width: 18px;
           height: 18px;
           border-radius: 999px;
-          background: #8ca587;
+          background: #546d5d;
           border: 2px solid #ffffff;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+          box-shadow: 0 2px 8px rgba(40, 55, 47, 0.22), 0 0 0 2px rgba(255, 255, 255, 0.68);
           cursor: pointer;
+          pointer-events: auto;
         }
         .price-range-input::-moz-range-thumb {
           width: 18px;
           height: 18px;
           border-radius: 999px;
-          background: #8ca587;
+          background: #546d5d;
           border: 2px solid #ffffff;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+          box-shadow: 0 2px 8px rgba(40, 55, 47, 0.22), 0 0 0 2px rgba(255, 255, 255, 0.68);
           cursor: pointer;
+          pointer-events: auto;
+        }
+        .price-range-input::-moz-range-track {
+          background: transparent;
         }
       `}</style>
       <section className="container mx-auto max-w-7xl px-4">
@@ -362,17 +425,26 @@ const ProductPage = () => {
               <div>
                 <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Loại sản phẩm</h3>
                 <div className="space-y-3">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
+                    <input
+                      type="radio"
+                      name="product-category-filter"
+                      checked={categoryFilter === ""}
+                      onChange={() => setCategoryFilter("")}
+                      className="h-4 w-4 cursor-pointer appearance-none rounded-full border-2 border-neutral-300 transition-all checked:border-[#8ca587] checked:bg-[#8ca587] relative after:absolute after:left-1 after:top-0.5 after:hidden after:h-2 after:w-1 after:rotate-45 after:border-b-2 after:border-r-2 after:border-white checked:after:block after:content-['']"
+                    />
+                    Tất cả sản phẩm
+                  </label>
                   {sidebarCategories.map((c) => {
                     const value = String(c?._id || "");
-                    const checked = categoryFilter === value;
                     return (
-                      <label key={value} className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer">
+                      <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
                         <input
                           type="radio"
-                          name="category"
-                          checked={checked}
-                          onChange={() => setCategoryFilter((prev) => (prev === value ? "" : value))}
-                          className="h-4 w-4 accent-[#8ca587]"
+                          name="product-category-filter"
+                          checked={categoryFilter === value}
+                          onChange={() => setCategoryFilter(value)}
+                          className="h-4 w-4 cursor-pointer appearance-none rounded-full border-2 border-neutral-300 transition-all checked:border-[#8ca587] checked:bg-[#8ca587] relative after:absolute after:left-1 after:top-0.5 after:hidden after:h-2 after:w-1 after:rotate-45 after:border-b-2 after:border-r-2 after:border-white checked:after:block after:content-['']"
                         />
                         {c?.name || "Danh mục"}
                       </label>
@@ -384,18 +456,49 @@ const ProductPage = () => {
 
             <div>
               <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Giá</h3>
-              <input
-                type="range"
-                min={0}
-                max={maxAvailablePrice || 1}
-                value={maxPriceFilter}
-                onChange={(e) => setMaxPriceFilter(Number(e.target.value))}
-                className="price-range-input w-full"
-                style={{ "--range-pct": `${priceRangePercent}%` }}
-              />
-              <div className="mt-2 flex items-center justify-between text-xs text-neutral-600">
-                <span>0đ</span>
-                <span>{Number(maxPriceFilter || 0).toLocaleString("vi-VN")}đ</span>
+              <div className="mb-2 ml-auto w-fit rounded-lg border border-[#d9e0da] bg-[#f7faf8] px-2.5 py-1.5 text-right">
+                <p className="text-[10px] font-medium tracking-[0.08em] text-[#708276]">Khoảng tiền</p>
+                <p className="mt-0.5 text-xs font-semibold text-[#3f5648]">
+                  {Number(minPriceFilter || 0).toLocaleString("vi-VN")}đ -{" "}
+                  {Number(maxPriceFilter || 0).toLocaleString("vi-VN")}đ
+                </p>
+              </div>
+              <div
+                className="price-range-slider"
+                style={{ "--min-pct": `${minRangePercent}%`, "--max-pct": `${maxRangePercent}%` }}
+              >
+                <div className="price-range-track" />
+                <div className="price-range-selected" />
+                <input
+                  type="range"
+                  min={0}
+                  max={maxAvailablePrice || 1}
+                  value={minPriceFilter}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setMinPriceFilter(Math.min(next, maxPriceFilter));
+                  }}
+                  className="price-range-input"
+                />
+                <input
+                  type="range"
+                  min={0}
+                  max={maxAvailablePrice || 1}
+                  value={maxPriceFilter}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setMaxPriceFilter(Math.max(next, minPriceFilter));
+                  }}
+                  className="price-range-input"
+                />
+              </div>
+              <div className="mt-2 flex items-center justify-between text-xs font-semibold text-[#3f5648]">
+                <span className="rounded-full border border-[#d9e0da] bg-[#f7faf8] px-2.5 py-1">
+                  {Number(minPriceFilter || 0).toLocaleString("vi-VN")}đ
+                </span>
+                <span className="rounded-full border border-[#d9e0da] bg-[#f7faf8] px-2.5 py-1">
+                  {Number(maxPriceFilter || 0).toLocaleString("vi-VN")}đ
+                </span>
               </div>
             </div>
 
@@ -428,11 +531,11 @@ const ProductPage = () => {
                   {availableColors.slice(0, 6).map((color) => (
                     <label key={color} className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer">
                       <input
-                        type="radio"
+                        type="checkbox"
                         name="color"
                         checked={selectedColor === color}
                         onChange={() => setSelectedColor((prev) => (prev === color ? "" : color))}
-                        className="h-4 w-4 accent-[#8ca587]"
+                        className="h-4 w-4 appearance-none rounded-full border-2 border-neutral-300 checked:border-[#8ca587] checked:bg-[#8ca587] transition-all cursor-pointer relative after:content-[''] after:absolute after:hidden checked:after:block after:left-1 after:top-0.5 after:w-1 after:h-2 after:border-white after:border-b-2 after:border-r-2 after:rotate-45"
                       />
                       {color}
                     </label>
@@ -450,11 +553,11 @@ const ProductPage = () => {
                 ].map((item) => (
                   <label key={item.id} className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer">
                     <input
-                      type="radio"
+                      type="checkbox"
                       name="rating"
                       checked={rating === item.id}
                       onChange={() => setRating((prev) => (prev === item.id ? "" : item.id))}
-                      className="h-4 w-4 accent-[#8ca587]"
+                      className="h-4 w-4 appearance-none rounded-full border-2 border-neutral-300 checked:border-[#8ca587] checked:bg-[#8ca587] transition-all cursor-pointer relative after:content-[''] after:absolute after:hidden checked:after:block after:left-1 after:top-0.5 after:w-1 after:h-2 after:border-white after:border-b-2 after:border-r-2 after:rotate-45"
                     />
                     {item.label}
                   </label>
@@ -514,6 +617,7 @@ const ProductPage = () => {
                     const image = getImageUrl(item?.image || item?.srcImages?.[0]);
                     const priceInfo = getProductPriceInfo(item);
                     const categoryText = item?.categoryId?.name || item?.category || "Sneakers";
+                    const outOfStock = isProductOutOfStock(item);
                     return (
                       <Link key={item?._id} to={`/product/${item?._id}`} className="group block overflow-hidden rounded-lg bg-white">
                         <div className="relative aspect-[4/4.4] overflow-hidden bg-neutral-100">
@@ -534,11 +638,27 @@ const ProductPage = () => {
                             )}
                           </button>
                           {image ? (
-                            <img
-                              src={image}
-                              alt={item?.name || "Sản phẩm"}
-                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                            />
+                            <>
+                              <img
+                                src={image}
+                                alt={item?.name || "Sản phẩm"}
+                                className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                              />
+                              {!outOfStock && (
+                                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-slate-800 shadow-md">
+                                    <FaEye size={16} />
+                                  </span>
+                                </div>
+                              )}
+                              {outOfStock && (
+                                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
+                                  <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-black/65 px-3 text-center text-lg font-semibold text-white shadow-lg">
+                                    Bán hết
+                                  </span>
+                                </div>
+                              )}
+                            </>
                           ) : (
                             <div className="h-full w-full bg-neutral-200" />
                           )}
