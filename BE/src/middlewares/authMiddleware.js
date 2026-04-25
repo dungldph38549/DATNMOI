@@ -25,10 +25,13 @@ const extractToken = (req) => {
 const decodeToken = async (token) => {
   const secret = process.env.ACCESS_TOKEN || process.env.ACCESS_TOKEN_SECRET || "access_secret";
   const decoded = jwt.verify(token, secret);
-  const { payload } = decoded;
+  const payload = decoded?.payload && typeof decoded.payload === "object"
+    ? decoded.payload
+    : decoded;
+  const resolvedId = payload?.id || payload?._id || payload?.userId || null;
 
-  if (payload?.id) {
-    const user = await User.findById(payload.id).select("-password");
+  if (resolvedId) {
+    const user = await User.findById(resolvedId).select("-password");
     if (!user) throw new Error("USER_NOT_FOUND");
 
     // UserModel dùng: role + isActive (soft ban qua isActive)
@@ -57,6 +60,7 @@ const decodeToken = async (token) => {
   // Token lightweight (không có id) → dùng payload trực tiếp
   return {
     ...payload,
+    id: resolvedId || undefined,
     isAdmin: payload.isAdmin || false,
     isStaff: payload.isStaff || false,
     isBanned: payload.isBanned || false,

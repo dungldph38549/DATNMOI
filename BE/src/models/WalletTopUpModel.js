@@ -58,12 +58,17 @@ const walletTopUpSchema = new mongoose.Schema(
 );
 
 walletTopUpSchema.statics.generateReferenceCode = function generateReferenceCode(
-  userId,
+  _userId,
 ) {
-  const tail = String(userId).slice(-4).toUpperCase();
-  const t = Date.now().toString(36).toUpperCase();
-  const rnd = crypto.randomBytes(2).toString("hex").toUpperCase();
-  return `NAP${tail}${t}${rnd}`;
+  // Mã chuyển khoản random để khó đoán và tránh trùng.
+  const random = crypto.randomBytes(6).toString("hex").toUpperCase();
+  return `NAP${random}`;
 };
+
+walletTopUpSchema.pre("validate", function autoReferenceCode() {
+  if (this.method === "bank_transfer" && !String(this.referenceCode || "").trim()) {
+    this.referenceCode = this.constructor.generateReferenceCode(this.userId);
+  }
+});
 
 module.exports = mongoose.model("WalletTopUp", walletTopUpSchema);

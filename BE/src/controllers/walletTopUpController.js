@@ -9,6 +9,7 @@ const {
   IpnUnknownError,
 } = require("vnpay");
 const WalletTopUp = require("../models/WalletTopUpModel.js");
+const WalletTransaction = require("../models/WalletTransactionModel.js");
 const { creditWalletForTopUp } = require("../services/walletService.js");
 
 const vnpayEnv = (key, fallback) => {
@@ -52,6 +53,23 @@ const mergeVnpayIpnParams = (req) => {
   return out;
 };
 
+const isTopupAmountMatched = (expectedAmountVnd, receivedVnpAmount) => {
+  const expected = Math.round(Number(expectedAmountVnd) || 0);
+  const received = Math.round(Number(receivedVnpAmount) || 0);
+  if (expected <= 0 || received <= 0) return false;
+  // Tùy thư viện VNPay có thể trả số tiền theo VND hoặc x100.
+  return received === expected || received === expected * 100;
+};
+
+const isVnpaySuccessResult = (result = {}) => {
+  const responseCode = String(result.vnp_ResponseCode ?? "").trim();
+  const txStatus = String(result.vnp_TransactionStatus ?? "").trim();
+  // Mặc định thành công khi responseCode=00; một số cấu hình trả thêm TransactionStatus=00.
+  if (responseCode !== "00") return false;
+  if (txStatus && txStatus !== "00") return false;
+  return true;
+};
+
 /** Nối thêm query khi base đã có ?... (tránh /profile?tab=wallet?topup=1). */
 const appendQuery = (baseUrl, queryWithoutQuestion) => {
   const b = String(baseUrl || "");
@@ -60,14 +78,56 @@ const appendQuery = (baseUrl, queryWithoutQuestion) => {
 };
 
 const MIN_TOPUP = 10000;
+const getRequestUserId = (req) =>
+  req?.user?.id || req?.user?._id || req?.user?.userId || null;
+
 const maxTopup = () =>
   Math.min(
     500_000_000,
     Math.max(MIN_TOPUP, Number(process.env.WALLET_TOPUP_MAX || 50_000_000)),
   );
 
+const isTransactionUnsupportedError = (err) => {
+  const msg = String(err?.message || "").toLowerCase();
+  return (
+    msg.includes("replica set") ||
+    msg.includes("transaction numbers are only allowed") ||
+    msg.includes("transactions are not supported")
+  );
+};
+
+const creditTopupWithOptionalTransaction = async (topUpId) => {
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const fresh = await WalletTopUp.findById(topUpId).session(session);
+    if (!fresh) throw new Error("Không tìm thấy yêu cầu nạp ví");
+    await creditWalletForTopUp(fresh, session);
+    await session.commitTransaction();
+  } catch (err) {
+    try {
+      await session.abortTransaction();
+    } catch {
+      // ignore abort errors
+    }
+    if (!isTransactionUnsupportedError(err)) {
+      throw err;
+    }
+    // Fallback cho Mongo standalone (không bật replica set).
+    const fresh = await WalletTopUp.findById(topUpId);
+    if (!fresh) throw new Error("Không tìm thấy yêu cầu nạp ví");
+    await creditWalletForTopUp(fresh, null);
+  } finally {
+    session.endSession();
+  }
+};
+
 exports.createVnpayTopupUrl = async (req, res) => {
   try {
+    const userId = getRequestUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: "Vui lòng đăng nhập để tiếp tục" });
+    }
     const amount = Math.round(Number(req.body?.amount));
     const returnUrl = req.body?.returnUrl;
     const cancelUrl = req.body?.cancelUrl;
@@ -79,7 +139,7 @@ exports.createVnpayTopupUrl = async (req, res) => {
     }
 
     const topUp = await WalletTopUp.create({
-      userId: req.user.id,
+      userId,
       amount,
       method: "vnpay",
       status: "pending",
@@ -148,8 +208,7 @@ exports.vnpayTopupReturn = async (req, res) => {
       return res.redirect(appendQuery(cancelUrl, "topup=0&reason=invalid"));
     }
 
-    const ok =
-      result.isVerified && result.isSuccess && String(result.vnp_ResponseCode ?? "") === "00";
+    const ok = result.isVerified && isVnpaySuccessResult(result);
     if (!ok) {
       await WalletTopUp.findOneAndUpdate(
         { _id: topUpId, status: { $ne: "completed" } },
@@ -158,9 +217,7 @@ exports.vnpayTopupReturn = async (req, res) => {
       return res.redirect(appendQuery(cancelUrl, "topup=0"));
     }
 
-    const expected = Math.round(Number(topUp.amount) * 100);
-    const received = Number(result.vnp_Amount);
-    if (expected !== received) {
+    if (!isTopupAmountMatched(topUp.amount, result.vnp_Amount)) {
       await WalletTopUp.findOneAndUpdate(
         { _id: topUpId, status: { $ne: "completed" } },
         { status: "failed" },
@@ -168,18 +225,7 @@ exports.vnpayTopupReturn = async (req, res) => {
       return res.redirect(appendQuery(cancelUrl, "topup=0&reason=amount"));
     }
 
-    const session = await mongoose.startSession();
-    try {
-      session.startTransaction();
-      const fresh = await WalletTopUp.findById(topUpId).session(session);
-      await creditWalletForTopUp(fresh, session);
-      await session.commitTransaction();
-    } catch (e) {
-      await session.abortTransaction();
-      throw e;
-    } finally {
-      session.endSession();
-    }
+    await creditTopupWithOptionalTransaction(topUpId);
 
     return res.redirect(
       appendQuery(successUrl, `topup=1&amount=${encodeURIComponent(topUp.amount)}`),
@@ -207,30 +253,16 @@ exports.vnpayTopupIpn = async (req, res) => {
       return res.status(200).json(IpnOrderNotFound);
     }
 
-    const expected = Math.round(Number(topUp.amount) * 100);
-    const received = Number(result.vnp_Amount);
-    if (expected !== received) {
+    if (!isTopupAmountMatched(topUp.amount, result.vnp_Amount)) {
       return res.status(200).json(IpnInvalidAmount);
     }
 
-    const ok =
-      result.isSuccess && String(result.vnp_ResponseCode ?? "") === "00";
+    const ok = isVnpaySuccessResult(result);
     if (ok) {
       if (topUp.status === "completed") {
         return res.status(200).json(InpOrderAlreadyConfirmed);
       }
-      const session = await mongoose.startSession();
-      try {
-        session.startTransaction();
-        const fresh = await WalletTopUp.findById(topUpId).session(session);
-        await creditWalletForTopUp(fresh, session);
-        await session.commitTransaction();
-      } catch (e) {
-        await session.abortTransaction();
-        throw e;
-      } finally {
-        session.endSession();
-      }
+      await creditTopupWithOptionalTransaction(topUpId);
     } else {
       await WalletTopUp.findOneAndUpdate(
         { _id: topUpId, status: { $ne: "completed" } },
@@ -244,6 +276,7 @@ exports.vnpayTopupIpn = async (req, res) => {
     return res.status(200).json(IpnUnknownError);
   }
 };
+
 
 exports.getBankInfo = async (req, res) => {
   try {
@@ -263,6 +296,10 @@ exports.getBankInfo = async (req, res) => {
 
 exports.createBankTopupRequest = async (req, res) => {
   try {
+    const userId = getRequestUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: "Vui lòng đăng nhập để tiếp tục" });
+    }
     const amount = Math.round(Number(req.body?.amount));
     const hi = maxTopup();
     if (!Number.isFinite(amount) || amount < MIN_TOPUP || amount > hi) {
@@ -271,9 +308,9 @@ exports.createBankTopupRequest = async (req, res) => {
       });
     }
 
-    const referenceCode = WalletTopUp.generateReferenceCode(req.user.id);
+    const referenceCode = WalletTopUp.generateReferenceCode(userId);
     const topUp = await WalletTopUp.create({
-      userId: req.user.id,
+      userId,
       amount,
       method: "bank_transfer",
       status: "awaiting_transfer",
@@ -302,10 +339,14 @@ exports.createBankTopupRequest = async (req, res) => {
 exports.markBankTopupSent = async (req, res) => {
   const { id } = req.params;
   try {
+    const userId = getRequestUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: "Vui lòng đăng nhập để tiếp tục" });
+    }
     const topUp = await WalletTopUp.findOneAndUpdate(
       {
       _id: id,
-      userId: req.user.id,
+      userId,
       method: "bank_transfer",
       status: "awaiting_transfer",
       },
@@ -330,16 +371,20 @@ exports.markBankTopupSent = async (req, res) => {
 
 exports.listMyTopups = async (req, res) => {
   try {
+    const userId = getRequestUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: "Vui lòng đăng nhập để tiếp tục" });
+    }
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
-      WalletTopUp.find({ userId: req.user.id })
+      WalletTopUp.find({ userId })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      WalletTopUp.countDocuments({ userId: req.user.id }),
+      WalletTopUp.countDocuments({ userId }),
     ]);
     res.status(200).json({
       data,
@@ -353,11 +398,9 @@ exports.listMyTopups = async (req, res) => {
   }
 };
 
-exports.adminListBankPending = async (req, res) => {
+exports.adminListTopupTransactions = async (req, res) => {
   try {
-    const items = await WalletTopUp.find({
-      method: "bank_transfer",
-    })
+    const items = await WalletTopUp.find({})
       .sort({ createdAt: -1 })
       .populate("userId", "name email phone")
       .lean();

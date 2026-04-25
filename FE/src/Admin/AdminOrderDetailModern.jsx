@@ -124,6 +124,8 @@ export default function AdminOrderDetailModern() {
   const [lineCanceling, setLineCanceling] = useState(null);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelNote, setCancelNote] = useState("");
+  const [previewImageOpen, setPreviewImageOpen] = useState(false);
+  const [previewImageSrc, setPreviewImageSrc] = useState("");
 
   useEffect(() => {
     const admin = getAdminSession();
@@ -325,6 +327,24 @@ export default function AdminOrderDetailModern() {
           onChange={(e) => setCancelNote(e.target.value)}
           placeholder="Ví dụ: Khách yêu cầu hủy — hết hàng, sai thông tin giao hàng..."
         />
+      </Modal>
+      <Modal
+        open={previewImageOpen}
+        footer={null}
+        centered
+        width={900}
+        onCancel={() => {
+          setPreviewImageOpen(false);
+          setPreviewImageSrc("");
+        }}
+      >
+        {previewImageSrc ? (
+          <img
+            src={previewImageSrc}
+            alt="return-preview"
+            className="max-h-[75vh] w-full rounded-lg object-contain"
+          />
+        ) : null}
       </Modal>
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex items-center gap-2 text-xs font-semibold text-slate-500">
@@ -574,19 +594,21 @@ export default function AdminOrderDetailModern() {
                             ? img
                             : `http://localhost:3002/uploads/${String(img).replace(/^\/+/, "")}`;
                           return (
-                            <a
+                            <button
+                              type="button"
                               key={`${img}-${idx}`}
-                              href={src}
-                              target="_blank"
-                              rel="noreferrer"
+                              onClick={() => {
+                                setPreviewImageSrc(src);
+                                setPreviewImageOpen(true);
+                              }}
                               className="block overflow-hidden rounded-lg border border-orange-200 bg-white"
                             >
                               <img
                                 src={src}
                                 alt={`return-${idx + 1}`}
-                                className="h-20 w-full object-cover"
+                                className="h-20 w-full object-cover transition-transform duration-200 hover:scale-105"
                               />
-                            </a>
+                            </button>
                           );
                         })}
                       </div>

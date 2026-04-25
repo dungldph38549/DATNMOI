@@ -39,9 +39,9 @@ const ProfilePage = () => {
     const [showAllWalletTx, setShowAllWalletTx] = useState(false);
     const [topupSubmitting, setTopupSubmitting] = useState(false);
     const [bankAmount, setBankAmount] = useState("100000");
-    const [bankRequest, setBankRequest] = useState(null);
     const [bankCreating, setBankCreating] = useState(false);
     const [bankConfirming, setBankConfirming] = useState(false);
+    const [bankRequest, setBankRequest] = useState(null);
 
     // Handle tab switching from query params
     useEffect(() => {
@@ -139,6 +139,7 @@ const ProfilePage = () => {
         }
     };
 
+
     const handleCreateBankRequest = async () => {
         const n = Number(String(bankAmount).replace(/\D/g, ""));
         if (!Number.isFinite(n) || n < 10000) {
@@ -173,6 +174,7 @@ const ProfilePage = () => {
             setBankConfirming(false);
         }
     };
+
 
     const displayedWalletTx = showAllWalletTx ? walletTx : walletTx.slice(0, 3);
 
@@ -385,7 +387,7 @@ const ProfilePage = () => {
                                             <div className="w-16 h-10 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 flex items-center justify-center text-white/40 italic font-black">VISA</div>
                                         </div>
                                         <p className="text-slate-400 text-sm font-medium max-w-md">
-                                            Nạp qua VNPay hoặc chuyển khoản; hoàn hàng / hoàn hủy đơn cũng được cộng vào ví.
+                                            Nạp qua VNPay; hoàn hàng / hoàn hủy đơn cũng được cộng vào ví.
                                         </p>
                                     </div>
                                 </div>
@@ -418,6 +420,7 @@ const ProfilePage = () => {
                                             </button>
                                         </div>
                                     </div>
+
 
                                     <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 md:p-8">
                                         <h4 className="font-black text-slate-900 mb-2 flex items-center gap-2">
@@ -508,6 +511,7 @@ const ProfilePage = () => {
                                             </div>
                                         )}
                                     </div>
+
                                 </div>
 
                                 <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 md:p-10">

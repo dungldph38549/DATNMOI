@@ -1,9 +1,16 @@
 const User = require("../models/UserModel.js");
 const WalletTransaction = require("../models/WalletTransactionModel.js");
 
+const getRequestUserId = (req) =>
+  req?.user?.id || req?.user?._id || req?.user?.userId || null;
+
 exports.getMyWallet = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("walletBalance");
+    const userId = getRequestUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: "Vui lòng đăng nhập để tiếp tục" });
+    }
+    const user = await User.findById(userId).select("walletBalance");
     if (!user)
       return res.status(404).json({ message: "Không tìm thấy người dùng" });
     res.status(200).json({
@@ -19,11 +26,15 @@ exports.getMyWallet = async (req, res) => {
 
 exports.getMyTransactions = async (req, res) => {
   try {
+    const userId = getRequestUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: "Vui lòng đăng nhập để tiếp tục" });
+    }
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const skip = (page - 1) * limit;
 
-    const filter = { userId: req.user.id };
+    const filter = { userId };
     const [items, total] = await Promise.all([
       WalletTransaction.find(filter)
         .sort({ createdAt: -1 })

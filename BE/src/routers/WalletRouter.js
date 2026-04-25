@@ -24,9 +24,8 @@ router.post(
   authMiddleware,
   walletTopUpController.createVnpayTopupUrl,
 );
-router.get("/bank-info", authMiddleware, walletTopUpController.getBankInfo);
 router.post(
-  "/topup/bank/request",
+  "/topup/bank",
   authMiddleware,
   walletTopUpController.createBankTopupRequest,
 );
@@ -36,19 +35,18 @@ router.post(
   walletTopUpController.markBankTopupSent,
 );
 router.get("/topups", authMiddleware, walletTopUpController.listMyTopups);
-
 router.get(
-  "/admin/topups/bank-pending",
+  "/admin/topups/transactions",
   authAdminMiddleware,
-  walletTopUpController.adminListBankPending,
+  walletTopUpController.adminListTopupTransactions,
 );
 router.post(
-  "/admin/topups/:id/confirm-bank",
+  "/admin/topups/bank/:id/confirm",
   authAdminMiddleware,
   walletTopUpController.adminConfirmBankTopup,
 );
 router.post(
-  "/admin/topups/:id/reject-bank",
+  "/admin/topups/bank/:id/reject",
   authAdminMiddleware,
   walletTopUpController.adminRejectBankTopup,
 );
