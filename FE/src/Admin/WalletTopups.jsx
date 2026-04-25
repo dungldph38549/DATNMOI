@@ -1,39 +1,67 @@
-  import React from "react";
-import { Table, Button, Space, message, Popconfirm, Input } from "antd";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  adminListBankPendingTopups,
-  adminConfirmBankTopup,
-  adminRejectBankTopup,
-} from "../api/index";
+import React from "react";
+import { Table, Button, Tag } from "antd";
+import { useQuery } from "@tanstack/react-query";
+import { adminListTopupTransactions } from "../api/index";
+
+const formatMoney = (v) => `${Number(v || 0).toLocaleString("vi-VN")}đ`;
+
+const shortId = (v) => String(v || "").slice(-8).toUpperCase();
+
+const txTypeLabel = (type) => {
+  switch (type) {
+    case "topup_vnpay":
+      return "Nạp ví qua VNPay";
+    case "topup_bank":
+      return "Nạp ví chuyển khoản";
+    case "order_payment":
+      return "Thanh toán đơn hàng";
+    case "order_cancel_refund":
+      return "Hoàn ví do hủy đơn";
+    case "order_line_cancel_refund":
+      return "Hoàn ví do hủy dòng hàng";
+    case "return_refund":
+      return "Hoàn tiền hoàn hàng";
+    default:
+      return "Giao dịch ví";
+  }
+};
+
+const methodLabel = (row) => {
+  const method = row?.topUpId?.method;
+  if (method === "vnpay") return "VNPay";
+  if (method === "bank_transfer") return "Chuyển khoản";
+  if (row?.type === "order_payment") {
+    const paymentMethod = String(row?.orderId?.paymentMethod || "").toLowerCase();
+    if (paymentMethod === "wallet") return "Thanh toán bằng ví";
+    if (paymentMethod === "vnpay") return "Thanh toán VNPay";
+    if (paymentMethod === "cod") return "Thanh toán COD";
+  }
+  return "Hệ thống ví";
+};
+
+const purposeLabel = (row) => {
+  const oid = row?.orderId?._id || row?.orderId;
+  if (row?.type === "order_payment" && oid) {
+    return `Thanh toán cho đơn #${shortId(oid)}`;
+  }
+  if (
+    (row?.type === "order_cancel_refund" ||
+      row?.type === "order_line_cancel_refund" ||
+      row?.type === "return_refund") &&
+    oid
+  ) {
+    return `Hoàn tiền liên quan đơn #${shortId(oid)}`;
+  }
+  if (row?.type === "topup_vnpay" || row?.type === "topup_bank") {
+    return "Cộng số dư ví người dùng";
+  }
+  return row?.note || "Giao dịch ví";
+};
 
 const WalletTopups = () => {
-  const queryClient = useQueryClient();
-  const [rejectNote, setRejectNote] = React.useState({});
-
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["admin-wallet-bank-pending"],
-    queryFn: adminListBankPendingTopups,
-  });
-
-  const confirmMut = useMutation({
-    mutationFn: adminConfirmBankTopup,
-    onSuccess: () => {
-      message.success("Đã cộng ví cho khách");
-      queryClient.invalidateQueries({ queryKey: ["admin-wallet-bank-pending"] });
-    },
-    onError: (e) =>
-      message.error(e?.response?.data?.message || "Thất bại"),
-  });
-
-  const rejectMut = useMutation({
-    mutationFn: ({ id, note }) => adminRejectBankTopup(id, note),
-    onSuccess: () => {
-      message.info("Đã từ chối yêu cầu");
-      queryClient.invalidateQueries({ queryKey: ["admin-wallet-bank-pending"] });
-    },
-    onError: (e) =>
-      message.error(e?.response?.data?.message || "Thất bại"),
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ["admin-wallet-topup-transactions"],
+    queryFn: () => adminListTopupTransactions(1, 100),
   });
 
   const rows = data?.data || [];
@@ -58,93 +86,113 @@ const WalletTopups = () => {
     {
       title: "Số tiền",
       dataIndex: "amount",
-      render: (v) => `${Number(v || 0).toLocaleString("vi-VN")}đ`,
+      width: 140,
+      render: (v) => <span style={{ fontWeight: 700 }}>{formatMoney(v)}</span>,
+    },
+    {
+      title: "Loại giao dịch",
+      dataIndex: "type",
+      width: 190,
+      render: (v) => {
+        const color =
+          v === "order_payment" ? "volcano" : v?.includes("refund") ? "green" : "gold";
+        return <Tag color={color}>{txTypeLabel(v)}</Tag>;
+      },
+    },
+    {
+      title: "Phương thức",
+      width: 170,
+      render: (_, r) => methodLabel(r),
+    },
+    {
+      title: "Mục đích / Thanh toán cho",
+      key: "purpose",
+      render: (_, r) => (
+        <div style={{ lineHeight: 1.35 }}>
+          <div style={{ fontWeight: 600, color: "#0f172a" }}>{purposeLabel(r)}</div>
+          {r?.orderId?._id ? (
+            <div style={{ fontSize: 12, color: "#64748b" }}>
+              Trạng thái đơn: {r?.orderId?.status || "—"}
+            </div>
+          ) : null}
+        </div>
+      ),
     },
     {
       title: "Nội dung CK",
-      dataIndex: "referenceCode",
-      render: (v) => (
+      key: "referenceCode",
+      render: (_, r) => (
         <code style={{ fontSize: 12, background: "#f1f5f9", padding: "2px 6px" }}>
-          {v}
+          {r?.topUpId?.referenceCode || "—"}
         </code>
       ),
     },
     {
       title: "Trạng thái",
-      dataIndex: "status",
-      render: (s) => {
-        const map = {
-          awaiting_transfer: "Chờ khách xác nhận",
-          awaiting_admin: "Chờ xử lý (cũ)",
-        };
-        return map[s] || s;
+      key: "status",
+      width: 130,
+      render: (_, r) => {
+        const status = r?.topUpId?.status;
+        if (!status || status === "completed") return <Tag color="green">Thành công</Tag>;
+        if (status === "pending" || status === "awaiting_admin") {
+          return <Tag color="orange">Đang xử lý</Tag>;
+        }
+        return <Tag color="red">{status}</Tag>;
       },
     },
     {
-      title: "Tạo lúc",
+      title: "Thời gian",
       dataIndex: "createdAt",
-      render: (d) =>
-        d ? new Date(d).toLocaleString("vi-VN") : "—",
-    },
-    {
-      title: "",
-      key: "actions",
-      render: (_, r) => (
-        <Space>
-          <Button
-            type="primary"
-            size="small"
-            loading={confirmMut.isPending}
-            onClick={() => confirmMut.mutate(r._id)}
-          >
-            Xác nhận &amp; cộng ví
-          </Button>
-          <Popconfirm
-            title="Từ chối yêu cầu này?"
-            onConfirm={() =>
-              rejectMut.mutate({
-                id: r._id,
-                note: rejectNote[r._id] || "",
-              })
-            }
-            okText="Từ chối"
-            cancelText="Hủy"
-          >
-            <Button danger size="small" loading={rejectMut.isPending}>
-              Từ chối
-            </Button>
-          </Popconfirm>
-          <Input
-            size="small"
-            placeholder="Ghi chú từ chối"
-            style={{ width: 140 }}
-            value={rejectNote[r._id] || ""}
-            onChange={(e) =>
-              setRejectNote((prev) => ({ ...prev, [r._id]: e.target.value }))
-            }
-          />
-        </Space>
-      ),
+      width: 180,
+      render: (d) => (d ? new Date(d).toLocaleString("vi-VN") : "—"),
     },
   ];
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
-        <h2 style={{ margin: 0, fontWeight: 800 }}>Nạp ví — chuyển khoản</h2>
-        <Button onClick={() => refetch()}>Làm mới</Button>
+    <div style={{ padding: 24, background: "#f8fafc", minHeight: "100vh" }}>
+      <div
+        style={{
+          marginBottom: 16,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <h2 style={{ margin: 0, fontWeight: 800, color: "#0f172a" }}>Lịch sử giao dịch ví</h2>
+          <p style={{ color: "#64748b", margin: "6px 0 0", fontSize: 13 }}>
+            Hiển thị cả nạp ví, thanh toán đơn bằng ví và các giao dịch hoàn tiền.
+          </p>
+        </div>
+        <Button onClick={() => refetch()} type="primary">
+          Làm mới
+        </Button>
       </div>
-      <p style={{ color: "#64748b", marginBottom: 16, fontSize: 13 }}>
-        Khách tự cộng ví ngay khi bấm xác nhận trên trang cá nhân. Trang này chỉ còn các yêu cầu CK{" "}
-        <strong>đã tạo mã nhưng chưa bấm xác nhận</strong>, hoặc bản ghi <code>awaiting_admin</code> cũ — có thể xác nhận / từ chối thủ công nếu cần.
-      </p>
-      <Table
-        rowKey="_id"
-        loading={isLoading}
-        columns={columns}
-        dataSource={rows}
-        pagination={{ pageSize: 15 }}
-      />
+      {isError ? (
+        <p style={{ color: "#dc2626", marginBottom: 12, fontSize: 13 }}>
+          Không tải được giao dịch nạp ví: {error?.response?.data?.message || error?.message || "Lỗi không xác định"}.
+        </p>
+      ) : null}
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 16,
+          border: "1px solid #e2e8f0",
+          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
+          overflow: "hidden",
+        }}
+      >
+        <Table
+          rowKey="_id"
+          loading={isLoading}
+          columns={columns}
+          dataSource={rows}
+          pagination={{ pageSize: 15 }}
+          scroll={{ x: 1200 }}
+        />
+      </div>
     </div>
   );
 };

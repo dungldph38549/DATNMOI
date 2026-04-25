@@ -79,41 +79,11 @@ export const createWalletVnpayTopupUrl = async ({
   return res.data;
 };
 
-/** Thông tin tài khoản nhận CK (từ cấu hình server) */
-export const getWalletBankInfo = async () => {
-  const res = await axiosInstance.get("/wallet/bank-info");
-  return res.data;
-};
-
-/** Tạo yêu cầu nạp bằng chuyển khoản (nhận mã nội dung + STK) */
-export const createWalletBankTopupRequest = async (amount) => {
-  const res = await axiosInstance.post("/wallet/topup/bank/request", { amount });
-  return res.data;
-};
-
-export const markWalletBankTopupSent = async (id) => {
-  const res = await axiosInstance.post(`/wallet/topup/bank/${id}/mark-sent`);
-  return res.data;
-};
-
-/** Admin: danh sách nạp CK chờ xác nhận */
-export const adminListBankPendingTopups = async () => {
-  const res = await axiosInstance.get("/wallet/admin/topups/bank-pending");
-  return res.data;
-};
-
-export const adminConfirmBankTopup = async (id) => {
-  const res = await axiosInstance.post(
-    `/wallet/admin/topups/${id}/confirm-bank`,
-  );
-  return res.data;
-};
-
-export const adminRejectBankTopup = async (id, note = "") => {
-  const res = await axiosInstance.post(
-    `/wallet/admin/topups/${id}/reject-bank`,
-    { note },
-  );
+/** Admin: chỉ xem lịch sử giao dịch nạp ví */
+export const adminListTopupTransactions = async (page = 1, limit = 20) => {
+  const res = await axiosInstance.get("/wallet/admin/topups/transactions", {
+    params: { page, limit },
+  });
   return res.data;
 };
 

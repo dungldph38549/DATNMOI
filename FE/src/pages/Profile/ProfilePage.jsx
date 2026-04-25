@@ -8,8 +8,6 @@ import {
     getWalletBalance,
     getWalletTransactions,
     createWalletVnpayTopupUrl,
-    createWalletBankTopupRequest,
-    markWalletBankTopupSent,
 } from "../../api";
 import { updateUserInfo, clearUser } from "../../redux/user";
 import notify from "../../utils/notify";
@@ -38,10 +36,6 @@ const ProfilePage = () => {
     const [topupAmountVnpay, setTopupAmountVnpay] = useState("100000");
     const [showAllWalletTx, setShowAllWalletTx] = useState(false);
     const [topupSubmitting, setTopupSubmitting] = useState(false);
-    const [bankAmount, setBankAmount] = useState("100000");
-    const [bankRequest, setBankRequest] = useState(null);
-    const [bankCreating, setBankCreating] = useState(false);
-    const [bankConfirming, setBankConfirming] = useState(false);
 
     // Handle tab switching from query params
     useEffect(() => {
@@ -136,51 +130,6 @@ const ProfilePage = () => {
             notify.error(err?.response?.data?.message || "Không tạo được liên kết VNPay.");
         } finally {
             setTopupSubmitting(false);
-        }
-    };
-
-    const handleCreateBankRequest = async () => {
-        const n = Number(String(bankAmount).replace(/\D/g, ""));
-        if (!Number.isFinite(n) || n < 10000) {
-            notify.warning("Số tiền tối thiểu 10.000đ.");
-            return;
-        }
-        setBankCreating(true);
-        try {
-            const data = await createWalletBankTopupRequest(n);
-            setBankRequest(data);
-            notify.success(
-                "Đã tạo yêu cầu. Chuyển khoản đúng số tiền và nội dung, sau đó bấm xác nhận để cộng ví.",
-            );
-        } catch (err) {
-            notify.error(err?.response?.data?.message || "Không tạo được yêu cầu nạp CK.");
-        } finally {
-            setBankCreating(false);
-        }
-    };
-
-    const handleConfirmBankSent = async () => {
-        const id = bankRequest?.topUp?._id;
-        if (!id) return;
-        setBankConfirming(true);
-        try {
-            await markWalletBankTopupSent(id);
-            notify.success("Đã cộng tiền vào ví.");
-            setBankRequest(null);
-            const [bal, txRes] = await Promise.all([
-                getWalletBalance(),
-                getWalletTransactions(1, 30),
-            ]);
-            setWalletBalance(
-                typeof bal?.balance === "number"
-                    ? bal.balance
-                    : Number(bal?.balance) || 0,
-            );
-            setWalletTx(Array.isArray(txRes?.data) ? txRes.data : []);
-        } catch (err) {
-            notify.error(err?.response?.data?.message || "Không xác nhận được.");
-        } finally {
-            setBankConfirming(false);
         }
     };
 
@@ -395,7 +344,7 @@ const ProfilePage = () => {
                                             <div className="w-16 h-10 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 flex items-center justify-center text-white/40 italic font-black">VISA</div>
                                         </div>
                                         <p className="text-slate-400 text-sm font-medium max-w-md">
-                                            Nạp qua VNPay hoặc chuyển khoản; hoàn hàng / hoàn hủy đơn cũng được cộng vào ví.
+                                            Nạp qua VNPay; hoàn hàng / hoàn hủy đơn cũng được cộng vào ví.
                                         </p>
                                     </div>
                                 </div>
@@ -429,95 +378,6 @@ const ProfilePage = () => {
                                         </div>
                                     </div>
 
-                                    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 md:p-8">
-                                        <h4 className="font-black text-slate-900 mb-2 flex items-center gap-2">
-                                            <span className="text-primary">●</span> Nạp chuyển khoản
-                                        </h4>
-                                        <p className="text-xs text-slate-500 mb-4">
-                                            Tạo mã nội dung, chuyển đúng số tiền rồi bấm &quot;Đã chuyển khoản&quot; — hệ thống cộng ví ngay (không cần chờ admin).
-                                        </p>
-                                        {!bankRequest ? (
-                                            <div className="flex flex-wrap gap-3 items-end">
-                                                <div className="flex-1 min-w-[140px]">
-                                                    <label className="text-xs font-bold text-slate-400 uppercase">Số tiền (đ)</label>
-                                                    <input
-                                                        type="number"
-                                                        min={10000}
-                                                        step={1000}
-                                                        value={bankAmount}
-                                                        onChange={(e) => setBankAmount(e.target.value)}
-                                                        className="w-full mt-1 px-4 py-3 rounded-xl border border-slate-200 font-bold text-slate-800"
-                                                    />
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    disabled={bankCreating}
-                                                    onClick={handleCreateBankRequest}
-                                                    className="px-6 py-3 rounded-xl bg-slate-900 text-white font-black text-sm hover:bg-primary transition-colors disabled:opacity-50"
-                                                >
-                                                    {bankCreating ? "…" : "Tạo mã nạp"}
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-4 rounded-2xl bg-slate-50 border border-slate-100 p-5">
-                                                <p className="text-sm font-bold text-slate-800">
-                                                    Số tiền:{" "}
-                                                    <span className="text-primary">
-                                                        {Number(bankRequest.topUp?.amount || 0).toLocaleString("vi-VN")}đ
-                                                    </span>
-                                                </p>
-                                                <div className="text-sm text-slate-700 space-y-1">
-                                                    <p>
-                                                        <span className="font-bold text-slate-500">Ngân hàng:</span>{" "}
-                                                        {bankRequest.bank?.bankName || "—"}
-                                                    </p>
-                                                    <p>
-                                                        <span className="font-bold text-slate-500">Số TK:</span>{" "}
-                                                        <code className="bg-white px-2 py-0.5 rounded border border-slate-200">
-                                                            {bankRequest.bank?.accountNumber || "—"}
-                                                        </code>
-                                                    </p>
-                                                    <p>
-                                                        <span className="font-bold text-slate-500">Chủ TK:</span>{" "}
-                                                        {bankRequest.bank?.accountOwner || "—"}
-                                                    </p>
-                                                    {bankRequest.bank?.branch ? (
-                                                        <p>
-                                                            <span className="font-bold text-slate-500">Chi nhánh:</span>{" "}
-                                                            {bankRequest.bank.branch}
-                                                        </p>
-                                                    ) : null}
-                                                    <p>
-                                                        <span className="font-bold text-slate-500">Nội dung CK:</span>{" "}
-                                                        <code className="bg-amber-50 text-amber-900 px-2 py-0.5 rounded border border-amber-200 font-bold">
-                                                            {bankRequest.topUp?.referenceCode || "—"}
-                                                        </code>
-                                                    </p>
-                                                    {bankRequest.bank?.note ? (
-                                                        <p className="text-xs text-slate-500 italic">{bankRequest.bank.note}</p>
-                                                    ) : null}
-                                                </div>
-                                                <div className="flex flex-wrap gap-3 pt-2">
-                                                    <button
-                                                        type="button"
-                                                        disabled={bankConfirming}
-                                                        onClick={handleConfirmBankSent}
-                                                        className="px-6 py-3 rounded-xl bg-green-600 text-white font-black text-sm hover:bg-green-700 transition-colors disabled:opacity-50"
-                                                    >
-                                                        {bankConfirming ? "…" : "Đã chuyển khoản — cộng ví"}
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        disabled={bankConfirming}
-                                                        onClick={() => setBankRequest(null)}
-                                                        className="px-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-white"
-                                                    >
-                                                        Hủy
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
                                 </div>
 
                                 <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 md:p-10">

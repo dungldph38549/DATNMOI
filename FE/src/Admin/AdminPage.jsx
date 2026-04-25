@@ -17,7 +17,7 @@ import WalletTopups from "./WalletTopups";
 // import StaffManagement from "./StaffManagement";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getAllOrders, adminListBankPendingTopups } from "../api/index";
+import { getAllOrders, adminListTopupTransactions } from "../api/index";
 import { clearUser } from "../redux/user";
 
 const getAdminSession = () => {
@@ -56,9 +56,6 @@ const T = {
   greenBg: "rgba(34,197,94,0.10)",
 };
 
-// ================================================================
-// Menu items + group dropdown
-// ================================================================
 const MENU_ITEMS = {
   dashboard: { key: "dashboard", icon: "dashboard", label: "Dashboard" },
   orders: { key: "orders", icon: "local_shipping", label: "Đơn hàng" },
@@ -83,7 +80,7 @@ const MENU_ITEMS = {
   "wallet-topups": {
     key: "wallet-topups",
     icon: "account_balance_wallet",
-    label: "Nạp ví (CK)",
+    label: "Giao dịch nạp ví",
   },
   staff: { key: "staff", icon: "badge", label: "Nhân viên" },
 };
@@ -169,7 +166,7 @@ const SideItem = ({
         {item.icon}
       </span>
     )}
-    <span style={{ fontSize: asSection ? 13 : 13, fontWeight: asSection ? 800 : active ? 700 : 500 }}>
+    <span style={{ fontSize: 13, fontWeight: asSection ? 800 : active ? 700 : 500 }}>
       <span
         style={{
           display: "block",
@@ -241,12 +238,9 @@ const AdminPage = () => {
     "customers-wallet": true,
   });
 
-  // ── fetch data for badges ────────────────────────────────────
   const { data: orderData } = useQuery({
     queryKey: ["admin-orders-badges"],
     queryFn: async () => {
-      // Logic lấy 50 đơn gần nhất để đếm badge (hoặc lấy toàn bộ nếu cần chính xác tuyệt đối)
-      // Ở đây ta dùng 50 để cân bằng hiệu năng khởi động Admin
       const res = await getAllOrders(0, 50);
       return res?.data || [];
     },
@@ -255,22 +249,21 @@ const AdminPage = () => {
 
   const { data: topupData } = useQuery({
     queryKey: ["admin-topups-badges"],
-    queryFn: adminListBankPendingTopups,
+    queryFn: () => adminListTopupTransactions(1, 100),
     refetchInterval: 15000,
   });
 
   const orders = Array.isArray(orderData) ? orderData : [];
   const topups = Array.isArray(topupData?.data) ? topupData.data : [];
-
   const pendingOrdersCount = orders.filter((o) =>
     ["pending", "confirmed", "shipped", "delivered"].includes(o.status),
   ).length;
-
   const returnRequestsCount = orders.filter(
     (o) => o.status === "return-request",
   ).length;
-
-  const pendingTopupsCount = topups.length;
+  const pendingTopupsCount = topups.filter(
+    (t) => t?.topUpId?.method === "bank_transfer" && t?.topUpId?.status !== "completed",
+  ).length;
 
   const menuWithBadges = Object.values(MENU_ITEMS).map((item) => {
     if (item.key === "orders") return { ...item, count: pendingOrdersCount };
@@ -363,6 +356,8 @@ const AdminPage = () => {
         return <Categories />;
       case "order-returns":
         return <Order mode="returns" />;
+      case "orders-completed":
+        return <Order mode="completed" />;
       case "comments":
         return <Reviews />;
       case "staff":
@@ -459,11 +454,6 @@ const AdminPage = () => {
         .admin-shell,
         .admin-shell * {
           box-sizing: border-box;
-        }
-        .admin-shell {
-          width: 100%;
-          max-width: 100%;
-          font-size: 14px;
         }
         .admin-main {
           width: 100%;
@@ -661,8 +651,6 @@ const AdminPage = () => {
                     fontSize: 13,
                     fontWeight: 700,
                     color: T.text,
-                    display: "block",
-                    width: "100%",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
@@ -674,8 +662,6 @@ const AdminPage = () => {
                   style={{
                     fontSize: 11,
                     color: T.textMuted,
-                    display: "block",
-                    width: "100%",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
