@@ -301,42 +301,30 @@ exports.createBankTopupRequest = async (req, res) => {
 
 exports.markBankTopupSent = async (req, res) => {
   const { id } = req.params;
-  const session = await mongoose.startSession();
   try {
-    session.startTransaction();
-    const topUp = await WalletTopUp.findOne({
+    const topUp = await WalletTopUp.findOneAndUpdate(
+      {
       _id: id,
       userId: req.user.id,
       method: "bank_transfer",
       status: "awaiting_transfer",
-    }).session(session);
+      },
+      {
+        status: "awaiting_admin",
+        userMarkedSentAt: new Date(),
+      },
+      { new: true },
+    ).lean();
 
     if (!topUp) {
-      await session.abortTransaction();
       return res.status(400).json({
         message: "Không tìm thấy yêu cầu hoặc đã xử lý",
       });
     }
 
-    const uid = req.user?.id || req.user?._id;
-    const confirmedBy =
-      uid && mongoose.Types.ObjectId.isValid(String(uid))
-        ? new mongoose.Types.ObjectId(String(uid))
-        : undefined;
-
-    await creditWalletForTopUp(topUp, session, {
-      ...(confirmedBy ? { confirmedBy } : {}),
-      patchTopUp: { userMarkedSentAt: new Date() },
-    });
-
-    await session.commitTransaction();
-    const out = await WalletTopUp.findById(id).lean();
-    res.status(200).json(out);
+    res.status(200).json(topUp);
   } catch (err) {
-    await session.abortTransaction();
     res.status(500).json({ message: err?.message || "Internal server error" });
-  } finally {
-    session.endSession();
   }
 };
 
@@ -369,11 +357,9 @@ exports.adminListBankPending = async (req, res) => {
   try {
     const items = await WalletTopUp.find({
       method: "bank_transfer",
-      status: { $in: ["awaiting_transfer", "awaiting_admin"] },
     })
       .sort({ createdAt: -1 })
       .populate("userId", "name email phone")
-      .limit(200)
       .lean();
     res.status(200).json({ data: items });
   } catch (err) {

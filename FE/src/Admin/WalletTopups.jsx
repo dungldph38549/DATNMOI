@@ -1,5 +1,5 @@
   import React from "react";
-import { Table, Button, Space, message, Popconfirm, Input } from "antd";
+import { Table, Button, Space, message, Popconfirm, Input, Select } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   adminListBankPendingTopups,
@@ -10,6 +10,7 @@ import {
 const WalletTopups = () => {
   const queryClient = useQueryClient();
   const [rejectNote, setRejectNote] = React.useState({});
+  const [statusFilter, setStatusFilter] = React.useState("all");
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin-wallet-bank-pending"],
@@ -37,6 +38,14 @@ const WalletTopups = () => {
   });
 
   const rows = data?.data || [];
+  const filteredRows = React.useMemo(() => {
+    return rows.filter((row) => {
+      if (statusFilter !== "all" && row.status !== statusFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [rows, statusFilter]);
 
   const columns = [
     {
@@ -74,10 +83,64 @@ const WalletTopups = () => {
       dataIndex: "status",
       render: (s) => {
         const map = {
-          awaiting_transfer: "Chờ khách xác nhận",
-          awaiting_admin: "Chờ xử lý (cũ)",
+          awaiting_transfer: {
+            text: "Chờ khách bấm đã chuyển khoản",
+            textColor: "#475569",
+            bg: "#f8fafc",
+            border: "#cbd5e1",
+          },
+          awaiting_admin: {
+            text: "Chờ admin xác nhận",
+            textColor: "#1677ff",
+            bg: "#e6f4ff",
+            border: "#91caff",
+          },
+          completed: {
+            text: "Đã cộng ví",
+            textColor: "#389e0d",
+            bg: "#f6ffed",
+            border: "#95de64",
+          },
+          rejected: {
+            text: "Đã từ chối",
+            textColor: "#cf1322",
+            bg: "#fff1f0",
+            border: "#ffa39e",
+          },
+          failed: {
+            text: "Thất bại",
+            textColor: "#d4380d",
+            bg: "#fff2e8",
+            border: "#ffbb96",
+          },
+          cancelled: {
+            text: "Đã hủy",
+            textColor: "#d48806",
+            bg: "#fffbe6",
+            border: "#ffe58f",
+          },
         };
-        return map[s] || s;
+        const item = map[s];
+        const text = item?.text || s;
+        return (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              padding: "2px 10px",
+              borderRadius: 999,
+              border: `1px solid ${item?.border || "#d9d9d9"}`,
+              background: item?.bg || "#fafafa",
+              color: item?.textColor || "#475569",
+              fontWeight: 600,
+              fontSize: 12,
+              lineHeight: "18px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {text}
+          </span>
+        );
       },
     },
     {
@@ -87,13 +150,14 @@ const WalletTopups = () => {
         d ? new Date(d).toLocaleString("vi-VN") : "—",
     },
     {
-      title: "",
+      title: "Thao tác",
       key: "actions",
       render: (_, r) => (
         <Space>
           <Button
             type="primary"
             size="small"
+            disabled={r.status !== "awaiting_admin"}
             loading={confirmMut.isPending}
             onClick={() => confirmMut.mutate(r._id)}
           >
@@ -101,6 +165,7 @@ const WalletTopups = () => {
           </Button>
           <Popconfirm
             title="Từ chối yêu cầu này?"
+            disabled={!["awaiting_transfer", "awaiting_admin"].includes(r.status)}
             onConfirm={() =>
               rejectMut.mutate({
                 id: r._id,
@@ -110,7 +175,12 @@ const WalletTopups = () => {
             okText="Từ chối"
             cancelText="Hủy"
           >
-            <Button danger size="small" loading={rejectMut.isPending}>
+            <Button
+              danger
+              size="small"
+              disabled={!["awaiting_transfer", "awaiting_admin"].includes(r.status)}
+              loading={rejectMut.isPending}
+            >
               Từ chối
             </Button>
           </Popconfirm>
@@ -135,14 +205,49 @@ const WalletTopups = () => {
         <Button onClick={() => refetch()}>Làm mới</Button>
       </div>
       <p style={{ color: "#64748b", marginBottom: 16, fontSize: 13 }}>
-        Khách tự cộng ví ngay khi bấm xác nhận trên trang cá nhân. Trang này chỉ còn các yêu cầu CK{" "}
-        <strong>đã tạo mã nhưng chưa bấm xác nhận</strong>, hoặc bản ghi <code>awaiting_admin</code> cũ — có thể xác nhận / từ chối thủ công nếu cần.
+        Hiển thị tất cả yêu cầu nạp CK (mọi trạng thái), mới nhất ở trên cùng.{" "}
+        Chỉ dòng <code>awaiting_admin</code> có thể xác nhận cộng ví; từ chối áp dụng cho{" "}
+        <code>awaiting_transfer</code> hoặc <code>awaiting_admin</code>.
       </p>
+      <div
+        style={{
+          marginBottom: 16,
+          display: "flex",
+          gap: 12,
+          flexWrap: "wrap",
+          alignItems: "end",
+        }}
+      >
+        <div style={{ minWidth: 220 }}>
+          <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>Trạng thái</div>
+          <Select
+            value={statusFilter}
+            onChange={setStatusFilter}
+            style={{ width: "100%" }}
+            options={[
+              { value: "all", label: "Tất cả trạng thái" },
+              { value: "awaiting_transfer", label: "Chờ khách bấm đã chuyển khoản" },
+              { value: "awaiting_admin", label: "Chờ admin xác nhận" },
+              { value: "completed", label: "Đã cộng ví" },
+              { value: "rejected", label: "Đã từ chối" },
+              { value: "failed", label: "Thất bại" },
+              { value: "cancelled", label: "Đã hủy" },
+            ]}
+          />
+        </div>
+        <Button
+          onClick={() => {
+            setStatusFilter("all");
+          }}
+        >
+          Xóa lọc
+        </Button>
+      </div>
       <Table
         rowKey="_id"
         loading={isLoading}
         columns={columns}
-        dataSource={rows}
+        dataSource={filteredRows}
         pagination={{ pageSize: 15 }}
       />
     </div>

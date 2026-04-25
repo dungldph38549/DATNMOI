@@ -150,7 +150,7 @@ const ProfilePage = () => {
             const data = await createWalletBankTopupRequest(n);
             setBankRequest(data);
             notify.success(
-                "Đã tạo yêu cầu. Chuyển khoản đúng số tiền và nội dung, sau đó bấm xác nhận để cộng ví.",
+                "Đã tạo yêu cầu. Chuyển khoản đúng số tiền và nội dung, sau đó bấm xác nhận để gửi admin duyệt.",
             );
         } catch (err) {
             notify.error(err?.response?.data?.message || "Không tạo được yêu cầu nạp CK.");
@@ -165,18 +165,8 @@ const ProfilePage = () => {
         setBankConfirming(true);
         try {
             await markWalletBankTopupSent(id);
-            notify.success("Đã cộng tiền vào ví.");
+            notify.success("Đã gửi xác nhận chuyển khoản. Vui lòng chờ admin duyệt.");
             setBankRequest(null);
-            const [bal, txRes] = await Promise.all([
-                getWalletBalance(),
-                getWalletTransactions(1, 30),
-            ]);
-            setWalletBalance(
-                typeof bal?.balance === "number"
-                    ? bal.balance
-                    : Number(bal?.balance) || 0,
-            );
-            setWalletTx(Array.isArray(txRes?.data) ? txRes.data : []);
         } catch (err) {
             notify.error(err?.response?.data?.message || "Không xác nhận được.");
         } finally {
@@ -434,7 +424,7 @@ const ProfilePage = () => {
                                             <span className="text-primary">●</span> Nạp chuyển khoản
                                         </h4>
                                         <p className="text-xs text-slate-500 mb-4">
-                                            Tạo mã nội dung, chuyển đúng số tiền rồi bấm &quot;Đã chuyển khoản&quot; — hệ thống cộng ví ngay (không cần chờ admin).
+                                            Tạo mã nội dung, chuyển đúng số tiền rồi bấm &quot;Đã chuyển khoản&quot; để gửi admin xác nhận.
                                         </p>
                                         {!bankRequest ? (
                                             <div className="flex flex-wrap gap-3 items-end">
@@ -504,7 +494,7 @@ const ProfilePage = () => {
                                                         onClick={handleConfirmBankSent}
                                                         className="px-6 py-3 rounded-xl bg-green-600 text-white font-black text-sm hover:bg-green-700 transition-colors disabled:opacity-50"
                                                     >
-                                                        {bankConfirming ? "…" : "Đã chuyển khoản — cộng ví"}
+                                                        {bankConfirming ? "…" : "Đã chuyển khoản — gửi admin duyệt"}
                                                     </button>
                                                     <button
                                                         type="button"
