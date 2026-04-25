@@ -383,34 +383,36 @@ export default function AdminOrderDetailModern() {
           </div>
         </div>
 
-        <div className="mb-6 rounded-2xl bg-white p-6 shadow-sm">
-          <div className="relative flex items-start justify-between gap-3 overflow-x-auto pb-2">
-            <div className="absolute left-10 right-10 top-5 h-1 rounded bg-slate-200" />
-            <div
-              className="absolute left-10 top-5 h-1 rounded bg-[#874e00]"
-              style={{ width: `${Math.max(0, (flowIndex / (FLOW.length - 1)) * 100)}%`, right: "auto" }}
-            />
-            {FLOW.map((step, idx) => {
-              const active = idx <= flowIndex;
-              const stepTime = historyByStatus[step]?.createdAt;
-              return (
-                <div key={step} className="relative z-10 flex min-w-[120px] flex-col items-center gap-2">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-full ${active ? "bg-[#874e00] text-white" : "bg-slate-200 text-slate-400"}`}>
-                    <span className="material-symbols-outlined text-[18px]">
-                      {active ? "check" : "radio_button_unchecked"}
-                    </span>
+        {!isReturnFlow && (
+          <div className="mb-6 rounded-2xl bg-white p-6 shadow-sm">
+            <div className="relative flex items-start justify-between gap-3 overflow-x-auto pb-2">
+              <div className="absolute left-10 right-10 top-5 h-1 rounded bg-slate-200" />
+              <div
+                className="absolute left-10 top-5 h-1 rounded bg-[#874e00]"
+                style={{ width: `${Math.max(0, (flowIndex / (FLOW.length - 1)) * 100)}%`, right: "auto" }}
+              />
+              {FLOW.map((step, idx) => {
+                const active = idx <= flowIndex;
+                const stepTime = historyByStatus[step]?.createdAt;
+                return (
+                  <div key={step} className="relative z-10 flex min-w-[120px] flex-col items-center gap-2">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${active ? "bg-[#874e00] text-white" : "bg-slate-200 text-slate-400"}`}>
+                      <span className="material-symbols-outlined text-[18px]">
+                        {active ? "check" : "radio_button_unchecked"}
+                      </span>
+                    </div>
+                    <p className={`text-center text-xs font-bold ${active ? "text-slate-900" : "text-slate-400"}`}>
+                      {statusLabel(step)}
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      {stepTime ? new Date(stepTime).toLocaleString("vi-VN") : "-"}
+                    </p>
                   </div>
-                  <p className={`text-center text-xs font-bold ${active ? "text-slate-900" : "text-slate-400"}`}>
-                    {statusLabel(step)}
-                  </p>
-                  <p className="text-[10px] text-slate-400">
-                    {stepTime ? new Date(stepTime).toLocaleString("vi-VN") : "-"}
-                  </p>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
