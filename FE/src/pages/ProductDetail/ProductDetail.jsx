@@ -516,6 +516,11 @@ const ProductDetail = () => {
 
   const handleToggleWishlist = () => {
     if (!product) return;
+    if (!user?.login || !user?.token) {
+      notify.warning("Vui lòng đăng nhập để thêm sản phẩm vào yêu thích.");
+      navigate("/login", { state: { from: `/product/${product._id}` } });
+      return;
+    }
     dispatch(toggleWishlist(product));
   };
 

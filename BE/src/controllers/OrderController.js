@@ -1505,48 +1505,121 @@ exports.revenue = async (req, res) => {
       ],
     };
 
-    const results = await Order.aggregate([
+    const serializeGroupKey = (id) =>
+      typeof id === "object" && id !== null ? JSON.stringify(id) : String(id);
 
-      {
-        $match: {
-          createdAt: { $gte: start, $lte: end },
-          status: { $nin: ORDER_STATUSES_EXCLUDED_FROM_REVENUE },
-        },
-      },
-
-      { $match: revenueMatch },
-
-      {
-        $group: {
-          _id: groupId,
-          totalRevenue: { $sum: "$totalAmount" },
-          totalOrders: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
-    const formattedResults = results.map((item) => {
+    const formatBucketName = (idValue) => {
       let name = "";
-      if (unit === "day" && typeof item._id === "string") {
-        const d = new Date(item._id);
+      if (unit === "day" && typeof idValue === "string") {
+        const d = new Date(idValue);
         name = `${d.getDate()}/${d.getMonth() + 1}`;
       } else {
         const nameMap = {
-          year: `${item._id}`,
-          month: `${item._id.month}/${item._id.year}`,
-          week: `Tuần ${item._id.week}/${item._id.year}`,
-          hour: `${String(item._id.hour).padStart(2, "0")}:00`,
+          year: `${idValue}`,
+          month: `${idValue.month}/${idValue.year}`,
+          week: `Tuần ${idValue.week}/${idValue.year}`,
+          hour: `${String(idValue.hour).padStart(2, "0")}:00`,
         };
-        name = nameMap[unit] || item._id?.toString() || "N/A";
+        name = nameMap[unit] || idValue?.toString() || "N/A";
       }
-      return { ...item, name };
+      return name;
+    };
+
+    const [revenueResults, orderResults] = await Promise.all([
+      Order.aggregate([
+        { $match: revenueMatch },
+        {
+          $group: {
+            _id: groupId,
+            totalRevenue: { $sum: "$totalAmount" },
+            paidOrders: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+      Order.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: start, $lte: end },
+          },
+        },
+        {
+          $group: {
+            _id: groupId,
+            totalOrders: { $sum: 1 },
+            canceledOrders: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "canceled"] }, 1, 0],
+              },
+            },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+    ]);
+
+    const merged = new Map();
+
+    for (const item of revenueResults) {
+      const key = serializeGroupKey(item._id);
+      merged.set(key, {
+        _id: item._id,
+        name: formatBucketName(item._id),
+        totalRevenue: item.totalRevenue || 0,
+        paidOrders: item.paidOrders || 0,
+        totalOrders: 0,
+        canceledOrders: 0,
+      });
+    }
+
+    for (const item of orderResults) {
+      const key = serializeGroupKey(item._id);
+      const current = merged.get(key) || {
+        _id: item._id,
+        name: formatBucketName(item._id),
+        totalRevenue: 0,
+        paidOrders: 0,
+        totalOrders: 0,
+        canceledOrders: 0,
+      };
+      current.totalOrders = item.totalOrders || 0;
+      current.canceledOrders = item.canceledOrders || 0;
+      merged.set(key, current);
+    }
+
+    const buildSortKey = (idValue) => {
+      if (unit === "day" && typeof idValue === "string") return idValue;
+      if (unit === "year") return `${idValue}`;
+      if (unit === "month")
+        return `${idValue.year}-${String(idValue.month).padStart(2, "0")}`;
+      if (unit === "week")
+        return `${idValue.year}-${String(idValue.week).padStart(2, "0")}`;
+      if (unit === "hour") {
+        return `${idValue.year}-${String(idValue.month).padStart(2, "0")}-${String(
+          idValue.day,
+        ).padStart(2, "0")} ${String(idValue.hour).padStart(2, "0")}:00`;
+      }
+      return String(idValue);
+    };
+
+    const formattedResults = Array.from(merged.values()).sort((a, b) =>
+      buildSortKey(a._id).localeCompare(buildSortKey(b._id), "vi-VN", {
+        numeric: true,
+      }),
+    );
+
+    const normalizedResults = formattedResults.map((item) => {
+      return {
+        ...item,
+        // Giữ tương thích ngược: một số chỗ cũ đọc totalOrders từ revenue endpoint
+        totalOrdersRevenueMatched: item.paidOrders || 0,
+      };
     });
 
     res.status(200).json({
       status: "ok",
       message: "Successfully fetched revenue data",
-      data: formattedResults,
+      data: normalizedResults,
     });
   } catch (err) {
     res.status(500).json({

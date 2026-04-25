@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaEye, FaHeart, FaRegHeart } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProducts, getAllCategories } from "../../api";
@@ -12,6 +12,7 @@ import {
   getVariantSoleValue,
 } from "../../utils/variantAttributes";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
+import notify from "../../utils/notify";
 
 const PAGE_STEP = 12;
 
@@ -251,7 +252,10 @@ const VerticalOptionFilter = ({ title, allLabel, options, value, onChange, radio
 
 const AccessoriesPage = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const location = useLocation();
   const wishlistItems = useSelector((state) => state.wishlist.items || []);
+  const user = useSelector((state) => state.user);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [accessoryTypeFilter, setAccessoryTypeFilter] = useState("all");
@@ -784,6 +788,13 @@ const AccessoriesPage = () => {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
+                              if (!user?.login || !user?.token) {
+                                notify.warning("Vui lòng đăng nhập để thêm sản phẩm vào yêu thích.");
+                                navigate("/login", {
+                                  state: { from: location.pathname + location.search },
+                                });
+                                return;
+                              }
                               dispatch(toggleWishlist(item));
                             }}
                             className="absolute right-2 top-2 z-20 rounded-full bg-white/90 p-2 shadow ring-1 ring-neutral-200 transition hover:scale-105"

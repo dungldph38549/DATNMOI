@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { DatePicker } from "antd";
+import { useEffect, useMemo, useState } from "react";
+import { DatePicker, Segmented } from "antd";
 import {
   LineChart,
   Line,
@@ -262,8 +262,9 @@ const CustomTooltip = ({ active, payload, label, type }) => {
       {payload.map((p) => (
         <p
           key={p.dataKey}
-          style={{ margin: 0, fontWeight: 600, color: p.stroke }}
+          style={{ margin: 0, fontWeight: 600, color: p.color || p.stroke }}
         >
+          {p.name ? `${p.name}: ` : ""}
           {type === "revenue"
             ? `${p.value?.toLocaleString("vi-VN")}₫`
             : `${p.value} đơn`}
@@ -294,6 +295,7 @@ const Dashboard = () => {
     dayjs().startOf("month"),
     dayjs(),
   ]);
+  const [timeUnit, setTimeUnit] = useState("auto");
 
   const determineTimeUnit = (start, end) => {
     const diff = end.diff(start, "day");
@@ -304,12 +306,53 @@ const Dashboard = () => {
     return "hour";
   };
 
+  const effectiveUnit = useMemo(() => {
+    if (!dateRange?.[0] || !dateRange?.[1]) return "day";
+    return timeUnit === "auto"
+      ? determineTimeUnit(dateRange[0], dateRange[1])
+      : timeUnit;
+  }, [dateRange, timeUnit]);
+
+  const unitLabelMap = {
+    hour: "Theo giờ",
+    day: "Theo ngày",
+    week: "Theo tuần",
+    month: "Theo tháng",
+    year: "Theo năm",
+  };
+
+  const handleTimeUnitChange = (nextUnit) => {
+    setTimeUnit(nextUnit);
+    const now = dayjs();
+
+    // Chọn đơn vị thời gian thì tự đặt lại range tính lùi từ hôm nay
+    // để tránh cảm giác "trôi ngược" do startOf/endOf theo tháng/năm.
+    if (nextUnit === "day") {
+      setDateRange([now.subtract(1, "day").startOf("day"), now.endOf("day")]);
+      return;
+    }
+
+    if (nextUnit === "week") {
+      setDateRange([now.subtract(1, "week").startOf("day"), now.endOf("day")]);
+      return;
+    }
+
+    if (nextUnit === "month") {
+      setDateRange([now.subtract(1, "month").startOf("day"), now.endOf("day")]);
+      return;
+    }
+
+    if (nextUnit === "year") {
+      setDateRange([now.subtract(1, "year").startOf("day"), now.endOf("day")]);
+      return;
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const unit = determineTimeUnit(dateRange[0], dateRange[1]);
         const params = {
           startDate: dateRange[0].toISOString(),
           endDate: dateRange[1].toISOString(),
@@ -319,7 +362,7 @@ const Dashboard = () => {
           await Promise.all([
             axiosInstance.get("/order/dashboard", { params }),
             axiosInstance.get("/order/revenue", {
-              params: { ...params, unit },
+              params: { ...params, unit: effectiveUnit },
             }),
             axiosInstance.get("/order/paymentMethod", { params }),
             axiosInstance.get("/order/topSelling", { params }),
@@ -416,7 +459,7 @@ const Dashboard = () => {
       }
     };
     fetchData();
-  }, [dateRange]);
+  }, [dateRange, effectiveUnit]);
 
   // ── Loading ────────────────────────────────────────────────
   if (loading)
@@ -540,15 +583,36 @@ const Dashboard = () => {
               Thống kê doanh thu và đơn hàng theo thời gian
             </p>
           </div>
-          <DatePicker.RangePicker
-            value={dateRange}
-            onChange={(values) => {
-              if (values?.[0] && values?.[1]) setDateRange(values);
-            }}
-            format="DD/MM/YYYY"
-            allowClear={false}
-            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-          />
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <Segmented
+              value={timeUnit}
+              onChange={handleTimeUnitChange}
+              options={[
+                { value: "auto", label: "Tự động" },
+                { value: "day", label: "Ngày" },
+                { value: "week", label: "Tuần" },
+                { value: "month", label: "Tháng" },
+                { value: "year", label: "Năm" },
+              ]}
+            />
+            <DatePicker.RangePicker
+              value={dateRange}
+              onChange={(values) => {
+                if (values?.[0] && values?.[1]) setDateRange(values);
+              }}
+              format="DD/MM/YYYY"
+              allowClear={false}
+              style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+            />
+            <p style={{ margin: 0, fontSize: 12, color: T.textMuted }}>
+              Đang nhóm dữ liệu:{" "}
+              <strong style={{ color: T.textMid }}>
+                {timeUnit === "auto"
+                  ? `${unitLabelMap[effectiveUnit] || "Theo ngày"} (tự động)`
+                  : unitLabelMap[effectiveUnit] || "Theo ngày"}
+              </strong>
+            </p>
+          </div>
         </div>
 
         {/* ── Metric cards ──────────────────────────────────── */}
@@ -697,6 +761,14 @@ const Dashboard = () => {
                     strokeWidth={3}
                     dot={false}
                     name="Số đơn hàng"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="canceledOrders"
+                    stroke={T.red}
+                    strokeWidth={2}
+                    dot={false}
+                    name="Đơn hủy"
                   />
                 </LineChart>
               </ResponsiveContainer>

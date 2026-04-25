@@ -7,6 +7,7 @@ import { getProductPriceInfo } from "../../utils/pricing.js";
 import { getVariantColorValue, getVariantSizeValue } from "../../utils/variantAttributes";
 import { isProductOutOfStock } from "../../utils/stock.js";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
+import notify from "../../utils/notify";
 
 const PAGE_SIZE = 12;
 
@@ -96,6 +97,7 @@ const ProductPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const wishlistItems = useSelector((state) => state.wishlist.items || []);
+  const user = useSelector((state) => state.user);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [voucherScope, setVoucherScope] = useState(null);
@@ -640,6 +642,13 @@ const ProductPage = () => {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
+                              if (!user?.login || !user?.token) {
+                                notify.warning("Vui lòng đăng nhập để thêm sản phẩm vào yêu thích.");
+                                navigate("/login", {
+                                  state: { from: location.pathname + location.search },
+                                });
+                                return;
+                              }
                               dispatch(toggleWishlist(item));
                             }}
                             className="absolute right-2 top-2 z-20 rounded-full bg-white/90 p-2 shadow ring-1 ring-neutral-200 transition hover:scale-105"
