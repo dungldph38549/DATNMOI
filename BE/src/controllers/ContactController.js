@@ -1,7 +1,108 @@
 const mongoose = require("mongoose");
+const nodemailer = require("nodemailer");
 const Contact = require("../models/ContactModel");
 
 const normalizeText = (value = "") => String(value || "").trim();
+const escapeHtml = (value = "") =>
+  String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+const parseBoolean = (value, fallback = false) => {
+  if (value == null || value === "") return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  return ["1", "true", "yes", "on"].includes(normalized);
+};
+
+const REQUIRED_SMTP_KEYS = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS"];
+
+const createContactMailer = () => {
+  const host = process.env.SMTP_HOST || process.env.MAIL_HOST || "";
+  const user =
+    process.env.SMTP_USER ||
+    process.env.MAIL_USER ||
+    process.env.EMAIL_USER ||
+    "";
+  const pass =
+    process.env.SMTP_PASS ||
+    process.env.MAIL_PASS ||
+    process.env.EMAIL_PASS ||
+    "";
+  const port = Number(
+    process.env.SMTP_PORT || process.env.MAIL_PORT || process.env.EMAIL_PORT || 0,
+  );
+  const secure = parseBoolean(process.env.SMTP_SECURE, port === 465);
+
+  if (!host || !user || !pass || !port) return null;
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+  });
+};
+
+const sendContactAutoReply = async ({ toEmail, name, subject, message }) => {
+  const transporter = createContactMailer();
+  if (!transporter) {
+    return {
+      sent: false,
+      reason: `Thiếu cấu hình SMTP. Cần ${REQUIRED_SMTP_KEYS.join(", ")}`,
+    };
+  }
+
+  const fromEmail =
+    process.env.CONTACT_FROM_EMAIL ||
+    process.env.SMTP_FROM ||
+    process.env.MAIL_FROM ||
+    process.env.SMTP_USER ||
+    process.env.MAIL_USER ||
+    process.env.EMAIL_USER;
+
+  if (!fromEmail) {
+    return {
+      sent: false,
+      reason: "Thiếu email gửi đi (CONTACT_FROM_EMAIL hoặc SMTP_USER).",
+    };
+  }
+
+  const safeName = normalizeText(name) || "bạn";
+  const safeSubject = normalizeText(subject) || "Liên hệ từ khách hàng";
+  const safeMessage = normalizeText(message);
+  const htmlName = escapeHtml(safeName);
+  const htmlSubject = escapeHtml(safeSubject);
+  const htmlMessage = escapeHtml(safeMessage);
+
+  await transporter.sendMail({
+    from: `SneakerConverse <${fromEmail}>`,
+    to: toEmail,
+    subject: "SneakerConverse đã nhận được liên hệ của bạn",
+    text:
+      `Xin chào ${safeName},\n\n` +
+      "SneakerConverse đã nhận được liên hệ của bạn với nội dung:\n" +
+      `- Tiêu đề: ${safeSubject}\n` +
+      `- Nội dung: ${safeMessage}\n\n` +
+      "Đội ngũ hỗ trợ sẽ phản hồi sớm nhất trong giờ làm việc.\n\n" +
+      "Trân trọng,\nSneakerConverse",
+    html: `
+      <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.6">
+        <p>Xin chào <b>${htmlName}</b>,</p>
+        <p>SneakerConverse đã nhận được liên hệ của bạn với nội dung:</p>
+        <ul>
+          <li><b>Tiêu đề:</b> ${htmlSubject}</li>
+          <li><b>Nội dung:</b> ${htmlMessage}</li>
+        </ul>
+        <p>Đội ngũ hỗ trợ sẽ phản hồi sớm nhất trong giờ làm việc.</p>
+        <p>Trân trọng,<br/>SneakerConverse</p>
+      </div>
+    `,
+  });
+
+  return { sent: true, reason: "" };
+};
 
 const createContact = async (req, res) => {
   try {
@@ -42,9 +143,28 @@ const createContact = async (req, res) => {
       userAgent,
     });
 
+    let autoReplySent = false;
+    let autoReplyReason = "";
+    try {
+      const autoReply = await sendContactAutoReply({
+        toEmail: email,
+        name,
+        subject,
+        message,
+      });
+      autoReplySent = Boolean(autoReply?.sent);
+      autoReplyReason = String(autoReply?.reason || "");
+    } catch (mailError) {
+      // Không làm fail tạo liên hệ nếu SMTP gặp sự cố.
+      console.error("[ContactController] send auto reply failed:", mailError?.message);
+      autoReplyReason = mailError?.message || "Gửi email thất bại.";
+    }
+
     return res.status(201).json({
       status: "OK",
       message: "Đã gửi liên hệ thành công.",
+      autoReplySent,
+      autoReplyReason,
       data: created,
     });
   } catch (error) {

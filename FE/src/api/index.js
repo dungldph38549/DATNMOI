@@ -93,6 +93,11 @@ export const createWalletBankTopupRequest = async (amount) => {
   return res.data;
 };
 
+export const createContact = async (payload) => {
+  const res = await axiosInstance.post("/contact", payload);
+  return res.data;
+};
+
 /** Khách: xác nhận đã chuyển khoản (chờ admin duyệt) */
 export const markWalletBankTopupSent = async (id) => {
   const res = await axiosInstance.post(`/wallet/topup/bank/${id}/mark-sent`);
