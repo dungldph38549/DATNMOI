@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { FaArrowRight } from "react-icons/fa";
+import { isProductOutOfStock } from "../../utils/stock.js";
 
 const PLACEHOLDER_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='28' font-family='Plus Jakarta Sans'>No Image</text></svg>";
 
@@ -19,6 +20,7 @@ const getDisplayPrice = (p) => {
 const Product = ({ product }) => {
   const p = product;
   const isHot = p.soldCount > 50;
+  const outOfStock = isProductOutOfStock(p);
 
   return (
     <Link to={`/product/${p._id}`} className="group relative rounded-3xl bg-surface overflow-hidden hover:shadow-2xl hover:shadow-primary/20 transition-all duration-500 border border-slate-100 flex flex-col h-[400px]">
@@ -34,6 +36,13 @@ const Product = ({ product }) => {
           {isHot && <span className="bg-secondary text-white text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider backdrop-blur-md shadow-lg shadow-secondary/30">Hot Drop</span>}
           {p.isNew && <span className="bg-primary text-white text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider backdrop-blur-md shadow-lg shadow-primary/30">New</span>}
         </div>
+        {outOfStock && (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/20">
+            <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-black/65 px-3 text-center text-lg font-semibold text-white shadow-lg">
+              Bán hết
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="p-6 flex flex-col flex-1 bg-surface z-20">

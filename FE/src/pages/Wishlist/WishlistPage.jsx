@@ -6,6 +6,7 @@ import { removeFromWishlist, clearWishlist } from "../../redux/wishlist/wishlist
 import { addToCart } from "../../redux/cart/cartSlice";
 import notify from "../../utils/notify";
 import { getStocks } from "../../api";
+import { isProductOutOfStock } from "../../utils/stock.js";
 
 const WishlistPage = () => {
     const navigate = useNavigate();
@@ -51,6 +52,11 @@ const WishlistPage = () => {
     };
 
     const handleMoveToCart = async (product) => {
+        if (isProductOutOfStock(product)) {
+            notify.warning("Sản phẩm đã hết, vui lòng mua sản phẩm khác.");
+            return;
+        }
+
         if (!isLoggedIn) {
             notify.warning("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.");
             navigate("/login");
@@ -147,6 +153,7 @@ const WishlistPage = () => {
                     <div className="grid grid-cols-12 gap-7">
                         {items.map((item, index) => {
                             const isFeature = index === 2;
+                            const outOfStock = isProductOutOfStock(item);
                             return (
                                 <article
                                     key={item._id}
@@ -160,6 +167,13 @@ const WishlistPage = () => {
                                                 className={`w-full object-cover transition-transform duration-500 group-hover:scale-[1.02] ${isFeature ? "h-[300px] md:h-[380px]" : "h-[260px] md:h-[300px]"}`}
                                             />
                                         </Link>
+                                        {outOfStock && (
+                                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
+                                                <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-black/65 px-3 text-center text-lg font-semibold text-white shadow-lg">
+                                                    Bán hết
+                                                </span>
+                                            </div>
+                                        )}
 
                                         <button
                                             onClick={() => handleRemove(item._id)}
@@ -175,10 +189,15 @@ const WishlistPage = () => {
                                                 <h3 className="text-3xl font-black mb-3 leading-tight line-clamp-2">{item.name}</h3>
                                                 <button
                                                     onClick={() => handleMoveToCart(item)}
-                                                    className="px-4 py-2 rounded-full text-xs font-bold bg-white text-neutral-900 hover:bg-neutral-200 transition-colors inline-flex items-center gap-2"
+                                                    className={`px-4 py-2 rounded-full text-xs font-bold inline-flex items-center gap-2 transition-colors ${
+                                                        outOfStock
+                                                            ? "cursor-not-allowed bg-white/60 text-neutral-500"
+                                                            : "bg-white text-neutral-900 hover:bg-neutral-200"
+                                                    }`}
+                                                    disabled={outOfStock}
                                                 >
                                                     <FaShoppingCart size={12} />
-                                                    Thêm vào giỏ
+                                                    {outOfStock ? "Hết hàng" : "Thêm vào giỏ"}
                                                 </button>
                                             </div>
                                         )}
@@ -198,7 +217,12 @@ const WishlistPage = () => {
                                                 </p>
                                                 <button
                                                     onClick={() => handleMoveToCart(item)}
-                                                    className="w-10 h-10 rounded-full border border-neutral-300 text-neutral-800 hover:bg-neutral-900 hover:text-white hover:border-neutral-900 flex items-center justify-center transition-colors"
+                                                    className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
+                                                        outOfStock
+                                                            ? "cursor-not-allowed border-neutral-200 text-neutral-300"
+                                                            : "border-neutral-300 text-neutral-800 hover:bg-neutral-900 hover:text-white hover:border-neutral-900"
+                                                    }`}
+                                                    disabled={outOfStock}
                                                     title="Thêm vào giỏ hàng"
                                                 >
                                                     <FaShoppingCart size={14} />

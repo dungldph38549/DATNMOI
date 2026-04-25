@@ -12,7 +12,7 @@ import { addToCart } from "../../redux/cart/cartSlice";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 import { getProductPriceInfo } from "../../utils/pricing.js";
 import notify from "../../utils/notify";
-import { getStocks } from "../../api";
+import { isProductOutOfStock } from "../../utils/stock.js";
 
 const Product = ({ product, ratingValue, compactCartCta = false, hoverStyle = "default" }) => {
   const dispatch = useDispatch();
@@ -31,6 +31,7 @@ const Product = ({ product, ratingValue, compactCartCta = false, hoverStyle = "d
 
   const hasVariants =
     Array.isArray(product?.variants) && product.variants.length > 0;
+  const isOutOfStock = useMemo(() => isProductOutOfStock(product), [product]);
 
   const { minPrice, maxPrice } = useMemo(() => {
     const pr = product?.priceRange;
@@ -123,6 +124,11 @@ const Product = ({ product, ratingValue, compactCartCta = false, hoverStyle = "d
       return;
     }
 
+    if (isOutOfStock) {
+      notify.warning("Sản phẩm đã hết hàng");
+      return;
+    }
+
     if (hasVariants) {
       navigate(`/product/${product._id}`);
       return;
@@ -161,11 +167,20 @@ const Product = ({ product, ratingValue, compactCartCta = false, hoverStyle = "d
             useCatalogHover ? "group-hover:scale-105" : ""
           }`}
         />
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-slate-800 shadow-md">
-            <FaEye size={16} />
-          </span>
-        </div>
+        {!isOutOfStock && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-slate-800 shadow-md">
+              <FaEye size={16} />
+            </span>
+          </div>
+        )}
+        {isOutOfStock && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
+            <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-black/65 px-3 text-center text-lg font-semibold text-white shadow-lg">
+              Bán hết
+            </span>
+          </div>
+        )}
 
         {/* HOT */}
         {product?.sold > 50 && (
@@ -209,10 +224,15 @@ const Product = ({ product, ratingValue, compactCartCta = false, hoverStyle = "d
         {!compactCartCta && (
           <button
             onClick={handleAddCart}
-            className="mt-3 w-full bg-black text-white py-2 rounded"
+            className={`mt-3 w-full py-2 rounded text-white ${
+              isOutOfStock
+                ? "cursor-not-allowed bg-neutral-400"
+                : "bg-black"
+            }`}
+            disabled={isOutOfStock}
             aria-label={hasVariants ? "Chọn kích cỡ" : "Thêm vào giỏ"}
           >
-            {added ? "Đã thêm" : "Thêm vào giỏ"}
+            {isOutOfStock ? "Hết hàng" : added ? "Đã thêm" : "Thêm vào giỏ"}
           </button>
         )}
       </div>

@@ -4,6 +4,7 @@ import { FaEye, FaHeart, FaRegHeart } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProducts, getAllCategories } from "../../api";
 import { getProductPriceInfo } from "../../utils/pricing.js";
+import { isProductOutOfStock } from "../../utils/stock.js";
 import {
   getVariantLaceColorValue,
   getVariantShoelaceLengthValue,
@@ -730,6 +731,7 @@ const AccessoriesPage = () => {
                     const image = getImageUrl(item?.image || item?.srcImages?.[0]);
                     const priceInfo = getProductPriceInfo(item);
                     const categoryText = item?.categoryId?.name || item?.category || "Phụ kiện";
+                    const outOfStock = isProductOutOfStock(item);
                     return (
                       <Link
                         key={item._id}
@@ -760,11 +762,20 @@ const AccessoriesPage = () => {
                                 alt={item.name}
                                 className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                               />
-                              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-slate-800 shadow-md">
-                                  <FaEye size={16} />
-                                </span>
-                              </div>
+                              {!outOfStock && (
+                                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-slate-800 shadow-md">
+                                    <FaEye size={16} />
+                                  </span>
+                                </div>
+                              )}
+                              {outOfStock && (
+                                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
+                                  <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-black/65 px-3 text-center text-lg font-semibold text-white shadow-lg">
+                                    Bán hết
+                                  </span>
+                                </div>
+                              )}
                             </>
                           ) : (
                             <div className="h-full w-full bg-neutral-200" />
