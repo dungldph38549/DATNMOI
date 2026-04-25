@@ -13,34 +13,33 @@ export default function ChatWidget({ disabled = false }) {
 
   return (
     <>
-      {open && (
+      <div
+        role="presentation"
+        onClick={() => setOpen(false)}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.35)",
+          zIndex: 150,
+          display: open ? "block" : "none",
+        }}
+      >
         <div
-          role="presentation"
-          onClick={() => setOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => e.stopPropagation()}
           style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.35)",
-            zIndex: 150,
+            position: "absolute",
+            right: 18,
+            bottom: 86,
           }}
         >
-          <div
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: "absolute",
-              right: 18,
-              bottom: 86,
-            }}
-          >
-            <ChatPanel
-              compact
-              onClose={() => setOpen(false)}
-            />
-          </div>
+          <ChatPanel
+            compact
+            onClose={() => setOpen(false)}
+          />
         </div>
-      )}
+      </div>
 
       <button
         type="button"
