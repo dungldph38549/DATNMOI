@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaUser, FaLock, FaShoppingBag, FaCamera, FaChevronRight, FaSignOutAlt, FaWallet, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import {
     updateCustomerById,
+    uploadImage,
     getOrdersByUser,
     getWalletBalance,
     getWalletTransactions,
@@ -42,6 +43,9 @@ const ProfilePage = () => {
     const [bankCreating, setBankCreating] = useState(false);
     const [bankConfirming, setBankConfirming] = useState(false);
     const [bankRequest, setBankRequest] = useState(null);
+    const [avatarUploading, setAvatarUploading] = useState(false);
+    const [avatarPreview, setAvatarPreview] = useState(user?.avatar || "");
+    const avatarInputRef = useRef(null);
 
     // Handle tab switching from query params
     useEffect(() => {
@@ -115,6 +119,24 @@ const ProfilePage = () => {
             navigate("/profile?tab=wallet", { replace: true });
         }
     }, [activeTab, location.search, navigate]);
+
+    useEffect(() => {
+        setAvatarPreview(user?.avatar || "");
+    }, [user?.avatar]);
+
+    const getAvatarSrc = (src) => {
+        if (!src) return "";
+        if (
+            src.startsWith("http://")
+            || src.startsWith("https://")
+            || src.startsWith("data:")
+            || src.startsWith("blob:")
+        ) {
+            return src;
+        }
+        return `http://localhost:3002/uploads/${src.startsWith("/") ? src.slice(1) : src}`;
+    };
+
 
     const handleVnpayTopup = async () => {
         const n = Number(String(topupAmountVnpay).replace(/\D/g, ""));
@@ -207,6 +229,64 @@ const ProfilePage = () => {
         navigate("/");
     };
 
+    const handleAvatarFileChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type?.startsWith("image/")) {
+            notify.warning("Vui lòng chọn file ảnh hợp lệ.");
+            e.target.value = "";
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            notify.warning("Ảnh đại diện tối đa 5MB.");
+            e.target.value = "";
+            return;
+        }
+
+        const localPreviewUrl = URL.createObjectURL(file);
+        setAvatarPreview(localPreviewUrl);
+        setAvatarUploading(true);
+
+        try {
+            const fd = new FormData();
+            fd.append("file", file);
+            const uploadRes = await uploadImage(fd);
+            const avatarPath = uploadRes?.path;
+            if (!avatarPath) throw new Error("Upload không trả về đường dẫn ảnh.");
+
+            const payload = {
+                ...formData,
+                id: user.id || user._id,
+                avatar: avatarPath,
+            };
+            const updateRes = await updateCustomerById(payload);
+
+            const statusRaw = updateRes?.status;
+            const statusNormalized = typeof statusRaw === "string" ? statusRaw.toLowerCase() : statusRaw;
+            const isAvatarUpdateSuccess =
+                updateRes?.success === true
+                || statusNormalized === "ok"
+                || statusNormalized === "success"
+                || statusRaw === true;
+
+            if (isAvatarUpdateSuccess) {
+                dispatch(updateUserInfo({ ...formData, avatar: avatarPath }));
+                setAvatarPreview(getAvatarSrc(avatarPath));
+                notify.success("Cập nhật ảnh đại diện thành công.");
+            } else {
+                throw new Error(updateRes?.message || "Cập nhật ảnh đại diện thất bại.");
+            }
+        } catch (err) {
+            setAvatarPreview(getAvatarSrc(user?.avatar || ""));
+            notify.error(err?.response?.data?.message || err?.message || "Không thể cập nhật ảnh đại diện.");
+        } finally {
+            URL.revokeObjectURL(localPreviewUrl);
+            e.target.value = "";
+            setAvatarUploading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 pt-28 pb-20 font-body">
             <div className="container mx-auto px-4 max-w-6xl">
@@ -218,13 +298,26 @@ const ProfilePage = () => {
                             <div className="p-8 text-center border-b border-slate-50">
                                 <div className="relative inline-block mb-4">
                                     <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border-4 border-white shadow-lg overflow-hidden">
-                                        {user?.avatar ? (
-                                            <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                                        {avatarPreview ? (
+                                            <img src={getAvatarSrc(avatarPreview)} alt={user.name} className="w-full h-full object-cover" />
                                         ) : (
                                             <FaUser size={40} />
                                         )}
                                     </div>
-                                    <button className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full shadow-lg hover:scale-110 transition-transform">
+                                    <input
+                                        ref={avatarInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleAvatarFileChange}
+                                        className="hidden"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => avatarInputRef.current?.click()}
+                                        disabled={avatarUploading}
+                                        className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full shadow-lg hover:scale-110 transition-transform disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                        title="Đổi ảnh đại diện"
+                                    >
                                         <FaCamera size={12} />
                                     </button>
                                 </div>
