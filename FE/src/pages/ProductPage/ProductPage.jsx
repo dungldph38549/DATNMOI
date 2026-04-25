@@ -118,6 +118,7 @@ const ProductPage = () => {
     const load = async () => {
       try {
         setLoading(true);
+        if (categorySlug) setCategoryFilter("");
         const payload = { limit: 200, page: 0 };
         const catRes = await getAllCategories("active");
         const categories = Array.isArray(catRes?.data) ? catRes.data : [];
@@ -423,17 +424,26 @@ const ProductPage = () => {
               <div>
                 <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Loại sản phẩm</h3>
                 <div className="space-y-3">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
+                    <input
+                      type="radio"
+                      name="product-category-filter"
+                      checked={categoryFilter === ""}
+                      onChange={() => setCategoryFilter("")}
+                      className="h-4 w-4 cursor-pointer appearance-none rounded-full border-2 border-neutral-300 transition-all checked:border-[#8ca587] checked:bg-[#8ca587] relative after:absolute after:left-1 after:top-0.5 after:hidden after:h-2 after:w-1 after:rotate-45 after:border-b-2 after:border-r-2 after:border-white checked:after:block after:content-['']"
+                    />
+                    Tất cả sản phẩm
+                  </label>
                   {sidebarCategories.map((c) => {
                     const value = String(c?._id || "");
-                    const checked = categoryFilter === value;
                     return (
-                      <label key={value} className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer">
+                      <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
                         <input
-                          type="checkbox"
-                          name="category"
-                          checked={checked}
-                          onChange={() => setCategoryFilter((prev) => (prev === value ? "" : value))}
-                          className="h-4 w-4 appearance-none rounded-full border-2 border-neutral-300 checked:border-[#8ca587] checked:bg-[#8ca587] transition-all cursor-pointer relative after:content-[''] after:absolute after:hidden checked:after:block after:left-1 after:top-0.5 after:w-1 after:h-2 after:border-white after:border-b-2 after:border-r-2 after:rotate-45"
+                          type="radio"
+                          name="product-category-filter"
+                          checked={categoryFilter === value}
+                          onChange={() => setCategoryFilter(value)}
+                          className="h-4 w-4 cursor-pointer appearance-none rounded-full border-2 border-neutral-300 transition-all checked:border-[#8ca587] checked:bg-[#8ca587] relative after:absolute after:left-1 after:top-0.5 after:hidden after:h-2 after:w-1 after:rotate-45 after:border-b-2 after:border-r-2 after:border-white checked:after:block after:content-['']"
                         />
                         {c?.name || "Danh mục"}
                       </label>
