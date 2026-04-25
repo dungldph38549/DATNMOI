@@ -1070,7 +1070,7 @@ const CheckOut = () => {
             </form>
           </div>
 
-          <aside className="order-1 xl:order-2 xl:sticky xl:top-6">
+          <aside className="order-1 xl:order-2 xl:sticky xl:top-6 xl:max-h-[calc(100vh-48px)] xl:overflow-y-auto custom-scrollbar pr-1">
             <div className="bg-white/90 backdrop-blur-sm border border-[#e8e4db] rounded-2xl p-5 shadow-md">
               <h2 className="text-2xl font-bold text-slate-800 mb-4">Sản phẩm</h2>
               <div className="rounded-xl border border-[#ece7dd] bg-white overflow-hidden">
