@@ -704,6 +704,13 @@ const ProductDetail = () => {
                     alt={product.name}
                   />
                 </div>
+                {isOutOfStock && (
+                  <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/20">
+                    <span className="inline-flex h-28 w-28 items-center justify-center rounded-full bg-black/65 px-3 text-center text-xl font-semibold text-white shadow-lg">
+                      Bán hết
+                    </span>
+                  </div>
+                )}
                 {product.isNew && (
                   <span className="absolute left-5 top-5 rounded-full bg-convot-charcoal px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white">
                     Mới
@@ -762,6 +769,11 @@ const ProductDetail = () => {
             {!isOutOfStock && (
               <p className="mt-4 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-emerald-800">
                 <FaCheckCircle className="text-emerald-600" /> Còn hàng
+              </p>
+            )}
+            {isOutOfStock && (
+              <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-red-600">
+                Bán hết
               </p>
             )}
 
