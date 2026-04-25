@@ -16,7 +16,7 @@ import {
   getWalletBalance,
   getAllVouchers,
 } from "../../api";
-import { FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaCreditCard, FaTruck, FaMoneyBillWave, FaShieldAlt, FaWallet, FaTicketAlt } from "react-icons/fa";
+import { FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaCreditCard, FaTruck, FaMoneyBillWave, FaShieldAlt, FaWallet, FaTicketAlt, FaCheck } from "react-icons/fa";
 import notify from "../../utils/notify";
 
 const VIETNAM_LOCATION_API = "https://provinces.open-api.vn/api";
@@ -995,68 +995,70 @@ const CheckOut = () => {
 
               <div className="bg-white/90 backdrop-blur-sm p-5 md:p-6 rounded-2xl border border-[#e8e4db] shadow-sm">
                 <h2 className="text-xl font-bold text-slate-800 mb-4">Thông tin thanh toán</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                      <FaTruck className="text-[#ee4d2d]" /> Vận chuyển
-                    </h3>
-                    <div className="space-y-2.5">
-                      <div className="block p-4 rounded-xl border border-[#ee4d2d] bg-[#fff2ee]">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-800">Giao hàng tiêu chuẩn</span>
-                          <span className="text-sm font-bold text-green-600">Miễn phí</span>
+                <div className="space-y-6">
+                  {/* Shipping Section - Now more balanced as a horizontal bar */}
+                  <div className="bg-[#fff2ee]/50 border border-[#ee4d2d]/20 rounded-2xl p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-[#ee4d2d] flex items-center justify-center text-white text-xl shadow-sm">
+                          <FaTruck />
                         </div>
-                        <p className="text-xs text-slate-500 mt-1">Từ 2-4 ngày làm việc</p>
+                        <div>
+                          <h3 className="text-base font-bold text-slate-800">Vận chuyển: Giao hàng tiêu chuẩn</h3>
+                          <p className="text-sm text-slate-500">Dự kiến nhận hàng sau 2-4 ngày làm việc</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-[#ee4d2d]/10 shadow-sm">
+                        <span className="text-sm font-medium text-slate-500">Phí vận chuyển:</span>
+                        <span className="text-base font-bold text-green-600">Miễn phí</span>
                       </div>
                     </div>
                   </div>
 
+                  {/* Payment Section */}
                   <div>
-                    <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                      <FaCreditCard className="text-[#ee4d2d]" /> Thanh toán
+                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                      <FaCreditCard className="text-[#ee4d2d]" /> Phương thức thanh toán
                     </h3>
-                    <div className="space-y-2.5">
-                      <label className={`block p-3 rounded-xl border cursor-pointer transition-all ${paymentMethod === "cod" ? "border-[#ee4d2d] bg-[#fff2ee]" : "border-[#e4e1d8] bg-white"}`}>
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-800">Thanh toán khi nhận hàng</span>
-                          <FaMoneyBillWave className={paymentMethod === "cod" ? "text-[#ee4d2d]" : "text-slate-400"} />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <label className={`group relative flex flex-col items-center justify-center p-4 rounded-2xl border transition-all cursor-pointer hover:shadow-md ${paymentMethod === "cod" ? "border-[#ee4d2d] bg-[#fff2ee] ring-1 ring-[#ee4d2d]" : "border-[#e4e1d8] bg-white hover:border-[#ee4d2d]/50"}`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 transition-colors ${paymentMethod === "cod" ? "bg-[#ee4d2d] text-white" : "bg-slate-100 text-slate-400 group-hover:bg-slate-200"}`}>
+                          <FaMoneyBillWave size={20} />
                         </div>
+                        <span className="font-bold text-slate-800 text-center text-sm">Khi nhận hàng (COD)</span>
                         <input type="radio" className="hidden" value="cod" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} />
+                        {paymentMethod === "cod" && <div className="absolute top-2 right-2 w-5 h-5 bg-[#ee4d2d] rounded-full flex items-center justify-center"><FaCheck className="text-white text-[10px]" /></div>}
                       </label>
-                      <label className={`block p-3 rounded-xl border cursor-pointer transition-all ${paymentMethod === "vnpay" ? "border-[#ee4d2d] bg-[#fff2ee]" : "border-[#e4e1d8] bg-white"}`}>
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-800">Thanh toán qua VNPay</span>
-                          <span className="text-xs font-bold text-[#ee4d2d]">VNPAY</span>
+
+                      <label className={`group relative flex flex-col items-center justify-center p-4 rounded-2xl border transition-all cursor-pointer hover:shadow-md ${paymentMethod === "vnpay" ? "border-[#ee4d2d] bg-[#fff2ee] ring-1 ring-[#ee4d2d]" : "border-[#e4e1d8] bg-white hover:border-[#ee4d2d]/50"}`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 transition-colors ${paymentMethod === "vnpay" ? "bg-[#ee4d2d] text-white" : "bg-slate-100 text-slate-400 group-hover:bg-slate-200"}`}>
+                          <span className="font-black text-[10px]">VNPAY</span>
                         </div>
+                        <span className="font-bold text-slate-800 text-center text-sm">Qua VNPay</span>
                         <input type="radio" className="hidden" value="vnpay" checked={paymentMethod === "vnpay"} onChange={() => setPaymentMethod("vnpay")} />
+                        {paymentMethod === "vnpay" && <div className="absolute top-2 right-2 w-5 h-5 bg-[#ee4d2d] rounded-full flex items-center justify-center"><FaCheck className="text-white text-[10px]" /></div>}
                       </label>
+
                       {(() => {
                         const walletOk = isLoggedIn && (total <= 0 || (walletBalance !== null && walletBalance >= total));
                         return (
-                          <label className={`block p-3 rounded-xl border transition-all ${!isLoggedIn || !walletOk ? "border-[#ece8df] bg-slate-50 opacity-70 cursor-not-allowed" : paymentMethod === "wallet" ? "border-[#ee4d2d] bg-[#fff2ee] cursor-pointer" : "border-[#e4e1d8] bg-white cursor-pointer"}`}>
-                            <div className="flex items-center justify-between">
-                              <span className="font-semibold text-slate-800">Ví SNEAKERCONVERSE</span>
-                              <FaWallet className={paymentMethod === "wallet" ? "text-[#ee4d2d]" : "text-slate-400"} />
-                              <input
-                                type="radio"
-                                className="hidden"
-                                value="wallet"
-                                checked={paymentMethod === "wallet"}
-                                disabled={!isLoggedIn || !walletOk}
-                                onChange={() => {
-                                  if (isLoggedIn && walletOk) setPaymentMethod("wallet");
-                                }}
-                              />
+                          <label className={`group relative flex flex-col items-center justify-center p-4 rounded-2xl border transition-all ${!isLoggedIn || !walletOk ? "border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed" : paymentMethod === "wallet" ? "border-[#ee4d2d] bg-[#fff2ee] ring-1 ring-[#ee4d2d] cursor-pointer" : "border-[#e4e1d8] bg-white hover:border-[#ee4d2d]/50 cursor-pointer hover:shadow-md"}`}>
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 transition-colors ${paymentMethod === "wallet" ? "bg-[#ee4d2d] text-white" : "bg-slate-100 text-slate-400"}`}>
+                              <FaWallet size={20} />
                             </div>
-                            <p className="text-xs text-slate-500 mt-1">
-                              {!isLoggedIn
-                                ? "Đăng nhập để thanh toán bằng ví."
-                                : walletBalance === null
-                                  ? "Đang tải số dư ví..."
-                                  : total > 0 && walletBalance < total
-                                    ? `Không đủ số dư (còn ${walletBalance.toLocaleString("vi-VN")}đ).`
-                                    : `Số dư: ${walletBalance.toLocaleString("vi-VN")}đ`}
+                            <span className="font-bold text-slate-800 text-center text-sm">Ví SNEAKERCONVERSE</span>
+                            <p className="text-[10px] text-slate-500 mt-1 text-center line-clamp-1">
+                              {!isLoggedIn ? "Đăng nhập" : walletBalance === null ? "..." : `Dư: ${walletBalance.toLocaleString("vi-VN")}đ`}
                             </p>
+                            <input
+                              type="radio"
+                              className="hidden"
+                              value="wallet"
+                              checked={paymentMethod === "wallet"}
+                              disabled={!isLoggedIn || !walletOk}
+                              onChange={() => { if (isLoggedIn && walletOk) setPaymentMethod("wallet"); }}
+                            />
+                            {paymentMethod === "wallet" && <div className="absolute top-2 right-2 w-5 h-5 bg-[#ee4d2d] rounded-full flex items-center justify-center"><FaCheck className="text-white text-[10px]" /></div>}
                           </label>
                         );
                       })()}
