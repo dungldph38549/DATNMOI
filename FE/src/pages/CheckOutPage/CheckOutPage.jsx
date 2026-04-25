@@ -14,7 +14,7 @@ function CheckOutPage() {
   const user = useSelector((state) => state.user);
 
   const [paymentMethod, setPaymentMethod] = useState("COD");
-  const [shippingMethod] = useState("fast"); // map về backend: fast/standard
+  const [shippingMethod] = useState("standard"); // Luôn mặc định là standard
   const [walletBalance, setWalletBalance] = useState(null);
   const isLoggedIn = !!user?.login;
 
@@ -47,7 +47,7 @@ function CheckOutPage() {
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
 
-  const shippingFee = 30000;
+  const shippingFee = 0;
 
   const subtotal = useMemo(() => {
     return cartItems.reduce((sum, item) => {

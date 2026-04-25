@@ -576,7 +576,7 @@ const CheckOut = () => {
     }
   }, [location.search]);
 
-  const shipping = useMemo(() => (shippingMethod === "fast" ? 30000 : 0), [shippingMethod]);
+  const shipping = 0; // Luôn miễn phí vì đã bỏ giao hàng hỏa tốc
   const total = Math.max(0, subtotal + shipping - discount);
 
   const validateForm = () => {
@@ -1001,22 +1001,13 @@ const CheckOut = () => {
                       <FaTruck className="text-[#ee4d2d]" /> Vận chuyển
                     </h3>
                     <div className="space-y-2.5">
-                      <label className={`block p-3 rounded-xl border cursor-pointer transition-all ${shippingMethod === "standard" ? "border-[#ee4d2d] bg-[#fff2ee]" : "border-[#e4e1d8] bg-white"}`}>
+                      <div className="block p-4 rounded-xl border border-[#ee4d2d] bg-[#fff2ee]">
                         <div className="flex items-center justify-between">
                           <span className="font-semibold text-slate-800">Giao hàng tiêu chuẩn</span>
                           <span className="text-sm font-bold text-green-600">Miễn phí</span>
                         </div>
                         <p className="text-xs text-slate-500 mt-1">Từ 2-4 ngày làm việc</p>
-                        <input type="radio" className="hidden" value="standard" checked={shippingMethod === "standard"} onChange={() => setShippingMethod("standard")} />
-                      </label>
-                      <label className={`block p-3 rounded-xl border cursor-pointer transition-all ${shippingMethod === "fast" ? "border-[#ee4d2d] bg-[#fff2ee]" : "border-[#e4e1d8] bg-white"}`}>
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-800">Giao hàng hỏa tốc</span>
-                          <span className="text-sm font-bold text-slate-700">+30.000đ</span>
-                        </div>
-                        <p className="text-xs text-slate-500 mt-1">Giao trong ngày</p>
-                        <input type="radio" className="hidden" value="fast" checked={shippingMethod === "fast"} onChange={() => setShippingMethod("fast")} />
-                      </label>
+                      </div>
                     </div>
                   </div>
 
@@ -1116,7 +1107,7 @@ const CheckOut = () => {
                 <div className="px-4 py-3 bg-[#f8fbff] border-t border-[#e8edf6] text-xs text-slate-600 space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <span className="font-semibold">Phương thức vận chuyển:</span>
-                    <span className="text-right">{shippingMethod === "fast" ? "Giao hàng hỏa tốc" : "Giao hàng tiêu chuẩn"} ({shipping === 0 ? "Miễn phí" : formatMoney(shipping)})</span>
+                    <span className="text-right">Giao hàng tiêu chuẩn (Miễn phí)</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-semibold">Voucher của shop:</span>

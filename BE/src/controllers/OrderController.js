@@ -198,7 +198,7 @@ exports.createOrder = async (req, res) => {
         .json({ message: "Danh sách sản phẩm không hợp lệ" });
     }
 
-    const shippingFee = shippingMethod === "fast" ? 30000 : 0;
+    const shippingFee = 0; // Đã bỏ giao hàng hỏa tốc, tất cả đều là 0đ
     const mappedProducts = [];
 
     // Đầu tiên kiểm tra và chuẩn hóa dữ liệu sản phẩm
