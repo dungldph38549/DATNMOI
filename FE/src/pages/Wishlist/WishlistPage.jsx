@@ -108,134 +108,120 @@ const WishlistPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#f7f6f3] font-body pt-12 pb-16">
-            <div className="container mx-auto px-4 max-w-7xl">
-                <section className="mb-10">
-                    <div className="flex items-start justify-between gap-4">
+        <div className="min-h-screen bg-gradient-to-b from-[#fbf8f2] via-[#f8f5ee] to-[#f6f2ea] font-body pb-16 pt-10 md:pt-12">
+            <div className="container mx-auto max-w-7xl px-4">
+                <section className="mb-8 rounded-3xl border border-[#e8dcc8] bg-[#fffdf9] p-6 text-neutral-900 shadow-[0_12px_38px_rgba(68,51,24,0.08)] md:p-8">
+                    <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
                         <div className="max-w-3xl">
-                            <h1 className="font-display text-3xl font-bold leading-[1.15] tracking-tight text-black md:text-5xl lg:text-[2.75rem] mb-3">
-                                SẢN PHẨM YÊU THÍCH.
+                            <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#e8dcc8] bg-[#fdf4e6] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8b6a32]">
+                                <FaHeart size={10} className="text-[#b88a3b]" />
+                                Danh sách yêu thích
+                            </span>
+                            <h1 className="font-display text-3xl font-bold leading-tight text-[#2a2116] md:text-5xl">
+                                Bộ sưu tập của bạn
                             </h1>
-                            <p className="mt-1 max-w-2xl text-sm md:text-sm text-neutral-600">
-                                Nơi lưu giữ những thiết kế làm đắc của bạn. Danh sách được cá nhân hóa dựa trên gu thẩm mỹ và những lựa chọn tinh tuyển từ các bộ sưu tập mới nhất.
+                            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#6c5a3d] md:text-[15px]">
+                                Lưu lại những đôi giày bạn muốn sở hữu. Tất cả sản phẩm được sắp xếp để bạn thêm vào giỏ nhanh hơn.
                             </p>
                         </div>
-                        {items.length > 0 && (
-                            <button
-                                onClick={() => dispatch(clearWishlist())}
-                                className="shrink-0 mt-1 text-sm text-neutral-500 hover:text-neutral-900 transition-colors inline-flex items-center gap-2"
-                            >
-                                <FaTrash size={12} />
-                                Xóa tất cả
-                            </button>
-                        )}
+
+                        <div className="flex flex-wrap items-center gap-3">
+                            <div className="rounded-2xl border border-[#e8dcc8] bg-[#fff8ee] px-4 py-3">
+                                <p className="text-[11px] uppercase tracking-[0.12em] text-[#8b6a32]">Tổng mục</p>
+                                <p className="mt-1 text-2xl font-semibold text-[#2a2116]">{items.length}</p>
+                            </div>
+                            {items.length > 0 && (
+                                <button
+                                    onClick={() => dispatch(clearWishlist())}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-[#e8dcc8] bg-white px-4 py-3 text-sm text-[#6c5a3d] transition-colors hover:bg-[#fff8ee] hover:text-[#2a2116]"
+                                >
+                                    <FaTrash size={12} />
+                                    Xóa tất cả
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </section>
 
                 {items.length === 0 ? (
-                    <div className="bg-white rounded-3xl border border-neutral-200 p-16 text-center">
-                        <div className="w-20 h-20 rounded-full bg-neutral-100 mx-auto flex items-center justify-center mb-6">
-                            <FaHeart className="text-neutral-400 text-3xl" />
+                    <div className="rounded-3xl border border-[#e8dcc8] bg-[#fffdf9] p-14 text-center shadow-[0_10px_30px_rgba(68,51,24,0.08)]">
+                        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#fbf2e2]">
+                            <FaHeart className="text-3xl text-neutral-400" />
                         </div>
-                        <h2 className="text-2xl font-black text-neutral-900 mb-3">Danh sách yêu thích trống</h2>
-                        <p className="text-neutral-500 mb-8 max-w-xl mx-auto">
+                        <h2 className="mb-3 text-2xl font-black text-[#2a2116]">Danh sách yêu thích trống</h2>
+                        <p className="mx-auto mb-8 max-w-xl text-[#6c5a3d]">
                             Bạn chưa có sản phẩm nào trong danh sách yêu thích. Khám phá bộ sưu tập mới và lưu lại những mẫu bạn muốn sở hữu.
                         </p>
                         <Link
                             to="/product"
-                            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-neutral-900 text-white text-sm font-semibold hover:bg-neutral-700 transition-colors"
+                            className="inline-flex items-center gap-2 rounded-full bg-[#2a2116] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#453521]"
                         >
                             Khám phá ngay
                             <FaArrowRight size={12} />
                         </Link>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-12 gap-7">
-                        {items.map((item, index) => {
-                            const isFeature = index === 2;
+                    <div className="grid grid-cols-12 gap-5 md:gap-6">
+                        {items.map((item) => {
                             const outOfStock = isProductOutOfStock(item);
                             return (
-                                <article
-                                    key={item._id}
-                                    className={`group col-span-12 sm:col-span-6 ${isFeature ? "lg:col-span-6" : "lg:col-span-3"}`}
-                                >
-                                    <div className="relative rounded-md overflow-hidden bg-neutral-200">
-                                        <Link to={`/product/${item._id}`} className="block">
-                                            <img
-                                                src={getImageUrl(item.image || item.srcImages?.[0])}
-                                                alt={item.name}
-                                                className={`w-full object-cover transition-transform duration-500 group-hover:scale-[1.02] ${isFeature ? "h-[300px] md:h-[380px]" : "h-[260px] md:h-[300px]"}`}
-                                            />
-                                        </Link>
-                                        {outOfStock && (
-                                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
-                                                <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-black/65 px-3 text-center text-lg font-semibold text-white shadow-lg">
+                                <article key={item._id} className="group col-span-12 sm:col-span-6 lg:col-span-4">
+                                    <div className="h-full overflow-hidden rounded-3xl border border-[#e8dcc8] bg-[#fffdf9] shadow-[0_8px_22px_rgba(68,51,24,0.08)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(68,51,24,0.14)]">
+                                        <div className="relative overflow-hidden bg-[#f7f1e6]">
+                                            <Link to={`/product/${item._id}`} className="block">
+                                                <img
+                                                    src={getImageUrl(item.image || item.srcImages?.[0])}
+                                                    alt={item.name}
+                                                    className="h-[280px] w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+                                                />
+                                            </Link>
+
+                                            {outOfStock && (
+                                                <span className="absolute left-3 top-3 rounded-full bg-[#2a2116] px-3 py-1 text-xs font-semibold text-white">
                                                     Hết hàng
                                                 </span>
-                                            </div>
-                                        )}
+                                            )}
 
-                                        <button
-                                            onClick={() => handleRemove(item._id)}
-                                            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/85 text-neutral-700 hover:bg-white hover:text-neutral-900 shadow flex items-center justify-center transition-colors"
-                                            aria-label="Xóa khỏi yêu thích"
-                                        >
-                                            <FaTimes size={12} />
-                                        </button>
+                                            <button
+                                                onClick={() => handleRemove(item._id)}
+                                                className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#6c5a3d] shadow transition-colors hover:bg-white hover:text-[#2a2116]"
+                                                aria-label="Xóa khỏi yêu thích"
+                                            >
+                                                <FaTimes size={12} />
+                                            </button>
+                                        </div>
 
-                                        {isFeature && (
-                                            <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black/75 via-black/35 to-transparent text-white">
-                                                <p className="text-[10px] tracking-[0.2em] uppercase text-white/70 mb-2">Limitless Collection</p>
-                                                <h3 className="text-3xl font-black mb-3 leading-tight line-clamp-2">{item.name}</h3>
-                                                <button
-                                                    onClick={() => handleMoveToCart(item)}
-                                                    className={`px-4 py-2 rounded-full text-xs font-bold inline-flex items-center gap-2 transition-colors ${
-                                                        outOfStock
-                                                            ? "cursor-not-allowed bg-white/60 text-neutral-500"
-                                                            : "bg-white text-neutral-900 hover:bg-neutral-200"
-                                                    }`}
-                                                    disabled={outOfStock}
-                                                >
-                                                    <FaShoppingCart size={12} />
-                                                    {outOfStock ? "Hết hàng" : "Thêm vào giỏ"}
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {!isFeature && (
-                                        <div className="pt-3">
-                                            <Link to={`/product/${item._id}`} className="block font-semibold text-[28px] text-neutral-900 leading-tight line-clamp-2 hover:text-neutral-700 transition-colors">
-                                                {item.name}
-                                            </Link>
-                                            <p className="text-xs text-neutral-400 mt-1">
+                                        <div className="p-5">
+                                            <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[#9a7b45]">
                                                 {item?.category?.name || item?.category || "Lifestyle / Performance"}
                                             </p>
-                                            <div className="flex items-center justify-between mt-3">
-                                                <p className="text-xl font-bold text-neutral-900">
+                                            <Link
+                                                to={`/product/${item._id}`}
+                                                className="block min-h-[56px] text-2xl font-semibold leading-tight text-[#2a2116] transition-colors hover:text-[#5b4630] line-clamp-2"
+                                            >
+                                                {item.name}
+                                            </Link>
+
+                                            <div className="mt-5 flex items-center justify-between gap-3">
+                                                <p className="text-2xl font-bold text-[#2a2116]">
                                                     {getDisplayPrice(item)}
                                                 </p>
                                                 <button
                                                     onClick={() => handleMoveToCart(item)}
-                                                    className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
+                                                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
                                                         outOfStock
-                                                            ? "cursor-not-allowed border-neutral-200 text-neutral-300"
-                                                            : "border-neutral-300 text-neutral-800 hover:bg-neutral-900 hover:text-white hover:border-neutral-900"
+                                                            ? "cursor-not-allowed bg-[#f2ebdf] text-[#b8a385]"
+                                                            : "bg-[#2a2116] text-white hover:bg-[#453521]"
                                                     }`}
                                                     disabled={outOfStock}
                                                     title="Thêm vào giỏ hàng"
                                                 >
-                                                    <FaShoppingCart size={14} />
+                                                    <FaShoppingCart size={13} />
+                                                    Thêm
                                                 </button>
                                             </div>
                                         </div>
-                                    )}
-
-                                    {isFeature && (
-                                        <p className="text-xl font-bold text-neutral-900 mt-3">
-                                            {getDisplayPrice(item)}
-                                        </p>
-                                    )}
+                                    </div>
                                 </article>
                             );
                         })}
