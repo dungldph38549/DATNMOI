@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
@@ -77,6 +77,7 @@ const ProductDetail = () => {
   const [checkingStock, setCheckingStock] = useState(false);
   const [stockInfo, setStockInfo] = useState(null);
   const [qtyNotice, setQtyNotice] = useState("");
+  const relatedSectionRef = useRef(null);
 
   const PLACEHOLDER_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='28' font-family='Plus Jakarta Sans'>No Image</text></svg>";
 
@@ -639,6 +640,13 @@ const ProductDetail = () => {
     return s;
   };
 
+  const scrollToRelatedProducts = () => {
+    relatedSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
   if (!product) return (
     <div className="flex min-h-screen items-center justify-center bg-convot-cream font-body">
       <div className="h-12 w-12 animate-spin rounded-full border-2 border-neutral-200 border-t-convot-charcoal" />
@@ -707,7 +715,7 @@ const ProductDetail = () => {
                 {isOutOfStock && (
                   <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/20">
                     <span className="inline-flex h-28 w-28 items-center justify-center rounded-full bg-black/65 px-3 text-center text-xl font-semibold text-white shadow-lg">
-                      Bán hết
+                      Hết hàng
                     </span>
                   </div>
                 )}
@@ -716,6 +724,14 @@ const ProductDetail = () => {
                     Mới
                   </span>
                 )}
+                <button
+                  type="button"
+                  onClick={scrollToRelatedProducts}
+                  className="absolute bottom-4 left-4 z-30 inline-flex items-center gap-2 rounded-2xl bg-white/95 px-4 py-2 text-sm font-semibold text-convot-charcoal shadow-md transition hover:bg-white"
+                >
+                  <span className="text-red-500">🛍️</span>
+                  Sản phẩm tương tự
+                </button>
               </div>
             </div>
           </div>
@@ -773,7 +789,7 @@ const ProductDetail = () => {
             )}
             {isOutOfStock && (
               <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-red-600">
-                Bán hết
+                Hết hàng
               </p>
             )}
 
@@ -1167,7 +1183,7 @@ const ProductDetail = () => {
             </div>
         </section>
 
-        <section className="mt-12 w-full border-t border-neutral-200 pt-10">
+        <section ref={relatedSectionRef} className="mt-12 w-full border-t border-neutral-200 pt-10">
               <h3 className="font-display text-base font-semibold tracking-wide text-convot-charcoal">
                 Các sản phẩm khác
               </h3>

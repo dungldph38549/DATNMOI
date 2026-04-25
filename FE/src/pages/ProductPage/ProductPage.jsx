@@ -654,7 +654,7 @@ const ProductPage = () => {
                               {outOfStock && (
                                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
                                   <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-black/65 px-3 text-center text-lg font-semibold text-white shadow-lg">
-                                    Bán hết
+                                    Hết hàng
                                   </span>
                                 </div>
                               )}
