@@ -52,99 +52,75 @@ const T = {
 };
 
 // ================================================================
-// Menu items — khớp với các component hiện có
+// Menu items + group dropdown
 // ================================================================
-const MENU = [
-  {
-    key: "dashboard",
-    icon: "dashboard",
-    label: "Dashboard",
-    desc: "Tổng quan kinh doanh",
-  },
-  {
-    key: "products",
-    icon: "inventory_2",
-    label: "Sản phẩm",
-    desc: "Quản lý danh mục giày",
-  },
-  {
-    key: "orders",
-    icon: "local_shipping",
-    label: "Đơn hàng",
-    desc: "Theo dõi & xử lý đơn",
-  },
-  {
-    key: "users",
-    icon: "group",
-    label: "Khách hàng",
-    desc: "Tài khoản & hồ sơ",
-  },
-  {
-    key: "vouchers",
-    icon: "confirmation_number",
-    label: "Voucher",
-    desc: "Mã giảm giá & khuyến mãi",
-  },
-  {
-    key: "wallet-topups",
-    icon: "account_balance_wallet",
-    label: "Nạp ví (CK)",
-    desc: "Xác nhận chuyển khoản nạp ví",
-  },
-  {
-    key: "sizes",
-    icon: "straighten",
-    label: "Size",
-    desc: "Danh sách size cho biến thể",
-  },
-  {
-    key: "shoelace-sizes",
-    icon: "sprint",
-    label: "PK — dây giày",
-    desc: "Kích thước dây (phụ kiện, không phải SP)",
-  },
-  {
-    key: "colors",
-    icon: "palette",
-    label: "Màu",
-    desc: "Danh sách màu cho biến thể",
-  },
-  {
-    key: "chat",
-    icon: "chat",
-    label: "Chat",
-    desc: "Hỗ trợ khách hàng realtime",
-  },
-  {
-    key: "categories",
-    icon: "category",
-    label: "Danh mục",
-    desc: "Phân loại sản phẩm",
-  },
-  {
+const MENU_ITEMS = {
+  dashboard: { key: "dashboard", icon: "dashboard", label: "Dashboard" },
+  orders: { key: "orders", icon: "local_shipping", label: "Đơn hàng" },
+  "order-returns": {
     key: "order-returns",
     icon: "assignment_return",
     label: "Hoàn hàng",
-    desc: "Xử lý yêu cầu hoàn trả",
+  },
+  chat: { key: "chat", icon: "chat", label: "Chat" },
+  products: { key: "products", icon: "inventory_2", label: "Sản phẩm" },
+  categories: { key: "categories", icon: "category", label: "Danh mục" },
+  sizes: { key: "sizes", icon: "straighten", label: "Size" },
+  colors: { key: "colors", icon: "palette", label: "Màu" },
+  "shoelace-sizes": {
+    key: "shoelace-sizes",
+    icon: "sprint",
+    label: "PK dây giày",
+  },
+  vouchers: { key: "vouchers", icon: "confirmation_number", label: "Voucher" },
+  comments: { key: "comments", icon: "star", label: "Đánh giá" },
+  users: { key: "users", icon: "group", label: "Khách hàng" },
+  "wallet-topups": {
+    key: "wallet-topups",
+    icon: "account_balance_wallet",
+    label: "Nạp ví (CK)",
+  },
+  staff: { key: "staff", icon: "badge", label: "Nhân viên" },
+};
+
+const MENU_GROUPS = [
+  {
+    id: "operations",
+    label: "Vận hành",
+    icon: "settings",
+    items: ["orders", "order-returns"],
   },
   {
-    key: "comments",
-    icon: "star",
-    label: "Đánh giá",
-    desc: "Phản hồi & xếp hạng",
+    id: "products",
+    label: "Sản phẩm",
+    icon: "inventory_2",
+    items: ["products", "categories", "sizes", "colors", "shoelace-sizes"],
   },
   {
-    key: "staff",
-    icon: "badge",
-    label: "Nhân viên",
-    desc: "Phân quyền & quản lý",
+    id: "promo-feedback",
+    label: "Ưu đãi và phản hồi",
+    icon: "campaign",
+    items: ["vouchers", "comments", "chat"],
+  },
+  {
+    id: "customers-wallet",
+    label: "Khách hàng và ví",
+    icon: "groups",
+    items: ["users", "wallet-topups"],
   },
 ];
 
 // ================================================================
 // Sidebar item
 // ================================================================
-const SideItem = ({ item, active, onClick }) => (
+const SideItem = ({
+  item,
+  active,
+  onClick,
+  nested = false,
+  hideIcon = false,
+  asSection = false,
+}) => (
   <button
     onClick={onClick}
     style={{
@@ -152,35 +128,43 @@ const SideItem = ({ item, active, onClick }) => (
       display: "flex",
       alignItems: "center",
       gap: 10,
-      padding: "10px 14px",
+      padding: asSection ? "9px 12px" : nested ? "9px 12px 9px 26px" : "10px 14px",
       borderRadius: 12,
       border: "none",
       cursor: "pointer",
       fontFamily: "'Plus Jakarta Sans', sans-serif",
       transition: "all 0.15s",
-      background: active ? T.primaryBg : "transparent",
-      color: active ? T.primary : T.textMid,
+      background: asSection
+        ? active
+          ? T.primaryBg
+          : "#F8FAFC"
+        : active
+          ? T.primaryBg
+          : "transparent",
+      color: active ? T.primary : asSection ? T.text : T.textMid,
       textAlign: "left",
     }}
     onMouseEnter={(e) => {
-      if (!active) e.currentTarget.style.background = "#F8FAFC";
+      if (!active) e.currentTarget.style.background = asSection ? "#F1F5F9" : "#F8FAFC";
     }}
     onMouseLeave={(e) => {
-      if (!active) e.currentTarget.style.background = "transparent";
+      if (!active) e.currentTarget.style.background = asSection ? "#F8FAFC" : "transparent";
     }}
   >
-    <span
-      className="material-symbols-outlined"
-      style={{
-        fontSize: 20,
-        color: active ? T.primary : T.textMuted,
-        flexShrink: 0,
-        fontVariationSettings: active ? "'FILL' 1" : "'FILL' 0",
-      }}
-    >
-      {item.icon}
-    </span>
-    <span style={{ fontSize: 13, fontWeight: active ? 700 : 500 }}>
+    {!hideIcon && (
+      <span
+        className="material-symbols-outlined"
+        style={{
+          fontSize: 20,
+          color: active ? T.primary : T.textMuted,
+          flexShrink: 0,
+          fontVariationSettings: active ? "'FILL' 1" : "'FILL' 0",
+        }}
+      >
+        {item.icon}
+      </span>
+    )}
+    <span style={{ fontSize: asSection ? 13 : 13, fontWeight: asSection ? 800 : active ? 700 : 500 }}>
       {item.label}
     </span>
     {item.count > 0 && (
@@ -235,6 +219,12 @@ const AdminPage = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
     typeof window !== "undefined" ? getMobileMatch() : false,
   );
+  const [expandedGroups, setExpandedGroups] = useState({
+    operations: true,
+    products: true,
+    "promo-feedback": true,
+    "customers-wallet": true,
+  });
 
   // ── fetch data for badges ────────────────────────────────────
   const { data: orderData } = useQuery({
@@ -267,14 +257,16 @@ const AdminPage = () => {
 
   const pendingTopupsCount = topups.length;
 
-  const menuWithBadges = MENU.map((item) => {
+  const menuWithBadges = Object.values(MENU_ITEMS).map((item) => {
     if (item.key === "orders") return { ...item, count: pendingOrdersCount };
-    if (item.key === "order-returns")
-      return { ...item, count: returnRequestsCount };
-    if (item.key === "wallet-topups")
-      return { ...item, count: pendingTopupsCount };
+    if (item.key === "order-returns") return { ...item, count: returnRequestsCount };
+    if (item.key === "wallet-topups") return { ...item, count: pendingTopupsCount };
     return item;
   });
+  const menuMap = menuWithBadges.reduce((acc, item) => {
+    acc[item.key] = item;
+    return acc;
+  }, {});
 
   // ── mobile / desktop (matchMedia ổn định hơn innerWidth khi zoom / DevTools) ──
   useEffect(() => {
@@ -323,6 +315,9 @@ const AdminPage = () => {
   const handleMenuClick = (key) => {
     setSelectedMenu(key);
     if (isMobile) setSidebarCollapsed(true);
+  };
+  const toggleGroup = (groupId) => {
+    setExpandedGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
   };
 
   const renderContent = () => {
@@ -657,14 +652,72 @@ const AdminPage = () => {
               gap: 2,
             }}
           >
-            {menuWithBadges.map((item) => (
+            <SideItem
+              item={menuMap.dashboard}
+              active={selectedMenu === "dashboard"}
+              asSection
+              onClick={() => handleMenuClick("dashboard")}
+            />
+
+            {MENU_GROUPS.map((group) => {
+              const isOpen = !!expandedGroups[group.id];
+              return (
+                <div key={group.id} style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.id)}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "9px 12px",
+                      border: "none",
+                      background: "#F8FAFC",
+                      cursor: "pointer",
+                      color: T.text,
+                      fontSize: 13,
+                      fontWeight: 800,
+                      letterSpacing: "0.01em",
+                      borderRadius: 10,
+                    }}
+                  >
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                        {group.icon || "folder"}
+                      </span>
+                      {group.label}
+                    </span>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                      {isOpen ? "expand_less" : "expand_more"}
+                    </span>
+                  </button>
+                  {isOpen &&
+                    group.items.map((itemKey) => {
+                      const item = menuMap[itemKey];
+                      if (!item) return null;
+                      return (
+                        <SideItem
+                          key={item.key}
+                          item={item}
+                          active={selectedMenu === item.key}
+                          nested
+                          onClick={() => handleMenuClick(item.key)}
+                        />
+                      );
+                    })}
+                </div>
+              );
+            })}
+
+            <div style={{ marginTop: 8 }}>
               <SideItem
-                key={item.key}
-                item={item}
-                active={selectedMenu === item.key}
-                onClick={() => handleMenuClick(item.key)}
+                item={menuMap.staff}
+                active={selectedMenu === "staff"}
+                onClick={() => handleMenuClick("staff")}
+                asSection
               />
-            ))}
+            </div>
           </nav>
 
           {/* Bottom */}
