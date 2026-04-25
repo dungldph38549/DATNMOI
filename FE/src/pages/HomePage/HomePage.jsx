@@ -45,6 +45,19 @@ const prioritizeShoes = (items = [], limit = 8) => {
   return [...shoes, ...accessories].slice(0, limit);
 };
 
+const isProductOnRealSale = (product) => {
+  if (!product) return false;
+  const amount = (value) => Number(value) || 0;
+  if (amount(product.saleDiscountAmount) > 0) return true;
+  if (
+    Array.isArray(product.variants) &&
+    product.variants.some((variant) => amount(variant?.saleDiscountAmount) > 0)
+  ) {
+    return true;
+  }
+  return false;
+};
+
 const pickForRecommendation = ({
   recommendations = [],
   best = [],
@@ -97,6 +110,7 @@ const HomePage = () => {
   const [newProducts, setNewProducts] = useState([]);
   const [accessoryProducts, setAccessoryProducts] = useState([]);
   const [recommendedProducts, setRecommendedProducts] = useState([]);
+  const [saleProductIds, setSaleProductIds] = useState(new Set());
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [sort, setSort] = useState("new");
@@ -138,6 +152,13 @@ const HomePage = () => {
         );
 
         const allProducts = Array.isArray(allProductRes?.data) ? allProductRes.data : [];
+        setSaleProductIds(
+          new Set(
+            allProducts
+              .filter((product) => isProductOnRealSale(product))
+              .map((product) => String(product?._id || "")),
+          ),
+        );
         const accessoryFromAll = allProducts.filter(isAccessoryProduct);
         const newestNonAccessory = allProducts
           .filter((p) => !isAccessoryProduct(p))
@@ -351,7 +372,13 @@ const HomePage = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {newDisplay.map((p) => (
-                <Product key={p._id} product={p} compactCartCta hoverStyle="catalog" />
+                <Product
+                  key={p._id}
+                  product={p}
+                  compactCartCta
+                  hoverStyle="catalog"
+                  showSalePercentBadge={saleProductIds.has(String(p?._id || ""))}
+                />
               ))}
             </div>
           </section>
@@ -372,7 +399,13 @@ const HomePage = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {recommendedProducts.slice(0, 8).map((p) => (
-                <Product key={p._id} product={p} compactCartCta hoverStyle="catalog" />
+                <Product
+                  key={p._id}
+                  product={p}
+                  compactCartCta
+                  hoverStyle="catalog"
+                  showSalePercentBadge={saleProductIds.has(String(p?._id || ""))}
+                />
               ))}
             </div>
           </section>
@@ -425,7 +458,13 @@ const HomePage = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {hotDisplay.map((p) => (
-                <Product key={p._id} product={p} compactCartCta hoverStyle="catalog" />
+                <Product
+                  key={p._id}
+                  product={p}
+                  compactCartCta
+                  hoverStyle="catalog"
+                  showSalePercentBadge={saleProductIds.has(String(p?._id || ""))}
+                />
               ))}
             </div>
           </section>
@@ -446,7 +485,13 @@ const HomePage = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {accessoryProducts.map((p) => (
-                <Product key={p._id} product={p} compactCartCta hoverStyle="catalog" />
+                <Product
+                  key={p._id}
+                  product={p}
+                  compactCartCta
+                  hoverStyle="catalog"
+                  showSalePercentBadge={saleProductIds.has(String(p?._id || ""))}
+                />
               ))}
             </div>
           </section>

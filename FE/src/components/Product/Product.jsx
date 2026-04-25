@@ -14,7 +14,25 @@ import { getProductPriceInfo } from "../../utils/pricing.js";
 import notify from "../../utils/notify";
 import { isProductOutOfStock } from "../../utils/stock.js";
 
-const Product = ({ product, ratingValue, compactCartCta = false, hoverStyle = "default" }) => {
+const Product = ({
+  product,
+  ratingValue,
+  compactCartCta = false,
+  hoverStyle = "default",
+  showSalePercentBadge = true,
+}) => {
+  const isProductOnRealSale = useMemo(() => {
+    const amount = (value) => Number(value) || 0;
+    if (amount(product?.saleDiscountAmount) > 0) return true;
+    if (
+      Array.isArray(product?.variants) &&
+      product.variants.some((variant) => amount(variant?.saleDiscountAmount) > 0)
+    ) {
+      return true;
+    }
+    return false;
+  }, [product]);
+
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const user = useSelector((state) => state.user);
@@ -192,7 +210,7 @@ const Product = ({ product, ratingValue, compactCartCta = false, hoverStyle = "d
         )}
 
         {/* SALE */}
-        {cardPriceInfo.hasSale && (
+        {cardPriceInfo.hasSale && isProductOnRealSale && showSalePercentBadge && (
           <div className="absolute top-10 left-3">
             <span className="bg-red-500 text-white px-2 py-1 text-xs rounded">
               -{cardPriceInfo.discountPercent}%

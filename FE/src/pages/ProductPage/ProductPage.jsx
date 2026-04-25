@@ -78,6 +78,19 @@ const getProductColors = (product) => {
   return [...new Set(colors)];
 };
 
+const isProductOnRealSale = (product) => {
+  if (!product) return false;
+  const amount = (value) => Number(value) || 0;
+  if (amount(product.saleDiscountAmount) > 0) return true;
+  if (
+    Array.isArray(product.variants) &&
+    product.variants.some((variant) => amount(variant?.saleDiscountAmount) > 0)
+  ) {
+    return true;
+  }
+  return false;
+};
+
 const ProductPage = () => {
   const dispatch = useDispatch();
   const location = useLocation();
@@ -618,6 +631,7 @@ const ProductPage = () => {
                     const priceInfo = getProductPriceInfo(item);
                     const categoryText = item?.categoryId?.name || item?.category || "Sneakers";
                     const outOfStock = isProductOutOfStock(item);
+                    const isRealSale = isProductOnRealSale(item);
                     return (
                       <Link key={item?._id} to={`/product/${item?._id}`} className="group block overflow-hidden rounded-lg bg-white">
                         <div className="relative aspect-[4/4.4] overflow-hidden bg-neutral-100">
@@ -637,6 +651,13 @@ const ProductPage = () => {
                               <FaRegHeart className="text-neutral-400" size={14} />
                             )}
                           </button>
+                          {isRealSale && (
+                            <span className="absolute left-2 top-2 z-20 rounded bg-[#D0021B] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+                              {Number(priceInfo?.discountPercent || 0) > 0
+                                ? `-${Number(priceInfo.discountPercent)}%`
+                                : "Sale"}
+                            </span>
+                          )}
                           {image ? (
                             <>
                               <img

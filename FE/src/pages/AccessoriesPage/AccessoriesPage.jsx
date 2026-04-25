@@ -80,6 +80,19 @@ const getProductMinPrice = (product) => {
   return 0;
 };
 
+const isProductOnRealSale = (product) => {
+  if (!product) return false;
+  const amount = (value) => Number(value) || 0;
+  if (amount(product.saleDiscountAmount) > 0) return true;
+  if (
+    Array.isArray(product.variants) &&
+    product.variants.some((variant) => amount(variant?.saleDiscountAmount) > 0)
+  ) {
+    return true;
+  }
+  return false;
+};
+
 const normalizeValue = (value) => String(value || "").trim().toLowerCase();
 
 const normalizeLooseValue = (value) =>
@@ -758,6 +771,7 @@ const AccessoriesPage = () => {
                     const priceInfo = getProductPriceInfo(item);
                     const categoryText = item?.categoryId?.name || item?.category || "Phụ kiện";
                     const outOfStock = isProductOutOfStock(item);
+                    const isRealSale = isProductOnRealSale(item);
                     return (
                       <Link
                         key={item._id}
@@ -781,6 +795,13 @@ const AccessoriesPage = () => {
                               <FaRegHeart className="text-neutral-400" size={14} />
                             )}
                           </button>
+                          {isRealSale && (
+                            <span className="absolute left-2 top-2 z-20 rounded bg-[#D0021B] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+                              {Number(priceInfo?.discountPercent || 0) > 0
+                                ? `-${Number(priceInfo.discountPercent)}%`
+                                : "Sale"}
+                            </span>
+                          )}
                           {image ? (
                             <>
                               <img
