@@ -22,6 +22,13 @@ const BACKEND_BASE_URL = (
   .replace(/localhost:\d+/, "localhost:3002")
   .replace(/127\.0\.0\.1:\d+/, "127.0.0.1:3002");
 
+const toUploadUrl = (path) => {
+  if (!path || typeof path !== "string") return "";
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  const normalized = path.startsWith("/") ? path.slice(1) : path;
+  return `${BACKEND_BASE_URL}/uploads/${normalized}`;
+};
+
 // ── Toggle Switch ───────────────────────────────────────────────
 const Toggle = ({ checked, onChange, label, sub }) => (
   <div
@@ -318,6 +325,45 @@ const ProductDetail = ({ productId = null, onClose }) => {
     form.setFieldsValue({ srcImages: curr.filter((_, i) => i !== idx) });
   };
 
+  const handleVariantImagesUpload = async (variantIndex, fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    try {
+      const fd = new FormData();
+      files.forEach((f) => fd.append("files", f));
+      const result = await uploadImages(fd);
+      const uploaded = Array.isArray(result?.paths) ? result.paths : [];
+      if (!uploaded.length) return;
+      const variants = form.getFieldValue("variants") || [];
+      const next = [...variants];
+      const existing = Array.isArray(next?.[variantIndex]?.images)
+        ? next[variantIndex].images
+        : [];
+      next[variantIndex] = {
+        ...next[variantIndex],
+        images: Array.from(
+          new Set([...existing.filter(Boolean), ...uploaded.filter(Boolean)]),
+        ),
+      };
+      form.setFieldValue("variants", next);
+    } catch (err) {
+      Swal.fire("Upload thất bại", "Không thể tải ảnh biến thể.", "error");
+    }
+  };
+
+  const handleRemoveVariantImage = (variantIndex, imageIndex) => {
+    const variants = form.getFieldValue("variants") || [];
+    const next = [...variants];
+    const existing = Array.isArray(next?.[variantIndex]?.images)
+      ? next[variantIndex].images
+      : [];
+    next[variantIndex] = {
+      ...next[variantIndex],
+      images: existing.filter((_, i) => i !== imageIndex),
+    };
+    form.setFieldValue("variants", next);
+  };
+
   const onFinish = (values) => {
     const { brandId: _omitBrand, ...restValues } = values;
     const payload = {
@@ -327,6 +373,11 @@ const ProductDetail = ({ productId = null, onClose }) => {
       isFeatured: featured,
       srcImages: form.getFieldValue("srcImages"),
     };
+    // Luôn lấy variants từ form state để giữ được các field bổ sung như `images`
+    // (Form.List có thể làm rơi field không được render bằng Form.Item trong `values`).
+    if (hasVar) {
+      payload.variants = form.getFieldValue("variants") || [];
+    }
     payload.saleRules = saleEnabled && Number(values.saleValue) > 0
       ? [
           {
@@ -359,7 +410,10 @@ const ProductDetail = ({ productId = null, onClose }) => {
             if (!nk) return;
             remapped[nk] = val;
           });
-          return { ...v, attributes: remapped };
+          const normalizedImages = Array.isArray(v?.images)
+            ? v.images.filter((img) => typeof img === "string" && img.trim() !== "")
+            : [];
+          return { ...v, attributes: remapped, images: normalizedImages };
         });
         const sigs = payload.variants.map((v) => variantAttributesSignature(v.attributes));
         const seen = new Set();
@@ -702,6 +756,15 @@ const ProductDetail = ({ productId = null, onClose }) => {
                       {({ getFieldValue }) => {
                         const attributes = getFieldValue("attributes") || [];
                         const sizeOptions = sizes?.data || [];
+                        const hasColorAttribute = attributes.some((attr) => {
+                          const key = normalizeAttr(attr);
+                          return (
+                            key === "color" ||
+                            key === "mau" ||
+                            key.includes("mau sac") ||
+                            key.includes("color")
+                          );
+                        });
                         return (
                           <Form.List name="variants">
                             {(fields, { add, remove }) => {
@@ -723,6 +786,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                       : undefined,
                                   stock: 0,
                                   attributes: attrObj,
+                                  images: [],
                                 });
                               };
                               return (
@@ -753,6 +817,9 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                           "Giá (₫)",
                                           "Tồn kho",
                                           ...attributes,
+                                          ...(hasColorAttribute
+                                            ? ["Ảnh biến thể"]
+                                            : []),
                                           "",
                                         ].map((h) => (
                                           <th
@@ -777,7 +844,12 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                       {fields.length === 0 && (
                                         <tr>
                                           <td
-                                            colSpan={3 + attributes.length + 1}
+                                            colSpan={
+                                              3 +
+                                              attributes.length +
+                                              1 +
+                                              (hasColorAttribute ? 1 : 0)
+                                            }
                                             style={{
                                               padding: 28,
                                               textAlign: "center",
@@ -908,6 +980,112 @@ const ProductDetail = ({ productId = null, onClose }) => {
                                               </Form.Item>
                                             </td>
                                           ))}
+                                          {hasColorAttribute && (
+                                            <td style={{ padding: "8px 16px", minWidth: 220 }}>
+                                              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                                <label
+                                                  style={{
+                                                    display: "inline-flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    gap: 4,
+                                                    width: "fit-content",
+                                                    padding: "6px 10px",
+                                                    borderRadius: 8,
+                                                    border: "1px dashed #f49d25",
+                                                    background: "rgba(244,157,37,0.05)",
+                                                    color: "#f49d25",
+                                                    fontSize: 12,
+                                                    fontWeight: 600,
+                                                    cursor: "pointer",
+                                                  }}
+                                                >
+                                                  <PlusOutlined style={{ fontSize: 12 }} />
+                                                  Tải ảnh
+                                                  <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    multiple
+                                                    style={{ display: "none" }}
+                                                    onChange={async (e) => {
+                                                      await handleVariantImagesUpload(index, e.target.files);
+                                                      e.target.value = "";
+                                                    }}
+                                                  />
+                                                </label>
+                                                {(() => {
+                                                  const variantImages = Array.isArray(
+                                                    getFieldValue(["variants", index, "images"]),
+                                                  )
+                                                    ? getFieldValue(["variants", index, "images"])
+                                                    : [];
+                                                  if (!variantImages.length) {
+                                                    return (
+                                                      <span style={{ fontSize: 11, color: "#94A3B8" }}>
+                                                        Chưa có ảnh riêng
+                                                      </span>
+                                                    );
+                                                  }
+                                                  return (
+                                                    <div
+                                                      style={{
+                                                        display: "grid",
+                                                        gridTemplateColumns: "repeat(4, 1fr)",
+                                                        gap: 6,
+                                                      }}
+                                                    >
+                                                      {variantImages.map((imgPath, imgIdx) => (
+                                                        <div
+                                                          key={`${field.key}-${imgIdx}`}
+                                                          style={{
+                                                            position: "relative",
+                                                            aspectRatio: "1/1",
+                                                            borderRadius: 8,
+                                                            overflow: "hidden",
+                                                            border: "1px solid #E2E8F0",
+                                                            background: "#F8FAFC",
+                                                          }}
+                                                        >
+                                                          <img
+                                                            src={toUploadUrl(imgPath)}
+                                                            alt={`variant-${index}-${imgIdx}`}
+                                                            style={{
+                                                              width: "100%",
+                                                              height: "100%",
+                                                              objectFit: "cover",
+                                                            }}
+                                                          />
+                                                          <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                              handleRemoveVariantImage(index, imgIdx)
+                                                            }
+                                                            style={{
+                                                              position: "absolute",
+                                                              top: 2,
+                                                              right: 2,
+                                                              width: 16,
+                                                              height: 16,
+                                                              borderRadius: "50%",
+                                                              border: "none",
+                                                              background: "#EF4444",
+                                                              color: "#fff",
+                                                              fontSize: 10,
+                                                              cursor: "pointer",
+                                                              lineHeight: "16px",
+                                                              padding: 0,
+                                                            }}
+                                                          >
+                                                            ×
+                                                          </button>
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  );
+                                                })()}
+                                              </div>
+                                            </td>
+                                          )}
                                           <td
                                             style={{
                                               padding: "8px 16px",
