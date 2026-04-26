@@ -305,12 +305,12 @@ export default function Colors() {
             }}
           />
           <Tag
-            color="blue"
+            color="gold"
             style={{
               marginRight: 0,
               borderRadius: 999,
-              borderColor: "#BFDBFE",
-              color: "#1E40AF",
+              borderColor: "#FDE68A",
+              color: "#92400E",
               fontWeight: 600,
             }}
           >
@@ -357,8 +357,9 @@ export default function Colors() {
               onClick={() => openEdit(record)}
               style={{
                 borderRadius: 8,
-                borderColor: "#D1D5DB",
-                color: "#334155",
+                borderColor: "rgba(148, 163, 184, 0.4)",
+                color: "#E2E8F0",
+                background: "rgba(15, 23, 42, 0.7)",
               }}
             />
           </Tooltip>
@@ -375,7 +376,12 @@ export default function Colors() {
                 size="small"
                 danger
                 icon={<DeleteOutlined />}
-                style={{ borderRadius: 8 }}
+                style={{
+                  borderRadius: 8,
+                  borderColor: "rgba(248, 113, 113, 0.65)",
+                  color: "#DC2626",
+                  background: "rgba(127, 29, 29, 0.16)",
+                }}
               />
             </Popconfirm>
           </Tooltip>
@@ -402,7 +408,7 @@ export default function Colors() {
           marginBottom: 18,
           boxShadow: "0 12px 30px rgba(15, 23, 42, 0.05)",
           backgroundImage:
-            "radial-gradient(circle at 100% -10%, rgba(191, 219, 254, 0.40) 0%, rgba(255, 255, 255, 0) 42%)",
+            "radial-gradient(circle at 100% -10%, rgba(253, 230, 138, 0.35) 0%, rgba(255, 255, 255, 0) 40%)",
         }}
       >
         <div
@@ -453,7 +459,7 @@ export default function Colors() {
             style={{
               minWidth: 165,
               borderRadius: 14,
-              border: "1px solid #FDE68A",
+              border: "1px solid rgba(245,158,11,0.45)",
               background: T.primarySoft,
               color: "#92400E",
               padding: "10px 12px",
@@ -464,7 +470,7 @@ export default function Colors() {
           </div>
           <div
             style={{
-              minWidth: 220,
+              minWidth: 190,
               borderRadius: 14,
               border: `1px solid ${T.border}`,
               background: "#FFFFFF",
@@ -502,6 +508,7 @@ export default function Colors() {
               </div>
             ),
           }}
+          style={{ background: "#fff" }}
           pagination={{ pageSize: 10, showSizeChanger: false }}
         />
       </div>
@@ -520,7 +527,7 @@ export default function Colors() {
         styles={{
           content: { borderRadius: 18, overflow: "hidden", border: "1px solid rgba(148, 163, 184, 0.25)" },
           header: {
-            background: "linear-gradient(180deg, rgba(191,219,254,0.25), rgba(255,255,255,1))",
+            background: "linear-gradient(180deg, rgba(251,191,36,0.12), rgba(255,255,255,1))",
             paddingBottom: 14,
           },
         }}
@@ -541,7 +548,7 @@ export default function Colors() {
             <div
               style={{
                 padding: "16px",
-                background: "#F9FBFF",
+                background: "#F8FAFC",
                 borderRadius: 14,
                 border: `1px solid ${T.border}`,
               }}
@@ -657,7 +664,12 @@ export default function Colors() {
               type="primary"
               htmlType="submit"
               loading={createMutation.isPending || updateMutation.isPending}
-              style={{ borderRadius: 10, fontWeight: 700 }}
+              style={{
+                borderRadius: 10,
+                fontWeight: 700,
+                background: T.primary,
+                borderColor: T.primaryStrong,
+              }}
             >
               {editingId ? "Cập nhật" : "Tạo màu"}
             </Button>
