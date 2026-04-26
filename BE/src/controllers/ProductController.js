@@ -92,6 +92,19 @@ exports.getAllProducts = async (req, res) => {
   }
 };
 
+// GET /api/product/admin/inventory-summary
+exports.getAdminInventorySummary = async (req, res) => {
+  try {
+    const { isListProductRemoved } = req.query;
+    const summary = await ProductService.getAdminInventorySummary(
+      isListProductRemoved,
+    );
+    res.json(summary);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // ================================================================
 // GET BY ID — Chi tiết sản phẩm
 // GET /api/product/:id

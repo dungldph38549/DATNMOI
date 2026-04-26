@@ -274,6 +274,14 @@ export const getAllProducts = async ({
   return res.data;
 };
 
+/** Thống kê tồn kho toàn cửa hàng (admin) */
+export const getAdminInventorySummary = async (isListProductRemoved = 0) => {
+  const res = await axiosInstance.get(
+    `/product/admin/inventory-summary?isListProductRemoved=${isListProductRemoved}`,
+  );
+  return res.data;
+};
+
 export const createProduct = async (payload) => {
   const res = await axiosInstance.post("/product/create", { payload });
   return res.data;

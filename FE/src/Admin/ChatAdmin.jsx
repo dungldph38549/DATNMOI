@@ -55,6 +55,16 @@ const normalizeMessage = (m) => {
   };
 };
 
+/** Tên hiển thị đồng bộ với User trong DB (name → email → mã) */
+const customerDisplayName = (entry, fallbackId) => {
+  const n = entry?.customer?.name?.trim();
+  if (n) return n;
+  const em = entry?.customer?.email?.trim();
+  if (em) return em;
+  if (fallbackId != null && String(fallbackId).trim()) return String(fallbackId).trim();
+  return "Khách hàng";
+};
+
 const getAdminToken = () => {
   try {
     const raw = localStorage.getItem("admin_v1") || localStorage.getItem("admin");
@@ -88,11 +98,30 @@ export default function ChatAdmin() {
     return `customer:${selectedCustomerId}`;
   }, [selectedCustomerId]);
 
+  const selectedInboxEntry = useMemo(() => {
+    if (!selectedCustomerId) return null;
+    return (
+      inbox.find((x) => String(x.customerId) === String(selectedCustomerId)) ||
+      null
+    );
+  }, [inbox, selectedCustomerId]);
+
+  const selectedChatTitle = selectedInboxEntry
+    ? customerDisplayName(selectedInboxEntry, selectedCustomerId)
+    : "";
+
   const loadInbox = async () => {
     setInboxLoading(true);
     try {
       const list = await getChatInbox();
-      setInbox(Array.isArray(list) ? list : []);
+      const rows = Array.isArray(list) ? list : [];
+      setInbox(
+        rows.map((row) => ({
+          ...row,
+          customerId:
+            row.customerId != null ? String(row.customerId).trim() : "",
+        })),
+      );
     } catch (e) {
       message.error(e?.response?.data?.message || e?.message || "Không tải được danh sách tin nhắn");
     } finally {
@@ -126,20 +155,28 @@ export default function ChatAdmin() {
     socket.on("chat:inbox:newMessage", (payload) => {
       const cid = payload?.customerId;
       if (!cid) return;
+      const idStr = String(cid).trim();
 
       setInbox((prev) => {
         const next = Array.isArray(prev) ? [...prev] : [];
-        const idx = next.findIndex((x) => String(x.customerId) === String(cid));
+        const idx = next.findIndex((x) => String(x.customerId) === idStr);
         const item = {
-          customerId: cid,
+          customerId: idStr,
           lastMessage: payload?.lastMessage || payload?.message || "",
           lastTimestamp: payload?.lastTimestamp || payload?.timestamp || new Date().toISOString(),
           senderRole: payload?.senderRole,
-          // customer sẽ không cập nhật realtime (đủ dùng cho list)
+          customer: payload?.customer ?? undefined,
         };
 
-        if (idx >= 0) next[idx] = { ...next[idx], ...item };
-        else next.unshift(item);
+        if (idx >= 0) {
+          next[idx] = {
+            ...next[idx],
+            ...item,
+            customer: item.customer ?? next[idx].customer ?? null,
+          };
+        } else {
+          next.unshift({ ...item, customer: item.customer ?? null });
+        }
         return next;
       });
     });
@@ -183,10 +220,27 @@ export default function ChatAdmin() {
     });
   };
 
+  const scrollPane = {
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    WebkitOverflowScrolling: "touch",
+    minHeight: 0,
+  };
+
   return (
-    <div style={{ padding: 24, background: "#F8F7F5", minHeight: "100%" }}>
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        background: "#F8F7F5",
+      }}
+    >
       <div
         style={{
+          flexShrink: 0,
           background: "#fff",
           border: "1px solid #E2E8F0",
           borderRadius: 16,
@@ -212,29 +266,51 @@ export default function ChatAdmin() {
 
       <div
         style={{
+          flex: 1,
+          minHeight: 0,
           display: "grid",
-          gridTemplateColumns: "320px 1fr",
+          gridTemplateColumns: "minmax(260px, 320px) minmax(0, 1fr)",
+          gridTemplateRows: "minmax(0, 1fr)",
           gap: 16,
           alignItems: "stretch",
         }}
       >
-        <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, overflow: "hidden" }}>
-          <div style={{ padding: "12px 14px", borderBottom: "1px solid #F1F5F9", background: "#F8FAFC" }}>
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #E2E8F0",
+            borderRadius: 14,
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
+            minWidth: 0,
+          }}
+        >
+          <div
+            style={{
+              flexShrink: 0,
+              padding: "12px 14px",
+              borderBottom: "1px solid #F1F5F9",
+              background: "#F8FAFC",
+            }}
+          >
             <b style={{ color: "#0F172A" }}>Danh sách</b>
           </div>
-          <div style={{ maxHeight: 620, overflowY: "auto" }}>
+          <div style={{ ...scrollPane, flex: 1 }}>
             {inbox.length === 0 && (
               <div style={{ padding: 18, color: "#94A3B8", fontSize: 13 }}>
                 Chưa có hội thoại
               </div>
             )}
-            {inbox.map((item) => {
-              const active = String(item.customerId) === String(selectedCustomerId);
+            {inbox.map((item, rowIdx) => {
+              const idStr = String(item.customerId ?? "").trim();
+              const active = idStr === String(selectedCustomerId ?? "").trim();
               return (
                 <button
-                  key={item.customerId}
+                  key={idStr || `inbox-row-${rowIdx}`}
                   type="button"
-                  onClick={() => setSelectedCustomerId(item.customerId)}
+                  onClick={() => setSelectedCustomerId(idStr)}
                   style={{
                     width: "100%",
                     textAlign: "left",
@@ -248,7 +324,7 @@ export default function ChatAdmin() {
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 800, color: "#0F172A", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {item.customer?.name || item.customer?.email || item.customerId}
+                        {customerDisplayName(item, idStr)}
                       </div>
                       <div style={{ marginTop: 4, color: "#64748B", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {item.lastMessage || "—"}
@@ -264,14 +340,39 @@ export default function ChatAdmin() {
           </div>
         </div>
 
-        <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-          <div style={{ padding: "12px 14px", borderBottom: "1px solid #F1F5F9", background: "#F8FAFC" }}>
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #E2E8F0",
+            borderRadius: 14,
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
+            minWidth: 0,
+          }}
+        >
+          <div
+            style={{
+              flexShrink: 0,
+              padding: "12px 14px",
+              borderBottom: "1px solid #F1F5F9",
+              background: "#F8FAFC",
+            }}
+          >
             <b style={{ color: "#0F172A" }}>
-              {selectedCustomerId ? `Chat: ${selectedCustomerId}` : "Chọn một khách hàng"}
+              {selectedCustomerId ? `Chat: ${selectedChatTitle}` : "Chọn một khách hàng"}
             </b>
           </div>
 
-          <div style={{ flex: 1, overflowY: "auto", padding: 14, background: "#FAFAF8" }}>
+          <div
+            style={{
+              ...scrollPane,
+              flex: 1,
+              padding: 14,
+              background: "#FAFAF8",
+            }}
+          >
             {selectedCustomerId && messages.length === 0 && (
               <div style={{ padding: 18, color: "#94A3B8", fontSize: 13 }}>
                 Chưa có tin nhắn
@@ -311,7 +412,17 @@ export default function ChatAdmin() {
             })}
           </div>
 
-          <div style={{ padding: 12, borderTop: "1px solid #F1F5F9", background: "#fff", display: "flex", gap: 10, alignItems: "center" }}>
+          <div
+            style={{
+              flexShrink: 0,
+              padding: 12,
+              borderTop: "1px solid #F1F5F9",
+              background: "#fff",
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+            }}
+          >
             <Input
               value={text}
               onChange={(e) => setText(e.target.value)}

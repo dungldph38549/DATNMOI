@@ -155,6 +155,85 @@ const getAllProducts = async (
 
 const getAllProductsAdmin = getAllProducts;
 
+/** Ngưỡng "Sắp hết" đồng bộ với admin Products.jsx (StatusBadge) */
+const ADMIN_LOW_STOCK_THRESHOLD = 20;
+
+/**
+ * Thống kê tồn kho toàn cửa hàng (admin) — không phân trang.
+ * totalProducts: số SKU sản phẩm; withStock: tổng tồn > 0; lowStock: 0 < tồn < ngưỡng.
+ */
+const getAdminInventorySummary = async (isListProductRemoved = 0) => {
+  const includeRemoved =
+    isListProductRemoved === "1" ||
+    isListProductRemoved === 1 ||
+    isListProductRemoved === true;
+
+  const match = includeRemoved ? {} : { isDeleted: { $ne: true } };
+
+  const [row] = await Product.aggregate([
+    { $match: match },
+    {
+      $addFields: {
+        variantSum: {
+          $sum: {
+            $map: {
+              input: { $ifNull: ["$variants", []] },
+              as: "v",
+              in: { $ifNull: ["$$v.stock", 0] },
+            },
+          },
+        },
+      },
+    },
+    {
+      $addFields: {
+        totalStock: {
+          $cond: [
+            {
+              $and: [
+                { $eq: ["$hasVariants", true] },
+                { $gt: [{ $size: { $ifNull: ["$variants", []] } }, 0] },
+              ],
+            },
+            "$variantSum",
+            { $ifNull: ["$stock", 0] },
+          ],
+        },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalProducts: { $sum: 1 },
+        withStock: {
+          $sum: { $cond: [{ $gt: ["$totalStock", 0] }, 1, 0] },
+        },
+        lowStock: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $gt: ["$totalStock", 0] },
+                  { $lt: ["$totalStock", ADMIN_LOW_STOCK_THRESHOLD] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+      },
+    },
+  ]);
+
+  return {
+    totalProducts: row?.totalProducts ?? 0,
+    withStock: row?.withStock ?? 0,
+    lowStock: row?.lowStock ?? 0,
+    lowStockThreshold: ADMIN_LOW_STOCK_THRESHOLD,
+  };
+};
+
 // ================================================================
 // GET BY ID
 // ================================================================
@@ -622,6 +701,7 @@ const getHomeRecommendations = async ({ userId, limit = 8 } = {}) => {
 module.exports = {
   getAllProducts,
   getAllProductsAdmin,
+  getAdminInventorySummary,
   getProductById,
   getProductDetail,
   createProduct,
