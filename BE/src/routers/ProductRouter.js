@@ -36,6 +36,7 @@ router.post("/get-stock", PC.getStock);
 router.post("/relation", PC.relationProduct);
 router.post("/get-products", PC.getProducts);
 router.get("/admin/sale-report", adminGuard, PC.getSaleReport);
+router.get("/admin/inventory-summary", adminGuard, PC.getAdminInventorySummary);
 router.get("/admin/get-all", adminGuard, PC.getAllProducts);
 router.post("/:id/view", authMiddleware, PC.trackViewedProduct);
 router.get("/:id/recommendations", PC.getRecommendations);

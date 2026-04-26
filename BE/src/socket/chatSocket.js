@@ -148,11 +148,19 @@ const initChatSocket = (io) => {
 
       // Emit cập nhật inbox realtime tới tất cả admin
       if (senderRole) {
+        let customer = null;
+        try {
+          const u = await User.findById(cid).select("name email").lean();
+          if (u) customer = { name: u.name, email: u.email };
+        } catch {
+          /* ignore */
+        }
         io.to("admin:inbox").emit("chat:inbox:newMessage", {
           customerId: chatDoc.customerId,
           lastMessage: chatDoc.message,
           lastTimestamp: chatDoc.timestamp,
           senderRole: chatDoc.senderRole,
+          customer,
         });
       }
     });

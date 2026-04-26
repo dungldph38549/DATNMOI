@@ -5,6 +5,7 @@ import Swal from "sweetalert2";
 import ProductDetail from "./ProductDetail.jsx";
 import {
   getAllProducts,
+  getAdminInventorySummary,
   restoreProductById,
   getAllCategories,
 } from "./../api/index";
@@ -454,6 +455,12 @@ export default function Products() {
       getAllProducts({ page: page - 1, limit, isListProductRemoved, filter }),
     keepPreviousData: true,
   });
+  const { data: inventorySummary, isLoading: inventorySummaryLoading } =
+    useQuery({
+      queryKey: ["admin-products", "inventory-summary", isListProductRemoved],
+      queryFn: () => getAdminInventorySummary(isListProductRemoved),
+      enabled: !isListProductRemoved,
+    });
   // ── Handlers ───────────────────────────────────────────────
   const handleList = () => {
     setIsListProductRemoved((prev) => (prev === 1 ? 0 : 1));
@@ -629,6 +636,115 @@ export default function Products() {
             </button>
           </div>
         </div>
+
+        {/* ── Tổng quan tồn kho ─────────────────────────────── */}
+        {!isListProductRemoved && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: 14,
+              marginBottom: 16,
+            }}
+          >
+            {[
+              {
+                label: "Tổng số sản phẩm",
+                value: inventorySummary?.totalProducts,
+                hint: "SKU trong danh sách đang quản lý",
+                icon: "inventory",
+                accent: T.text,
+                bg: "#fff",
+              },
+              {
+                label: "Còn hàng",
+                value: inventorySummary?.withStock,
+                hint: "Có tồn kho > 0",
+                icon: "check_circle",
+                accent: T.green,
+                bg: T.greenBg,
+              },
+              {
+                label: "Sắp hết",
+                value: inventorySummary?.lowStock,
+                hint: `Tồn > 0 và < ${inventorySummary?.lowStockThreshold ?? 20}`,
+                icon: "warning",
+                accent: T.yellow,
+                bg: T.yellowBg,
+              },
+            ].map((card) => (
+              <div
+                key={card.label}
+                style={{
+                  background: T.card,
+                  borderRadius: 14,
+                  border: `1px solid ${T.border}`,
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                  padding: "16px 18px",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 12,
+                }}
+              >
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 12,
+                    background: card.bg,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <span
+                    className="material-symbols-outlined"
+                    style={{ fontSize: 24, color: card.accent }}
+                  >
+                    {card.icon}
+                  </span>
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: T.textMuted,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    {card.label}
+                  </p>
+                  <p
+                    style={{
+                      margin: "6px 0 0",
+                      fontSize: 26,
+                      fontWeight: 800,
+                      color: T.text,
+                      letterSpacing: "-0.5px",
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    {inventorySummaryLoading ? "…" : card.value ?? "—"}
+                  </p>
+                  <p
+                    style={{
+                      margin: "6px 0 0",
+                      fontSize: 12,
+                      color: T.textMuted,
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    {card.hint}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* ── Search + Filter bar ───────────────────────────── */}
         <div
