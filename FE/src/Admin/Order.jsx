@@ -44,6 +44,13 @@ const toUploadUrl = (value) => {
 
 const MIN_ADMIN_CANCEL_NOTE_LEN = 5;
 const FETCH_LIMIT = 50;
+const DATE_PRESETS = [
+  { key: "today", label: "Hôm nay" },
+  { key: "7d", label: "7 ngày qua" },
+  { key: "30d", label: "30 ngày qua" },
+  { key: "month", label: "Tháng này" },
+  { key: "all", label: "Tất cả" },
+];
 
 const TRANSITIONS = {
   pending: ["confirmed", "canceled"],
@@ -114,6 +121,47 @@ const StatusBadge = ({ status, label }) => {
   );
 };
 
+const toInputDate = (date) => {
+  const y = date.getFullYear();
+  const m = `${date.getMonth() + 1}`.padStart(2, "0");
+  const d = `${date.getDate()}`.padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+const startOfLocalDay = (dateStr) => {
+  const d = new Date(dateStr);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const endOfLocalDay = (dateStr) => {
+  const d = new Date(dateStr);
+  d.setHours(23, 59, 59, 999);
+  return d;
+};
+
+const resolvePresetRange = (preset) => {
+  const today = new Date();
+  const end = new Date(today);
+  end.setHours(0, 0, 0, 0);
+
+  if (preset === "today") {
+    const x = toInputDate(end);
+    return { startDate: x, endDate: x };
+  }
+  if (preset === "7d" || preset === "30d") {
+    const days = preset === "7d" ? 6 : 29;
+    const start = new Date(end);
+    start.setDate(start.getDate() - days);
+    return { startDate: toInputDate(start), endDate: toInputDate(end) };
+  }
+  if (preset === "month") {
+    const start = new Date(end.getFullYear(), end.getMonth(), 1);
+    return { startDate: toInputDate(start), endDate: toInputDate(end) };
+  }
+  return { startDate: "", endDate: "" };
+};
+
 export default function Order({ mode = "all" }) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
@@ -127,15 +175,22 @@ export default function Order({ mode = "all" }) {
   const [cancelReasonText, setCancelReasonText] = useState("");
   const [returnDetailOrder, setReturnDetailOrder] = useState(null);
   const [previewImage, setPreviewImage] = useState("");
+  const [datePreset, setDatePreset] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const hasDateFilter = !!(startDate || endDate);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-orders-all"],
+    queryKey: ["admin-orders-all", startDate, endDate],
     queryFn: async () => {
       let cursor = 0;
       let totalPage = 1;
       const all = [];
       do {
-        const res = await getAllOrders(cursor, FETCH_LIMIT);
+        const res = await getAllOrders(cursor, FETCH_LIMIT, {
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+        });
         const rows = Array.isArray(res?.data) ? res.data : [];
         all.push(...rows);
         totalPage = Number(res?.totalPage || 1);
@@ -213,13 +268,42 @@ export default function Order({ mode = "all" }) {
         mode !== "returns" ||
         returnReasonFilter === "all" ||
         reasonCode === returnReasonFilter;
+      const orderCreatedAt = o?.createdAt ? new Date(o.createdAt) : null;
+      const byDateStart =
+        !startDate ||
+        (orderCreatedAt instanceof Date &&
+          !Number.isNaN(orderCreatedAt.getTime()) &&
+          orderCreatedAt >= startOfLocalDay(startDate));
+      const byDateEnd =
+        !endDate ||
+        (orderCreatedAt instanceof Date &&
+          !Number.isNaN(orderCreatedAt.getTime()) &&
+          orderCreatedAt <= endOfLocalDay(endDate));
 
-      return byKeyword && byPaymentStatus && byStatus && byMethod && byReturnReason;
+      return (
+        byKeyword &&
+        byPaymentStatus &&
+        byStatus &&
+        byMethod &&
+        byReturnReason &&
+        byDateStart &&
+        byDateEnd
+      );
     });
-  }, [orders, keyword, paymentFilter, statusFilter, methodFilter, mode, returnReasonFilter]);
+  }, [
+    orders,
+    keyword,
+    paymentFilter,
+    statusFilter,
+    methodFilter,
+    mode,
+    returnReasonFilter,
+    startDate,
+    endDate,
+  ]);
   useEffect(() => {
     setPage(0);
-  }, [mode, keyword, paymentFilter, statusFilter, methodFilter, returnReasonFilter]);
+  }, [mode, keyword, paymentFilter, statusFilter, methodFilter, returnReasonFilter, startDate, endDate]);
   const allowedNext = (current) => TRANSITIONS[current] || [];
   const pagedOrders = useMemo(
     () => filteredOrders.slice(page * limit, (page + 1) * limit),
@@ -818,6 +902,44 @@ export default function Order({ mode = "all" }) {
         .admin-order-table .ant-table-tbody > tr:hover > td {
           background: #FFFBF5 !important;
         }
+        .admin-date-quick-btn {
+          border: 1px solid #E5E7EB;
+          border-radius: 12px;
+          height: 34px;
+          padding: 0 12px;
+          background: #fff;
+          color: #374151;
+          font-size: 13px;
+          font-family: "Lexend", "Plus Jakarta Sans", sans-serif;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .admin-date-quick-btn:hover {
+          border-color: #f49d25;
+          color: #f49d25;
+        }
+        .admin-date-quick-btn.active {
+          border-color: #f49d25;
+          background: #FFF7E8;
+          color: #b56600;
+          font-weight: 600;
+        }
+        .admin-date-input {
+          border: 1px solid #E5E7EB;
+          border-radius: 12px;
+          height: 34px;
+          padding: 0 10px;
+          font-size: 13px;
+          color: #111827;
+          font-family: "Lexend", "Plus Jakarta Sans", sans-serif;
+          outline: none;
+          background: #fff;
+        }
+        .admin-date-input:focus {
+          border-color: #f49d25;
+          box-shadow: 0 0 0 2px rgba(244, 157, 37, 0.12);
+        }
       `}</style>
       <h2 style={{ margin: "0 0 10px", fontSize: 20, fontWeight: 700, color: "#111827" }}>
         Quản lý đơn hàng
@@ -889,6 +1011,69 @@ export default function Order({ mode = "all" }) {
             onChange={setReturnReasonFilter}
           />
         )}
+        <div
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+            paddingTop: 4,
+            borderTop: "1px dashed #E5E7EB",
+            marginTop: 4,
+          }}
+        >
+          {DATE_PRESETS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              className={`admin-date-quick-btn ${datePreset === p.key ? "active" : ""}`}
+              onClick={() => {
+                setDatePreset(p.key);
+                const range = resolvePresetRange(p.key);
+                setStartDate(range.startDate);
+                setEndDate(range.endDate);
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+          <span style={{ color: "#9CA3AF", fontSize: 12 }}>|</span>
+          <input
+            type="date"
+            className="admin-date-input"
+            value={startDate}
+            onChange={(e) => {
+              setStartDate(e.target.value);
+              setDatePreset("");
+            }}
+          />
+          <span style={{ color: "#6B7280", fontSize: 12 }}>đến</span>
+          <input
+            type="date"
+            className="admin-date-input"
+            value={endDate}
+            onChange={(e) => {
+              setEndDate(e.target.value);
+              setDatePreset("");
+            }}
+          />
+          {hasDateFilter ? (
+            <button
+              type="button"
+              className="admin-date-quick-btn"
+              onClick={() => {
+                setDatePreset("all");
+                setStartDate("");
+                setEndDate("");
+              }}
+              style={{ width: 34, minWidth: 34, padding: 0, fontWeight: 700 }}
+              title="Reset thời gian"
+            >
+              X
+            </button>
+          ) : null}
+        </div>
         <Button
           size="small"
           onClick={() => {
@@ -897,6 +1082,9 @@ export default function Order({ mode = "all" }) {
             setMethodFilter("all");
             setPaymentFilter("all");
             setReturnReasonFilter("all");
+            setDatePreset("all");
+            setStartDate("");
+            setEndDate("");
           }}
         >
           Xóa lọc
