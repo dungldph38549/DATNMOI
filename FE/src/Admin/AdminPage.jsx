@@ -329,6 +329,8 @@ const AdminPage = () => {
     setExpandedGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
   };
 
+  const isChatView = selectedMenu === "chat";
+
   const renderContent = () => {
     switch (selectedMenu) {
       case "dashboard":
@@ -460,6 +462,10 @@ const AdminPage = () => {
           width: 100%;
           max-width: 100%;
           overflow-x: hidden;
+          min-height: 0;
+        }
+        .admin-nav-scroll {
+          overscroll-behavior: contain;
         }
         .admin-content {
           width: 100%;
@@ -494,7 +500,9 @@ const AdminPage = () => {
         className="admin-shell"
         style={{
           display: "flex",
-          minHeight: "100vh",
+          height: "100vh",
+          maxHeight: "100vh",
+          overflow: "hidden",
           background: T.bg,
           fontFamily: "'Plus Jakarta Sans', sans-serif",
           position: "relative",
@@ -694,8 +702,10 @@ const AdminPage = () => {
 
           {/* Nav */}
           <nav
+            className="admin-nav-scroll"
             style={{
               flex: 1,
+              minHeight: 0,
               padding: "12px 12px",
               overflowY: "auto",
               display: "flex",
@@ -866,7 +876,7 @@ const AdminPage = () => {
             flex: 1,
             display: "flex",
             flexDirection: "column",
-            minHeight: "100vh",
+            minHeight: 0,
             minWidth: 0,
             marginLeft: isMobile ? 0 : 0,
           }}
@@ -904,9 +914,31 @@ const AdminPage = () => {
           <main
             key={selectedMenu}
             className="sh-content-anim"
-            style={{ flex: 1, overflowY: "auto" }}
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: isChatView ? "hidden" : "auto",
+              overflowX: "hidden",
+              display: "flex",
+              flexDirection: "column",
+            }}
           >
-            <div className="admin-content">{renderContent()}</div>
+            <div
+              className="admin-content"
+              style={
+                isChatView
+                  ? {
+                      flex: 1,
+                      minHeight: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      overflow: "hidden",
+                    }
+                  : undefined
+              }
+            >
+              {renderContent()}
+            </div>
           </main>
         </div>
       </div>

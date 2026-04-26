@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { getOrderById } from "../../api";
+import ScSneakerLogo from "../../components/FooterComponent/ScSneakerLogo";
 
 const PaymentReturnPage = () => {
   const [searchParams] = useSearchParams();
@@ -36,7 +37,9 @@ const PaymentReturnPage = () => {
     <div className="max-w-lg mx-auto px-4 py-20 text-center">
       {success ? (
         <>
-          <div className="text-6xl mb-4">✅</div>
+          <div className="flex w-full justify-center mb-8">
+            <ScSneakerLogo variant="hero" />
+          </div>
           <h1 className="text-2xl font-bold text-green-700 mb-2">
             Thanh toán thành công
           </h1>

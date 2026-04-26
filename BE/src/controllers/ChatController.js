@@ -1,5 +1,8 @@
+const mongoose = require("mongoose");
 const Chat = require("../models/ChatModel");
 const User = require("../models/UserModel");
+
+const normId = (v) => (v == null || v === "" ? "" : String(v).trim());
 
 const getCustomerIdFromRoomID = (roomID) => {
   if (!roomID) return null;
@@ -43,6 +46,7 @@ const inbox = async (req, res) => {
       $project: {
         customerId: "$_id",
         _id: 0,
+        lastRoomID: "$last.roomID",
         lastMessage: "$last.message",
         lastTimestamp: "$last.timestamp",
         senderRole: "$last.senderRole",
@@ -52,25 +56,43 @@ const inbox = async (req, res) => {
     { $sort: { lastTimestamp: -1 } },
   ]);
 
-  const customerIds = items.map((i) => i.customerId).filter(Boolean);
-  const customers = customerIds.length
-    ? await User.find({ _id: { $in: customerIds } })
+  const resolvedIds = [
+    ...new Set(
+      items
+        .map((i) => normId(i.customerId) || getCustomerIdFromRoomID(i.lastRoomID))
+        .filter(Boolean),
+    ),
+  ];
+
+  const objectIds = resolvedIds
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+
+  const customers = objectIds.length
+    ? await User.find({ _id: { $in: objectIds } })
         .select("name email avatar")
         .lean()
     : [];
 
   const customerMap = customers.reduce((acc, u) => {
-    acc[String(u._id)] = u;
+    acc[normId(u._id)] = u;
     return acc;
   }, {});
 
-  const data = items.map((i) => ({
-    customerId: i.customerId,
-    customer: customerMap[i.customerId] || null,
-    lastMessage: i.lastMessage,
-    lastTimestamp: i.lastTimestamp,
-    senderRole: i.senderRole,
-  }));
+  const data = items
+    .map((i) => {
+      const customerId =
+        normId(i.customerId) || getCustomerIdFromRoomID(i.lastRoomID);
+      if (!customerId) return null;
+      return {
+        customerId,
+        customer: customerMap[customerId] || null,
+        lastMessage: i.lastMessage,
+        lastTimestamp: i.lastTimestamp,
+        senderRole: i.senderRole,
+      };
+    })
+    .filter(Boolean);
 
   return res.status(200).json({ data });
 };
