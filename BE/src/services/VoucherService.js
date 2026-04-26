@@ -95,7 +95,6 @@ const createVoucher = async (newVoucher) => {
       maxDiscountAmount,
       startDate,
       endDate,
-      usageLimit,
       status,
       applicableProductIds,
       ownerUserId,
@@ -117,10 +116,6 @@ const createVoucher = async (newVoucher) => {
       maxDiscountAmount !== undefined && maxDiscountAmount !== null
         ? Number(maxDiscountAmount)
         : 0;
-    const numericUsageLimit =
-      usageLimit !== undefined && usageLimit !== null
-        ? Number(usageLimit)
-        : 0;
 
     if (Number.isNaN(numericDiscountValue) || numericDiscountValue < 0) {
       return {
@@ -140,13 +135,6 @@ const createVoucher = async (newVoucher) => {
       return {
         status: "ERR",
         message: "maxDiscountAmount must be a non-negative number",
-      };
-    }
-
-    if (Number.isNaN(numericUsageLimit) || numericUsageLimit < 0) {
-      return {
-        status: "ERR",
-        message: "usageLimit must be a non-negative number",
       };
     }
 
@@ -180,7 +168,7 @@ const createVoucher = async (newVoucher) => {
       maxDiscountAmount: numericMaxDiscount,
       startDate,
       endDate,
-      usageLimit: numericUsageLimit,
+      usageLimit: 1,
       status: status || "active",
       applicableProductIds: normalizeApplicableProductIds(applicableProductIds),
       ownerUserId: normalizeOwnerUserId(ownerUserId),
@@ -314,9 +302,8 @@ const previewVoucherDiscount = async (body, actorUser = null) => {
       };
     }
 
-    const usageLimit = Number(voucherDoc.usageLimit ?? 0);
     const usedCount = Number(voucherDoc.usedCount ?? 0);
-    if (usageLimit !== 0 && usedCount >= usageLimit) {
+    if (usedCount >= 1) {
       return { status: "ERR", message: "Voucher đã hết lượt sử dụng" };
     }
 
@@ -335,6 +322,7 @@ const previewVoucherDiscount = async (body, actorUser = null) => {
         productId: item.productId,
         sku: item.sku || null,
         quantity: item.quantity,
+        unitPrice: item.price,
         lineTotal: item.price * item.quantity,
       }));
 
@@ -391,7 +379,8 @@ const previewVoucherDiscount = async (body, actorUser = null) => {
         };
       }
 
-      discountBaseAmount = Number(selectedTarget.lineTotal || 0);
+      // Voucher cá nhân chỉ giảm cho 1 đơn vị sản phẩm được chọn.
+      discountBaseAmount = Number(selectedTarget.unitPrice || 0);
     }
 
     const discountAmount = computeFinalVoucherDiscountAmount(voucherDoc, discountBaseAmount);
@@ -531,16 +520,7 @@ const updateVoucher = async (voucherId, updateData) => {
       payload.maxDiscountAmount = num;
     }
 
-    if (updateData.usageLimit !== undefined) {
-      const num = Number(updateData.usageLimit);
-      if (Number.isNaN(num) || num < 0) {
-        return {
-          status: "ERR",
-          message: "usageLimit must be a non-negative number",
-        };
-      }
-      payload.usageLimit = num;
-    }
+    payload.usageLimit = 1;
 
     if (payload.code) {
       const duplicate = await Voucher.findOne({

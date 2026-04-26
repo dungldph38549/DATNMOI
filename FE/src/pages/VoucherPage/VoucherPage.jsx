@@ -25,6 +25,7 @@ const VoucherPage = () => {
   const [loading, setLoading] = useState(false);
   const [vouchers, setVouchers] = useState([]);
   const [collectedCodes, setCollectedCodes] = useState([]);
+  const [expiredCodes, setExpiredCodes] = useState([]);
 
   const storageKey = useMemo(() => {
     const identity = user?._id || user?.id || user?.email || "guest";
@@ -34,19 +35,48 @@ const VoucherPage = () => {
   const loadCollectedCodes = () => {
     try {
       const raw = JSON.parse(localStorage.getItem(storageKey) || "[]");
-      if (!Array.isArray(raw)) return [];
-      return raw.map((v) => String(v || "").trim().toUpperCase()).filter(Boolean);
+      if (Array.isArray(raw)) {
+        return {
+          active: raw.map((v) => String(v || "").trim().toUpperCase()).filter(Boolean),
+          expired: [],
+        };
+      }
+      if (raw && typeof raw === "object") {
+        const active = Array.isArray(raw.active)
+          ? raw.active.map((v) => String(v || "").trim().toUpperCase()).filter(Boolean)
+          : [];
+        const expired = Array.isArray(raw.expired)
+          ? raw.expired.map((v) => String(v || "").trim().toUpperCase()).filter(Boolean)
+          : [];
+        return { active, expired };
+      }
+      return { active: [], expired: [] };
     } catch {
-      return [];
+      return { active: [], expired: [] };
     }
+  };
+
+  const saveCollectedCodes = (active, expired) => {
+    const nextActive = [...new Set((active || []).map((v) => String(v || "").trim().toUpperCase()).filter(Boolean))];
+    const nextExpired = [...new Set((expired || []).map((v) => String(v || "").trim().toUpperCase()).filter(Boolean))];
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        active: nextActive,
+        expired: nextExpired,
+      }),
+    );
   };
 
   useEffect(() => {
     if (!isLoggedIn) {
       setCollectedCodes([]);
+      setExpiredCodes([]);
       return;
     }
-    setCollectedCodes(loadCollectedCodes());
+    const data = loadCollectedCodes();
+    setCollectedCodes(data.active);
+    setExpiredCodes(data.expired);
   }, [storageKey, isLoggedIn]);
 
   useEffect(() => {
@@ -72,7 +102,11 @@ const VoucherPage = () => {
 
   const activeVouchers = useMemo(() => {
     const now = new Date();
+    const collectedSet = new Set(collectedCodes.map((code) => String(code).trim().toUpperCase()));
+    const expiredSet = new Set(expiredCodes.map((code) => String(code).trim().toUpperCase()));
     return vouchers.filter((v) => {
+      const code = String(v?.code || "").trim().toUpperCase();
+      if (code && (collectedSet.has(code) || expiredSet.has(code))) return false;
       const start = v?.startDate ? new Date(v.startDate) : null;
       const end = v?.endDate ? new Date(v.endDate) : null;
       const statusOk = v?.status === "active";
@@ -82,7 +116,7 @@ const VoucherPage = () => {
       const usageOk = usageLimit === 0 || usedCount < usageLimit;
       return statusOk && timeOk && usageOk;
     });
-  }, [vouchers]);
+  }, [vouchers, collectedCodes, expiredCodes]);
 
   const sortedActive = useMemo(() => {
     const score = (v) => {
@@ -94,11 +128,39 @@ const VoucherPage = () => {
 
   const featured = sortedActive[0];
   const gridVouchers = sortedActive.slice(1);
+  const voucherByCode = useMemo(() => {
+    const map = new Map();
+    vouchers.forEach((voucher) => {
+      const code = String(voucher?.code || "").trim().toUpperCase();
+      if (code) map.set(code, voucher);
+    });
+    return map;
+  }, [vouchers]);
+  const savedVouchers = useMemo(
+    () =>
+      collectedCodes
+        .map((code) => voucherByCode.get(String(code).trim().toUpperCase()))
+        .filter((voucher) => {
+          if (!voucher) return false;
+          const now = new Date();
+          const start = voucher?.startDate ? new Date(voucher.startDate) : null;
+          const end = voucher?.endDate ? new Date(voucher.endDate) : null;
+          const statusOk = voucher?.status === "active";
+          const timeOk = (!start || now >= start) && (!end || now <= end);
+          const usedCount = Number(voucher?.usedCount ?? 0);
+          return statusOk && timeOk && usedCount < 1;
+        }),
+    [collectedCodes, voucherByCode],
+  );
 
   const upcomingVouchers = useMemo(() => {
     const now = new Date();
+    const collectedSet = new Set(collectedCodes.map((code) => String(code).trim().toUpperCase()));
+    const expiredSet = new Set(expiredCodes.map((code) => String(code).trim().toUpperCase()));
     return vouchers
       .filter((v) => {
+        const code = String(v?.code || "").trim().toUpperCase();
+        if (code && (collectedSet.has(code) || expiredSet.has(code))) return false;
         const start = v?.startDate ? new Date(v.startDate) : null;
         const statusOk = v?.status === "active";
         const usageLimit = Number(v?.usageLimit ?? 0);
@@ -107,7 +169,7 @@ const VoucherPage = () => {
         return statusOk && usageOk && start && now < start;
       })
       .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-  }, [vouchers]);
+  }, [vouchers, collectedCodes, expiredCodes]);
 
   const formatVoucherFromDate = (d) => {
     if (!d) return "";
@@ -162,9 +224,13 @@ const VoucherPage = () => {
     }
     const normalizedCode = String(code || "").trim().toUpperCase();
     if (!normalizedCode) return;
+    if (expiredCodes.includes(normalizedCode)) {
+      notify.warning("Voucher này đã sử dụng/hết hiệu lực.");
+      return;
+    }
     const next = Array.from(new Set([...collectedCodes, normalizedCode]));
     setCollectedCodes(next);
-    localStorage.setItem(storageKey, JSON.stringify(next));
+    saveCollectedCodes(next, expiredCodes);
     notify.success("Đã lưu phiếu giảm giá vào tài khoản.");
   };
 
@@ -192,6 +258,7 @@ const VoucherPage = () => {
   const VoucherMiniCard = ({ voucher, dark, upcoming }) => {
     const code = String(voucher?.code || "").trim().toUpperCase();
     const isCollected = collectedCodes.includes(code);
+    const isExpired = expiredCodes.includes(code);
     const Icon = ICONsFromCode(code);
     const tag = upcoming
       ? "Sắp diễn ra"
@@ -262,15 +329,18 @@ const VoucherPage = () => {
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={isCollected}
+            disabled={isCollected || isExpired}
             onClick={() => collectVoucher(code)}
             className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wide transition ${
+              isExpired
+                ? "bg-red-100 text-red-700 hover:bg-red-100 cursor-not-allowed"
+                :
               dark
                 ? "bg-white/20 text-white hover:bg-white/30 disabled:opacity-50"
                 : "bg-neutral-900 text-white hover:bg-neutral-800 disabled:opacity-50"
             }`}
           >
-            {isCollected ? "Đã lưu" : "Lưu voucher"}
+            {isExpired ? "Đã sử dụng" : isCollected ? "Đã lưu" : "Lưu voucher"}
           </button>
           {upcoming ? (
             <span
@@ -365,25 +435,6 @@ const VoucherPage = () => {
           </div>
         )}
 
-        {!loading && upcomingVouchers.length > 0 && (
-          <section className="mb-16">
-            <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <h2 className="font-display text-2xl font-bold text-neutral-900">Voucher sắp diễn ra</h2>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
-                {upcomingVouchers.length} mã sắp mở
-              </p>
-            </div>
-            <p className="mb-8 max-w-2xl text-sm text-neutral-600">
-              Các mã dưới đây chưa đến thời điểm áp dụng — bạn vẫn có thể sao chép hoặc lưu để dùng sau.
-            </p>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {upcomingVouchers.map((voucher, idx) => (
-                <VoucherMiniCard key={voucher._id || voucher.code} voucher={voucher} dark={idx === 1} upcoming />
-              ))}
-            </div>
-          </section>
-        )}
-
         {/* Available grid */}
         {!loading && (activeVouchers.length > 0 || featured) && (
           <section className="mb-16">
@@ -411,6 +462,45 @@ const VoucherPage = () => {
                   Theo dõi trang này để không bỏ lỡ mã mới.
                 </p>
               </div>
+            </div>
+          </section>
+        )}
+
+        {!loading && isLoggedIn && savedVouchers.length > 0 && (
+          <section className="mb-16">
+            <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <h2 className="font-display text-2xl font-bold text-neutral-900">Voucher đã lưu</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
+                {savedVouchers.length} mã đã lưu
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {savedVouchers.map((voucher, idx) => (
+                <VoucherMiniCard
+                  key={voucher._id || voucher.code}
+                  voucher={voucher}
+                  dark={idx % 3 === 1}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!loading && upcomingVouchers.length > 0 && (
+          <section className="mb-16">
+            <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <h2 className="font-display text-2xl font-bold text-neutral-900">Voucher sắp diễn ra</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
+                {upcomingVouchers.length} mã sắp mở
+              </p>
+            </div>
+            <p className="mb-8 max-w-2xl text-sm text-neutral-600">
+              Các mã dưới đây chưa đến thời điểm áp dụng — bạn vẫn có thể sao chép hoặc lưu để dùng sau.
+            </p>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {upcomingVouchers.map((voucher, idx) => (
+                <VoucherMiniCard key={voucher._id || voucher.code} voucher={voucher} dark={idx === 1} upcoming />
+              ))}
             </div>
           </section>
         )}

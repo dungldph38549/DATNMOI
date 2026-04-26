@@ -372,9 +372,8 @@ exports.createOrder = async (req, res) => {
         });
       }
 
-      const usageLimit = Number(voucherDoc.usageLimit ?? 0); // 0 = unlimited
       const usedCount = Number(voucherDoc.usedCount ?? 0);
-      if (usageLimit !== 0 && usedCount >= usageLimit) {
+      if (usedCount >= 1) {
         await session.abortTransaction();
         session.endSession();
         return res.status(422).json({ message: "Voucher đã hết lượt sử dụng" });
@@ -466,11 +465,13 @@ exports.createOrder = async (req, res) => {
         eligibleItems = [matched];
       }
 
-      const voucherDiscountBase = eligibleItems.reduce(
-        (sum, item) =>
-          sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
-        0,
-      );
+      const voucherDiscountBase = voucherDoc.ownerUserId
+        ? Number(eligibleItems[0]?.price || 0)
+        : eligibleItems.reduce(
+            (sum, item) =>
+              sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
+            0,
+          );
       discountAmount = computeFinalVoucherDiscountAmount(
         voucherDoc,
         voucherDiscountBase,
@@ -560,11 +561,16 @@ exports.createOrder = async (req, res) => {
     }
 
     if (voucherDoc) {
-      await Voucher.findOneAndUpdate(
-        { _id: voucherDoc._id },
+      const lockVoucher = await Voucher.findOneAndUpdate(
+        { _id: voucherDoc._id, usedCount: { $lt: 1 } },
         { $inc: { usedCount: 1 } },
-        { session },
+        { session, new: true },
       );
+      if (!lockVoucher) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(422).json({ message: "Voucher đã hết lượt sử dụng" });
+      }
     }
 
     await OrderStatusHistory.create(

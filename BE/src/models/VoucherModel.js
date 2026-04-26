@@ -53,8 +53,8 @@ const voucherSchema = new mongoose.Schema(
 
     usageLimit: {
       type: Number,
-      default: 0, // 0 = unlimited
-      min: 0,
+      default: 1, // toàn hệ thống: mỗi mã chỉ dùng 1 lần
+      min: 1,
     },
 
     usedCount: {

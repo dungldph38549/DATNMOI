@@ -319,7 +319,14 @@ const CheckOut = () => {
 
   const isExpiredVoucherError = (message) => {
     const msg = String(message || "").toLowerCase();
-    return msg.includes("hết hạn") || msg.includes("het han") || msg.includes("expired");
+    return (
+      msg.includes("hết hạn") ||
+      msg.includes("het han") ||
+      msg.includes("expired") ||
+      msg.includes("hết lượt sử dụng") ||
+      msg.includes("het luot su dung") ||
+      msg.includes("da het luot su dung")
+    );
   };
 
   const markVoucherAsExpired = (code) => {
@@ -549,6 +556,13 @@ const CheckOut = () => {
           if (!code) return;
           next[code] = v;
         });
+        const usedCodes = list
+          .filter((v) => Number(v?.usedCount ?? 0) >= 1)
+          .map((v) => String(v?.code || "").trim().toUpperCase())
+          .filter(Boolean);
+        if (usedCodes.length > 0) {
+          markVouchersAsExpired(usedCodes);
+        }
         setVoucherMetaByCode(next);
       } catch {
         if (!cancelled) setVoucherMetaByCode({});
@@ -782,6 +796,9 @@ const CheckOut = () => {
         }
         if (payUrl) {
           hasPlacedOrderRef.current = true;
+          if (appliedVoucher?.code) {
+            markVoucherAsExpired(appliedVoucher.code);
+          }
           persistCheckoutInfo(); await updateProfileIfLoggedIn();
           dispatch(removeManyFromCart(checkoutItems.map((i) => i.cartKey || i.productId)));
           window.location.href = payUrl; return;
@@ -797,6 +814,9 @@ const CheckOut = () => {
       }
 
       hasPlacedOrderRef.current = true;
+      if (appliedVoucher?.code) {
+        markVoucherAsExpired(appliedVoucher.code);
+      }
       dispatch(removeManyFromCart(checkoutItems.map((i) => i.cartKey || i.productId)));
       persistCheckoutInfo();
       await updateProfileIfLoggedIn();
@@ -1347,7 +1367,10 @@ const CheckOut = () => {
                 {collectedVoucherCodes.length === 0 ? (
                   <p className="text-sm text-slate-500">Chưa có voucher khả dụng.</p>
                 ) : (
-                  collectedVoucherCodes.map((code) => {
+                  collectedVoucherCodes
+                    .filter((code) => !expiredVoucherCodes.includes(code))
+                    .filter((code) => Number(voucherMetaByCode[code]?.usedCount ?? 0) < 1)
+                    .map((code) => {
                     const selected = String(draftVoucherCode || "").trim().toUpperCase() === code;
                     const info = voucherAvailability[code];
                     const meta = voucherMetaByCode[code];
