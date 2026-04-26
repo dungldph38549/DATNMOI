@@ -637,8 +637,32 @@ exports.getAllOrders = async (req, res) => {
     if (isNaN(page) || isNaN(limit))
       return res.status(422).json({ message: "Trang không hợp lệ" });
 
-    const total = await Order.countDocuments();
-    const orders = await Order.find()
+    const startDateRaw = String(req.query.startDate || "").trim();
+    const endDateRaw = String(req.query.endDate || "").trim();
+    const filter = {};
+    if (startDateRaw || endDateRaw) {
+      const createdAt = {};
+      if (startDateRaw) {
+        const start = new Date(startDateRaw);
+        if (Number.isNaN(start.getTime())) {
+          return res.status(422).json({ message: "startDate không hợp lệ" });
+        }
+        start.setHours(0, 0, 0, 0);
+        createdAt.$gte = start;
+      }
+      if (endDateRaw) {
+        const end = new Date(endDateRaw);
+        if (Number.isNaN(end.getTime())) {
+          return res.status(422).json({ message: "endDate không hợp lệ" });
+        }
+        end.setHours(23, 59, 59, 999);
+        createdAt.$lte = end;
+      }
+      filter.createdAt = createdAt;
+    }
+
+    const total = await Order.countDocuments(filter);
+    const orders = await Order.find(filter)
       .populate("userId")
       .populate("products.productId")
       .limit(limit)

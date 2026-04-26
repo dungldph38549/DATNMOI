@@ -551,9 +551,14 @@ export const rejectReturn = async (id, note) => {
   return res.data;
 };
 
-// Admin: lấy tất cả đơn hàng
-export const getAllOrders = async (page = 0, limit = 10) => {
-  const res = await axiosInstance.get(`/order?page=${page}&limit=${limit}`);
+// Admin: lấy tất cả đơn hàng (hỗ trợ lọc ngày nếu backend có)
+export const getAllOrders = async (page = 0, limit = 10, options = {}) => {
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  params.set("limit", String(limit));
+  if (options?.startDate) params.set("startDate", String(options.startDate));
+  if (options?.endDate) params.set("endDate", String(options.endDate));
+  const res = await axiosInstance.get(`/order?${params.toString()}`);
   return res.data;
 };
 
