@@ -99,14 +99,18 @@ async function debitWalletForUserOrder(userId, orderId, amount, session) {
 }
 
 /**
- * Hoàn ví khi hủy đơn đã thanh toán bằng ví (chưa hoàn hủy trước đó).
+ * Hoàn ví khi hủy đơn đã thanh toán (ví hoặc VNPay), tài khoản có userId.
+ * Khách guest (không userId): không cộng ví — shop xử lý thủ công nếu cần.
  * @returns {Promise<Object>} Patch cho Order
  */
 async function buildWalletCancelRefundPatch(order, session) {
   if (!order?.userId) return {};
-  if (order.paymentMethod !== "wallet") return {};
   if (order.paymentStatus !== "paid") return {};
   if (order.walletCancelRefundTransactionId) return {};
+
+  const paidByWallet = order.paymentMethod === "wallet";
+  const paidByVnpay = order.paymentMethod === "vnpay";
+  if (!paidByWallet && !paidByVnpay) return {};
 
   const existing = await WalletTransaction.findOne({
     orderId: order._id,
@@ -128,6 +132,10 @@ async function buildWalletCancelRefundPatch(order, session) {
 
   const balanceAfter = Math.max(0, Number(updatedUser.walletBalance) || 0);
 
+  const note = paidByVnpay
+    ? "Hoàn ví do hủy đơn (đã thanh toán VNPay)"
+    : "Hoàn ví do hủy đơn (thanh toán ví)";
+
   const [tx] = await WalletTransaction.create(
     [
       {
@@ -136,7 +144,7 @@ async function buildWalletCancelRefundPatch(order, session) {
         type: "order_cancel_refund",
         amount,
         balanceAfter,
-        note: "Hoàn ví do hủy đơn",
+        note,
       },
     ],
     { session },

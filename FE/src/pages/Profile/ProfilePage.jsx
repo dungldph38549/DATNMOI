@@ -610,7 +610,7 @@ const ProfilePage = () => {
                                 <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 md:p-10">
                                     <div className="mb-8">
                                         <h3 className="text-2xl font-display font-black text-slate-900 mb-2">Lịch sử giao dịch</h3>
-                                        <p className="text-slate-400 text-sm">Theo dõi các hoạt động nạp tiền và thanh toán gần đây.</p>
+                                        <p className="text-slate-400 text-sm">Nạp tiền, thanh toán đơn và hoàn tiền (ví / hủy đơn VNPay) hiển thị tại đây.</p>
                                     </div>
                                     <div className="space-y-1">
                                         {walletLoading && walletTx.length === 0 ? (
@@ -628,6 +628,8 @@ const ProfilePage = () => {
                                                           ? `Thanh toán đơn bằng ví${shortId ? ` · #${shortId}` : ""}`
                                                           : tx.type === "order_cancel_refund"
                                                             ? `Hoàn ví (hủy đơn)${shortId ? ` · #${shortId}` : ""}`
+                                                            : tx.type === "order_line_cancel_refund"
+                                                              ? `Hoàn ví (hủy / điều chỉnh dòng đơn)${shortId ? ` · #${shortId}` : ""}`
                                                             : tx.type === "topup_vnpay"
                                                               ? "Nạp tiền VNPay"
                                                               : tx.type === "topup_bank"
@@ -640,6 +642,7 @@ const ProfilePage = () => {
                                                 const credit =
                                                     tx.type === "return_refund" ||
                                                     tx.type === "order_cancel_refund" ||
+                                                    tx.type === "order_line_cancel_refund" ||
                                                     tx.type === "topup_vnpay" ||
                                                     tx.type === "topup_bank";
                                                 return (

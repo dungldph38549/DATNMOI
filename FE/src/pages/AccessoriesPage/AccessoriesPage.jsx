@@ -621,15 +621,6 @@ const AccessoriesPage = () => {
         }
       `}</style>
       <section className="container mx-auto max-w-7xl px-4">
-        <div className="mb-3 border-b border-neutral-200 pb-2">
-          <h1 className="font-display text-3xl font-bold leading-[1.15] tracking-tight text-black md:text-5xl lg:text-[2.75rem]">
-            PHỤ KIỆN
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm md:text-sm text-neutral-600">
-            Hoàn thiện phong cách của bạn với tất cả mọi thứ ngoài đôi giày — từ vớ, mũ đến dụng cụ chăm sóc.
-          </p>
-        </div>
-
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
           <aside className="w-full lg:w-[248px] lg:shrink-0 space-y-6">
             <div>

@@ -1235,14 +1235,6 @@ async function cancelOrderLineCore({
       throw e;
     }
 
-    if (order.paymentMethod === "vnpay" && order.paymentStatus === "paid") {
-      const e = new Error(
-        "Đơn đã thanh toán VNPay — không hủy từng dòng trên hệ thống. Liên hệ shop.",
-      );
-      e.statusCode = 400;
-      throw e;
-    }
-
     const oldSub = sumActiveSubtotal(order.products);
     const oldTotal = Math.round(Number(order.totalAmount) || 0);
 
@@ -1295,7 +1287,7 @@ async function cancelOrderLineCore({
     const newTotal = Math.round(Number(order.totalAmount) || 0);
 
     if (
-      order.paymentMethod === "wallet" &&
+      (order.paymentMethod === "wallet" || order.paymentMethod === "vnpay") &&
       order.paymentStatus === "paid" &&
       order.userId
     ) {

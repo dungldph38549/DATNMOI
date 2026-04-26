@@ -138,7 +138,6 @@ const ProductPage = () => {
   const [voucherScope, setVoucherScope] = useState(null);
   const [sidebarCategories, setSidebarCategories] = useState([]);
   const [page, setPage] = useState(1);
-  const [categoryLabel, setCategoryLabel] = useState("TẤT CẢ SẢN PHẨM");
 
   const [sort, setSort] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -186,19 +185,14 @@ const ProductPage = () => {
           });
           if (match?._id) {
             payload.categoryId = match._id;
-            setCategoryLabel((match.name || "Sản phẩm").toUpperCase());
           } else {
             setProducts([]);
-            setCategoryLabel("TẤT CẢ SẢN PHẨM");
           }
-        } else {
-          setCategoryLabel("TẤT CẢ SẢN PHẨM");
         }
 
         let forSidebar = Array.isArray(categories) ? [...categories] : [];
         if (segment === "products") {
           forSidebar = forSidebar.filter((c) => !isAccessoryCategory(c));
-          if (!categorySlug) setCategoryLabel("TẤT CẢ SẢN PHẨM");
         }
         setSidebarCategories(
           forSidebar.sort((a, b) =>
@@ -378,17 +372,18 @@ const ProductPage = () => {
 
     return data;
   }, [
-    products,
-    voucherScope,
-    categoryFilter,
-    selectedSize,
-    selectedColor,
-    rating,
-    minPriceFilter,
-    maxPriceFilter,
-    sort,
-    productRatingMap,
-  ]);
+  products,
+  voucherScope,
+  categoryFilter,
+  selectedSize,
+  selectedColor,
+  rating,
+  minPriceFilter,
+  maxPriceFilter,
+  maxAvailablePrice,
+  sort,
+  productRatingMap,
+]);
 
   useEffect(() => {
     setPage(1);
@@ -496,15 +491,6 @@ const ProductPage = () => {
         }
       `}</style>
       <section className="container mx-auto max-w-7xl px-4">
-        <div className="mb-3 border-b border-neutral-200 pb-2">
-          <h1 className="font-display text-3xl font-bold leading-[1.15] tracking-tight text-black md:text-5xl lg:text-[2.75rem]">
-            {categoryLabel}
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm md:text-sm text-neutral-600">
-            Khám phá bộ sưu tập giày cao cấp được tuyển chọn kỹ lưỡng, nơi phong cách đường dài gặp gỡ sự thoải mái tuyệt đối.
-          </p>
-        </div>
-
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
           <aside className="w-full lg:w-[248px] lg:shrink-0 space-y-6">
             {!categorySlug && sidebarCategories.length > 0 && (
