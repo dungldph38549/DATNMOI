@@ -173,26 +173,42 @@ export default function AdminOrderDetail() {
       <Modal
         title="Lý do hủy đơn (bắt buộc)"
         open={cancelModalOpen}
-        okText="Xác nhận hủy"
-        cancelText="Đóng"
         destroyOnClose
-        confirmLoading={saving}
         onCancel={() => {
           setCancelModalOpen(false);
           setCancelNote("");
         }}
-        onOk={async () => {
-          const t = cancelNote.trim();
-          if (t.length < MIN_ADMIN_CANCEL_NOTE_LEN) {
-            notify.error(
-              `Vui lòng nhập lý do hủy (ít nhất ${MIN_ADMIN_CANCEL_NOTE_LEN} ký tự).`,
-            );
-            return Promise.reject(new Error("invalid-note"));
-          }
-          setCancelModalOpen(false);
-          setCancelNote("");
-          await applyStatusChange("canceled", t);
-        }}
+        footer={
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <Button
+              onClick={() => {
+                setCancelModalOpen(false);
+                setCancelNote("");
+              }}
+            >
+              Đóng
+            </Button>
+            <Button
+              type="primary"
+              danger
+              loading={saving}
+              onClick={() => {
+                const t = cancelNote.trim();
+                if (t.length < MIN_ADMIN_CANCEL_NOTE_LEN) {
+                  notify.error(
+                    `Vui lòng nhập lý do hủy (ít nhất ${MIN_ADMIN_CANCEL_NOTE_LEN} ký tự).`,
+                  );
+                  return;
+                }
+                setCancelModalOpen(false);
+                setCancelNote("");
+                void applyStatusChange("canceled", t);
+              }}
+            >
+              Xác nhận hủy
+            </Button>
+          </div>
+        }
       >
         <p style={{ marginBottom: 8, color: "#555", fontSize: 13 }}>
           Lý do sẽ được lưu trong lịch sử trạng thái đơn hàng.

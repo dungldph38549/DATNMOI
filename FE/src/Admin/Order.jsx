@@ -814,39 +814,59 @@ export default function Order({ mode = "all" }) {
       <Modal
         title="Lý do hủy đơn (bắt buộc)"
         open={!!cancelReasonFlow}
-        okText="Xác nhận hủy"
-        cancelText="Đóng"
         destroyOnClose
         onCancel={() => {
           setCancelReasonFlow(null);
           setCancelReasonText("");
         }}
-        onOk={() => {
-          const t = cancelReasonText.trim();
-          if (t.length < MIN_ADMIN_CANCEL_NOTE_LEN) {
-            notify.error(
-              `Vui lòng nhập lý do hủy (ít nhất ${MIN_ADMIN_CANCEL_NOTE_LEN} ký tự).`,
-            );
-            return Promise.reject(new Error("invalid-note"));
-          }
-          const flow = cancelReasonFlow;
-          if (!flow?.id) return Promise.reject(new Error("no-flow"));
-          updateMutation.mutate({
-            id: flow.id,
-            fromStatus: flow.fromStatus,
-            body: {
-              status: "canceled",
-              note: t,
-              lookup: {
-                createdAt: flow.order?.createdAt || null,
-                totalAmount: flow.order?.totalAmount ?? null,
-                fullName: flow.order?.fullName || flow.order?.userId?.name || "",
-              },
-            },
-          });
-          setCancelReasonFlow(null);
-          setCancelReasonText("");
-        }}
+        footer={
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <Button
+              onClick={() => {
+                setCancelReasonFlow(null);
+                setCancelReasonText("");
+              }}
+            >
+              Đóng
+            </Button>
+            <Button
+              type="primary"
+              danger
+              onClick={() => {
+                const t = cancelReasonText.trim();
+                if (t.length < MIN_ADMIN_CANCEL_NOTE_LEN) {
+                  notify.error(
+                    `Vui lòng nhập lý do hủy (ít nhất ${MIN_ADMIN_CANCEL_NOTE_LEN} ký tự).`,
+                  );
+                  return;
+                }
+                const flow = cancelReasonFlow;
+                if (!flow?.id) {
+                  notify.error("Không xác định được đơn hàng.");
+                  return;
+                }
+                updateMutation.mutate({
+                  id: flow.id,
+                  fromStatus: flow.fromStatus,
+                  body: {
+                    status: "canceled",
+                    note: t,
+                    lookup: {
+                      createdAt: flow.order?.createdAt || null,
+                      totalAmount: flow.order?.totalAmount ?? null,
+                      fullName:
+                        flow.order?.fullName || flow.order?.userId?.name || "",
+                    },
+                  },
+                });
+                setCancelReasonFlow(null);
+                setCancelReasonText("");
+              }}
+            >
+              Xác nhận hủy
+            </Button>
+          </div>
+        }
       >
         <p style={{ marginBottom: 8, color: "#4B5563", fontSize: 13 }}>
           Nhập lý do hủy (bắt buộc). Lý do được lưu trong lịch sử đơn. Khi xác nhận,
