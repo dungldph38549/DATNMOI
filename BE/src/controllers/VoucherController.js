@@ -37,7 +37,7 @@ const createVoucher = async (req, res) => {
 
 const getAllVouchers = async (req, res) => {
   try {
-    const response = await VoucherService.getAllVouchers();
+    const response = await VoucherService.getAllVouchers(req.user || null);
     if (response.data) {
       response.data = sanitizeVoucherPayload(response.data, req.user);
     }
@@ -53,7 +53,7 @@ const getAllVouchers = async (req, res) => {
 const getVoucherDetail = async (req, res) => {
   try {
     const { id } = req.params;
-    const response = await VoucherService.getVoucherDetail(id);
+    const response = await VoucherService.getVoucherDetail(id, req.user || null);
 
     if (response.status === "ERR") {
       const status = response.message === "Voucher not found" ? 404 : 400;
@@ -75,7 +75,7 @@ const getVoucherDetail = async (req, res) => {
 const getVoucherByCode = async (req, res) => {
   try {
     const { code } = req.params;
-    const response = await VoucherService.getVoucherByCode(code);
+    const response = await VoucherService.getVoucherByCode(code, req.user || null);
 
     if (response.status === "ERR") {
       const status = response.message === "Voucher not found" ? 404 : 400;
@@ -96,7 +96,10 @@ const getVoucherByCode = async (req, res) => {
 
 const previewVoucherDiscount = async (req, res) => {
   try {
-    const response = await VoucherService.previewVoucherDiscount(req.body);
+    const response = await VoucherService.previewVoucherDiscount(
+      req.body,
+      req.user || null,
+    );
     if (response.status === "ERR") {
       return res.status(400).json(response);
     }

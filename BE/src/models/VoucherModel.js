@@ -75,6 +75,13 @@ const voucherSchema = new mongoose.Schema(
         ref: "Product",
       },
     ],
+    // null = voucher chung toàn hệ thống, có giá trị = voucher cá nhân của user đó
+    ownerUserId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
+    },
   },
   {
     timestamps: true,

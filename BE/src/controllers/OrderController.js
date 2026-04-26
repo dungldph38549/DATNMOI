@@ -142,6 +142,7 @@ exports.createOrder = async (req, res) => {
       email,
       products,
       voucherCode,
+      voucherTarget,
       vnpReturnUrl,
       vnpCancelUrl,
     } = req.body;
@@ -320,6 +321,17 @@ exports.createOrder = async (req, res) => {
         return res.status(422).json({ message: "Voucher không tồn tại" });
       }
 
+      if (voucherDoc.ownerUserId) {
+        const ownerId = String(voucherDoc.ownerUserId);
+        if (!userId || String(userId) !== ownerId) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(422).json({
+            message: "Voucher này không áp dụng cho tài khoản hiện tại",
+          });
+        }
+      }
+
       if (voucherDoc.status !== "active") {
         await session.abortTransaction();
         session.endSession();
@@ -403,7 +415,7 @@ exports.createOrder = async (req, res) => {
         ? voucherDoc.applicableProductIds.map((id) => String(id))
         : [];
       const hasProductScope = applicableIds.length > 0;
-      const eligibleItems = hasProductScope
+      let eligibleItems = hasProductScope
         ? mappedProducts.filter((item) =>
             applicableIds.includes(String(item.productId)),
           )
@@ -421,9 +433,47 @@ exports.createOrder = async (req, res) => {
         });
       }
 
+      if (voucherDoc.ownerUserId) {
+        const targetProductId = String(voucherTarget?.productId || "").trim();
+        const targetSku = String(voucherTarget?.sku || "")
+          .trim()
+          .toUpperCase();
+
+        if (!targetProductId) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(422).json({
+            message: "Voucher cá nhân yêu cầu chọn sản phẩm áp dụng giảm giá",
+          });
+        }
+
+        const matched = eligibleItems.find((item) => {
+          if (String(item.productId) !== targetProductId) return false;
+          if (!targetSku) return true;
+          return String(item.sku || "")
+            .trim()
+            .toUpperCase() === targetSku;
+        });
+
+        if (!matched) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(422).json({
+            message: "Sản phẩm chọn áp dụng voucher không hợp lệ",
+          });
+        }
+
+        eligibleItems = [matched];
+      }
+
+      const voucherDiscountBase = eligibleItems.reduce(
+        (sum, item) =>
+          sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
+        0,
+      );
       discountAmount = computeFinalVoucherDiscountAmount(
         voucherDoc,
-        eligibleSubtotal,
+        voucherDiscountBase,
       );
     }
 
@@ -460,6 +510,10 @@ exports.createOrder = async (req, res) => {
       products: mappedProducts,
       discount: discountAmount,
       voucherCode: normalizedVoucherCode,
+      voucherTargetProductId: voucherTarget?.productId || null,
+      voucherTargetSku: voucherTarget?.sku
+        ? String(voucherTarget.sku).trim().toUpperCase()
+        : null,
       shippingFee,
       totalAmount: finalTotal,
       paymentStatus: "unpaid",

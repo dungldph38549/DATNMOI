@@ -6,7 +6,7 @@ const { optionalAuthMiddleware } = require("../middlewares/authMiddleware");
 // POST /api/voucher/create
 router.post("/create", VoucherController.createVoucher);
 // POST /api/voucher/preview — tính tiền giảm (không lộ trần giảm cho client)
-router.post("/preview", VoucherController.previewVoucherDiscount);
+router.post("/preview", optionalAuthMiddleware, VoucherController.previewVoucherDiscount);
 // GET /api/voucher
 router.get("/", optionalAuthMiddleware, VoucherController.getAllVouchers);
 // GET /api/voucher/code/:code

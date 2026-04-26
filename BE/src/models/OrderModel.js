@@ -98,6 +98,15 @@ const orderSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    voucherTargetProductId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      default: null,
+    },
+    voucherTargetSku: {
+      type: String,
+      default: null,
+    },
     shippingFee: {
       type: Number,
       required: true,

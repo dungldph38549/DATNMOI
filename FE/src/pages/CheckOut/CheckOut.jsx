@@ -117,6 +117,7 @@ const CheckOut = () => {
   const [voucherChecking, setVoucherChecking] = useState(false);
   const [voucherError, setVoucherError] = useState("");
   const [appliedVoucher, setAppliedVoucher] = useState(null);
+  const [appliedVoucherTarget, setAppliedVoucherTarget] = useState(null);
   const [collectedVoucherCodes, setCollectedVoucherCodes] = useState([]);
   const [expiredVoucherCodes, setExpiredVoucherCodes] = useState([]);
   const [showVoucherModal, setShowVoucherModal] = useState(false);
@@ -124,6 +125,7 @@ const CheckOut = () => {
   const [voucherAvailability, setVoucherAvailability] = useState({});
   const [checkingVoucherList, setCheckingVoucherList] = useState(false);
   const [voucherMetaByCode, setVoucherMetaByCode] = useState({});
+  const [draftVoucherTarget, setDraftVoucherTarget] = useState(null);
   const [walletBalance, setWalletBalance] = useState(null);
 
   const isLoggedIn = !!user?.login;
@@ -350,11 +352,12 @@ const CheckOut = () => {
   const voucherPreviewItems = () =>
     checkoutItems.map((i) => ({
       productId: String(i.productId || i._id || ""),
+      sku: i?.sku ? String(i.sku).trim().toUpperCase() : null,
       price: Number(i.price || 0),
       quantity: Number(i.qty || 0),
     }));
 
-  const applyVoucherByCode = async (rawCode) => {
+  const applyVoucherByCode = async (rawCode, selectedTarget = null) => {
     const normalizedCode = String(rawCode || "").trim().toUpperCase();
     if (!normalizedCode) {
       setVoucherError("Vui lòng nhập mã giảm giá");
@@ -383,6 +386,7 @@ const CheckOut = () => {
       const result = await previewVoucherDiscount({
         code: normalizedCode,
         items: voucherPreviewItems(),
+        voucherTarget: selectedTarget,
       });
       if (result?.status === "ERR" || result?.status === "Err") {
         if (isExpiredVoucherError(result?.message)) {
@@ -393,8 +397,28 @@ const CheckOut = () => {
         setDiscount(0);
         return false;
       }
+      if (result?.data?.requiresProductSelection && !selectedTarget?.productId) {
+        setVoucherError("Voucher này chỉ áp dụng cho 1 sản phẩm. Vui lòng chọn sản phẩm áp dụng.");
+        setAppliedVoucher(null);
+        setAppliedVoucherTarget(null);
+        setDiscount(0);
+        return false;
+      }
       setVoucherCode(normalizedCode);
-      setAppliedVoucher({ code: normalizedCode });
+      setAppliedVoucher({
+        code: normalizedCode,
+        isWholeOrderVoucher: Boolean(result?.data?.isWholeOrderVoucher),
+      });
+      setAppliedVoucherTarget(
+        selectedTarget?.productId
+          ? {
+              productId: String(selectedTarget.productId),
+              sku: selectedTarget?.sku
+                ? String(selectedTarget.sku).trim().toUpperCase()
+                : null,
+            }
+          : null,
+      );
       setDiscount(Number(result?.data?.discountAmount ?? 0));
       setVoucherError("");
       try { localStorage.removeItem("pending_checkout_voucher_v1"); } catch { }
@@ -409,10 +433,11 @@ const CheckOut = () => {
     }
   };
 
-  const onApplyVoucher = async () => applyVoucherByCode(voucherCode);
+  const onApplyVoucher = async () => applyVoucherByCode(voucherCode, appliedVoucherTarget);
 
   const onRemoveVoucher = () => {
     setAppliedVoucher(null);
+    setAppliedVoucherTarget(null);
     setDiscount(0);
     setVoucherError("");
   };
@@ -422,14 +447,17 @@ const CheckOut = () => {
     if (!normalizedCode) return;
     setVoucherCode(normalizedCode);
     setVoucherError("");
+    setDraftVoucherTarget(null);
     if (appliedVoucher) {
       setAppliedVoucher(null);
+      setAppliedVoucherTarget(null);
       setDiscount(0);
     }
   };
 
   const onOpenVoucherModal = () => {
     setDraftVoucherCode(voucherCode || "");
+    setDraftVoucherTarget(appliedVoucherTarget || null);
     setShowVoucherModal(true);
   };
 
@@ -439,7 +467,17 @@ const CheckOut = () => {
       setVoucherError("Voucher này hiện không khả dụng với giỏ hàng.");
       return;
     }
-    const ok = await applyVoucherByCode(draftVoucherCode);
+    const selectedCode = String(draftVoucherCode || "").trim().toUpperCase();
+    const selectedMeta = voucherMetaByCode[selectedCode];
+    const isPersonalVoucher = Boolean(selectedMeta?.ownerUserId);
+    if (isPersonalVoucher && !draftVoucherTarget?.productId) {
+      setVoucherError("Voucher cá nhân cần chọn sản phẩm áp dụng.");
+      return;
+    }
+    const ok = await applyVoucherByCode(
+      draftVoucherCode,
+      isPersonalVoucher ? draftVoucherTarget : null,
+    );
     if (ok) setShowVoucherModal(false);
   };
 
@@ -456,6 +494,7 @@ const CheckOut = () => {
               const result = await previewVoucherDiscount({
                 code,
                 items: voucherPreviewItems(),
+                voucherTarget: null,
               });
               if (result?.status === "ERR" || result?.status === "Err") {
                 if (isExpiredVoucherError(result?.message)) {
@@ -532,9 +571,11 @@ const CheckOut = () => {
           code,
           items: checkoutItems.map((i) => ({
             productId: String(i.productId || i._id || ""),
+            sku: i?.sku ? String(i.sku).trim().toUpperCase() : null,
             price: Number(i.price || 0),
             quantity: Number(i.qty || 0),
           })),
+          voucherTarget: appliedVoucherTarget,
         });
         if (cancelled) return;
         if (result?.status === "ERR" || result?.status === "Err") {
@@ -560,7 +601,7 @@ const CheckOut = () => {
     return () => {
       cancelled = true;
     };
-  }, [subtotal, appliedVoucher?.code, checkoutItems]);
+  }, [subtotal, appliedVoucher?.code, checkoutItems, appliedVoucherTarget]);
 
   useEffect(() => {
     const queryVoucherCode = new URLSearchParams(location.search).get("voucher");
@@ -578,6 +619,34 @@ const CheckOut = () => {
 
   const shipping = 0; // Luôn miễn phí vì đã bỏ giao hàng hỏa tốc
   const total = Math.max(0, subtotal + shipping - discount);
+  const formatMoney = (v) => `${Number(v || 0).toLocaleString("vi-VN")}đ`;
+  const hasVoucherDiscount = discount > 0;
+  const voucherDiscountAmountLabel = formatMoney(discount);
+  const draftVoucherCodeNormalized = String(draftVoucherCode || "")
+    .trim()
+    .toUpperCase();
+  const draftVoucherMeta = voucherMetaByCode[draftVoucherCodeNormalized] || null;
+  const draftVoucherIsPersonal = Boolean(draftVoucherMeta?.ownerUserId);
+  const voucherTargetCandidates = useMemo(
+    () =>
+      checkoutItems.map((item) => ({
+        productId: String(item.productId || item._id || ""),
+        sku: item?.sku ? String(item.sku).trim().toUpperCase() : null,
+        label: `${item.name}${item?.size ? ` (${item.size})` : ""}`,
+      })),
+    [checkoutItems],
+  );
+  const selectedVoucherTargetLabel = useMemo(() => {
+    if (!appliedVoucherTarget?.productId) return "";
+    const found = checkoutItems.find((item) => {
+      const pid = String(item.productId || item._id || "");
+      if (pid !== String(appliedVoucherTarget.productId)) return false;
+      if (!appliedVoucherTarget?.sku) return true;
+      return String(item?.sku || "").trim().toUpperCase() === appliedVoucherTarget.sku;
+    });
+    if (!found) return "";
+    return `${found.name}${found?.size ? ` (${found.size})` : ""}`;
+  }, [appliedVoucherTarget, checkoutItems]);
 
   const validateForm = () => {
     let newErrors = {};
@@ -659,6 +728,13 @@ const CheckOut = () => {
         products,
         discount,
         voucherCode: appliedVoucher ? voucherCode.trim() : null,
+        voucherTarget:
+          appliedVoucher && appliedVoucherTarget?.productId
+            ? {
+                productId: String(appliedVoucherTarget.productId),
+                sku: appliedVoucherTarget?.sku || null,
+              }
+            : null,
         shippingFee: shipping, totalAmount: total,
         ...(paymentMethod === "vnpay"
           ? {
@@ -783,8 +859,6 @@ const CheckOut = () => {
       setLoading(false);
     }
   };
-
-  const formatMoney = (v) => `${Number(v || 0).toLocaleString("vi-VN")}đ`;
 
   return (
     <div className="min-h-screen font-body pb-14 pt-8 bg-[#f7f3ec]">
@@ -958,9 +1032,9 @@ const CheckOut = () => {
                     <FaTicketAlt className="text-[#ee4d2d] shrink-0 text-2xl" aria-hidden />
                     <span className="text-lg font-semibold text-slate-800 truncate">
                       Voucher shop
-                      {discount > 0 && (
+                      {hasVoucherDiscount && (
                         <span className="ml-2 text-base font-semibold text-green-600">
-                          Đã giảm {formatMoney(discount)}
+                          Đã giảm {voucherDiscountAmountLabel}
                         </span>
                       )}
                     </span>
@@ -984,6 +1058,11 @@ const CheckOut = () => {
                       </div>
                     )}
                     {voucherError && <p className="text-xs font-medium text-red-500">{voucherError}</p>}
+                    {discount > 0 && selectedVoucherTargetLabel && (
+                      <p className="text-xs text-slate-600">
+                        Áp dụng cho sản phẩm: <b>{selectedVoucherTargetLabel}</b>
+                      </p>
+                    )}
                     {expiredVoucherCodes.length > 0 && (
                       <p className="text-[11px] text-slate-400">
                         {expiredVoucherCodes.length} mã hết hạn đã ẩn khỏi danh sách.
@@ -1113,8 +1192,36 @@ const CheckOut = () => {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-semibold">Voucher của shop:</span>
-                    <span className="text-[#ee4d2d] font-semibold">{discount > 0 ? `Đã giảm ${formatMoney(discount)}` : "Chưa áp dụng"}</span>
+                    <span className="text-[#ee4d2d] font-semibold">
+                      {hasVoucherDiscount
+                        ? `Đã giảm ${voucherDiscountAmountLabel}`
+                        : "Chưa áp dụng"}
+                    </span>
                   </div>
+                  {hasVoucherDiscount && selectedVoucherTargetLabel && (
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-semibold">Sản phẩm được giảm:</span>
+                      <span className="text-right">{selectedVoucherTargetLabel}</span>
+                    </div>
+                  )}
+                  {hasVoucherDiscount && (
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-semibold">Mức giảm voucher:</span>
+                      <span className="text-right text-green-700">
+                        -{voucherDiscountAmountLabel}
+                      </span>
+                    </div>
+                  )}
+                  {hasVoucherDiscount && !selectedVoucherTargetLabel && (
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-semibold">Phạm vi voucher:</span>
+                      <span className="text-right">
+                        {appliedVoucher?.isWholeOrderVoucher
+                          ? "Toàn bộ đơn hàng"
+                          : "Theo phạm vi sản phẩm của voucher"}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1127,10 +1234,10 @@ const CheckOut = () => {
                   <span>Phí vận chuyển</span>
                   <span className="font-semibold text-slate-800">{shipping === 0 ? "Miễn phí" : formatMoney(shipping)}</span>
                 </div>
-                {discount > 0 && (
+                {hasVoucherDiscount && (
                   <div className="flex justify-between text-green-600">
-                    <span>Giảm giá</span>
-                    <span className="font-semibold">-{formatMoney(discount)}</span>
+                    <span>Giảm giá voucher</span>
+                    <span className="font-semibold">-{voucherDiscountAmountLabel}</span>
                   </div>
                 )}
               </div>
@@ -1187,12 +1294,50 @@ const CheckOut = () => {
                 <button
                   type="button"
                   onClick={onConfirmVoucherFromModal}
-                  disabled={voucherChecking || !String(draftVoucherCode || "").trim()}
+                  disabled={
+                    voucherChecking ||
+                    !String(draftVoucherCode || "").trim() ||
+                    (draftVoucherIsPersonal && !draftVoucherTarget?.productId)
+                  }
                   className="px-4 rounded-md bg-[#ee4d2d] text-white text-sm font-bold hover:bg-[#d84325] disabled:opacity-50"
                 >
                   ÁP DỤNG
                 </button>
               </div>
+
+              {draftVoucherIsPersonal && (
+                <div className="mb-4 rounded-md border border-orange-200 bg-orange-50 p-3">
+                  <p className="text-xs font-semibold text-orange-700 mb-2">
+                    Voucher cá nhân chỉ giảm cho 1 sản phẩm. Chọn sản phẩm áp dụng:
+                  </p>
+                  <div className="space-y-2 max-h-36 overflow-y-auto custom-scrollbar pr-1">
+                    {voucherTargetCandidates.map((target) => {
+                      const checked =
+                        draftVoucherTarget?.productId === target.productId &&
+                        (draftVoucherTarget?.sku || "") === (target.sku || "");
+                      return (
+                        <label
+                          key={`${target.productId}-${target.sku || "no-sku"}`}
+                          className="flex items-center gap-2 text-sm text-slate-700"
+                        >
+                          <input
+                            type="radio"
+                            name="voucher-target-product"
+                            checked={checked}
+                            onChange={() =>
+                              setDraftVoucherTarget({
+                                productId: target.productId,
+                                sku: target.sku,
+                              })
+                            }
+                          />
+                          <span>{target.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <p className="text-sm font-semibold text-slate-700 mb-2">Mã đã thu thập</p>
               <div className="max-h-64 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
@@ -1210,6 +1355,10 @@ const CheckOut = () => {
                     const unknown = info?.status === "unknown";
                     const dimmed = unavailable || unknown;
                     const estimatedDiscount = info?.status === "available" ? Number(info?.discountAmount || 0) : 0;
+                    const metaIsPersonal = Boolean(meta?.ownerUserId);
+                    const metaHasProductScope = Array.isArray(meta?.applicableProductIds) && meta.applicableProductIds.length > 0;
+                    const metaIsWholeOrder = !metaIsPersonal && !metaHasProductScope;
+                    const canShowEstimatedDiscount = checkoutItems.length === 1 && metaIsWholeOrder;
                     const discountLabel =
                       meta?.discountType === "percent"
                         ? `Giảm ${Number(meta?.discountValue || 0)}%`
@@ -1229,7 +1378,10 @@ const CheckOut = () => {
                         key={code}
                         type="button"
                         onClick={() => {
-                          if (!dimmed) setDraftVoucherCode(code);
+                          if (!dimmed) {
+                            setDraftVoucherCode(code);
+                            setDraftVoucherTarget(null);
+                          }
                         }}
                         disabled={dimmed}
                         className={`w-full text-left px-3 py-2.5 rounded-md border transition-colors ${
@@ -1246,7 +1398,7 @@ const CheckOut = () => {
                             <span className="text-[11px] font-semibold text-slate-500">Không khả dụng</span>
                           ) : unknown ? (
                             <span className="text-[11px] font-semibold text-slate-500">Tạm thời không khả dụng</span>
-                          ) : estimatedDiscount > 0 ? (
+                          ) : estimatedDiscount > 0 && canShowEstimatedDiscount ? (
                             <span className="text-[11px] font-semibold text-green-700">Giảm {formatMoney(estimatedDiscount)}</span>
                           ) : null}
                         </div>
@@ -1287,7 +1439,8 @@ const CheckOut = () => {
                 disabled={
                   voucherChecking ||
                   !String(draftVoucherCode || "").trim() ||
-                  voucherAvailability[String(draftVoucherCode || "").trim().toUpperCase()]?.status === "unavailable"
+                  voucherAvailability[String(draftVoucherCode || "").trim().toUpperCase()]?.status === "unavailable" ||
+                  (draftVoucherIsPersonal && !draftVoucherTarget?.productId)
                 }
                 className="px-5 h-10 rounded-md bg-[#ee4d2d] text-white font-bold hover:bg-[#d84325] disabled:opacity-50"
               >
