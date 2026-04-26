@@ -67,6 +67,9 @@ const getSoldScore = (product) => {
   return baseSold + variantSold;
 };
 
+const getCreatedTimestamp = (product) =>
+  new Date(product?.createdAt || product?.updatedAt || 0).getTime();
+
 const pickForRecommendation = ({
   recommendations = [],
   best = [],
@@ -134,15 +137,13 @@ const HomePage = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const monthStart = new Date();
-        monthStart.setDate(1);
-        monthStart.setHours(0, 0, 0, 0);
+        const allTimeStart = new Date("2000-01-01T00:00:00.000Z");
         const [featuredRes, bestRes, topSellingRes, newRes, recommendationRes, allProductRes] = await Promise.all([
           getFeaturedProducts(8),
           getBestSellers(40),
           getTopSellingProducts({
             limit: 8,
-            startDate: monthStart.toISOString(),
+            startDate: allTimeStart.toISOString(),
             endDate: new Date().toISOString(),
           }).catch(() => ({ data: [] })),
           getNewArrivals(8),
@@ -165,22 +166,15 @@ const HomePage = () => {
             const soldB = getSoldScore(b);
             return soldB - soldA;
           })
-          .slice(0, 8);
+          .slice(0, 24);
         const bestSellerFromApi = [...topSelling]
           .filter((p) => !isAccessoryProduct(p))
           .sort((a, b) => getSoldScore(b) - getSoldScore(a))
-          .slice(0, 8);
+          .slice(0, 24);
         const bestSellerFallback = [...best]
           .filter((p) => !isAccessoryProduct(p))
           .sort((a, b) => getSoldScore(b) - getSoldScore(a))
-          .slice(0, 8);
-        setHotProducts(
-          bestSellerFromApi.length > 0
-            ? bestSellerFromApi
-            : bestSellerFromAll.length > 0
-              ? bestSellerFromAll
-              : bestSellerFallback,
-        );
+          .slice(0, 24);
         setRecommendedProducts(
           pickForRecommendation({
             recommendations: recommendationRes,
@@ -200,23 +194,28 @@ const HomePage = () => {
           ),
         );
         const accessoryFromAll = allProducts.filter(isAccessoryProduct);
-        const newestNonAccessory = allProducts
-          .filter((p) => !isAccessoryProduct(p))
-          .sort((a, b) => {
-            const tA = new Date(a?.createdAt || a?.updatedAt || 0).getTime();
-            const tB = new Date(b?.createdAt || b?.updatedAt || 0).getTime();
-            return tB - tA;
-          })
+        const newestShoesFromAll = allProducts.filter((p) => !isAccessoryProduct(p));
+        const newestShoesFromApi = newArr.filter((p) => !isAccessoryProduct(p));
+        const newestShoePool = [...newestShoesFromAll, ...newestShoesFromApi];
+        const newestShoeMap = new Map();
+        newestShoePool.forEach((item) => {
+          const id = String(item?._id || "");
+          if (!id || newestShoeMap.has(id)) return;
+          newestShoeMap.set(id, item);
+        });
+        const newestShoes = [...newestShoeMap.values()]
+          .sort((a, b) => getCreatedTimestamp(b) - getCreatedTimestamp(a))
           .slice(0, 8);
-        setNewProducts(
-          newestNonAccessory.length > 0
-            ? newestNonAccessory
-            : newArr.filter((p) => !isAccessoryProduct(p)).length > 0
-              ? newArr.filter((p) => !isAccessoryProduct(p))
-              : featured.length > 0
-                ? featured
-                : best,
-        );
+        setNewProducts(newestShoes);
+
+        const newestIds = new Set(newestShoes.map((item) => String(item?._id || "")));
+        const hotPool = (bestSellerFromApi.length > 0
+          ? bestSellerFromApi
+          : bestSellerFromAll.length > 0
+            ? bestSellerFromAll
+            : bestSellerFallback
+        ).filter((item) => !newestIds.has(String(item?._id || "")));
+        setHotProducts(hotPool.slice(0, 8));
         setAccessoryProducts(accessoryFromAll.slice(0, 8));
 
         if (featured.length > 0 || best.length > 0 || newArr.length > 0) {
