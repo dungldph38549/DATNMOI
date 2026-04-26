@@ -48,6 +48,25 @@ const ORDER_STATUSES_EXCLUDED_FROM_REVENUE = [
   "accepted",
 ];
 
+/** Thứ Hai 00:00 UTC của tuần ISO `week` trong năm ISO `isoWeekYear` (khớp Mongo $isoWeek / $isoWeekYear). */
+function isoWeekMondayUtcMs(isoWeekYear, week) {
+  const jan4 = Date.UTC(isoWeekYear, 0, 4);
+  let dow = new Date(jan4).getUTCDay();
+  if (dow === 0) dow = 7;
+  const week1Monday = jan4 - (dow - 1) * 86400000;
+  return week1Monday + (week - 1) * 7 * 86400000;
+}
+
+/** Hiển thị Thứ 2 → Chủ nhật (UTC) cho nhãn biểu đồ. */
+function formatIsoWeekRangeLabelVi(isoWeekYear, week) {
+  const m0 = isoWeekMondayUtcMs(isoWeekYear, week);
+  const m6 = m0 + 6 * 86400000;
+  const fmt = (ms) => {
+    const d = new Date(ms);
+    return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  };
+  return `${fmt(m0)} → ${fmt(m6)}`;
+}
 
 // Khi không khai báo VNP_* trong .env sẽ dùng fallback bên dưới.
 // Chỉ truyền host (không thêm /paymentv2/...): thư viện tự nối endpoint thanh toán.
@@ -1448,10 +1467,16 @@ exports.deleteOrder = async (req, res) => {
 exports.dashboard = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    const start = startDate
+    let start = startDate
       ? new Date(startDate)
       : new Date(new Date().getFullYear(), 0, 1);
-    const end = endDate ? new Date(endDate) : new Date();
+    let end = endDate ? new Date(endDate) : new Date();
+
+    // Cùng một mốc hoặc end <= start (vd. RangePicker hai ngày cùng 00:00) → coi là 1 ngày đầy đủ
+    if (end.getTime() <= start.getTime()) {
+      end = new Date(start);
+      end.setHours(23, 59, 59, 999);
+    }
 
     const revenueMatch = (s, e) => ({
       createdAt: { $gte: s, $lte: e },
@@ -1491,6 +1516,7 @@ exports.dashboard = async (req, res) => {
     let comparisonPeriod = null;
     let revenueChangePercent = null;
     let ordersChangePercent = null;
+    let canceledOrdersChangePercent = null;
 
     let current;
     if (spanMs > 0) {
@@ -1501,9 +1527,11 @@ exports.dashboard = async (req, res) => {
         end: prevEnd.toISOString(),
       };
       const roundPct = (cur, prev) => {
-        if (prev === 0 && cur === 0) return 0;
-        if (prev === 0) return null;
-        return Math.round(((cur - prev) / prev) * 1000) / 10;
+        const c = Number(cur) || 0;
+        const p = Number(prev) || 0;
+        if (p === 0 && c === 0) return 0;
+        if (p === 0) return c > 0 ? 100 : 0;
+        return Math.round(((c - p) / p) * 1000) / 10;
       };
       const [cur, prev] = await Promise.all([
         loadMetrics(start, end),
@@ -1512,6 +1540,10 @@ exports.dashboard = async (req, res) => {
       current = cur;
       revenueChangePercent = roundPct(cur.totalRevenue, prev.totalRevenue);
       ordersChangePercent = roundPct(cur.totalOrders, prev.totalOrders);
+      canceledOrdersChangePercent = roundPct(
+        cur.canceledOrders,
+        prev.canceledOrders,
+      );
     } else {
       current = await loadMetrics(start, end);
     }
@@ -1525,6 +1557,7 @@ exports.dashboard = async (req, res) => {
       comparisonPeriod,
       revenueChangePercent,
       ordersChangePercent,
+      canceledOrdersChangePercent,
     };
 
     res.status(200).json({
@@ -1560,7 +1593,10 @@ exports.revenue = async (req, res) => {
     const groupMap = {
       year: { $year: "$createdAt" },
       month: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
-      week: { year: { $year: "$createdAt" }, week: { $isoWeek: "$createdAt" } },
+      week: {
+        year: { $isoWeekYear: "$createdAt" },
+        week: { $isoWeek: "$createdAt" },
+      },
       hour: {
         year: { $year: "$createdAt" },
         month: { $month: "$createdAt" },
@@ -1593,7 +1629,17 @@ exports.revenue = async (req, res) => {
         const nameMap = {
           year: `${idValue}`,
           month: `${idValue.month}/${idValue.year}`,
-          week: `Tuần ${idValue.week}/${idValue.year}`,
+          week: (() => {
+            const y = idValue.year;
+            const w = idValue.week;
+            const range =
+              y != null && w != null
+                ? formatIsoWeekRangeLabelVi(Number(y), Number(w))
+                : "";
+            return range
+              ? `Tuần ${w} (${range})`
+              : `Tuần ${w}/${y}`;
+          })(),
           hour: `${String(idValue.hour).padStart(2, "0")}:00`,
         };
         name = nameMap[unit] || idValue?.toString() || "N/A";

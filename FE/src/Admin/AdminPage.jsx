@@ -332,7 +332,7 @@ const AdminPage = () => {
   const renderContent = () => {
     switch (selectedMenu) {
       case "dashboard":
-        return <Dashboard />;
+        return <Dashboard onNavigateTo={handleMenuClick} />;
       case "products":
         return <Products />;
       case "orders":

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useId } from "react";
 import { DatePicker, Segmented } from "antd";
 import {
-  LineChart,
+  ComposedChart,
+  Area,
   Line,
   XAxis,
   YAxis,
@@ -15,28 +16,45 @@ import axiosInstance from "../api/axiosConfig";
 
 dayjs.extend(isBetween);
 
+/** 7 ngày gần nhất (đủ 7 mốc theo ngày trên biểu đồ): từ 6 ngày trước → hôm nay. */
+const getLast7DaysRange = () => {
+  const end = dayjs().endOf("day");
+  const start = dayjs().subtract(6, "day").startOf("day");
+  return [start, end];
+};
+
+/** Chuẩn hóa [bắt đầu, kết thúc] đủ 24h/ngày — tránh cùng 00:00 → span 0, mất so sánh. */
+const normalizeDateRangeBounds = (range) => {
+  if (!range?.[0] || !range?.[1]) return null;
+  return [range[0].startOf("day"), range[1].endOf("day")];
+};
+
 /** Nhãn mốc so sánh: cùng độ dài, ngay trước khoảng đang xem. */
 const formatComparisonCaption = (period, showZeroBaselineHint) => {
   if (!period?.start || !period?.end) return null;
-  const a = dayjs(period.start).format("DD/MM/YYYY");
-  const b = dayjs(period.end).format("DD/MM/YYYY");
-  let s = `So với (${a} → ${b})`;
+  const a = dayjs(period.start);
+  const b = dayjs(period.end);
+  const oneCalendarDay = a.format("YYYY-MM-DD") === b.format("YYYY-MM-DD");
+  let s = oneCalendarDay
+    ? `So với ngày ${a.format("DD/MM/YYYY")}`
+    : `So với (${a.format("DD/MM/YYYY")} → ${b.format("DD/MM/YYYY")})`;
   if (showZeroBaselineHint) s += " · kỳ trước = 0, không tính %";
   return s;
 };
 
+/** % thay đổi: âm/dương đều tính. Kỳ trước = 0: coi như mức tăng +100% nếu kỳ này > 0. */
 const roundPctChange = (cur, prev) => {
   const c = Number(cur) || 0;
   const p = Number(prev) || 0;
   if (p === 0 && c === 0) return 0;
-  if (p === 0) return null;
+  if (p === 0) return c > 0 ? 100 : 0;
   return Math.round(((c - p) / p) * 1000) / 10;
 };
 
 // ── Design tokens ──────────────────────────────────────────────
 const T = {
-  primary: "#f49d25",
-  primaryBg: "rgba(244,157,37,0.08)",
+  primary: "#f05a22",
+  primaryBg: "rgba(240,90,34,0.10)",
   border: "#E9EEF4",
   text: "#0F172A",
   textMid: "#475569",
@@ -51,6 +69,45 @@ const T = {
   blueBg: "rgba(59,130,246,0.10)",
   amber: "#F59E0B",
   amberBg: "rgba(245,158,11,0.10)",
+  chartNavy: "#0F172A",
+};
+
+const formatRevenueAxisTick = (v) => {
+  const n = Number(v) || 0;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
+  return `${Math.round(n)}`;
+};
+
+// ── Badge phương thức thanh toán (COD / VNPay / Ví) ───────────
+const PayBadge = ({ method }) => {
+  const map = {
+    cod: { label: "COD", bg: T.amberBg, color: T.amber },
+    vnpay: { label: "VNPay", bg: T.blueBg, color: T.blue },
+    wallet: { label: "Ví", bg: "rgba(34,197,94,0.12)", color: T.green },
+    momo: { label: "MoMo", bg: "rgba(234,56,88,0.10)", color: "#EA3858" },
+  };
+  const key = String(method || "").toLowerCase();
+  const m = map[key] || {
+    label: method || "Khác",
+    bg: "#F1F5F9",
+    color: T.textMid,
+  };
+  return (
+    <span
+      style={{
+        padding: "3px 10px",
+        borderRadius: 99,
+        fontSize: 11,
+        fontWeight: 700,
+        background: m.bg,
+        color: m.color,
+        textTransform: "uppercase",
+      }}
+    >
+      {m.label}
+    </span>
+  );
 };
 
 // ── Metric card ────────────────────────────────────────────────
@@ -62,18 +119,34 @@ const MetricCard = ({
   comparisonLabel,
   color,
   bg,
+  /** true: tăng % là xấu (vd. đơn hủy) → đỏ khi dương, xanh khi âm */
+  invertDelta = false,
 }) => {
   const hasDelta =
     deltaPercent !== null && deltaPercent !== undefined && !Number.isNaN(deltaPercent);
+  const isUp = hasDelta && deltaPercent > 0;
   const isDown = hasDelta && deltaPercent < 0;
   const isFlat = hasDelta && deltaPercent === 0;
-  const badgeBg = isDown ? T.redBg : isFlat ? "#F1F5F9" : T.greenBg;
-  const badgeColor = isDown ? T.red : isFlat ? T.textMuted : T.green;
+  let badgeBg;
+  let badgeColor;
+  if (!invertDelta) {
+    badgeBg = isDown ? T.redBg : isFlat ? "#F1F5F9" : T.greenBg;
+    badgeColor = isDown ? T.red : isFlat ? T.textMuted : T.green;
+  } else {
+    badgeBg = isUp ? T.redBg : isDown ? T.greenBg : "#F1F5F9";
+    badgeColor = isUp ? T.red : isDown ? T.green : T.textMuted;
+  }
   const deltaText = hasDelta
-    ? `${deltaPercent > 0 ? "+" : ""}${deltaPercent.toLocaleString("vi-VN", {
-        maximumFractionDigits: 1,
-        minimumFractionDigits: 0,
-      })}%`
+    ? (() => {
+        const n = Number(deltaPercent);
+        const fmt = Math.abs(n).toLocaleString("vi-VN", {
+          maximumFractionDigits: 1,
+          minimumFractionDigits: 0,
+        });
+        if (n > 0) return `+${fmt}%`;
+        if (n < 0) return `-${fmt}%`;
+        return `${fmt}%`;
+      })()
     : null;
 
   return (
@@ -212,34 +285,42 @@ const SCard = ({ title, action, children }) => (
   </div>
 );
 
-// ── Payment badge ──────────────────────────────────────────────
-const PayBadge = ({ method }) => {
-  const map = {
-    cod: { label: "COD", bg: T.amberBg, color: T.amber },
-    vnpay: { label: "VNPay", bg: T.blueBg, color: T.blue },
-    momo: { label: "MoMo", bg: "rgba(234,56,88,0.10)", color: "#EA3858" },
-  };
-  const m = map[method?.toLowerCase()] || {
-    label: method || "N/A",
-    bg: "#F1F5F9",
-    color: T.textMid,
-  };
-  return (
-    <span
-      style={{
-        padding: "3px 10px",
-        borderRadius: 99,
-        fontSize: 11,
-        fontWeight: 700,
-        background: m.bg,
-        color: m.color,
-        textTransform: "uppercase",
-      }}
-    >
-      {m.label}
-    </span>
-  );
-};
+// ── Chart legend (mockup) ────────────────────────────────────
+const ChartLegend = ({ items }) => (
+  <div
+    style={{
+      display: "flex",
+      flexWrap: "wrap",
+      gap: "14px 18px",
+      marginBottom: 14,
+    }}
+  >
+    {items.map(({ color, label }) => (
+      <div
+        key={label}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          fontSize: 12,
+          fontWeight: 600,
+          color: T.textMid,
+        }}
+      >
+        <span
+          style={{
+            width: 9,
+            height: 9,
+            borderRadius: "50%",
+            background: color,
+            flexShrink: 0,
+          }}
+        />
+        {label}
+      </div>
+    ))}
+  </div>
+);
 
 // ── Custom tooltip for recharts ────────────────────────────────
 const CustomTooltip = ({ active, payload, label, type }) => {
@@ -277,7 +358,7 @@ const CustomTooltip = ({ active, payload, label, type }) => {
 // ================================================================
 // Dashboard
 // ================================================================
-const Dashboard = () => {
+const Dashboard = ({ onNavigateTo }) => {
   const [overview, setOverview] = useState({
     totalOrders: 0,
     totalRevenue: 0,
@@ -285,41 +366,17 @@ const Dashboard = () => {
     comparisonPeriod: null,
     revenueChangePercent: null,
     ordersChangePercent: null,
+    canceledOrdersChangePercent: null,
   });
   const [revenue, setRevenue] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [topVariants, setTopVariants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [dateRange, setDateRange] = useState([
-    dayjs().startOf("month"),
-    dayjs(),
-  ]);
-  const [timeUnit, setTimeUnit] = useState("auto");
-
-  const determineTimeUnit = (start, end) => {
-    const diff = end.diff(start, "day");
-    if (diff > 365) return "year";
-    if (diff > 31) return "month";
-    if (diff > 7) return "week";
-    if (diff > 1) return "day";
-    return "hour";
-  };
-
-  const effectiveUnit = useMemo(() => {
-    if (!dateRange?.[0] || !dateRange?.[1]) return "day";
-    return timeUnit === "auto"
-      ? determineTimeUnit(dateRange[0], dateRange[1])
-      : timeUnit;
-  }, [dateRange, timeUnit]);
-
-  const unitLabelMap = {
-    hour: "Theo giờ",
-    day: "Theo ngày",
-    week: "Theo tuần",
-    month: "Theo tháng",
-    year: "Theo năm",
-  };
+  const [dateRange, setDateRange] = useState(() => getLast7DaysRange());
+  const [timeUnit, setTimeUnit] = useState("week");
+  const revFillGradId = useId().replace(/:/g, "");
+  const ordFillGradId = useId().replace(/:/g, "");
 
   const handleTimeUnitChange = (nextUnit) => {
     setTimeUnit(nextUnit);
@@ -327,13 +384,13 @@ const Dashboard = () => {
 
     // Chọn đơn vị thời gian thì tự đặt lại range tính lùi từ hôm nay
     // để tránh cảm giác "trôi ngược" do startOf/endOf theo tháng/năm.
-    if (nextUnit === "day") {
-      setDateRange([now.subtract(1, "day").startOf("day"), now.endOf("day")]);
+    if (nextUnit === "auto" || nextUnit === "week") {
+      setDateRange(getLast7DaysRange());
       return;
     }
 
-    if (nextUnit === "week") {
-      setDateRange([now.subtract(1, "week").startOf("day"), now.endOf("day")]);
+    if (nextUnit === "day") {
+      setDateRange([now.subtract(1, "day").startOf("day"), now.endOf("day")]);
       return;
     }
 
@@ -353,19 +410,27 @@ const Dashboard = () => {
       setLoading(true);
       setError(null);
       try {
+        const bounds = normalizeDateRangeBounds(dateRange);
+        if (!bounds) throw new Error("Khoảng ngày không hợp lệ");
+        const [normStart, normEnd] = bounds;
         const params = {
-          startDate: dateRange[0].toISOString(),
-          endDate: dateRange[1].toISOString(),
+          startDate: normStart.toISOString(),
+          endDate: normEnd.toISOString(),
         };
+
+        const revenueUnit =
+          timeUnit === "month" ? "week" : timeUnit === "year" ? "month" : "day";
 
         const [overviewRes, revenueRes, paymentRes, topVariantRes] =
           await Promise.all([
             axiosInstance.get("/order/dashboard", { params }),
             axiosInstance.get("/order/revenue", {
-              params: { ...params, unit: effectiveUnit },
+              params: { ...params, unit: revenueUnit },
             }),
             axiosInstance.get("/order/paymentMethod", { params }),
-            axiosInstance.get("/order/topSelling", { params }),
+            axiosInstance.get("/order/topSelling", {
+              params: { ...params, limit: 10 },
+            }),
           ]);
 
         const od = overviewRes.data?.data || {};
@@ -373,8 +438,8 @@ const Dashboard = () => {
         const pd = paymentRes.data?.data || [];
         const td = topVariantRes.data?.data || [];
 
-        const startMs = dateRange[0].valueOf();
-        const endMs = dateRange[1].valueOf();
+        const startMs = normStart.valueOf();
+        const endMs = normEnd.valueOf();
         const spanMs = endMs - startMs;
         const prevParams =
           spanMs > 0
@@ -400,6 +465,10 @@ const Dashboard = () => {
             : null;
         let ordersChangePercent =
           od.ordersChangePercent !== undefined ? od.ordersChangePercent : null;
+        let canceledOrdersChangePercent =
+          od.canceledOrdersChangePercent !== undefined
+            ? od.canceledOrdersChangePercent
+            : null;
 
         if (prevParams && !hasServerCompare) {
           try {
@@ -419,10 +488,28 @@ const Dashboard = () => {
               od.totalOrders || 0,
               pod.totalOrders || 0,
             );
+            canceledOrdersChangePercent = roundPctChange(
+              od.canceledOrders || 0,
+              pod.canceledOrders || 0,
+            );
           } catch {
             comparisonPeriod = null;
             revenueChangePercent = null;
             ordersChangePercent = null;
+            canceledOrdersChangePercent = null;
+          }
+        } else if (prevParams && hasServerCompare && od.canceledOrdersChangePercent === undefined) {
+          try {
+            const prevRes = await axiosInstance.get("/order/dashboard", {
+              params: prevParams,
+            });
+            const pod = prevRes.data?.data || {};
+            canceledOrdersChangePercent = roundPctChange(
+              od.canceledOrders || 0,
+              pod.canceledOrders || 0,
+            );
+          } catch {
+            canceledOrdersChangePercent = null;
           }
         }
 
@@ -433,6 +520,7 @@ const Dashboard = () => {
           comparisonPeriod,
           revenueChangePercent,
           ordersChangePercent,
+          canceledOrdersChangePercent,
         });
         setRevenue(Array.isArray(rd) ? rd : []);
         setPaymentMethods(Array.isArray(pd) ? pd : []);
@@ -450,6 +538,7 @@ const Dashboard = () => {
           comparisonPeriod: null,
           revenueChangePercent: null,
           ordersChangePercent: null,
+          canceledOrdersChangePercent: null,
         });
         setRevenue([]);
         setPaymentMethods([]);
@@ -459,7 +548,7 @@ const Dashboard = () => {
       }
     };
     fetchData();
-  }, [dateRange, effectiveUnit]);
+  }, [dateRange, timeUnit]);
 
   // ── Loading ────────────────────────────────────────────────
   if (loading)
@@ -503,7 +592,9 @@ const Dashboard = () => {
         .sh-dash { font-family:'Plus Jakarta Sans',sans-serif; background:${T.bg}; padding:28px; animation:fadeIn 0.2s ease; }
         .sh-tr:hover td { background:#FFFBF5 !important; }
         .ant-picker { border-radius:10px !important; font-family:'Plus Jakarta Sans',sans-serif !important; border:1.5px solid ${T.border} !important; }
-        .ant-picker:hover,.ant-picker-focused { border-color:${T.primary} !important; box-shadow:0 0 0 3px rgba(244,157,37,0.10) !important; }
+        .ant-picker:hover,.ant-picker-focused { border-color:${T.primary} !important; box-shadow:0 0 0 3px rgba(240,90,34,0.12) !important; }
+        .sh-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-bottom:24px; }
+        @media (max-width:900px){ .sh-metrics{ grid-template-columns:1fr !important; } }
         .recharts-cartesian-grid-horizontal line, .recharts-cartesian-grid-vertical line { stroke: #F1F5F9; }
         .recharts-tooltip-wrapper { outline:none; }
       `}</style>
@@ -553,7 +644,7 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* ── Header ────────────────────────────────────────── */}
+        {/* ── Header: tiêu đề trái, khoảng thời gian góc phải ─ */}
         <div
           style={{
             display: "flex",
@@ -565,9 +656,11 @@ const Dashboard = () => {
             borderRadius: 16,
             border: `1px solid ${T.border}`,
             boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+            gap: 20,
+            flexWrap: "wrap",
           }}
         >
-          <div>
+          <div style={{ minWidth: 0 }}>
             <h1
               style={{
                 margin: 0,
@@ -583,7 +676,15 @@ const Dashboard = () => {
               Thống kê doanh thu và đơn hàng theo thời gian
             </p>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              alignItems: "flex-end",
+              flexShrink: 0,
+            }}
+          >
             <Segmented
               value={timeUnit}
               onChange={handleTimeUnitChange}
@@ -598,32 +699,23 @@ const Dashboard = () => {
             <DatePicker.RangePicker
               value={dateRange}
               onChange={(values) => {
-                if (values?.[0] && values?.[1]) setDateRange(values);
+                if (values?.[0] && values?.[1]) {
+                  setDateRange([
+                    values[0].startOf("day"),
+                    values[1].endOf("day"),
+                  ]);
+                }
               }}
               format="DD/MM/YYYY"
               allowClear={false}
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
             />
-            <p style={{ margin: 0, fontSize: 12, color: T.textMuted }}>
-              Đang nhóm dữ liệu:{" "}
-              <strong style={{ color: T.textMid }}>
-                {timeUnit === "auto"
-                  ? `${unitLabelMap[effectiveUnit] || "Theo ngày"} (tự động)`
-                  : unitLabelMap[effectiveUnit] || "Theo ngày"}
-              </strong>
-            </p>
+
           </div>
         </div>
 
-        {/* ── Metric cards ──────────────────────────────────── */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
-            gap: 16,
-            marginBottom: 24,
-          }}
-        >
+        {/* ── Metric cards (3 ô như ban đầu) ────────────────── */}
+        <div className="sh-metrics">
           <MetricCard
             icon="payments"
             label="Tổng doanh thu"
@@ -656,54 +748,104 @@ const Dashboard = () => {
             color={T.red}
             bg={T.redBg}
             value={overview.canceledOrders.toLocaleString()}
+            deltaPercent={overview.canceledOrdersChangePercent}
+            comparisonLabel={formatComparisonCaption(
+              overview.comparisonPeriod,
+              overview.canceledOrdersChangePercent === null &&
+                overview.canceledOrders > 0,
+            )}
+            invertDelta
           />
         </div>
 
-        {/* ── Revenue chart ─────────────────────────────────── */}
-        <div style={{ marginBottom: 20 }}>
-          <SCard title="Biểu đồ doanh thu">
+        {/* ── Hai biểu đồ vùng (area) cạnh nhau ─────────────── */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 20,
+            marginBottom: 24,
+          }}
+          className="sh-chart-row"
+        >
+          <style>{`
+            @media (max-width: 960px) {
+              .sh-chart-row { grid-template-columns: 1fr !important; }
+            }
+          `}</style>
+          <SCard
+            title="Xu hướng Doanh thu"
+            action={null}
+          >
             {revenue.length > 0 ? (
-              <ResponsiveContainer width="100%" height={260}>
-                <LineChart
-                  data={revenue}
-                  margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="name"
-                    tick={{
-                      fontFamily: "'Plus Jakarta Sans'",
-                      fontSize: 11,
-                      fill: T.textMuted,
-                    }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tickFormatter={(v) => `${(v / 1_000_000).toFixed(1)}M`}
-                    tick={{
-                      fontFamily: "'Plus Jakarta Sans'",
-                      fontSize: 11,
-                      fill: T.textMuted,
-                    }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip content={<CustomTooltip type="revenue" />} />
-                  <Line
-                    type="monotone"
-                    dataKey="totalRevenue"
-                    stroke={T.primary}
-                    strokeWidth={3}
-                    dot={false}
-                    name="Doanh thu"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <>
+                <ChartLegend
+                  items={[{ color: T.primary, label: "Doanh thu" }]}
+                />
+                <ResponsiveContainer width="100%" height={280}>
+                  <ComposedChart
+                    data={revenue}
+                    margin={{ top: 4, right: 12, left: 4, bottom: 4 }}
+                  >
+                    <defs>
+                      <linearGradient
+                        id={revFillGradId}
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="0%"
+                          stopColor={T.primary}
+                          stopOpacity={0.35}
+                        />
+                        <stop
+                          offset="92%"
+                          stopColor={T.primary}
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="name"
+                      tick={{
+                        fontFamily: "'Plus Jakarta Sans'",
+                        fontSize: 11,
+                        fill: T.textMuted,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tickFormatter={formatRevenueAxisTick}
+                      tick={{
+                        fontFamily: "'Plus Jakarta Sans'",
+                        fontSize: 11,
+                        fill: T.textMuted,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip content={<CustomTooltip type="revenue" />} />
+                    <Area
+                      type="monotone"
+                      dataKey="totalRevenue"
+                      name="Doanh thu"
+                      stroke={T.primary}
+                      strokeWidth={3}
+                      fill={`url(#${revFillGradId})`}
+                      dot={false}
+                      activeDot={{ r: 4, fill: T.primary }}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </>
             ) : (
               <div
                 style={{
-                  height: 260,
+                  height: 280,
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -722,60 +864,90 @@ const Dashboard = () => {
               </div>
             )}
           </SCard>
-        </div>
 
-        {/* ── Orders chart ──────────────────────────────────── */}
-        <div style={{ marginBottom: 20 }}>
-          <SCard title="Biểu đồ đơn hàng">
+          <SCard title="Số lượng đơn hàng" action={null}>
             {revenue.length > 0 ? (
-              <ResponsiveContainer width="100%" height={260}>
-                <LineChart
-                  data={revenue}
-                  margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="name"
-                    tick={{
-                      fontFamily: "'Plus Jakarta Sans'",
-                      fontSize: 11,
-                      fill: T.textMuted,
-                    }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{
-                      fontFamily: "'Plus Jakarta Sans'",
-                      fontSize: 11,
-                      fill: T.textMuted,
-                    }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip content={<CustomTooltip type="orders" />} />
-                  <Line
-                    type="monotone"
-                    dataKey="totalOrders"
-                    stroke={T.blue}
-                    strokeWidth={3}
-                    dot={false}
-                    name="Số đơn hàng"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="canceledOrders"
-                    stroke={T.red}
-                    strokeWidth={2}
-                    dot={false}
-                    name="Đơn hủy"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <>
+                <ChartLegend
+                  items={[
+                    { color: T.chartNavy, label: "Đơn hàng" },
+                    { color: T.red, label: "Đơn hủy" },
+                  ]}
+                />
+                <ResponsiveContainer width="100%" height={280}>
+                  <ComposedChart
+                    data={revenue}
+                    margin={{ top: 4, right: 12, left: 4, bottom: 4 }}
+                  >
+                    <defs>
+                      <linearGradient
+                        id={ordFillGradId}
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="0%"
+                          stopColor={T.chartNavy}
+                          stopOpacity={0.22}
+                        />
+                        <stop
+                          offset="92%"
+                          stopColor={T.chartNavy}
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="name"
+                      tick={{
+                        fontFamily: "'Plus Jakarta Sans'",
+                        fontSize: 11,
+                        fill: T.textMuted,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      tick={{
+                        fontFamily: "'Plus Jakarta Sans'",
+                        fontSize: 11,
+                        fill: T.textMuted,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip content={<CustomTooltip type="orders" />} />
+                    <Area
+                      type="monotone"
+                      dataKey="totalOrders"
+                      name="Đơn hàng"
+                      stroke={T.chartNavy}
+                      strokeWidth={3}
+                      fill={`url(#${ordFillGradId})`}
+                      dot={false}
+                      activeDot={{ r: 4, fill: T.chartNavy }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="canceledOrders"
+                      name="Đơn hủy"
+                      stroke={T.red}
+                      strokeWidth={2}
+                      strokeDasharray="5 4"
+                      dot={false}
+                      activeDot={{ r: 3, fill: T.red }}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </>
             ) : (
               <div
                 style={{
-                  height: 260,
+                  height: 280,
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -796,12 +968,24 @@ const Dashboard = () => {
           </SCard>
         </div>
 
-        {/* ── Bottom 2 cols ─────────────────────────────────── */}
+        {/* ── Thống kê thanh toán + Top bán chạy ─────────────── */}
         <div
-          style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 20 }}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 2fr",
+            gap: 20,
+          }}
+          className="sh-bottom-row"
         >
-          {/* Payment methods */}
-          <SCard title="Phương thức thanh toán">
+          <style>{`
+            @media (max-width: 960px) {
+              .sh-bottom-row { grid-template-columns: 1fr !important; }
+            }
+          `}</style>
+          <SCard
+            title="Thống kê thanh toán (COD, VNPay, Ví)"
+            action={null}
+          >
             {paymentMethods.length === 0 ? (
               <div
                 style={{
@@ -811,7 +995,7 @@ const Dashboard = () => {
                   fontSize: 13,
                 }}
               >
-                Không có dữ liệu
+                Không có đơn trong khoảng thời gian
               </div>
             ) : (
               <div
@@ -823,7 +1007,7 @@ const Dashboard = () => {
                     total > 0 ? ((p.count / total) * 100).toFixed(0) : 0;
                   return (
                     <div
-                      key={p._id}
+                      key={String(p._id)}
                       style={{ display: "flex", alignItems: "center", gap: 12 }}
                     >
                       <PayBadge method={p._id} />
@@ -874,8 +1058,7 @@ const Dashboard = () => {
             )}
           </SCard>
 
-          {/* Top selling */}
-          <SCard title="Top 10 sản phẩm bán chạy">
+          <SCard title="Top sản phẩm bán chạy" action={null}>
             {topVariants.length === 0 ? (
               <div
                 style={{
@@ -1016,6 +1199,25 @@ const Dashboard = () => {
                     ))}
                   </tbody>
                 </table>
+                <button
+                  type="button"
+                  onClick={() => onNavigateTo?.("products")}
+                  style={{
+                    width: "100%",
+                    marginTop: 16,
+                    padding: "12px 16px",
+                    borderRadius: 12,
+                    border: `2px dashed ${T.border}`,
+                    background: "#FFFBF8",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    color: T.textMid,
+                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  }}
+                >
+                  Quản lý sản phẩm
+                </button>
               </div>
             )}
           </SCard>
