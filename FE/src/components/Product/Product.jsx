@@ -222,10 +222,14 @@ const Product = ({
       <div className="p-4">
         <h3 className="font-semibold text-sm">{product.name}</h3>
 
-        <div className="text-yellow-400 flex">
-          {[...Array(5)].map((_, i) => (
-            <FaStar key={i} />
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <FaStar
+              key={star}
+              className={star <= Math.round(ratingOutOf5.value) ? "text-yellow-400" : "text-neutral-300"}
+            />
           ))}
+          <span className="ml-1 text-xs text-neutral-500">({ratingOutOf5.label})</span>
         </div>
 
         <div className="mt-2">

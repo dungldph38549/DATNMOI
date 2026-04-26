@@ -6,6 +6,7 @@ import Product from "../../components/Product/Product";
 import {
   getFeaturedProducts,
   getBestSellers,
+  getTopSellingProducts,
   getNewArrivals,
   getHomeRecommendations,
   fetchProducts,
@@ -56,6 +57,14 @@ const isProductOnRealSale = (product) => {
     return true;
   }
   return false;
+};
+
+const getSoldScore = (product) => {
+  const baseSold = Number(product?.soldCount || product?.sold || 0);
+  const variantSold = Array.isArray(product?.variants)
+    ? product.variants.reduce((sum, variant) => sum + Number(variant?.sold || 0), 0)
+    : 0;
+  return baseSold + variantSold;
 };
 
 const pickForRecommendation = ({
@@ -125,9 +134,17 @@ const HomePage = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [featuredRes, bestRes, newRes, recommendationRes, allProductRes] = await Promise.all([
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        const [featuredRes, bestRes, topSellingRes, newRes, recommendationRes, allProductRes] = await Promise.all([
           getFeaturedProducts(8),
-          getBestSellers(8),
+          getBestSellers(40),
+          getTopSellingProducts({
+            limit: 8,
+            startDate: monthStart.toISOString(),
+            endDate: new Date().toISOString(),
+          }).catch(() => ({ data: [] })),
           getNewArrivals(8),
           getHomeRecommendations(8).catch(() => []),
           fetchProducts({ limit: 120, page: 0 }).catch(() => ({ data: [] })),
@@ -137,9 +154,33 @@ const HomePage = () => {
 
         const featured = featuredRes?.data ?? [];
         const best = bestRes?.data ?? [];
+        const topSelling = topSellingRes?.data ?? [];
         const newArr = newRes?.data ?? [];
 
-        setHotProducts(best.length > 0 ? best : featured.length > 0 ? featured : newArr);
+        const allProducts = Array.isArray(allProductRes?.data) ? allProductRes.data : [];
+        const bestSellerFromAll = allProducts
+          .filter((p) => !isAccessoryProduct(p))
+          .sort((a, b) => {
+            const soldA = getSoldScore(a);
+            const soldB = getSoldScore(b);
+            return soldB - soldA;
+          })
+          .slice(0, 8);
+        const bestSellerFromApi = [...topSelling]
+          .filter((p) => !isAccessoryProduct(p))
+          .sort((a, b) => getSoldScore(b) - getSoldScore(a))
+          .slice(0, 8);
+        const bestSellerFallback = [...best]
+          .filter((p) => !isAccessoryProduct(p))
+          .sort((a, b) => getSoldScore(b) - getSoldScore(a))
+          .slice(0, 8);
+        setHotProducts(
+          bestSellerFromApi.length > 0
+            ? bestSellerFromApi
+            : bestSellerFromAll.length > 0
+              ? bestSellerFromAll
+              : bestSellerFallback,
+        );
         setRecommendedProducts(
           pickForRecommendation({
             recommendations: recommendationRes,
@@ -151,7 +192,6 @@ const HomePage = () => {
           }),
         );
 
-        const allProducts = Array.isArray(allProductRes?.data) ? allProductRes.data : [];
         setSaleProductIds(
           new Set(
             allProducts
@@ -188,7 +228,12 @@ const HomePage = () => {
           const allRes = await fetchProducts({ limit: 24, page: 0 });
           const list = allRes?.data ?? [];
           setProducts(list);
-          setHotProducts(list.slice(0, 8));
+          setHotProducts(
+            [...list]
+              .filter((p) => !isAccessoryProduct(p))
+              .sort((a, b) => getSoldScore(b) - getSoldScore(a))
+              .slice(0, 8),
+          );
           setNewProducts(list.slice(8, 16));
           if (!allProducts.length) {
             setAccessoryProducts(list.filter(isAccessoryProduct).slice(0, 8));
@@ -384,6 +429,37 @@ const HomePage = () => {
           </section>
         )}
 
+        {((!isFiltering && hotDisplay.length > 0) || isFiltering) && (
+          <section>
+            <div className="flex items-end justify-between mb-8">
+              <div>
+                {!isFiltering && (
+                  <span className="text-convot-sage font-bold tracking-widest uppercase text-xs mb-2 flex items-center gap-2">
+                    <FaFire /> Hot
+                  </span>
+                )}
+                <h2 className="text-2xl md:text-3xl font-display font-bold text-convot-charcoal">
+                  {isFiltering ? "Kết quả" : "Sản phẩm hot"}
+                </h2>
+              </div>
+              <Link to="/product" className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-convot-sage hover:underline">
+                Xem tất cả <FaArrowRight className="text-xs" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {hotDisplay.map((p) => (
+                <Product
+                  key={p._id}
+                  product={p}
+                  compactCartCta
+                  hoverStyle="catalog"
+                  showSalePercentBadge={saleProductIds.has(String(p?._id || ""))}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
         {!isFiltering && recommendedProducts.length > 0 && (
           <section>
             <div className="flex items-end justify-between mb-8">
@@ -399,6 +475,33 @@ const HomePage = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {recommendedProducts.slice(0, 8).map((p) => (
+                <Product
+                  key={p._id}
+                  product={p}
+                  compactCartCta
+                  hoverStyle="catalog"
+                  showSalePercentBadge={saleProductIds.has(String(p?._id || ""))}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!isFiltering && accessoryProducts.length > 0 && (
+          <section>
+            <div className="flex items-end justify-between mb-8">
+              <div>
+                <span className="text-convot-sage font-bold tracking-widest uppercase text-xs mb-2 flex items-center gap-2">
+                  <FaGem /> Khác
+                </span>
+                <h2 className="text-2xl md:text-3xl font-display font-bold text-convot-charcoal">Sản phẩm khác</h2>
+              </div>
+              <Link to="/accessories" className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-convot-sage hover:underline">
+                Xem tất cả <FaArrowRight className="text-xs" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {accessoryProducts.map((p) => (
                 <Product
                   key={p._id}
                   product={p}
@@ -438,64 +541,6 @@ const HomePage = () => {
             </div>
           </div>
         </section>
-
-        {((!isFiltering && hotDisplay.length > 0) || isFiltering) && (
-          <section>
-            <div className="flex items-end justify-between mb-8">
-              <div>
-                {!isFiltering && (
-                  <span className="text-convot-sage font-bold tracking-widest uppercase text-xs mb-2 flex items-center gap-2">
-                    <FaFire /> Hot
-                  </span>
-                )}
-                <h2 className="text-2xl md:text-3xl font-display font-bold text-convot-charcoal">
-                  {isFiltering ? "Kết quả" : "Sản phẩm hot"}
-                </h2>
-              </div>
-              <Link to="/product" className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-convot-sage hover:underline">
-                Xem tất cả <FaArrowRight className="text-xs" />
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {hotDisplay.map((p) => (
-                <Product
-                  key={p._id}
-                  product={p}
-                  compactCartCta
-                  hoverStyle="catalog"
-                  showSalePercentBadge={saleProductIds.has(String(p?._id || ""))}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {!isFiltering && accessoryProducts.length > 0 && (
-          <section>
-            <div className="flex items-end justify-between mb-8">
-              <div>
-                <span className="text-convot-sage font-bold tracking-widest uppercase text-xs mb-2 flex items-center gap-2">
-                  <FaGem /> Khác
-                </span>
-                <h2 className="text-2xl md:text-3xl font-display font-bold text-convot-charcoal">Sản phẩm khác</h2>
-              </div>
-              <Link to="/accessories" className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-convot-sage hover:underline">
-                Xem tất cả <FaArrowRight className="text-xs" />
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {accessoryProducts.map((p) => (
-                <Product
-                  key={p._id}
-                  product={p}
-                  compactCartCta
-                  hoverStyle="catalog"
-                  showSalePercentBadge={saleProductIds.has(String(p?._id || ""))}
-                />
-              ))}
-            </div>
-          </section>
-        )}
       </div>
     </main>
   );

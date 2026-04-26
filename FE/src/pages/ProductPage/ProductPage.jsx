@@ -1,8 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { FaChevronLeft, FaChevronRight, FaHeart, FaRegHeart, FaEye } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaHeart, FaRegHeart, FaEye, FaStar } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchProducts, getAllCategories, getVoucherByCode } from "../../api";
+import {
+  fetchProducts,
+  getAllCategories,
+  getReviewStatsByProduct,
+  getVoucherByCode,
+} from "../../api";
 import { getProductPriceInfo } from "../../utils/pricing.js";
 import { getVariantColorValue, getVariantSizeValue } from "../../utils/variantAttributes";
 import { isProductOutOfStock } from "../../utils/stock.js";
@@ -92,6 +97,35 @@ const isProductOnRealSale = (product) => {
   return false;
 };
 
+const matchRatingFilter = (product, selectedRating) => {
+  if (!selectedRating) return true;
+  const currentRating = Number(
+    product?.rating ??
+      product?.averageRating ??
+      product?.avgRating ??
+      product?.reviewStats?.average ??
+      0,
+  );
+  if (selectedRating === "5") return currentRating === 5;
+  const minRating = Number(selectedRating);
+  if (!Number.isFinite(minRating)) return true;
+  return currentRating >= minRating && currentRating < 5;
+};
+
+const getResolvedProductRating = (product, ratingMap = {}) => {
+  const id = String(product?._id || "");
+  const fromStats = Number(ratingMap[id]);
+  if (Number.isFinite(fromStats) && fromStats > 0) return fromStats;
+  const fromProduct = Number(
+    product?.rating ??
+      product?.averageRating ??
+      product?.avgRating ??
+      product?.reviewStats?.average ??
+      0,
+  );
+  return Number.isFinite(fromProduct) ? fromProduct : 0;
+};
+
 const ProductPage = () => {
   const dispatch = useDispatch();
   const location = useLocation();
@@ -99,6 +133,7 @@ const ProductPage = () => {
   const wishlistItems = useSelector((state) => state.wishlist.items || []);
   const user = useSelector((state) => state.user);
   const [products, setProducts] = useState([]);
+  const [productRatingMap, setProductRatingMap] = useState({});
   const [loading, setLoading] = useState(false);
   const [voucherScope, setVoucherScope] = useState(null);
   const [sidebarCategories, setSidebarCategories] = useState([]);
@@ -210,6 +245,36 @@ const ProductPage = () => {
     };
   }, [location.search]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const ids = (Array.isArray(products) ? products : [])
+      .map((p) => String(p?._id || ""))
+      .filter(Boolean)
+      .filter((id) => productRatingMap[id] == null);
+    if (!ids.length) return undefined;
+
+    const loadRatingStats = async () => {
+      const entries = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const stats = await getReviewStatsByProduct(id);
+            const avg = Number(stats?.data?.average ?? stats?.average ?? 0);
+            return [id, Number.isFinite(avg) ? avg : 0];
+          } catch {
+            return [id, 0];
+          }
+        }),
+      );
+      if (cancelled) return;
+      setProductRatingMap((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+    };
+    loadRatingStats();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [products, productRatingMap]);
+
   const maxAvailablePrice = useMemo(() => {
     if (!products.length) return 0;
     return Math.max(...products.map((p) => getProductMinPrice(p)));
@@ -291,7 +356,12 @@ const ProductPage = () => {
     }
 
     if (rating) {
-      data = data.filter((p) => Number(p?.rating ?? 0) >= Number(rating));
+      data = data.filter((p) =>
+        matchRatingFilter(
+          { ...p, rating: getResolvedProductRating(p, productRatingMap) },
+          rating,
+        ),
+      );
     }
 
     if (maxPriceFilter > 0) {
@@ -317,6 +387,7 @@ const ProductPage = () => {
     minPriceFilter,
     maxPriceFilter,
     sort,
+    productRatingMap,
   ]);
 
   useEffect(() => {
@@ -563,8 +634,8 @@ const ProductPage = () => {
               <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Đánh giá</h3>
               <div className="space-y-3">
                 {[
-                  { id: "4", label: "Từ 4 sao" },
-                  { id: "5", label: "Từ 5 sao" },
+                  { id: "3", label: "Từ 3 sao" },
+                  { id: "5", label: "5 sao" },
                 ].map((item) => (
                   <label key={item.id} className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer">
                     <input
@@ -632,6 +703,8 @@ const ProductPage = () => {
                     const image = getImageUrl(item?.image || item?.srcImages?.[0]);
                     const priceInfo = getProductPriceInfo(item);
                     const categoryText = item?.categoryId?.name || item?.category || "Sneakers";
+                    const resolvedRating = getResolvedProductRating(item, productRatingMap);
+                    const roundedRating = Math.round(Math.min(5, Math.max(0, resolvedRating)));
                     const outOfStock = isProductOutOfStock(item);
                     const isRealSale = isProductOnRealSale(item);
                     return (
@@ -698,6 +771,17 @@ const ProductPage = () => {
                           <p className="mt-0.5 line-clamp-1 text-[11px] uppercase tracking-[0.08em] text-neutral-500">
                             {categoryText}
                           </p>
+                          <div className="mt-1 flex items-center gap-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <FaStar
+                                key={star}
+                                className={`text-[11px] ${star <= roundedRating ? "text-amber-400" : "text-neutral-300"}`}
+                              />
+                            ))}
+                            <span className="ml-1 text-[11px] text-neutral-500">
+                              ({resolvedRating > 0 ? resolvedRating.toFixed(1) : "0.0"})
+                            </span>
+                          </div>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <span className="text-base font-bold text-neutral-900">
                               {Number(priceInfo?.effectivePrice || 0).toLocaleString("vi-VN")}đ

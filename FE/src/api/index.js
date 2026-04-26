@@ -187,6 +187,24 @@ export const getBestSellers = async (limit = 10) => {
 };
 
 /**
+ * Lấy top sản phẩm bán chạy theo đơn hàng
+ * GET /api/product/top-selling?limit=8&startDate=&endDate=
+ * Mặc định BE: từ đầu tháng hiện tại đến hiện tại
+ */
+export const getTopSellingProducts = async ({
+  limit = 8,
+  startDate,
+  endDate,
+} = {}) => {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (startDate) params.set("startDate", String(startDate));
+  if (endDate) params.set("endDate", String(endDate));
+  const res = await axiosInstance.get(`/product/top-selling?${params.toString()}`);
+  return res.data;
+};
+
+/**
  * Tìm kiếm sản phẩm theo từ khóa
  * GET /api/product/search?keyword=air+max&limit=12&page=0
  */

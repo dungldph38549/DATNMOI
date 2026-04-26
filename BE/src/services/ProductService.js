@@ -3,6 +3,7 @@
 // ================================================================
 const mongoose = require("mongoose");
 const Product = require("../models/ProductModel");
+const Review = require("../models/Review");
 const { enrichProductPricing, normalizeSaleRules } = require("../utils/salePricing");
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -83,6 +84,51 @@ const computeSimilarityScore = (base, candidate) => {
   }
 
   return Number(score.toFixed(4));
+};
+
+const applyReviewStatsToProducts = async (items = []) => {
+  const list = Array.isArray(items) ? items : [];
+  const ids = list
+    .map((item) => String(item?._id || ""))
+    .filter((id) => mongoose.Types.ObjectId.isValid(id));
+  if (!ids.length) return list;
+
+  const stats = await Review.aggregate([
+    {
+      $match: {
+        productId: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) },
+        isDeleted: false,
+        status: { $in: ["approved", "pending"] },
+      },
+    },
+    {
+      $group: {
+        _id: "$productId",
+        average: { $avg: "$rating" },
+        total: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const byProductId = new Map(
+    stats.map((item) => [
+      String(item?._id || ""),
+      {
+        average: Number(item?.average || 0),
+        total: Number(item?.total || 0),
+      },
+    ]),
+  );
+
+  return list.map((item) => {
+    const stat = byProductId.get(String(item?._id || ""));
+    if (!stat) return { ...item, rating: 0, reviewCount: 0 };
+    return {
+      ...item,
+      rating: Math.round(stat.average * 10) / 10,
+      reviewCount: stat.total,
+    };
+  });
 };
 
 // ================================================================
@@ -385,9 +431,10 @@ const getProducts = async (
       .lean(),
     Product.countDocuments(query),
   ]);
+  const productsWithReviewStats = await applyReviewStatsToProducts(data);
 
   return {
-    data: data.map((item) => enrichProductPricing(item)),
+    data: productsWithReviewStats.map((item) => enrichProductPricing(item)),
     total,
     page: Number(page),
     limit: limitNum,
