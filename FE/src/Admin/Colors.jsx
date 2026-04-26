@@ -402,7 +402,7 @@ export default function Colors() {
           marginBottom: 18,
           boxShadow: "0 12px 30px rgba(15, 23, 42, 0.05)",
           backgroundImage:
-            "radial-gradient(circle at 100% -10%, rgba(253, 230, 138, 0.35) 0%, rgba(255, 255, 255, 0) 40%)",
+            "radial-gradient(circle at 100% -10%, rgba(191, 219, 254, 0.40) 0%, rgba(255, 255, 255, 0) 42%)",
         }}
       >
         <div
@@ -453,7 +453,7 @@ export default function Colors() {
             style={{
               minWidth: 165,
               borderRadius: 14,
-              border: "1px solid rgba(245,158,11,0.45)",
+              border: "1px solid #FDE68A",
               background: T.primarySoft,
               color: "#92400E",
               padding: "10px 12px",
@@ -464,7 +464,7 @@ export default function Colors() {
           </div>
           <div
             style={{
-              minWidth: 190,
+              minWidth: 220,
               borderRadius: 14,
               border: `1px solid ${T.border}`,
               background: "#FFFFFF",
@@ -502,7 +502,6 @@ export default function Colors() {
               </div>
             ),
           }}
-          style={{ background: "#fff" }}
           pagination={{ pageSize: 10, showSizeChanger: false }}
         />
       </div>
@@ -521,7 +520,7 @@ export default function Colors() {
         styles={{
           content: { borderRadius: 18, overflow: "hidden", border: "1px solid rgba(148, 163, 184, 0.25)" },
           header: {
-            background: "linear-gradient(180deg, rgba(251,191,36,0.12), rgba(255,255,255,1))",
+            background: "linear-gradient(180deg, rgba(191,219,254,0.25), rgba(255,255,255,1))",
             paddingBottom: 14,
           },
         }}
@@ -658,12 +657,7 @@ export default function Colors() {
               type="primary"
               htmlType="submit"
               loading={createMutation.isPending || updateMutation.isPending}
-              style={{
-                borderRadius: 10,
-                fontWeight: 700,
-                background: T.primary,
-                borderColor: T.primaryStrong,
-              }}
+              style={{ borderRadius: 10, fontWeight: 700 }}
             >
               {editingId ? "Cập nhật" : "Tạo màu"}
             </Button>
