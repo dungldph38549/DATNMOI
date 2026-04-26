@@ -532,11 +532,11 @@ const OrderDetailPage = () => {
             rating: reviewRating,
             title: null,
             content: mergedContent || null,
-            status: "pending",
+            status: "approved",
           },
         }));
       }
-      notify.success("Đã gửi đánh giá. Đánh giá sẽ hiển thị sau khi được duyệt.");
+      notify.success("Đã gửi đánh giá. Đánh giá hiển thị ngay trên trang sản phẩm.");
       closeReviewModal();
     } catch (err) {
       setReviewError(err?.response?.data?.message || "Không thể gửi đánh giá.");
@@ -886,21 +886,6 @@ const OrderDetailPage = () => {
                                   <span className="inline-flex items-center gap-1 text-secondary">
                                     <FaStar size={11} />
                                     {myReview.rating || 0}/5
-                                  </span>
-                                  <span
-                                    className={`ml-auto rounded border px-2 py-0.5 text-[10px] ${
-                                      myReview.status === "approved"
-                                        ? "border-green-200 bg-green-50 text-green-700"
-                                        : myReview.status === "rejected"
-                                          ? "border-red-200 bg-red-50 text-red-700"
-                                          : "border-amber-200 bg-amber-50 text-amber-700"
-                                    }`}
-                                  >
-                                    {myReview.status === "approved"
-                                      ? "Đã duyệt"
-                                      : myReview.status === "rejected"
-                                        ? "Bị từ chối"
-                                        : "Chờ duyệt"}
                                   </span>
                                 </div>
                                 {myReview.title && (

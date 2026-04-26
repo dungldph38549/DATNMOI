@@ -316,9 +316,11 @@ export const getAllProducts = async ({
   limit = 10,
   isListProductRemoved = false,
   filter = {},
+  reviewsFirst = false,
 } = {}) => {
+  const rf = reviewsFirst ? "&reviewsFirst=1" : "";
   const res = await axiosInstance.get(
-    `/product/admin/get-all?page=${page}&limit=${limit}&isListProductRemoved=${isListProductRemoved}&filter=${encodeURIComponent(JSON.stringify(filter))}`,
+    `/product/admin/get-all?page=${page}&limit=${limit}&isListProductRemoved=${isListProductRemoved}&filter=${encodeURIComponent(JSON.stringify(filter))}${rf}`,
   );
   return res.data;
 };
@@ -794,6 +796,27 @@ export const getAdminReviews = async ({ status, productId, page, limit } = {}) =
   return res.data;
 };
 
+/** Tổng số đánh giá chưa xóa (toàn hệ thống). GET /api/admin/reviews/stats-summary */
+export const getAdminReviewTotalCount = async () => {
+  const res = await axiosInstance.get("/admin/reviews/stats-summary");
+  return res.data;
+};
+
+/** Cài đặt phản hồi tự động cho đánh giá mới */
+export const getAdminReviewAutoReplySettings = async () => {
+  const res = await axiosInstance.get("/admin/reviews/auto-reply-settings");
+  const body = res.data;
+  if (body?.status === "OK" && body.data != null) return body.data;
+  return body?.data ?? body;
+};
+
+export const patchAdminReviewAutoReplySettings = async (payload) => {
+  const res = await axiosInstance.patch("/admin/reviews/auto-reply-settings", payload);
+  const body = res.data;
+  if (body?.status === "OK" && body.data != null) return body.data;
+  return body?.data ?? body;
+};
+
 export const approveAdminReview = async (id) => {
   const res = await axiosInstance.patch(`/admin/reviews/${id}/approve`);
   return res.data;
@@ -803,5 +826,10 @@ export const rejectAdminReview = async (id, reason = "") => {
   const res = await axiosInstance.patch(`/admin/reviews/${id}/reject`, {
     reason,
   });
+  return res.data;
+};
+
+export const addReviewReply = async (reviewId, content) => {
+  const res = await axiosInstance.post(`/reviews/${reviewId}/replies`, { content });
   return res.data;
 };

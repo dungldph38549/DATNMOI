@@ -139,7 +139,7 @@ const reviewSchema = new mongoose.Schema(
         values: ["pending", "approved", "rejected"],
         message: "Status không hợp lệ",
       },
-      default: "pending",
+      default: "approved",
       index: true,
     },
     rejectedReason: { type: String, default: null },

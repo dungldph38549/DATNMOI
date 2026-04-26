@@ -67,8 +67,6 @@ const ProductDetail = () => {
   const [relatedLoading, setRelatedLoading] = useState(false);
 
   const [reviews, setReviews] = useState([]);
-  /** Đánh giá của user cho SP (mỗi lần mua tối đa một bản ghi) */
-  const [myReviews, setMyReviews] = useState([]);
   const [reviewStats, setReviewStats] = useState(null);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   /** all | 1..5 | comment | media */
@@ -215,7 +213,7 @@ const ProductDetail = () => {
     return getProductPriceInfo(product);
   }, [product, selectedVariant, hasVariants]);
 
-  /** Trung bình sao từ API (tất cả đánh giá đã duyệt); khi chưa tải xong thì tạm dùng dữ liệu sản phẩm nếu có */
+  /** Trung bình sao từ API (đánh giá hiển thị công khai); khi chưa tải xong thì tạm dùng dữ liệu sản phẩm nếu có */
   const ratingAverage = useMemo(() => {
     if (reviewStats != null) {
       const a = Number(reviewStats.average);
@@ -501,7 +499,6 @@ const ProductDetail = () => {
             mineList = [];
           }
         }
-        setMyReviews(mineList);
         const mineIds = new Set(mineList.map((m) => String(m?._id)));
         let mergedReviews = [
           ...mineList,
@@ -525,7 +522,6 @@ const ProductDetail = () => {
         setReviewStats(res?.stats ?? null);
       } catch (err) {
         setReviews([]);
-        setMyReviews([]);
         setReviewStats(null);
       } finally {
         setReviewsLoading(false);
@@ -533,11 +529,6 @@ const ProductDetail = () => {
     };
     run();
   }, [product, user?.login, reviewListFilter]);
-
-  const myReviewIdSet = useMemo(
-    () => new Set(myReviews.map((m) => String(m?._id))),
-    [myReviews],
-  );
 
   const reviewDistribution = useMemo(() => {
     const d = reviewStats?.distribution;
@@ -1257,11 +1248,6 @@ const ProductDetail = () => {
                                       </p>
                                     );
                                   })()}
-                                  {myReviewIdSet.has(String(r?._id)) && (
-                                    <span className={`inline-block mt-2 text-[10px] font-bold px-2 py-0.5 rounded ${r?.status === "approved" ? "bg-green-100 text-green-700" : r?.status === "rejected" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
-                                      {r?.status === "approved" ? "Đã duyệt" : r?.status === "rejected" ? "Bị từ chối" : "Chờ duyệt"}
-                                    </span>
-                                  )}
                                   {r.title && <p className="font-bold text-slate-900 mt-3 text-sm">{r.title}</p>}
                                   {parsed.kv.length > 0 && (
                                     <div className="mt-2 space-y-1">

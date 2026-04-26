@@ -175,6 +175,33 @@ const adminGetReviews = async (req, res) => {
   }
 };
 
+const adminReviewStatsSummary = async (req, res) => {
+  try {
+    const data = await reviewService.adminReviewTotalCount();
+    return res.status(200).json({ status: "OK", ...data });
+  } catch (e) {
+    return handleError(res, e);
+  }
+};
+
+const getReviewAutoReplySettings = async (req, res) => {
+  try {
+    const data = await reviewService.getReviewAutoReplySettings();
+    return res.status(200).json({ status: "OK", data });
+  } catch (e) {
+    return handleError(res, e);
+  }
+};
+
+const patchReviewAutoReplySettings = async (req, res) => {
+  try {
+    const data = await reviewService.updateReviewAutoReplySettings(req.body);
+    return res.status(200).json({ status: "OK", data });
+  } catch (e) {
+    return handleError(res, e);
+  }
+};
+
 const approveReview = async (req, res) => {
   try {
     const data = await reviewService.approveReview(req.params.id);
@@ -211,6 +238,9 @@ module.exports = {
   addReply,
   deleteReply,
   adminGetReviews,
+  adminReviewStatsSummary,
+  getReviewAutoReplySettings,
+  patchReviewAutoReplySettings,
   approveReview,
   rejectReview,
 };

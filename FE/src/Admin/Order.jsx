@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Table, Select, Button, Input, Pagination, Modal } from "antd";
+import { Table, Select, Button, Input, Pagination, Modal, DatePicker } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import dayjs from "dayjs";
 import { getAllOrders, updateOrderStatus } from "../api/index";
 import notify from "../utils/notify";
 
@@ -50,6 +51,12 @@ const DATE_PRESETS = [
   { key: "30d", label: "30 ngày qua" },
   { key: "month", label: "Tháng này" },
   { key: "all", label: "Tất cả" },
+];
+const ORDER_SORT_OPTIONS = [
+  { value: "newest", label: "Mới nhất" },
+  { value: "oldest", label: "Cũ nhất" },
+  { value: "total_desc", label: "Tổng đơn: cao đến thấp" },
+  { value: "total_asc", label: "Tổng đơn: thấp đến cao" },
 ];
 
 const TRANSITIONS = {
@@ -178,6 +185,7 @@ export default function Order({ mode = "all" }) {
   const [datePreset, setDatePreset] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [sortBy, setSortBy] = useState("newest");
   const hasDateFilter = !!(startDate || endDate);
 
   const { data, isLoading } = useQuery({
@@ -242,7 +250,7 @@ export default function Order({ mode = "all" }) {
   }, [rawOrders, mode]);
   const filteredOrders = useMemo(() => {
     const keywordNormalized = keyword.trim().toLowerCase();
-    return orders.filter((o) => {
+    const filtered = orders.filter((o) => {
       const paymentStatus = String(o?.paymentStatus || "").trim().toLowerCase();
       const orderStatus = String(o?.status || "").trim().toLowerCase();
       const paymentMethod = String(o?.paymentMethod || "").trim().toLowerCase();
@@ -290,6 +298,17 @@ export default function Order({ mode = "all" }) {
         byDateEnd
       );
     });
+    const sorted = [...filtered];
+    if (sortBy === "oldest") {
+      sorted.sort((a, b) => new Date(a?.createdAt || 0) - new Date(b?.createdAt || 0));
+    } else if (sortBy === "total_desc") {
+      sorted.sort((a, b) => Number(b?.totalAmount || 0) - Number(a?.totalAmount || 0));
+    } else if (sortBy === "total_asc") {
+      sorted.sort((a, b) => Number(a?.totalAmount || 0) - Number(b?.totalAmount || 0));
+    } else {
+      sorted.sort((a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0));
+    }
+    return sorted;
   }, [
     orders,
     keyword,
@@ -300,10 +319,11 @@ export default function Order({ mode = "all" }) {
     returnReasonFilter,
     startDate,
     endDate,
+    sortBy,
   ]);
   useEffect(() => {
     setPage(0);
-  }, [mode, keyword, paymentFilter, statusFilter, methodFilter, returnReasonFilter, startDate, endDate]);
+  }, [mode, keyword, paymentFilter, statusFilter, methodFilter, returnReasonFilter, startDate, endDate, sortBy]);
   const allowedNext = (current) => TRANSITIONS[current] || [];
   const pagedOrders = useMemo(
     () => filteredOrders.slice(page * limit, (page + 1) * limit),
@@ -966,6 +986,13 @@ export default function Order({ mode = "all" }) {
         />
         <Select
           size="small"
+          value={sortBy}
+          style={{ flex: "1 1 190px", minWidth: 180 }}
+          options={ORDER_SORT_OPTIONS}
+          onChange={setSortBy}
+        />
+        <Select
+          size="small"
           value={statusFilter}
           style={{ flex: "1 1 160px", minWidth: 150 }}
           options={[
@@ -1011,18 +1038,47 @@ export default function Order({ mode = "all" }) {
             onChange={setReturnReasonFilter}
           />
         )}
+        <Button
+          size="small"
+          onClick={() => {
+            setKeyword("");
+            setStatusFilter("all");
+            setMethodFilter("all");
+            setPaymentFilter("all");
+            setReturnReasonFilter("all");
+            setSortBy("newest");
+            setDatePreset("all");
+            setStartDate("");
+            setEndDate("");
+          }}
+        >
+          Xóa lọc
+        </Button>
         <div
           style={{
             width: "100%",
             display: "flex",
             alignItems: "center",
             gap: 8,
+            rowGap: 8,
             flexWrap: "wrap",
-            paddingTop: 4,
+            paddingTop: 8,
             borderTop: "1px dashed #E5E7EB",
-            marginTop: 4,
+            marginTop: 6,
+            justifyContent: "flex-start",
           }}
         >
+          <span
+            style={{
+              flex: "1 0 100%",
+              color: "#6B7280",
+              fontSize: 12,
+              fontWeight: 600,
+              marginBottom: -4,
+            }}
+          >
+            Thời gian đặt
+          </span>
           {DATE_PRESETS.map((p) => (
             <button
               key={p.key}
@@ -1038,25 +1094,29 @@ export default function Order({ mode = "all" }) {
               {p.label}
             </button>
           ))}
-          <span style={{ color: "#9CA3AF", fontSize: 12 }}>|</span>
-          <input
-            type="date"
-            className="admin-date-input"
-            value={startDate}
-            onChange={(e) => {
-              setStartDate(e.target.value);
+          <span style={{ color: "#9CA3AF", fontSize: 12, marginLeft: 4 }}>Từ</span>
+          <DatePicker
+            size="small"
+            format="DD/MM/YYYY"
+            placeholder="DD/MM/YYYY"
+            value={startDate ? dayjs(startDate, "YYYY-MM-DD") : null}
+            onChange={(value) => {
+              setStartDate(value ? value.format("YYYY-MM-DD") : "");
               setDatePreset("");
             }}
+            style={{ minWidth: 132, borderRadius: 12 }}
           />
           <span style={{ color: "#6B7280", fontSize: 12 }}>đến</span>
-          <input
-            type="date"
-            className="admin-date-input"
-            value={endDate}
-            onChange={(e) => {
-              setEndDate(e.target.value);
+          <DatePicker
+            size="small"
+            format="DD/MM/YYYY"
+            placeholder="DD/MM/YYYY"
+            value={endDate ? dayjs(endDate, "YYYY-MM-DD") : null}
+            onChange={(value) => {
+              setEndDate(value ? value.format("YYYY-MM-DD") : "");
               setDatePreset("");
             }}
+            style={{ minWidth: 132, borderRadius: 12 }}
           />
           {hasDateFilter ? (
             <button
@@ -1073,25 +1133,22 @@ export default function Order({ mode = "all" }) {
               X
             </button>
           ) : null}
+          <span
+            style={{
+              fontSize: 12,
+              color: "#6B7280",
+              marginLeft: "auto",
+              whiteSpace: "nowrap",
+              fontWeight: 600,
+              padding: "4px 10px",
+              borderRadius: 8,
+              background: "#F9FAFB",
+              border: "1px solid #EEF0F2",
+            }}
+          >
+            {filteredOrders.length} đơn · {productLineCount} dòng SP
+          </span>
         </div>
-        <Button
-          size="small"
-          onClick={() => {
-            setKeyword("");
-            setStatusFilter("all");
-            setMethodFilter("all");
-            setPaymentFilter("all");
-            setReturnReasonFilter("all");
-            setDatePreset("all");
-            setStartDate("");
-            setEndDate("");
-          }}
-        >
-          Xóa lọc
-        </Button>
-        <span style={{ fontSize: 12, color: "#888", marginLeft: "auto", whiteSpace: "nowrap" }}>
-          {filteredOrders.length} đơn · {productLineCount} dòng SP
-        </span>
       </div>
       {mode === "returns" && (
         <p style={{ margin: "0 0 8px", fontSize: 13, color: "#666" }}>
@@ -1115,14 +1172,21 @@ export default function Order({ mode = "all" }) {
         style={{
           marginTop: 10,
           display: "flex",
-          justifyContent: "flex-end",
+          justifyContent: "space-between",
           flexWrap: "wrap",
-          gap: 8,
+          gap: 10,
+          rowGap: 10,
           alignItems: "center",
+          padding: "10px 12px",
+          background: "#FAFAFB",
+          borderRadius: 8,
+          border: "1px solid #ECECEC",
         }}
       >
-        <span style={{ fontSize: 12, color: "#666", marginRight: "auto" }}>
-          {filteredOrders.length} đơn · {productLineCount} dòng SP (đã lọc trang này)
+        <span style={{ fontSize: 12, color: "#666", flex: "1 1 180px", minWidth: 0, lineHeight: 1.45 }}>
+          <strong style={{ color: "#111827" }}>{filteredOrders.length}</strong> đơn ·{" "}
+          <strong style={{ color: "#111827" }}>{productLineCount}</strong> dòng SP{" "}
+          <span style={{ color: "#9CA3AF" }}>(theo bộ lọc)</span>
         </span>
         <Pagination
           current={page + 1}

@@ -80,12 +80,18 @@ exports.getProducts = async (req, res) => {
 // ================================================================
 exports.getAllProducts = async (req, res) => {
   try {
-    const { limit, page, filter, isListProductRemoved } = req.query;
+    const { limit, page, filter, isListProductRemoved, reviewsFirst } = req.query;
+    const rf =
+      reviewsFirst === "1" ||
+      reviewsFirst === "true" ||
+      reviewsFirst === 1 ||
+      reviewsFirst === true;
     const result = await ProductService.getAllProductsAdmin(
       Number(limit) || 10,
       Number(page) || 0,
       filter,
       isListProductRemoved,
+      rf,
     );
     res.json(result);
   } catch (err) {

@@ -139,6 +139,7 @@ const getAllProducts = async (
   page = 0,
   filter = {},
   isListProductRemoved = 0,
+  reviewsFirst = false,
 ) => {
   const includeRemoved =
     isListProductRemoved === "1" ||
@@ -179,16 +180,110 @@ const getAllProducts = async (
   const limitNum = Number(limit) || 10;
   const skip = Number(page) * limitNum;
 
-  const [total, items] = await Promise.all([
-    Product.countDocuments(query),
-    Product.find(query)
-      .populate("brandId", "name logo")
-      .populate("categoryId", "name")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limitNum)
-      .lean(),
+  const rr = parsedFilter?.reviewRating;
+  let reviewRatingNum = null;
+  if (rr != null && rr !== "") {
+    const n = Math.round(Number(rr));
+    if (Number.isFinite(n) && n >= 1 && n <= 5) reviewRatingNum = n;
+  }
+
+  if (!reviewsFirst) {
+    const [total, items] = await Promise.all([
+      Product.countDocuments(query),
+      Product.find(query)
+        .populate("brandId", "name logo")
+        .populate("categoryId", "name")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+    ]);
+
+    return {
+      data: items.map((item) => enrichProductPricing(item)),
+      total,
+      page: Number(page),
+      limit: limitNum,
+      totalPage: Math.ceil(total / limitNum) || 1,
+    };
+  }
+
+  const reviewColl = Review.collection.collectionName;
+
+  const buildReviewLookupPipeline = () => {
+    const exprAnd = [
+      { $eq: ["$productId", "$$pid"] },
+      { $ne: ["$isDeleted", true] },
+    ];
+    if (reviewRatingNum != null) exprAnd.push({ $eq: ["$rating", reviewRatingNum] });
+    return [{ $match: { $expr: { $and: exprAnd } } }, { $count: "total" }];
+  };
+
+  const reviewCountStages = [
+    {
+      $lookup: {
+        from: reviewColl,
+        let: { pid: "$_id" },
+        pipeline: buildReviewLookupPipeline(),
+        as: "_rc",
+      },
+    },
+    {
+      $addFields: {
+        reviewCount: {
+          $let: {
+            vars: { first: { $arrayElemAt: ["$_rc", 0] } },
+            in: { $ifNull: ["$$first.total", 0] },
+          },
+        },
+      },
+    },
+  ];
+
+  const ratingMatchStage =
+    reviewRatingNum != null ? [{ $match: { reviewCount: { $gt: 0 } } }] : [];
+
+  const pipeline = [
+    { $match: query },
+    ...reviewCountStages,
+    ...ratingMatchStage,
+    { $sort: { reviewCount: -1, createdAt: -1 } },
+    { $skip: skip },
+    { $limit: limitNum },
+    { $project: { _rc: 0, reviewCount: 0 } },
+  ];
+
+  const countPipeline = [
+    { $match: query },
+    ...reviewCountStages,
+    ...ratingMatchStage,
+    { $count: "c" },
+  ];
+
+  const [countResult, aggDocs] = await Promise.all([
+    Product.aggregate(countPipeline),
+    Product.aggregate(pipeline),
   ]);
+  const total = countResult[0]?.c ?? 0;
+
+  const ids = aggDocs.map((d) => d._id).filter(Boolean);
+  if (!ids.length) {
+    return {
+      data: [],
+      total,
+      page: Number(page),
+      limit: limitNum,
+      totalPage: Math.ceil(total / limitNum) || 1,
+    };
+  }
+
+  const populated = await Product.find({ _id: { $in: ids } })
+    .populate("brandId", "name logo")
+    .populate("categoryId", "name")
+    .lean();
+
+  const byId = new Map(populated.map((p) => [String(p._id), p]));
+  const items = ids.map((id) => byId.get(String(id))).filter(Boolean);
 
   return {
     data: items.map((item) => enrichProductPricing(item)),

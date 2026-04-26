@@ -39,6 +39,11 @@ const STATUS_LABELS = {
 
 const RETURN_STATUSES = new Set(["return-request", "accepted", "rejected"]);
 const REVIEWABLE_STATUSES = new Set(["delivered", "received"]);
+const IN_PROGRESS_STATUSES = new Set([
+  "pending",
+  "confirmed",
+  "shipped",
+]);
 const PAGE_SIZE = 10;
 const FETCH_LIMIT = 50;
 const RETURN_REASON_OPTIONS = [
@@ -78,22 +83,12 @@ function orderMatchesTab(order, tabId) {
     return (
       pay === "unpaid" &&
       (method === "vnpay" || method === "wallet") &&
-      st === "pending"
+      (st === "pending" || st === "confirmed")
     );
   }
 
-  if (tabId === "shipping") {
-    if (st === "canceled" || RETURN_STATUSES.has(st)) return false;
-    if (st === "shipped") return true;
-    if (st === "pending") {
-      if (pay === "unpaid" && (method === "vnpay" || method === "wallet"))
-        return false;
-      return true;
-    }
-    return false;
-  }
-
-  if (tabId === "awaiting_delivery") return st === "confirmed" || st === "delivered";
+  if (tabId === "awaiting_delivery") return st === "confirmed";
+  if (tabId === "shipping") return st === "shipped" || st === "delivered";
   if (tabId === "completed") return st === "received";
   if (tabId === "canceled") return st === "canceled";
   if (tabId === "return_refund") return RETURN_STATUSES.has(st);
@@ -497,6 +492,7 @@ const OrderHistoryPage = () => {
               const st = normalize(order);
               const canReviewOrder = REVIEWABLE_STATUSES.has(st);
               const sub = statusSubline(st);
+              const shouldShowStatusNotice = IN_PROGRESS_STATUSES.has(st);
               const lines = order.products;
               if (!lines?.length) {
                 return null;
@@ -558,23 +554,27 @@ const OrderHistoryPage = () => {
                       </Link>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 justify-end text-base">
-                      <span className="inline-flex items-center gap-2 text-slate-600">
-                        {subIcon(sub.icon)}
-                        <span>{sub.text}</span>
-                      </span>
-                      <button
-                        type="button"
-                        className="p-0.5 text-slate-400 hover:text-slate-600"
-                        title="Trợ giúp"
-                        aria-label="Trợ giúp"
-                      >
-                        <FaQuestionCircle size={16} />
-                      </button>
-                      <span
-                        className={`ml-0.5 text-sm font-bold tracking-wide sm:text-base ${headlineClass(st)}`}
-                      >
-                        {headline}
-                      </span>
+                      {shouldShowStatusNotice && (
+                        <>
+                          <span className="inline-flex items-center gap-2 text-slate-600">
+                            {subIcon(sub.icon)}
+                            <span>{sub.text}</span>
+                          </span>
+                          <button
+                            type="button"
+                            className="p-0.5 text-slate-400 hover:text-slate-600"
+                            title="Trợ giúp"
+                            aria-label="Trợ giúp"
+                          >
+                            <FaQuestionCircle size={16} />
+                          </button>
+                          <span
+                            className={`ml-0.5 text-sm font-bold tracking-wide sm:text-base ${headlineClass(st)}`}
+                          >
+                            {headline}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 
