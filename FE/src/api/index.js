@@ -17,14 +17,15 @@ import axiosInstance from "./axiosConfig";
 
 export const addToCartAPI = async (payload) => {
   // Back-end: POST /api/cart/:userId/items
-  // payload: { userId, productId, qty, sku?, size? }
-  const { userId, productId, qty, sku, size } = payload || {};
+  // payload: { userId, productId, qty, sku?, size?, color? }
+  const { userId, productId, qty, sku, size, color } = payload || {};
   if (!userId || !productId) throw new Error("Missing userId or productId");
   const res = await axiosInstance.post(`/cart/${userId}/items`, {
     productId,
     qty,
     sku: sku ?? null,
     size: size ?? null,
+    color: color ?? null,
   });
   return res.data;
 };

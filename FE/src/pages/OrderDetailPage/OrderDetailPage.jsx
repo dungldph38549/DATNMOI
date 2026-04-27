@@ -211,8 +211,35 @@ const getReviewProductThumb = (line) => {
   return `http://localhost:3002/uploads/${String(imgName).startsWith("/") ? String(imgName).slice(1) : imgName}`;
 };
 
+const getLineColorFromAttributes = (line) => {
+  const attrs = line?.attributes;
+  if (!attrs || typeof attrs !== "object") return null;
+  const entries =
+    typeof attrs.entries === "function"
+      ? Array.from(attrs.entries())
+      : Object.entries(attrs);
+  for (const [k, v] of entries) {
+    const lk = String(k || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d");
+    if (
+      (lk === "color" || lk === "mau") &&
+      v != null &&
+      String(v).trim() !== ""
+    ) {
+      return String(v).trim();
+    }
+  }
+  return null;
+};
+
 const getReviewVariantLabel = (line) => {
-  if (line?.size) return String(line.size);
+  if (line?.size) {
+    const col = getLineColorFromAttributes(line);
+    return col ? `${line.size} · ${col}` : String(line.size);
+  }
   const attrs = line?.attributes;
   if (attrs && typeof attrs === "object") {
     const entries = Object.entries(attrs).filter(([, v]) => v != null && String(v).trim() !== "");
@@ -423,6 +450,11 @@ const OrderDetailPage = () => {
           qty: Math.max(1, Number(p.quantity || 1)),
           size: p.size ?? null,
           sku: p.sku ?? null,
+          color:
+            getLineColorFromAttributes(p) ??
+            (p.color != null && String(p.color).trim() !== ""
+              ? String(p.color).trim()
+              : null),
         }),
       );
     });

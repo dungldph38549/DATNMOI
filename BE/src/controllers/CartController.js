@@ -48,7 +48,7 @@ const getCart = async (req, res, next) => {
 const addItem = async (req, res, next) => {
   try {
     const { userId } = req.params;
-    const { productId, qty, sku, size } = req.body || {};
+    const { productId, qty, sku, size, color } = req.body || {};
 
     if (!isValidObjectId(userId)) {
       return res
@@ -81,6 +81,30 @@ const addItem = async (req, res, next) => {
     let availableStock = 0;
     let variantPrice = product.price;
     let variantSize = size ?? null;
+    let variantColor =
+      color != null && String(color).trim() !== ""
+        ? String(color).trim()
+        : null;
+
+    const pickColorFromAttrs = (attrs) => {
+      if (!attrs) return null;
+      const fromGet =
+        attrs.get?.("Color") ??
+        attrs.get?.("color") ??
+        attrs.get?.("Màu") ??
+        attrs.get?.("Mau");
+      if (fromGet != null && String(fromGet).trim() !== "")
+        return String(fromGet).trim();
+      if (typeof attrs === "object" && !attrs.get) {
+        const key = Object.keys(attrs).find((k) => {
+          const lk = String(k).toLowerCase();
+          return lk === "color" || lk === "màu" || lk === "mau";
+        });
+        const v = key ? attrs[key] : null;
+        if (v != null && String(v).trim() !== "") return String(v).trim();
+      }
+      return null;
+    };
 
     if (sku && product?.hasVariants) {
       const variant = product.variants.find((v) => v.sku === sku);
@@ -95,6 +119,8 @@ const addItem = async (req, res, next) => {
       // Map attributes trong Mongoose có thể là Map hoặc object tuỳ trường hợp
       const maybeGet = variant?.attributes?.get?.("Size");
       variantSize = size ?? maybeGet ?? variant?.attributes?.Size ?? null;
+      const fromVariant = pickColorFromAttrs(variant?.attributes);
+      variantColor = variantColor ?? fromVariant ?? null;
     } else {
       // Không có SKU → lấy tồn kho tổng sản phẩm
       availableStock = product.stock ?? product.countInStock ?? product?.totalStock ?? 0;
@@ -128,7 +154,10 @@ const addItem = async (req, res, next) => {
       if (sku && existing.sku !== sku) {
         existing.sku = sku;
         existing.size = variantSize;
+        existing.color = variantColor;
         existing.price = variantPrice ?? existing.price;
+      } else if (sku && existing.sku === sku && variantColor != null) {
+        existing.color = variantColor;
       }
 
       // Tính lại availableStock theo SKU hiện tại nếu có.
@@ -151,6 +180,7 @@ const addItem = async (req, res, next) => {
         product: product._id,
         sku: product?.hasVariants ? sku ?? null : null,
         size: product?.hasVariants ? variantSize : null,
+        color: product?.hasVariants ? variantColor : null,
         name: product.name,
         image: product.image,
         price: product?.hasVariants ? variantPrice ?? product.price : product.price,

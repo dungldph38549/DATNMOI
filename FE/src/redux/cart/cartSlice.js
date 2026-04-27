@@ -40,6 +40,7 @@ const parseStoredCartItems = () => {
       sku:
         i.sku == null ? null : String(i.sku).trim().toUpperCase(),
       size: i.size ?? null,
+      color: i.color ?? null,
       cartKey:
         i.cartKey ??
         buildCartKey({
@@ -94,6 +95,10 @@ const cartSlice = createSlice({
       const sku =
         skuRaw == null ? null : String(skuRaw).trim().toUpperCase();
       const size = payload.size ?? null;
+      const color =
+        payload.color == null || String(payload.color).trim() === ""
+          ? null
+          : String(payload.color).trim();
       const forceCartKey =
         payload.cartKey != null && String(payload.cartKey).trim() !== ""
           ? String(payload.cartKey).trim()
@@ -110,6 +115,7 @@ const cartSlice = createSlice({
         if (originalPrice != null && Number.isFinite(originalPrice)) {
           existing.originalPrice = originalPrice;
         }
+        if (color != null) existing.color = color;
       } else {
         state.items.push({
           cartKey,
@@ -121,6 +127,7 @@ const cartSlice = createSlice({
           qty,
           sku,
           size,
+          color,
         });
       }
 
@@ -162,7 +169,8 @@ const cartSlice = createSlice({
       saveCart(state);
     },
     updateCartVariant: (state, action) => {
-      const { cartKey, sku, size, price, originalPrice } = action.payload || {};
+      const { cartKey, sku, size, price, originalPrice, color } =
+        action.payload || {};
       if (!cartKey) return;
       const item = state.items.find((i) => i.cartKey === cartKey);
       if (!item) return;
@@ -175,6 +183,10 @@ const cartSlice = createSlice({
         size == null || String(size).trim() === ""
           ? null
           : String(size).trim();
+      const normalizedColor =
+        color == null || String(color).trim() === ""
+          ? null
+          : String(color).trim();
 
       const nextCartKey = buildCartKey({
         productId: item.productId,
@@ -184,6 +196,7 @@ const cartSlice = createSlice({
 
       item.sku = normalizedSku;
       item.size = normalizedSize;
+      item.color = normalizedColor;
       if (price != null && Number.isFinite(Number(price))) {
         item.price = Number(price);
       }

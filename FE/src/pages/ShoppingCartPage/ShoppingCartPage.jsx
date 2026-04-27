@@ -28,7 +28,10 @@ const ShoppingCartPage = () => {
   const [stockByItemKey, setStockByItemKey] = useState({});
   const [stockNoticeKey, setStockNoticeKey] = useState("");
   const [variantModal, setVariantModal] = useState({
-    open: false, itemKey: null, productId: null, currentSize: "", selectedSize: "",
+    open: false,
+    itemKey: null,
+    productId: null,
+    selectedSku: "",
   });
   const getItemKey = (item) => item.cartKey || item.productId;
 
@@ -194,7 +197,10 @@ const ShoppingCartPage = () => {
   };
 
   const loadVariantOptions = async (productId) => {
-    if (!productId || variantOptionsByProduct[productId]) return;
+    if (!productId) return [];
+    if (variantOptionsByProduct[productId]?.length) {
+      return variantOptionsByProduct[productId];
+    }
     try {
       const data = await getProductById(productId);
       const product = data?.data ?? data;
@@ -202,52 +208,108 @@ const ShoppingCartPage = () => {
       const normalized = variants.map((v) => {
         const attrs = v?.attributes;
         let size = null;
-        if (attrs && typeof attrs.get === "function") { size = attrs.get("Size") ?? attrs.get("size") ?? null; }
-        else if (attrs && typeof attrs === "object") {
-          const found = Object.keys(attrs).find((k) => String(k).toLowerCase() === "size");
-          size = found ? attrs[found] : null;
+        let color = null;
+        if (attrs && typeof attrs.get === "function") {
+          size = attrs.get("Size") ?? attrs.get("size") ?? null;
+          color =
+            attrs.get("Color") ??
+            attrs.get("color") ??
+            attrs.get("Màu") ??
+            attrs.get("Mau") ??
+            null;
+        } else if (attrs && typeof attrs === "object") {
+          const foundSize = Object.keys(attrs).find(
+            (k) => String(k).toLowerCase() === "size",
+          );
+          size = foundSize ? attrs[foundSize] : null;
+          const foundColor = Object.keys(attrs).find((k) => {
+            const lk = String(k).toLowerCase();
+            return lk === "color" || lk === "màu" || lk === "mau";
+          });
+          color = foundColor ? attrs[foundColor] : null;
         }
         const label = size != null ? String(size) : String(v?.sku || "");
-          return {
-            size: label,
-            sku: v?.sku ? String(v.sku).trim().toUpperCase() : null,
-            stock: Number(v?.stock ?? 0),
-            price: Number(v?.effectivePrice ?? v?.price ?? 0),
-            originalPrice: Number(v?.originalPrice ?? v?.price ?? 0),
-          };
-      }).filter((v) => v.size);
+        const colorStr =
+          color != null && String(color).trim() !== ""
+            ? String(color).trim()
+            : "";
+        return {
+          size: label,
+          color: colorStr,
+          sku: v?.sku ? String(v.sku).trim().toUpperCase() : null,
+          stock: Number(v?.stock ?? 0),
+          price: Number(v?.effectivePrice ?? v?.price ?? 0),
+          originalPrice: Number(v?.originalPrice ?? v?.price ?? 0),
+        };
+      }).filter((v) => v.sku || v.size);
       setVariantOptionsByProduct((prev) => ({ ...prev, [productId]: normalized }));
-    } catch { setVariantOptionsByProduct((prev) => ({ ...prev, [productId]: [] })); }
+      return normalized;
+    } catch {
+      setVariantOptionsByProduct((prev) => ({ ...prev, [productId]: [] }));
+      return [];
+    }
   };
 
   const openVariantModal = async (item) => {
     const itemKey = getItemKey(item);
     const productId = item.productId;
-    await loadVariantOptions(productId);
-    setVariantModal({ open: true, itemKey, productId, currentSize: item.size || "", selectedSize: item.size || "" });
+    const options = await loadVariantOptions(productId);
+    const skuNorm = item.sku ? String(item.sku).trim().toUpperCase() : "";
+    let selectedSku = skuNorm;
+    if (!options.some((o) => o.sku && String(o.sku) === selectedSku)) {
+      const bySize = options.find(
+        (o) => String(o.size) === String(item.size || ""),
+      );
+      selectedSku = bySize?.sku ? String(bySize.sku) : options[0]?.sku || "";
+    }
+    setVariantModal({
+      open: true,
+      itemKey,
+      productId,
+      selectedSku: selectedSku ? String(selectedSku).trim().toUpperCase() : "",
+    });
   };
 
   const applyVariantChange = () => {
     if (!variantModal.itemKey) return;
     const options = variantOptionsByProduct[variantModal.productId] || [];
-    const selectedOption = options.find((o) => String(o.size) === String(variantModal.selectedSize)) || null;
-    dispatch(updateCartVariant({
-      cartKey: variantModal.itemKey,
-      sku: selectedOption?.sku || null,
-      size: variantModal.selectedSize,
-      price: selectedOption?.price,
-      originalPrice: selectedOption?.originalPrice,
-    }));
-    setVariantModal({ open: false, itemKey: null, productId: null, currentSize: "", selectedSize: "" });
+    const want = String(variantModal.selectedSku || "").trim().toUpperCase();
+    const selectedOption =
+      options.find((o) => o.sku && String(o.sku).trim().toUpperCase() === want) ||
+      null;
+    if (!selectedOption) return;
+    dispatch(
+      updateCartVariant({
+        cartKey: variantModal.itemKey,
+        sku: selectedOption.sku || null,
+        size: selectedOption.size || null,
+        color: selectedOption.color || null,
+        price: selectedOption.price,
+        originalPrice: selectedOption.originalPrice,
+      }),
+    );
+    setVariantModal({
+      open: false,
+      itemKey: null,
+      productId: null,
+      selectedSku: "",
+    });
   };
 
-  const isVariantAlreadyInCart = (productId, itemKey, sizeValue) => {
+  const isVariantAlreadyInCart = (productId, itemKey, sku) => {
+    const skuU = sku ? String(sku).trim().toUpperCase() : "";
+    if (!skuU) return false;
     return cartItems.some((it) => {
       const key = getItemKey(it);
       if (String(key) === String(itemKey)) return false;
       if (String(it.productId) !== String(productId)) return false;
-      return String(it.size || "") === String(sizeValue || "");
+      return String(it.sku || "").trim().toUpperCase() === skuU;
     });
+  };
+
+  const variantOptionButtonLabel = (opt) => {
+    const parts = [opt?.size, opt?.color].filter(Boolean);
+    return parts.length ? parts.join(" · ") : String(opt?.sku || "");
   };
 
   const formatMoney = (v) => `${Number(v || 0).toLocaleString("vi-VN")}đ`;
@@ -341,7 +403,15 @@ const ShoppingCartPage = () => {
                             <div>
                               <Link to={`/product/${item.productId}`} className="font-display font-bold text-lg text-slate-800 hover:text-primary transition-colors line-clamp-2 leading-tight mb-1">{item.name}</Link>
                               <button onClick={() => openVariantModal(item)} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 rounded-lg text-xs font-bold text-neutral-600 hover:bg-neutral-200 transition-colors uppercase tracking-wide">
-                                Size: {item.size || "Mặc định"} <FaChevronDown size={10} />
+                                <span className="text-left">
+                                  Size: {item.size || "Mặc định"}
+                                  {item.color ? (
+                                    <span className="block normal-case font-semibold text-neutral-500 mt-0.5">
+                                      Màu: {item.color}
+                                    </span>
+                                  ) : null}
+                                </span>
+                                <FaChevronDown size={10} className="shrink-0" />
                               </button>
                             </div>
                             <div className="text-right">
@@ -430,28 +500,38 @@ const ShoppingCartPage = () => {
       {variantModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 md:p-8 overflow-hidden transform animate-in zoom-in-95 duration-200">
-            <h3 className="text-xl font-display font-black text-slate-800 mb-6 text-center">Chọn Phân Loại Kích Cỡ</h3>
+            <h3 className="text-xl font-display font-black text-slate-800 mb-6 text-center">Chọn phân loại</h3>
 
             <div className="flex flex-wrap gap-3 justify-center mb-8">
               {(variantOptionsByProduct[variantModal.productId] || []).map((opt) => {
-                const active = String(variantModal.selectedSize) === String(opt.size);
+                const optSku = opt.sku ? String(opt.sku).trim().toUpperCase() : "";
+                const active = optSku && String(variantModal.selectedSku).trim().toUpperCase() === optSku;
                 const outOfStock = Number(opt.stock || 0) <= 0;
-                const duplicated = isVariantAlreadyInCart(variantModal.productId, variantModal.itemKey, opt.size);
-                const disabled = outOfStock || duplicated;
+                const duplicated = isVariantAlreadyInCart(
+                  variantModal.productId,
+                  variantModal.itemKey,
+                  opt.sku,
+                );
+                const disabled = outOfStock || duplicated || !optSku;
 
                 return (
                   <button
-                    key={`${opt.size}-${opt.sku || "na"}`}
+                    key={optSku || `${opt.size}-${opt.color || "na"}`}
                     disabled={disabled}
-                    onClick={() => setVariantModal((prev) => ({ ...prev, selectedSize: String(opt.size) }))}
+                    onClick={() =>
+                      setVariantModal((prev) => ({
+                        ...prev,
+                        selectedSku: optSku,
+                      }))
+                    }
                     title={duplicated ? "Đã có trong giỏ" : outOfStock ? "Hết hàng" : ""}
-                    className={`min-w-[4rem] h-12 px-4 rounded-xl font-bold transition-all text-sm border
+                    className={`min-w-[4rem] min-h-12 px-4 py-2 rounded-xl font-bold transition-all text-sm border
                       ${active ? "bg-primary border-primary text-white shadow-md shadow-primary/30" :
                         disabled ? "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed" :
                           "bg-white border-slate-200 text-slate-600 hover:border-slate-900 hover:text-slate-900"
                       }`}
                   >
-                    {opt.size}
+                    {variantOptionButtonLabel(opt)}
                   </button>
                 );
               })}
@@ -459,14 +539,21 @@ const ShoppingCartPage = () => {
 
             <div className="flex gap-4">
               <button
-                onClick={() => setVariantModal({ open: false, itemKey: null, productId: null, currentSize: "", selectedSize: "" })}
+                onClick={() =>
+                  setVariantModal({
+                    open: false,
+                    itemKey: null,
+                    productId: null,
+                    selectedSku: "",
+                  })
+                }
                 className="flex-1 h-12 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
               >
                 Hủy
               </button>
               <button
                 onClick={applyVariantChange}
-                disabled={!variantModal.selectedSize}
+                disabled={!String(variantModal.selectedSku || "").trim()}
                 className="flex-[1.5] h-12 rounded-xl font-bold text-white bg-slate-900 hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
               >
                 Xác Nhận

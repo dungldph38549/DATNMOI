@@ -21,6 +21,11 @@ import notify from "../../utils/notify";
 
 const VIETNAM_LOCATION_API = "https://provinces.open-api.vn/api";
 
+const cartVariantSummary = (item) =>
+  [item?.size, item?.color]
+    .filter((x) => x != null && String(x).trim() !== "")
+    .join(" · ");
+
 const CheckOut = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -643,11 +648,14 @@ const CheckOut = () => {
   const draftVoucherIsPersonal = Boolean(draftVoucherMeta?.ownerUserId);
   const voucherTargetCandidates = useMemo(
     () =>
-      checkoutItems.map((item) => ({
-        productId: String(item.productId || item._id || ""),
-        sku: item?.sku ? String(item.sku).trim().toUpperCase() : null,
-        label: `${item.name}${item?.size ? ` (${item.size})` : ""}`,
-      })),
+      checkoutItems.map((item) => {
+        const vLabel = cartVariantSummary(item);
+        return {
+          productId: String(item.productId || item._id || ""),
+          sku: item?.sku ? String(item.sku).trim().toUpperCase() : null,
+          label: `${item.name}${vLabel ? ` (${vLabel})` : ""}`,
+        };
+      }),
     [checkoutItems],
   );
   const selectedVoucherTargetLabel = useMemo(() => {
@@ -659,7 +667,7 @@ const CheckOut = () => {
       return String(item?.sku || "").trim().toUpperCase() === appliedVoucherTarget.sku;
     });
     if (!found) return "";
-    return `${found.name}${found?.size ? ` (${found.size})` : ""}`;
+    return `${found.name}${cartVariantSummary(found) ? ` (${cartVariantSummary(found)})` : ""}`;
   }, [appliedVoucherTarget, checkoutItems]);
 
   const validateForm = () => {
@@ -852,6 +860,27 @@ const CheckOut = () => {
               }
               return null;
             };
+            const getVariantColorValue = (variant) => {
+              const attrs = variant?.attributes;
+              if (!attrs) return null;
+              if (typeof attrs.get === "function") {
+                return (
+                  attrs.get("Color") ??
+                  attrs.get("color") ??
+                  attrs.get("Màu") ??
+                  attrs.get("Mau") ??
+                  null
+                );
+              }
+              if (typeof attrs === "object") {
+                const foundKey = Object.keys(attrs).find((k) => {
+                  const lk = String(k).toLowerCase();
+                  return lk === "color" || lk === "màu" || lk === "mau";
+                });
+                return foundKey ? attrs[foundKey] : null;
+              }
+              return null;
+            };
 
             let target = null;
             if (sizeKey) { target = variants.find((v) => skuSet.has(normalizeSku(v?.sku)) && String(getVariantSizeValue(v) ?? "").trim().toUpperCase() === sizeKey) ?? null; }
@@ -859,8 +888,24 @@ const CheckOut = () => {
             if (!target) return false;
 
             const finalSize = cartItem?.size ? cartItem.size : getVariantSizeValue(target);
+            const finalColorRaw = getVariantColorValue(target);
+            const finalColor =
+              finalColorRaw != null && String(finalColorRaw).trim() !== ""
+                ? String(finalColorRaw).trim()
+                : null;
             dispatch(removeFromCart(productId));
-            dispatch(addToCart({ productId: productId, name: cartItem.name, image: cartItem.image, price: target.price, qty: cartItem.qty || 1, sku: target.sku, size: finalSize ?? null }));
+            dispatch(
+              addToCart({
+                productId: productId,
+                name: cartItem.name,
+                image: cartItem.image,
+                price: target.price,
+                qty: cartItem.qty || 1,
+                sku: target.sku,
+                size: finalSize ?? null,
+                color: finalColor,
+              }),
+            );
             return true;
           } catch { return false; }
         };
@@ -1192,7 +1237,9 @@ const CheckOut = () => {
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-slate-800 line-clamp-2">{item.name}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">Phân loại: {item.size || "Mặc định"}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Phân loại: {cartVariantSummary(item) || "Mặc định"}
+                          </p>
                         </div>
                       </div>
                       <div className="hidden md:flex col-span-2 items-center justify-end text-sm text-slate-700">{formatMoney(item.price || 0)}</div>

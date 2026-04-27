@@ -552,6 +552,9 @@ const ProductDetail = () => {
     }
     const sizeToSave = hasVariants ? selectedSizeValue : null;
     const skuToSave = hasVariants ? selectedSku : null;
+    const colorToSave = hasVariants
+      ? (String(getVariantColorLabel(selectedVariant) || "").trim() || null)
+      : null;
 
     if (hasVariants && !skuToSave) { notify.warning("Vui lòng chọn kích cỡ!"); return false; }
     if (stockInfo?.available === false) { notify.warning("Sản phẩm đã hết, vui lòng mua sản phẩm khác."); return false; }
@@ -594,12 +597,19 @@ const ProductDetail = () => {
       productId: product._id, name: product.name, image: product.image,
       price: displayPrice,
       originalPrice: Number(selectedPriceInfo.originalPrice || displayPrice),
-      qty: qtySafe, sku: skuToSave, size: sizeToSave
+      qty: qtySafe, sku: skuToSave, size: sizeToSave, color: colorToSave,
     }));
 
     try {
       if (user?.login && user?.id) {
-        await addToCartAPI({ userId: user.id, productId: product._id, qty: qtySafe, sku: skuToSave ?? null, size: sizeToSave ?? null });
+        await addToCartAPI({
+          userId: user.id,
+          productId: product._id,
+          qty: qtySafe,
+          sku: skuToSave ?? null,
+          size: sizeToSave ?? null,
+          color: colorToSave ?? null,
+        });
       }
     } catch (err) { }
     return true;
@@ -629,6 +639,9 @@ const ProductDetail = () => {
     }
     const sizeToSave = hasVariants ? selectedSizeValue : null;
     const skuToSave = hasVariants ? selectedSku : null;
+    const colorToSave = hasVariants
+      ? (String(getVariantColorLabel(selectedVariant) || "").trim() || null)
+      : null;
 
     if (hasVariants && !skuToSave) {
       notify.warning("Vui lòng chọn kích cỡ!");
@@ -684,6 +697,7 @@ const ProductDetail = () => {
       qty: qtySafe,
       sku: skuToSave,
       size: sizeToSave,
+      color: colorToSave,
     };
     const buyNowAction = addToCart({
       ...buyNowItem,
