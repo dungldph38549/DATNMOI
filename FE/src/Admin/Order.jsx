@@ -192,7 +192,7 @@ const orderFlowBucket = (status) => {
   if (s === "shipped")
     return { key: "shipping", label: "VẬN CHUYỂN", bg: "#E6F4FF", color: "#0958D9", border: "#91CAFF" };
   if (s === "delivered" || s === "received")
-    return { key: "done", label: "HOÀN TẤT", bg: "#F6FFED", color: "#237804", border: "#B7EB8F" };
+    return { key: "done", label: "THÀNH CÔNG", bg: "#F6FFED", color: "#237804", border: "#B7EB8F" };
   if (s === "pending" || s === "confirmed")
     return { key: "processing", label: "CẦN XỬ LÝ", bg: "#FFF7E6", color: "#D46B08", border: "#FFD591" };
   return {
@@ -459,12 +459,24 @@ export default function Order({ mode = "all" }) {
       ["pending", "confirmed"].includes(String(o?.status || "").toLowerCase()),
     ).length;
     const inTransit = list.filter((o) => String(o?.status || "").toLowerCase() === "shipped").length;
+    const returnPending = list.filter(
+      (o) => String(o?.status || "").toLowerCase() === "return-request",
+    ).length;
+    const returnAccepted = list.filter(
+      (o) => String(o?.status || "").toLowerCase() === "accepted",
+    ).length;
+    const returnRejected = list.filter(
+      (o) => String(o?.status || "").toLowerCase() === "rejected",
+    ).length;
     return {
       total: list.length,
       pendingOnly,
       processing,
       inTransit,
       completedToday,
+      returnPending,
+      returnAccepted,
+      returnRejected,
     };
   }, [filteredOrders]);
 
@@ -1724,7 +1736,8 @@ export default function Order({ mode = "all" }) {
     [mode, updateMutation],
   );
 
-  const columns = mode === "returns" ? columnsReturns : columnsModern;
+  // Giữ columnsReturns làm fallback, nhưng mặc định 2 trang dùng cùng layout hiện đại.
+  const columns = mode === "returns-legacy" ? columnsReturns : columnsModern;
 
   return (
     <div style={{ padding: "12px 16px 24px", width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
@@ -2166,57 +2179,88 @@ export default function Order({ mode = "all" }) {
       </div>
 
       <div className="admin-order-stats-grid">
-        <div className="admin-order-stat-card">
-          <div style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Tổng đơn</div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: "#111827", marginTop: 6 }}>
-            {dashboardStats.total.toLocaleString("vi-VN")}
-          </div>
-        </div>
-        <div className="admin-order-stat-card">
-          <div
-            style={{
-              fontSize: 12,
-              color: "#64748B",
-              fontWeight: 600,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              flexWrap: "wrap",
-            }}
-          >
-            Chờ xử lý
-            {dashboardStats.pendingOnly > 0 ? (
-              <span
+        {mode === "returns" ? (
+          <>
+            <div className="admin-order-stat-card">
+              <div style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Tổng đơn hoàn</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "#111827", marginTop: 6 }}>
+                {dashboardStats.total.toLocaleString("vi-VN")}
+              </div>
+            </div>
+            <div className="admin-order-stat-card">
+              <div style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Chờ xử lý hoàn</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "#D46B08", marginTop: 6 }}>
+                {dashboardStats.returnPending.toLocaleString("vi-VN")}
+              </div>
+            </div>
+            <div className="admin-order-stat-card">
+              <div style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Đã chấp nhận hoàn</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "#237804", marginTop: 6 }}>
+                {dashboardStats.returnAccepted.toLocaleString("vi-VN")}
+              </div>
+            </div>
+            <div className="admin-order-stat-card">
+              <div style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Không chấp nhận</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "#C41D3D", marginTop: 6 }}>
+                {dashboardStats.returnRejected.toLocaleString("vi-VN")}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="admin-order-stat-card">
+              <div style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Tổng đơn</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "#111827", marginTop: 6 }}>
+                {dashboardStats.total.toLocaleString("vi-VN")}
+              </div>
+            </div>
+            <div className="admin-order-stat-card">
+              <div
                 style={{
-                  fontSize: 10,
-                  fontWeight: 800,
-                  padding: "2px 8px",
-                  borderRadius: 4,
-                  background: "#FFECEC",
-                  color: "#C41D3D",
+                  fontSize: 12,
+                  color: "#64748B",
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
                 }}
               >
-                Cao
-              </span>
-            ) : null}
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: "#111827", marginTop: 6 }}>
-            {dashboardStats.processing.toLocaleString("vi-VN")}
-          </div>
-          <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>Chờ + đã xác nhận</div>
-        </div>
-        <div className="admin-order-stat-card">
-          <div style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Đang giao</div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: "#111827", marginTop: 6 }}>
-            {dashboardStats.inTransit.toLocaleString("vi-VN")}
-          </div>
-        </div>
-        <div className="admin-order-stat-card">
-          <div style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Hoàn thành hôm nay</div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: ACCENT_ORANGE, marginTop: 6 }}>
-            {dashboardStats.completedToday.toLocaleString("vi-VN")}
-          </div>
-        </div>
+                Chờ xử lý
+                {dashboardStats.pendingOnly > 0 ? (
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 800,
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      background: "#FFECEC",
+                      color: "#C41D3D",
+                    }}
+                  >
+                    Cao
+                  </span>
+                ) : null}
+              </div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "#111827", marginTop: 6 }}>
+                {dashboardStats.processing.toLocaleString("vi-VN")}
+              </div>
+              <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>Chờ + đã xác nhận</div>
+            </div>
+            <div className="admin-order-stat-card">
+              <div style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Đang giao</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "#111827", marginTop: 6 }}>
+                {dashboardStats.inTransit.toLocaleString("vi-VN")}
+              </div>
+            </div>
+            <div className="admin-order-stat-card">
+              <div style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Hoàn thành hôm nay</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: ACCENT_ORANGE, marginTop: 6 }}>
+                {dashboardStats.completedToday.toLocaleString("vi-VN")}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="admin-order-toolbar">
@@ -2249,35 +2293,31 @@ export default function Order({ mode = "all" }) {
           scroll={{ x: mode === "returns" ? 1180 : 1020 }}
           size="small"
           pagination={false}
-          {...(mode !== "returns"
-            ? {
-                expandable: {
-                  expandedRowRender: renderExpandedOrderRow,
-                  expandedRowKeys,
-                  onExpandedRowsChange: setExpandedRowKeys,
-                  expandIcon: ({ expanded, onExpand, record }) => (
-                    <Button
-                      type="text"
-                      size="small"
-                      onClick={(e) => onExpand(record, e)}
-                      icon={
-                        expanded ? (
-                          <EyeInvisibleOutlined style={{ color: ACCENT_ORANGE, fontSize: 16 }} />
-                        ) : (
-                          <EyeOutlined style={{ color: ACCENT_ORANGE, fontSize: 16 }} />
-                        )
-                      }
-                      aria-label={expanded ? "Thu gọn chi tiết đơn" : "Xem nhanh chi tiết đơn"}
-                    />
-                  ),
-                },
-                onRow: (record) => ({
-                  className: expandedRowKeys.includes(record.key)
-                    ? "admin-order-row-expanded"
-                    : "",
-                }),
-              }
-            : {})}
+          expandable={{
+            expandedRowRender: renderExpandedOrderRow,
+            expandedRowKeys,
+            onExpandedRowsChange: setExpandedRowKeys,
+            expandIcon: ({ expanded, onExpand, record }) => (
+              <Button
+                type="text"
+                size="small"
+                onClick={(e) => onExpand(record, e)}
+                icon={
+                  expanded ? (
+                    <EyeInvisibleOutlined style={{ color: ACCENT_ORANGE, fontSize: 16 }} />
+                  ) : (
+                    <EyeOutlined style={{ color: ACCENT_ORANGE, fontSize: 16 }} />
+                  )
+                }
+                aria-label={expanded ? "Thu gọn chi tiết đơn" : "Xem nhanh chi tiết đơn"}
+              />
+            ),
+          }}
+          onRow={(record) => ({
+            className: expandedRowKeys.includes(record.key)
+              ? "admin-order-row-expanded"
+              : "",
+          })}
         />
       </div>
       <div className="admin-order-footer">
