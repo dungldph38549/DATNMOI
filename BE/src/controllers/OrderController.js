@@ -1204,12 +1204,28 @@ function assertUserOwnsOrderForLineCancel(order, reqUser) {
   return false;
 }
 
+const MIN_CANCEL_LINE_REASON_LEN = 5;
+
+function normalizeCancelLineReason(raw) {
+  const t =
+    typeof raw === "string" ? raw.trim() : String(raw ?? "").trim();
+  if (t.length < MIN_CANCEL_LINE_REASON_LEN) {
+    const e = new Error(
+      `Vui lòng nhập lý do hủy (tối thiểu ${MIN_CANCEL_LINE_REASON_LEN} ký tự).`,
+    );
+    e.statusCode = 422;
+    throw e;
+  }
+  return t.slice(0, 2000);
+}
+
 async function cancelOrderLineCore({
   orderId,
   lineIndex,
   canceledBy,
   reqUser,
   requireOwnership,
+  cancelReason,
 }) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -1254,6 +1270,8 @@ async function cancelOrderLineCore({
       throw e;
     }
 
+    const reasonText = normalizeCancelLineReason(cancelReason);
+
     const oldSub = sumActiveSubtotal(order.products);
     const oldTotal = Math.round(Number(order.totalAmount) || 0);
 
@@ -1280,6 +1298,7 @@ async function cancelOrderLineCore({
     line.lineStatus = "canceled";
     line.canceledAt = new Date();
     line.canceledBy = canceledBy;
+    line.cancelReason = reasonText;
 
     const activeAfter = (order.products || []).filter(isLineActive);
     const newSub = sumActiveSubtotal(order.products);
@@ -1331,7 +1350,7 @@ async function cancelOrderLineCore({
           oldStatus: prevOrderStatus,
           newStatus: historyNewStatus,
           orderId: order._id,
-          note: `Hủy dòng #${idx + 1} — ${canceledBy === "admin" ? "Admin" : "Khách hàng"}`,
+          note: `Hủy dòng #${idx + 1} — ${canceledBy === "admin" ? "Admin" : "Khách hàng"}. Lý do: ${reasonText}`,
         },
       ],
       { session },
@@ -1355,12 +1374,14 @@ exports.cancelOrderLineByUser = async (req, res) => {
   try {
     const { id } = req.params;
     const lineIndex = req.body?.lineIndex ?? req.body?.line_index;
+    const cancelReason = req.body?.cancelReason ?? req.body?.reason;
     const order = await cancelOrderLineCore({
       orderId: id,
       lineIndex,
       canceledBy: "user",
       reqUser: req.user,
       requireOwnership: true,
+      cancelReason,
     });
     const history = await OrderStatusHistory.find({ orderId: order._id }).sort({
       createdAt: -1,
@@ -1378,12 +1399,14 @@ exports.cancelOrderLineByAdmin = async (req, res) => {
   try {
     const { id } = req.params;
     const lineIndex = req.body?.lineIndex ?? req.body?.line_index;
+    const cancelReason = req.body?.cancelReason ?? req.body?.reason;
     const order = await cancelOrderLineCore({
       orderId: id,
       lineIndex,
       canceledBy: "admin",
       reqUser: req.user,
       requireOwnership: false,
+      cancelReason,
     });
     const history = await OrderStatusHistory.find({ orderId: order._id }).sort({
       createdAt: -1,

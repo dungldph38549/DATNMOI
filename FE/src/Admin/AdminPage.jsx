@@ -220,6 +220,8 @@ const getMobileMatch = () => {
   return window.matchMedia("(max-width: 767px)").matches;
 };
 
+const ADMIN_BADGE_REFETCH_MS = 3000;
+
 const AdminPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -241,16 +243,20 @@ const AdminPage = () => {
   const { data: orderData } = useQuery({
     queryKey: ["admin-orders-badges"],
     queryFn: async () => {
-      const res = await getAllOrders(0, 50);
+      const res = await getAllOrders(0, 300);
       return res?.data || [];
     },
-    refetchInterval: 15000,
+    refetchInterval: ADMIN_BADGE_REFETCH_MS,
+    placeholderData: (prev) => prev,
+    staleTime: 1500,
   });
 
   const { data: topupData } = useQuery({
     queryKey: ["admin-topups-badges"],
     queryFn: () => adminListTopupTransactions(1, 100),
-    refetchInterval: 15000,
+    refetchInterval: ADMIN_BADGE_REFETCH_MS,
+    placeholderData: (prev) => prev,
+    staleTime: 1500,
   });
 
   const orders = Array.isArray(orderData) ? orderData : [];

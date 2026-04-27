@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Button, Select, Modal, Input } from "antd";
+import { Button, Select } from "antd";
 import { getOrderById, updateOrderStatus, cancelOrderLineByAdmin } from "../api";
 import notify from "../utils/notify";
-import { confirmShopee } from "../utils/shopeeNotify";
+import { pickAdminCancelReason } from "../utils/shopeeNotify";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Chờ xử lý" },
@@ -64,8 +64,6 @@ export default function AdminOrderDetail() {
   const [order, setOrder] = useState(null);
   const [history, setHistory] = useState([]);
   const [lineCanceling, setLineCanceling] = useState(null);
-  const [cancelModalOpen, setCancelModalOpen] = useState(false);
-  const [cancelNote, setCancelNote] = useState("");
 
   useEffect(() => {
     const admin = getAdminSession();
@@ -106,15 +104,24 @@ export default function AdminOrderDetail() {
 
   const onCancelOrderLine = async (lineIndex) => {
     if (!order?._id) return;
-    const ok = await confirmShopee({
-      text: `Hủy dòng này (#${lineIndex + 1}) khỏi đơn?`,
-      confirmText: "Đồng ý",
-      cancelText: "Đóng",
+    const selectedReason = await pickAdminCancelReason({
+      title: `Lý do hủy dòng #${lineIndex + 1} (cửa hàng)`,
     });
-    if (!ok) return;
+    if (selectedReason == null) return;
+    const cancelReason = String(selectedReason).trim();
+    if (cancelReason.length < MIN_ADMIN_CANCEL_NOTE_LEN) {
+      notify.warning(
+        `Vui lòng nhập lý do (ít nhất ${MIN_ADMIN_CANCEL_NOTE_LEN} ký tự).`,
+      );
+      return;
+    }
     setLineCanceling(lineIndex);
     try {
-      const data = await cancelOrderLineByAdmin(order._id, lineIndex);
+      const data = await cancelOrderLineByAdmin(
+        order._id,
+        lineIndex,
+        cancelReason,
+      );
       if (data?.order) setOrder(data.order);
       if (Array.isArray(data?.history)) setHistory(data.history);
       notify.success("Đã hủy dòng hàng.");
@@ -158,8 +165,20 @@ export default function AdminOrderDetail() {
   const onChangeStatus = async (newStatus) => {
     if (!order?._id || newStatus === normalizedStatus) return;
     if (newStatus === "canceled") {
-      setCancelNote("");
-      setCancelModalOpen(true);
+      void (async () => {
+        const note = await pickAdminCancelReason({
+          title: "Lý do hủy đơn (cửa hàng)",
+        });
+        if (note == null) return;
+        const t = String(note).trim();
+        if (t.length < MIN_ADMIN_CANCEL_NOTE_LEN) {
+          notify.warning(
+            `Vui lòng nhập lý do hủy (ít nhất ${MIN_ADMIN_CANCEL_NOTE_LEN} ký tự).`,
+          );
+          return;
+        }
+        await applyStatusChange("canceled", t);
+      })();
       return;
     }
     await applyStatusChange(newStatus);
@@ -170,58 +189,6 @@ export default function AdminOrderDetail() {
 
   return (
     <div style={{ padding: 24, background: "#F8F7F5", minHeight: "100vh" }}>
-      <Modal
-        title="Lý do hủy đơn (bắt buộc)"
-        open={cancelModalOpen}
-        destroyOnClose
-        onCancel={() => {
-          setCancelModalOpen(false);
-          setCancelNote("");
-        }}
-        footer={
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <Button
-              onClick={() => {
-                setCancelModalOpen(false);
-                setCancelNote("");
-              }}
-            >
-              Đóng
-            </Button>
-            <Button
-              type="primary"
-              danger
-              loading={saving}
-              onClick={() => {
-                const t = cancelNote.trim();
-                if (t.length < MIN_ADMIN_CANCEL_NOTE_LEN) {
-                  notify.error(
-                    `Vui lòng nhập lý do hủy (ít nhất ${MIN_ADMIN_CANCEL_NOTE_LEN} ký tự).`,
-                  );
-                  return;
-                }
-                setCancelModalOpen(false);
-                setCancelNote("");
-                void applyStatusChange("canceled", t);
-              }}
-            >
-              Xác nhận hủy
-            </Button>
-          </div>
-        }
-      >
-        <p style={{ marginBottom: 8, color: "#555", fontSize: 13 }}>
-          Lý do sẽ được lưu trong lịch sử trạng thái đơn hàng.
-        </p>
-        <Input.TextArea
-          rows={4}
-          maxLength={2000}
-          showCount
-          value={cancelNote}
-          onChange={(e) => setCancelNote(e.target.value)}
-          placeholder="Ví dụ: Khách yêu cầu hủy — hết hàng, sai thông tin giao hàng..."
-        />
-      </Modal>
       <div style={{ marginBottom: 14, display: "flex", gap: 10 }}>
         <Link to="/admin">
           <Button>Quay lai Admin</Button>

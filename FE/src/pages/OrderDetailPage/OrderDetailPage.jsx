@@ -480,14 +480,17 @@ const OrderDetailPage = () => {
   };
 
   const handleCancelOrderLine = async (lineIndex) => {
-    const ok = await confirmShopee({
-      text: "Hủy dòng này khỏi đơn? Tiền ví (nếu có) sẽ được hoàn tương ứng.",
-      confirmText: "Đồng ý",
-      cancelText: "Đóng",
+    const selectedReason = await pickCancelReasonShopee({
+      title: "Lý do hủy dòng hàng",
     });
-    if (!ok) return;
+    if (selectedReason == null) return;
+    const cancelReason = String(selectedReason).trim();
+    if (cancelReason.length < 5) {
+      notify.warning("Bạn cần nhập lý do hủy (tối thiểu 5 ký tự).");
+      return;
+    }
     try {
-      const data = await cancelOrderLineByUser(id, lineIndex);
+      const data = await cancelOrderLineByUser(id, lineIndex, cancelReason);
       if (data?.order) {
         setOrder(data.order);
         setHistory(Array.isArray(data.history) ? data.history : []);
@@ -900,10 +903,17 @@ const OrderDetailPage = () => {
                           Xem chi tiết sản phẩm
                         </Link>
                         {!isOrderLineActive(p) && (
-                          <p className="mt-2 text-xs font-bold text-red-600">
-                            Đã hủy dòng
-                            {p.canceledBy === "admin" ? " (admin)" : ""}
-                          </p>
+                          <div className="mt-2 space-y-1">
+                            <p className="text-xs font-bold text-red-600">
+                              Đã hủy dòng
+                              {p.canceledBy === "admin" ? " (admin)" : ""}
+                            </p>
+                            {p.cancelReason ? (
+                              <p className="text-xs font-medium text-amber-900">
+                                Lý do: {p.cancelReason}
+                              </p>
+                            ) : null}
+                          </div>
                         )}
                         {canReviewOrder && isLoggedIn && isOrderLineActive(p) && (() => {
                           const productIdKey = String(

@@ -532,18 +532,19 @@ export const cancelOrderByUser = async (id, cancelReason) => {
 };
 
 /** Hủy một dòng sản phẩm (đơn chờ xử lý / đã xác nhận). Trả về { order, history } */
-export const cancelOrderLineByUser = async (orderId, lineIndex) => {
+export const cancelOrderLineByUser = async (orderId, lineIndex, cancelReason) => {
   const res = await axiosInstance.post(`/order/${orderId}/cancel-line`, {
     lineIndex,
+    cancelReason,
   });
   return res.data;
 };
 
 /** Admin: hủy một dòng sản phẩm — cùng quy tắc với khách */
-export const cancelOrderLineByAdmin = async (orderId, lineIndex) => {
+export const cancelOrderLineByAdmin = async (orderId, lineIndex, cancelReason) => {
   const res = await axiosInstance.post(
     `/order/admin/${orderId}/cancel-line`,
-    { lineIndex },
+    { lineIndex, cancelReason },
   );
   return res.data;
 };

@@ -154,6 +154,34 @@ const DEFAULT_CANCEL_REASONS = [
   "Tôi không tìm thấy lý do hủy phù hợp",
 ];
 
+/** Lý do hủy dành cho admin/cửa hàng — tách biệt bộ lý do phía khách ở trên. */
+export const ADMIN_CANCEL_REASONS = [
+  "Hết hàng / không đủ tồn kho để giao.",
+  "Sai thông tin sản phẩm, giá hoặc khuyến mãi trên hệ thống Shop.",
+  "Khách liên hệ yêu cầu hủy (đã xác minh với CSKH).",
+  "Đơn trùng hoặc dấu hiệu gian lận.",
+  "Không liên lạc được khách để xác nhận giao hàng.",
+  "Khu vực giao hàng không khả thi hoặc lỗi vận chuyển.",
+];
+
+/**
+ * Chọn lý do hủy cho thao tác admin (đơn / dòng).
+ * Dùng cùng UI với khách nhưng danh sách preset khác hoàn toàn.
+ */
+export function pickAdminCancelReason({
+  title = "Lý do hủy (cửa hàng)",
+  reasons = ADMIN_CANCEL_REASONS,
+  confirmText = "Xác nhận",
+  cancelText = "Đóng",
+} = {}) {
+  return pickCancelReasonShopee({
+    title,
+    reasons,
+    confirmText,
+    cancelText,
+  });
+}
+
 export function pickCancelReasonShopee({
   title = "Lý Do Hủy",
   reasons = DEFAULT_CANCEL_REASONS,

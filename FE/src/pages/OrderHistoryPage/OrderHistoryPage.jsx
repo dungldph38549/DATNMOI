@@ -364,14 +364,17 @@ const OrderHistoryPage = () => {
   };
 
   const handleCancelOrderLine = async (orderId, lineIndex) => {
-    const ok = await confirmShopee({
-      text: "Hủy dòng này khỏi đơn? Tiền (nếu đã trừ ví) sẽ được hoàn tương ứng.",
-      confirmText: "Đồng ý",
-      cancelText: "Đóng",
+    const selectedReason = await pickCancelReasonShopee({
+      title: "Lý do hủy dòng hàng",
     });
-    if (!ok) return;
+    if (selectedReason == null) return;
+    const cancelReason = String(selectedReason).trim();
+    if (cancelReason.length < 5) {
+      notify.warning("Bạn cần nhập lý do hủy (tối thiểu 5 ký tự).");
+      return;
+    }
     try {
-      const data = await cancelOrderLineByUser(orderId, lineIndex);
+      const data = await cancelOrderLineByUser(orderId, lineIndex, cancelReason);
       const updated = data?.order;
       if (updated?._id) {
         setOrders((prev) =>

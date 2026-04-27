@@ -88,6 +88,11 @@ const orderSchema = new mongoose.Schema(
           type: String,
           enum: ["user", "admin"],
         },
+        cancelReason: {
+          type: String,
+          default: null,
+          trim: true,
+        },
       },
     ],
     discount: {
