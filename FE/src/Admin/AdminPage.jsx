@@ -221,6 +221,7 @@ const getMobileMatch = () => {
 };
 
 const ADMIN_BADGE_REFETCH_MS = 3000;
+const ADMIN_AVATAR_LOGO = `${process.env.PUBLIC_URL || ""}/images/sc-sneaker-logo.png`;
 
 const AdminPage = () => {
   const navigate = useNavigate();
@@ -553,41 +554,53 @@ const AdminPage = () => {
           {/* Logo */}
           <div
             style={{
-              padding: "22px 20px 18px",
+              padding: "16px 14px 14px",
               borderBottom: `1px solid ${T.border}`,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                background: "#ffffff",
+                border: `1px solid ${T.border}`,
+                borderRadius: 12,
+                padding: "8px 10px",
+                boxShadow: "0 2px 8px rgba(15,23,42,0.05)",
+              }}
+            >
               <div
                 style={{
-                  width: 38,
-                  height: 38,
+                  width: 34,
+                  height: 34,
                   borderRadius: "50%",
-                  background: T.primary,
+                  background: "#fff",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "#fff",
+                  overflow: "hidden",
+                  border: `1px solid ${T.border}`,
                   flexShrink: 0,
                 }}
               >
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: 20, fontVariationSettings: "'FILL' 1" }}
-                >
-                  skateboarding
-                </span>
+                <img
+                  src={ADMIN_AVATAR_LOGO}
+                  alt="SneakerConverse logo"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
               </div>
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <div
                   style={{
                     fontWeight: 800,
-                    fontSize: 15,
+                    fontSize: 14,
                     color: T.text,
                     lineHeight: 1.2,
+                    letterSpacing: "-0.01em",
                   }}
                 >
                   SneakerConverse
@@ -595,13 +608,13 @@ const AdminPage = () => {
                 <div
                   style={{
                     fontSize: 10,
-                    color: T.textMuted,
-                    fontWeight: 600,
+                    color: "#64748b",
+                    fontWeight: 700,
                     textTransform: "uppercase",
-                    letterSpacing: "0.06em",
+                    letterSpacing: "0.08em",
                   }}
                 >
-                  Admin Panel
+                  ADMIN
                 </div>
               </div>
             </div>
@@ -648,17 +661,24 @@ const AdminPage = () => {
                   width: 36,
                   height: 36,
                   borderRadius: "50%",
-                  background: T.primary,
+                  background: "#fff",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "#fff",
-                  fontWeight: 700,
-                  fontSize: 13,
+                  overflow: "hidden",
+                  border: `1px solid ${T.border}`,
                   flexShrink: 0,
                 }}
               >
-                {initials}
+                <img
+                  src={ADMIN_AVATAR_LOGO}
+                  alt="Admin logo"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                />
               </div>
               <div style={{ minWidth: 0 }}>
                 <div

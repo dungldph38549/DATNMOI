@@ -40,6 +40,11 @@ router.get(
   authAdminMiddleware,
   walletTopUpController.adminListTopupTransactions,
 );
+router.get(
+  "/admin/transactions",
+  authAdminMiddleware,
+  walletTopUpController.adminListWalletTransactions,
+);
 router.post(
   "/admin/topups/bank/:id/confirm",
   authAdminMiddleware,

@@ -339,6 +339,7 @@ const updateUser = async (id, payload) => {
     isAdmin,
     isStaff,
     isBanned,
+    banReason,
     // cho phép gửi thẳng role nếu frontend có (dự phòng)
     role: requestedRole,
     ...rest
@@ -358,6 +359,15 @@ const updateUser = async (id, payload) => {
 
   // Map isBanned -> isActive
   if (typeof isBanned === "boolean") {
+    if (isBanned) {
+      const reason = String(banReason || "").trim();
+      if (reason.length < 5) {
+        throw { status: 422, message: "Lý do khóa tài khoản tối thiểu 5 ký tự" };
+      }
+      updateData.banReason = reason;
+    } else {
+      updateData.banReason = "";
+    }
     updateData.isActive = !isBanned;
   }
 

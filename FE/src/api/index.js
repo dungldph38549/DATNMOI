@@ -88,6 +88,14 @@ export const adminListTopupTransactions = async (page = 1, limit = 20) => {
   return res.data;
 };
 
+/** Admin: lịch sử giao dịch ví (nạp VNPay + hoàn tiền) */
+export const adminListWalletTransactions = async (page = 1, limit = 100) => {
+  const res = await axiosInstance.get("/wallet/admin/transactions", {
+    params: { page, limit },
+  });
+  return res.data;
+};
+
 /** Khách: tạo yêu cầu nạp ví chuyển khoản */
 export const createWalletBankTopupRequest = async (amount) => {
   const res = await axiosInstance.post("/wallet/topup/bank", { amount });

@@ -410,6 +410,28 @@ exports.adminListTopupTransactions = async (req, res) => {
   }
 };
 
+exports.adminListWalletTransactions = async (req, res) => {
+  try {
+    const items = await WalletTransaction.find({
+      type: {
+        $in: [
+          "topup_vnpay",
+          "return_refund",
+          "order_cancel_refund",
+          "order_line_cancel_refund",
+        ],
+      },
+    })
+      .sort({ createdAt: -1 })
+      .populate("userId", "name email phone")
+      .populate("orderId", "_id")
+      .lean();
+    res.status(200).json({ data: items });
+  } catch (err) {
+    res.status(500).json({ message: err?.message || "Internal server error" });
+  }
+};
+
 exports.adminConfirmBankTopup = async (req, res) => {
   const session = await mongoose.startSession();
   try {

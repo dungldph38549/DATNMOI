@@ -34,12 +34,18 @@ const ProfilePage = () => {
     const [walletBalance, setWalletBalance] = useState(null);
     const [walletTx, setWalletTx] = useState([]);
     const [walletLoading, setWalletLoading] = useState(false);
-    const [topupAmountVnpay, setTopupAmountVnpay] = useState("100000");
+    const [topupAmountVnpay, setTopupAmountVnpay] = useState("");
     const [showAllWalletTx, setShowAllWalletTx] = useState(false);
     const [topupSubmitting, setTopupSubmitting] = useState(false);
     const [avatarUploading, setAvatarUploading] = useState(false);
     const [avatarPreview, setAvatarPreview] = useState(user?.avatar || "");
     const avatarInputRef = useRef(null);
+
+    const formatAmountInput = (value) => {
+        const digits = String(value ?? "").replace(/\D/g, "");
+        if (!digits) return "";
+        return Number(digits).toLocaleString("vi-VN");
+    };
 
     // Handle tab switching from query params
     useEffect(() => {
@@ -452,12 +458,12 @@ const ProfilePage = () => {
                                             <div className="flex-1 min-w-[140px]">
                                                 <label className="text-xs font-bold text-slate-400 uppercase">Số tiền (đ)</label>
                                                 <input
-                                                    type="number"
-                                                    min={10000}
-                                                    step={1000}
-                                                    value={topupAmountVnpay}
-                                                    onChange={(e) => setTopupAmountVnpay(e.target.value)}
-                                                    className="w-full mt-1 px-4 py-3 rounded-xl border border-slate-200 font-bold text-slate-800"
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    value={formatAmountInput(topupAmountVnpay)}
+                                                    onChange={(e) => setTopupAmountVnpay(e.target.value.replace(/\D/g, ""))}
+                                                    placeholder="Ví dụ: 100.000"
+                                                    className="w-full mt-1 px-4 py-3 rounded-xl border border-slate-200 font-bold text-slate-500 placeholder:text-slate-300"
                                                 />
                                             </div>
                                             <button

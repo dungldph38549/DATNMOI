@@ -94,7 +94,7 @@ const Login = () => {
         <div className="max-w-md w-full mx-auto">
 
           <Link to="/" className="inline-block mb-16 hover:opacity-80 transition-opacity">
-            <span className="text-3xl font-display font-black tracking-tighter text-slate-900">DATN<span className="text-primary">MOI.</span></span>
+            <span className="text-3xl font-display font-black tracking-tighter text-slate-900">SNEAKER<span className="text-primary">CONVERSE.</span></span>
           </Link>
 
           <div>
