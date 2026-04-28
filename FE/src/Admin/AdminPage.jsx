@@ -614,7 +614,7 @@ const AdminPage = () => {
                     letterSpacing: "0.08em",
                   }}
                 >
-                  ADMIN
+                  ADMIN 
                 </div>
               </div>
             </div>
