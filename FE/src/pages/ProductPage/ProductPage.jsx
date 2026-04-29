@@ -7,7 +7,6 @@ import { getProductPriceInfo } from "../../utils/pricing.js";
 import { getVariantColorValue, getVariantSizeValue } from "../../utils/variantAttributes";
 import { isProductOutOfStock } from "../../utils/stock.js";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
-
 const PAGE_SIZE = 12;
 
 const categoryNameToSlug = (str = "") =>
@@ -95,8 +94,6 @@ const ProductPage = () => {
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
   const [rating, setRating] = useState("");
-  const [minPriceFilter, setMinPriceFilter] = useState(0);
-  const [maxPriceFilter, setMaxPriceFilter] = useState(0);
 
   const categorySlug = useMemo(() => {
     const raw = new URLSearchParams(location.search).get("category");
@@ -120,11 +117,13 @@ const ProductPage = () => {
       try {
         setLoading(true);
         if (categorySlug) setCategoryFilter("");
+
         const payload = { limit: 200, page: 0 };
+
         const catRes = await getAllCategories("active");
         const categories = Array.isArray(catRes?.data) ? catRes.data : [];
-
         const accessoryCategory = categories.find((c) => isAccessoryCategory(c));
+
         if (categorySlug) {
           const match = categories.find((c) => {
             const slugFromDb =
@@ -140,6 +139,8 @@ const ProductPage = () => {
           } else {
             setProducts([]);
             setCategoryLabel("TẤT CẢ SẢN PHẨM");
+            setLoading(false);
+            return;
           }
         } else {
           setCategoryLabel("TẤT CẢ SẢN PHẨM");
@@ -172,7 +173,7 @@ const ProductPage = () => {
       }
     };
     load();
-  }, [categorySlug, segment]);
+  }, [categorySlug, segment, location.search]);
 
   useEffect(() => {
     const voucherCode = new URLSearchParams(location.search).get("voucher");
@@ -194,32 +195,6 @@ const ProductPage = () => {
       cancelled = true;
     };
   }, [location.search]);
-
-  const maxAvailablePrice = useMemo(() => {
-    if (!products.length) return 0;
-    return Math.max(...products.map((p) => getProductMinPrice(p)));
-  }, [products]);
-  const minRangePercent = useMemo(() => {
-    const max = Number(maxAvailablePrice || 0);
-    const val = Number(minPriceFilter || 0);
-    if (!Number.isFinite(max) || max <= 0) return 0;
-    const clamped = Math.min(Math.max(0, val), max);
-    return Math.round((clamped / max) * 100);
-  }, [maxAvailablePrice, minPriceFilter]);
-  const maxRangePercent = useMemo(() => {
-    const max = Number(maxAvailablePrice || 0);
-    const val = Number(maxPriceFilter || 0);
-    if (!Number.isFinite(max) || max <= 0) return 0;
-    const clamped = Math.min(Math.max(0, val), max);
-    return Math.round((clamped / max) * 100);
-  }, [maxAvailablePrice, maxPriceFilter]);
-
-  useEffect(() => {
-    if (maxAvailablePrice > 0) {
-      setMinPriceFilter(0);
-      setMaxPriceFilter(maxAvailablePrice);
-    }
-  }, [maxAvailablePrice]);
 
   const availableSizes = useMemo(() => {
     const collected = products.flatMap((p) => getProductSizes(p));
@@ -279,14 +254,6 @@ const ProductPage = () => {
       data = data.filter((p) => Number(p?.rating ?? 0) >= Number(rating));
     }
 
-    if (maxPriceFilter > 0) {
-      data = data.filter((p) => {
-        const price = getProductMinPrice(p);
-        if (minPriceFilter === 0 && maxPriceFilter >= maxAvailablePrice) return true;
-        return price >= minPriceFilter && price <= maxPriceFilter;
-      });
-    }
-
     if (sort === "priceAsc") data.sort((a, b) => getProductMinPrice(a) - getProductMinPrice(b));
     if (sort === "priceDesc") data.sort((a, b) => getProductMinPrice(b) - getProductMinPrice(a));
     if (sort === "new") data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -299,14 +266,12 @@ const ProductPage = () => {
     selectedSize,
     selectedColor,
     rating,
-    minPriceFilter,
-    maxPriceFilter,
     sort,
   ]);
 
   useEffect(() => {
     setPage(1);
-  }, [sort, categoryFilter, selectedSize, selectedColor, rating, minPriceFilter, maxPriceFilter]);
+  }, [sort, categoryFilter, selectedSize, selectedColor, rating]);
 
   const totalPage = Math.ceil(filteredProducts.length / PAGE_SIZE);
   const showProducts = filteredProducts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -317,8 +282,6 @@ const ProductPage = () => {
     setSelectedSize("");
     setSelectedColor("");
     setRating("");
-    setMinPriceFilter(0);
-    setMaxPriceFilter(maxAvailablePrice || 0);
   };
 
   const pageItems = useMemo(() => {
@@ -344,71 +307,6 @@ const ProductPage = () => {
 
   return (
     <main className="min-h-screen bg-[#f5f5f4] pt-12 pb-10 text-neutral-900">
-      <style>{`
-        .price-range-slider {
-          position: relative;
-          height: 18px;
-        }
-        .price-range-track {
-          position: absolute;
-          top: 50%;
-          left: 0;
-          right: 0;
-          height: 8px;
-          border-radius: 999px;
-          background: linear-gradient(90deg, #dfe5e1 0%, #d3dbd5 100%);
-          transform: translateY(-50%);
-        }
-        .price-range-selected {
-          position: absolute;
-          top: 50%;
-          height: 8px;
-          border-radius: 999px;
-          background: linear-gradient(90deg, #4f6758 0%, #647d6d 100%);
-          box-shadow: 0 2px 6px rgba(56, 73, 63, 0.22);
-          transform: translateY(-50%);
-          left: var(--min-pct);
-          right: calc(100% - var(--max-pct));
-        }
-        .price-range-input {
-          position: absolute;
-          left: 0;
-          top: 0;
-          width: 100%;
-          -webkit-appearance: none;
-          appearance: none;
-          height: 18px;
-          border-radius: 999px;
-          background: transparent;
-          outline: none;
-          pointer-events: none;
-        }
-        .price-range-input::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 18px;
-          height: 18px;
-          border-radius: 999px;
-          background: #546d5d;
-          border: 2px solid #ffffff;
-          box-shadow: 0 2px 8px rgba(40, 55, 47, 0.22), 0 0 0 2px rgba(255, 255, 255, 0.68);
-          cursor: pointer;
-          pointer-events: auto;
-        }
-        .price-range-input::-moz-range-thumb {
-          width: 18px;
-          height: 18px;
-          border-radius: 999px;
-          background: #546d5d;
-          border: 2px solid #ffffff;
-          box-shadow: 0 2px 8px rgba(40, 55, 47, 0.22), 0 0 0 2px rgba(255, 255, 255, 0.68);
-          cursor: pointer;
-          pointer-events: auto;
-        }
-        .price-range-input::-moz-range-track {
-          background: transparent;
-        }
-      `}</style>
       <section className="container mx-auto max-w-7xl px-4">
         <div className="mb-3 border-b border-neutral-200 pb-2">
           <h1 className="font-display text-3xl font-bold leading-[1.15] tracking-tight text-black md:text-5xl lg:text-[2.75rem]">
@@ -453,54 +351,6 @@ const ProductPage = () => {
                 </div>
               </div>
             )}
-
-            <div>
-              <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Giá</h3>
-              <div className="mb-2 ml-auto w-fit rounded-lg border border-[#d9e0da] bg-[#f7faf8] px-2.5 py-1.5 text-right">
-                <p className="text-[10px] font-medium tracking-[0.08em] text-[#708276]">Khoảng tiền</p>
-                <p className="mt-0.5 text-xs font-semibold text-[#3f5648]">
-                  {Number(minPriceFilter || 0).toLocaleString("vi-VN")}đ -{" "}
-                  {Number(maxPriceFilter || 0).toLocaleString("vi-VN")}đ
-                </p>
-              </div>
-              <div
-                className="price-range-slider"
-                style={{ "--min-pct": `${minRangePercent}%`, "--max-pct": `${maxRangePercent}%` }}
-              >
-                <div className="price-range-track" />
-                <div className="price-range-selected" />
-                <input
-                  type="range"
-                  min={0}
-                  max={maxAvailablePrice || 1}
-                  value={minPriceFilter}
-                  onChange={(e) => {
-                    const next = Number(e.target.value);
-                    setMinPriceFilter(Math.min(next, maxPriceFilter));
-                  }}
-                  className="price-range-input"
-                />
-                <input
-                  type="range"
-                  min={0}
-                  max={maxAvailablePrice || 1}
-                  value={maxPriceFilter}
-                  onChange={(e) => {
-                    const next = Number(e.target.value);
-                    setMaxPriceFilter(Math.max(next, minPriceFilter));
-                  }}
-                  className="price-range-input"
-                />
-              </div>
-              <div className="mt-2 flex items-center justify-between text-xs font-semibold text-[#3f5648]">
-                <span className="rounded-full border border-[#d9e0da] bg-[#f7faf8] px-2.5 py-1">
-                  {Number(minPriceFilter || 0).toLocaleString("vi-VN")}đ
-                </span>
-                <span className="rounded-full border border-[#d9e0da] bg-[#f7faf8] px-2.5 py-1">
-                  {Number(maxPriceFilter || 0).toLocaleString("vi-VN")}đ
-                </span>
-              </div>
-            </div>
 
             {availableSizes.length > 0 && (
               <div>

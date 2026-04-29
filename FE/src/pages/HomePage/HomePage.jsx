@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useSelector } from "react-redux";
 import { FaFire, FaGem, FaArrowRight, FaFilter } from "react-icons/fa";
 import Product from "../../components/Product/Product";
+import BannerSlider from "../../components/BannerSlider/BannerSlider";
 import {
   getFeaturedProducts,
   getBestSellers,
@@ -11,16 +11,6 @@ import {
   fetchProducts,
   getAllCategories,
 } from "../../api";
-
-/* Converse / Chuck Taylor — 6 ảnh hero */
-const banners = [
-  "https://images.unsplash.com/photo-1624636224909-d986525fb391?q=85&w=2000&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1603217192634-61068e4d4bf9?q=85&w=2000&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1578986175247-7d60c6df07c5?q=85&w=2000&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1595184922849-05643a9ea3ce?q=85&w=2000&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1551583014-7ed375daad83?q=85&w=2000&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1581186088584-154ef8def9b6?q=85&w=2000&auto=format&fit=crop",
-];
 
 const normalizeText = (value = "") =>
   String(value)
@@ -89,9 +79,6 @@ const pickForRecommendation = ({
 };
 
 const HomePage = () => {
-  const user = useSelector((state) => state.user);
-  const isLoggedIn = !!(user?.login && (user?.token || user?.name || user?.email));
-
   const [products, setProducts] = useState([]);
   const [hotProducts, setHotProducts] = useState([]);
   const [newProducts, setNewProducts] = useState([]);
@@ -100,13 +87,7 @@ const HomePage = () => {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [sort, setSort] = useState("new");
-  const [slide, setSlide] = useState(0);
   const categoryBtnRefs = useRef({});
-
-  useEffect(() => {
-    const interval = setInterval(() => setSlide((prev) => (prev + 1) % banners.length), 5000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -210,74 +191,7 @@ const HomePage = () => {
 
   return (
     <main className="min-h-screen bg-convot-cream font-body text-convot-charcoal pb-16 md:pb-24">
-      {/* Hero — carousel ảnh, giữ khung bo góc */}
-      <section className="px-4 pt-6 md:pt-10 max-w-7xl mx-auto">
-        <div className="relative overflow-hidden rounded-[28px] md:rounded-[32px] min-h-[420px] md:min-h-[520px] shadow-lg shadow-teal-500/10 ring-1 ring-white/40">
-          {banners.map((img, index) => (
-            <div
-              key={index}
-              className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${slide === index ? "opacity-100 z-[1]" : "opacity-0 z-0 pointer-events-none"}`}
-            >
-              {/* Lớp màu trẻ trung: cam / hồng / cyan nhẹ — vẫn đọc được chữ */}
-              <div
-                className="absolute inset-0 z-[5] bg-gradient-to-br from-orange-300/18 via-fuchsia-300/12 to-cyan-300/16 mix-blend-soft-light"
-                aria-hidden
-              />
-              <div
-                className="absolute inset-0 z-[6] bg-gradient-to-t from-neutral-900/40 via-neutral-900/10 to-white/15"
-                aria-hidden
-              />
-              <img
-                src={img}
-                alt=""
-                className="relative z-0 w-full h-full object-cover object-center min-h-[420px] md:min-h-[520px] saturate-[1.08] contrast-[1.02]"
-              />
-            </div>
-          ))}
-          <div className="relative z-20 flex flex-col items-center justify-center text-center px-6 py-16 md:py-24 min-h-[420px] md:min-h-[520px]">
-            {isLoggedIn && (
-              <p className="mb-4 text-base md:text-lg font-semibold text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
-                Xin chào, {user?.name || user?.email?.split("@")[0] || "bạn"} 👋
-              </p>
-            )}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-display font-black tracking-tight max-w-4xl leading-[1.1] drop-shadow-lg">
-              <span className="bg-gradient-to-r from-amber-200 via-white to-cyan-200 bg-clip-text text-transparent">
-                GIÀY MỚI
-              </span>
-              <br />
-              <span className="text-white">— NĂNG ĐỘNG TỪNG BƯỚC</span>
-            </h1>
-            <p className="mt-5 md:mt-6 text-lg md:text-xl lg:text-2xl font-medium max-w-2xl text-white/95 drop-shadow-md leading-relaxed">
-              Converse hot, màu sắc bùng nổ — mang phố đi cùng bạn mỗi ngày.
-            </p>
-            <div className="mt-8 md:mt-10 flex flex-wrap justify-center gap-3">
-              <Link
-                to="/product"
-                className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-orange-500 to-fuchsia-600 px-9 py-4 text-base md:text-lg font-bold text-white shadow-lg shadow-orange-500/30 transition hover:brightness-110 hover:scale-[1.03] active:scale-[0.98]"
-              >
-                Săn giày hot
-              </Link>
-              <Link
-                to="/product"
-                className="inline-flex items-center gap-2 rounded-full border-2 border-white/80 bg-white/15 px-7 py-4 text-base md:text-lg font-bold text-white backdrop-blur-md hover:bg-white/25 hover:scale-[1.02] transition-all"
-              >
-                Xem bộ sưu tập <FaArrowRight className="text-sm" />
-              </Link>
-            </div>
-            <div className="mt-8 flex flex-wrap justify-center gap-2 sm:gap-2.5 max-w-md mx-auto px-2">
-              {banners.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setSlide(i)}
-                  className={`h-2 sm:h-2.5 rounded-full transition-all duration-300 shrink-0 ${slide === i ? "w-8 sm:w-10 bg-gradient-to-r from-amber-300 to-cyan-300 shadow-[0_0_12px_rgba(250,204,21,0.6)]" : "w-2 sm:w-2.5 bg-white/50 hover:bg-white/80"}`}
-                  aria-label={`Ảnh ${i + 1}`}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+      <BannerSlider />
 
       {/* Danh mục */}
       <section className="relative z-10 -mt-6 mb-12 md:mb-16">

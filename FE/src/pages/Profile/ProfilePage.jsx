@@ -7,7 +7,6 @@ import {
     getOrdersByUser,
     getWalletBalance,
     getWalletTransactions,
-    createWalletVnpayTopupUrl,
 } from "../../api";
 import { updateUserInfo, clearUser } from "../../redux/user";
 import notify from "../../utils/notify";
@@ -33,9 +32,7 @@ const ProfilePage = () => {
     const [walletBalance, setWalletBalance] = useState(null);
     const [walletTx, setWalletTx] = useState([]);
     const [walletLoading, setWalletLoading] = useState(false);
-    const [topupAmountVnpay, setTopupAmountVnpay] = useState("100000");
     const [showAllWalletTx, setShowAllWalletTx] = useState(false);
-    const [topupSubmitting, setTopupSubmitting] = useState(false);
 
     // Handle tab switching from query params
     useEffect(() => {
@@ -95,43 +92,6 @@ const ProfilePage = () => {
             cancelled = true;
         };
     }, [user?.login, activeTab]);
-
-    useEffect(() => {
-        if (activeTab !== "wallet") return;
-        const params = new URLSearchParams(location.search);
-        if (params.get("topup") === "1") {
-            const amt = params.get("amount");
-            notify.success(
-                amt
-                    ? `Nạp ví thành công: ${Number(amt).toLocaleString("vi-VN")}đ`
-                    : "Nạp ví thành công.",
-            );
-            navigate("/profile?tab=wallet", { replace: true });
-        }
-    }, [activeTab, location.search, navigate]);
-
-    const handleVnpayTopup = async () => {
-        const n = Number(String(topupAmountVnpay).replace(/\D/g, ""));
-        if (!Number.isFinite(n) || n < 10000) {
-            notify.warning("Số tiền tối thiểu 10.000đ.");
-            return;
-        }
-        setTopupSubmitting(true);
-        try {
-            const base = window.location.origin;
-            const data = await createWalletVnpayTopupUrl({
-                amount: n,
-                returnUrl: `${base}/profile?tab=wallet`,
-                cancelUrl: `${base}/profile?tab=wallet`,
-            });
-            if (data?.paymentUrl) window.location.href = data.paymentUrl;
-            else notify.error("Không nhận được liên kết thanh toán.");
-        } catch (err) {
-            notify.error(err?.response?.data?.message || "Không tạo được liên kết VNPay.");
-        } finally {
-            setTopupSubmitting(false);
-        }
-    };
 
     const displayedWalletTx = showAllWalletTx ? walletTx : walletTx.slice(0, 3);
 
@@ -344,40 +304,9 @@ const ProfilePage = () => {
                                             <div className="w-16 h-10 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 flex items-center justify-center text-white/40 italic font-black">VISA</div>
                                         </div>
                                         <p className="text-slate-400 text-sm font-medium max-w-md">
-                                            Nạp qua VNPay; hoàn hàng / hoàn hủy đơn cũng được cộng vào ví.
+                                            Số dư ví hiển thị các khoản hoàn hàng, hoàn hủy đơn và thanh toán bằng ví.
                                         </p>
                                     </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-6">
-                                    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 md:p-8">
-                                        <h4 className="font-black text-slate-900 mb-2 flex items-center gap-2">
-                                            <span className="text-primary">●</span> Nạp qua VNPay
-                                        </h4>
-                                        <p className="text-xs text-slate-500 mb-4">Chuyển hướng sang cổng thanh toán; tiền vào ví khi giao dịch thành công.</p>
-                                        <div className="flex flex-wrap gap-3 items-end">
-                                            <div className="flex-1 min-w-[140px]">
-                                                <label className="text-xs font-bold text-slate-400 uppercase">Số tiền (đ)</label>
-                                                <input
-                                                    type="number"
-                                                    min={10000}
-                                                    step={1000}
-                                                    value={topupAmountVnpay}
-                                                    onChange={(e) => setTopupAmountVnpay(e.target.value)}
-                                                    className="w-full mt-1 px-4 py-3 rounded-xl border border-slate-200 font-bold text-slate-800"
-                                                />
-                                            </div>
-                                            <button
-                                                type="button"
-                                                disabled={topupSubmitting}
-                                                onClick={handleVnpayTopup}
-                                                className="px-6 py-3 rounded-xl bg-slate-900 text-white font-black text-sm hover:bg-primary transition-colors disabled:opacity-50"
-                                            >
-                                                {topupSubmitting ? "…" : "Thanh toán VNPay"}
-                                            </button>
-                                        </div>
-                                    </div>
-
                                 </div>
 
                                 <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 md:p-10">

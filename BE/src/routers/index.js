@@ -12,6 +12,7 @@ const OrderRouter = require("./OrderRouter");
 const CartRouter = require("./CartRouter");
 const ChatRouter = require("./ChatRouter");
 const WalletRouter = require("./WalletRouter");
+const BannerRouter = require("./BannerRouter");
 
 const routes = (app) => {
   app.use("/api/product", ProductRouter);
@@ -28,6 +29,7 @@ const routes = (app) => {
   app.use("/api/cart", CartRouter);
   app.use("/api/chat", ChatRouter);
   app.use("/api/wallet", WalletRouter);
+  app.use("/api/banner", BannerRouter);
 };
 
 module.exports = routes;
