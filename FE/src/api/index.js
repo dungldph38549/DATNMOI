@@ -66,20 +66,6 @@ export const getWalletTransactions = async (page = 1, limit = 20) => {
   return res.data;
 };
 
-/** Tạo link thanh toán VNPay để nạp ví */
-export const createWalletVnpayTopupUrl = async ({
-  amount,
-  returnUrl,
-  cancelUrl,
-}) => {
-  const res = await axiosInstance.post("/wallet/topup/vnpay/create-url", {
-    amount,
-    returnUrl,
-    cancelUrl,
-  });
-  return res.data;
-};
-
 /** Admin: chỉ xem lịch sử giao dịch nạp ví */
 export const adminListTopupTransactions = async (page = 1, limit = 20) => {
   const res = await axiosInstance.get("/wallet/admin/topups/transactions", {
@@ -847,6 +833,43 @@ export const rejectAdminReview = async (id, reason = "") => {
   return res.data;
 };
 
+// ================== Banner API ==================
+export const getPublicBanners = async () => {
+  const res = await axiosInstance.get("/banner");
+  return res.data;
+};
+
+export const getAdminBanners = async () => {
+  const res = await axiosInstance.get("/banner/admin");
+  return res.data;
+};
+
+export const createBanner = async (payload) => {
+  const res = await axiosInstance.post("/banner", payload);
+  return res.data;
+};
+
+export const updateBanner = async (id, payload) => {
+  const res = await axiosInstance.put(`/banner/${id}`, payload);
+  return res.data;
+};
+
+export const deleteBanner = async (id) => {
+  const res = await axiosInstance.delete(`/banner/${id}`);
+  return res.data;
+};
+
+export const toggleBanner = async (id) => {
+  const res = await axiosInstance.patch(`/banner/${id}/toggle`);
+  return res.data;
+};
+
+export const reorderBanners = async (items) => {
+  const res = await axiosInstance.patch("/banner/reorder", { items });
+  return res.data;
+};
+
+// ================== Review API ==================
 export const addReviewReply = async (reviewId, content) => {
   const res = await axiosInstance.post(`/reviews/${reviewId}/replies`, { content });
   return res.data;

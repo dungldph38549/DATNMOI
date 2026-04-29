@@ -12,6 +12,7 @@ import Colors from "./Colors";
 import Reviews from "./Reviews";
 import ChatAdmin from "./ChatAdmin";
 import WalletTopups from "./WalletTopups";
+import BannerManager from "./BannerManager";
 // import OrderReturn from "./OrderReturn";
 // import Comments from "./Comments";
 // import StaffManagement from "./StaffManagement";
@@ -76,6 +77,7 @@ const MENU_ITEMS = {
   },
   vouchers: { key: "vouchers", icon: "confirmation_number", label: "Voucher" },
   comments: { key: "comments", icon: "star", label: "Đánh giá" },
+  banners: { key: "banners", icon: "view_carousel", label: "Banner trang chủ" },
   users: { key: "users", icon: "group", label: "Khách hàng" },
   "wallet-topups": {
     key: "wallet-topups",
@@ -102,7 +104,7 @@ const MENU_GROUPS = [
     id: "promo-feedback",
     label: "Ưu đãi và phản hồi",
     icon: "campaign",
-    items: ["vouchers", "comments", "chat"],
+    items: ["vouchers", "comments", "banners", "chat"],
   },
   {
     id: "customers-wallet",
@@ -372,6 +374,8 @@ const AdminPage = () => {
         return <Reviews />;
       case "staff":
         return <Users mode="staff" />;
+      case "banners":
+        return <BannerManager />;
       default:
         return (
           <div

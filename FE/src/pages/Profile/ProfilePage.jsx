@@ -1,14 +1,12 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaUser, FaLock, FaShoppingBag, FaCamera, FaChevronRight, FaSignOutAlt, FaWallet, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import {
     updateCustomerById,
-    uploadImage,
     getOrdersByUser,
     getWalletBalance,
     getWalletTransactions,
-    createWalletVnpayTopupUrl,
 } from "../../api";
 import { updateUserInfo, clearUser } from "../../redux/user";
 import notify from "../../utils/notify";
@@ -34,18 +32,7 @@ const ProfilePage = () => {
     const [walletBalance, setWalletBalance] = useState(null);
     const [walletTx, setWalletTx] = useState([]);
     const [walletLoading, setWalletLoading] = useState(false);
-    const [topupAmountVnpay, setTopupAmountVnpay] = useState("");
     const [showAllWalletTx, setShowAllWalletTx] = useState(false);
-    const [topupSubmitting, setTopupSubmitting] = useState(false);
-    const [avatarUploading, setAvatarUploading] = useState(false);
-    const [avatarPreview, setAvatarPreview] = useState(user?.avatar || "");
-    const avatarInputRef = useRef(null);
-
-    const formatAmountInput = (value) => {
-        const digits = String(value ?? "").replace(/\D/g, "");
-        if (!digits) return "";
-        return Number(digits).toLocaleString("vi-VN");
-    };
 
     // Handle tab switching from query params
     useEffect(() => {
@@ -106,61 +93,6 @@ const ProfilePage = () => {
         };
     }, [user?.login, activeTab]);
 
-    useEffect(() => {
-        if (activeTab !== "wallet") return;
-        const params = new URLSearchParams(location.search);
-        if (params.get("topup") === "1") {
-            const amt = params.get("amount");
-            notify.success(
-                amt
-                    ? `Nạp ví thành công: ${Number(amt).toLocaleString("vi-VN")}đ`
-                    : "Nạp ví thành công.",
-            );
-            navigate("/profile?tab=wallet", { replace: true });
-        }
-    }, [activeTab, location.search, navigate]);
-
-    useEffect(() => {
-        setAvatarPreview(user?.avatar || "");
-    }, [user?.avatar]);
-
-    const getAvatarSrc = (src) => {
-        if (!src) return "";
-        if (
-            src.startsWith("http://")
-            || src.startsWith("https://")
-            || src.startsWith("data:")
-            || src.startsWith("blob:")
-        ) {
-            return src;
-        }
-        return `http://localhost:3002/uploads/${src.startsWith("/") ? src.slice(1) : src}`;
-    };
-
-
-    const handleVnpayTopup = async () => {
-        const n = Number(String(topupAmountVnpay).replace(/\D/g, ""));
-        if (!Number.isFinite(n) || n < 10000) {
-            notify.warning("Số tiền tối thiểu 10.000đ.");
-            return;
-        }
-        setTopupSubmitting(true);
-        try {
-            const base = window.location.origin;
-            const data = await createWalletVnpayTopupUrl({
-                amount: n,
-                returnUrl: `${base}/profile?tab=wallet`,
-                cancelUrl: `${base}/profile?tab=wallet`,
-            });
-            if (data?.paymentUrl) window.location.href = data.paymentUrl;
-            else notify.error("Không nhận được liên kết thanh toán.");
-        } catch (err) {
-            notify.error(err?.response?.data?.message || "Không tạo được liên kết VNPay.");
-        } finally {
-            setTopupSubmitting(false);
-        }
-    };
-
     const displayedWalletTx = showAllWalletTx ? walletTx : walletTx.slice(0, 3);
 
     const handleInfoUpdate = async (e) => {
@@ -192,64 +124,6 @@ const ProfilePage = () => {
         navigate("/");
     };
 
-    const handleAvatarFileChange = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        if (!file.type?.startsWith("image/")) {
-            notify.warning("Vui lòng chọn file ảnh hợp lệ.");
-            e.target.value = "";
-            return;
-        }
-        if (file.size > 5 * 1024 * 1024) {
-            notify.warning("Ảnh đại diện tối đa 5MB.");
-            e.target.value = "";
-            return;
-        }
-
-        const localPreviewUrl = URL.createObjectURL(file);
-        setAvatarPreview(localPreviewUrl);
-        setAvatarUploading(true);
-
-        try {
-            const fd = new FormData();
-            fd.append("file", file);
-            const uploadRes = await uploadImage(fd);
-            const avatarPath = uploadRes?.path;
-            if (!avatarPath) throw new Error("Upload không trả về đường dẫn ảnh.");
-
-            const payload = {
-                ...formData,
-                id: user.id || user._id,
-                avatar: avatarPath,
-            };
-            const updateRes = await updateCustomerById(payload);
-
-            const statusRaw = updateRes?.status;
-            const statusNormalized = typeof statusRaw === "string" ? statusRaw.toLowerCase() : statusRaw;
-            const isAvatarUpdateSuccess =
-                updateRes?.success === true
-                || statusNormalized === "ok"
-                || statusNormalized === "success"
-                || statusRaw === true;
-
-            if (isAvatarUpdateSuccess) {
-                dispatch(updateUserInfo({ ...formData, avatar: avatarPath }));
-                setAvatarPreview(getAvatarSrc(avatarPath));
-                notify.success("Cập nhật ảnh đại diện thành công.");
-            } else {
-                throw new Error(updateRes?.message || "Cập nhật ảnh đại diện thất bại.");
-            }
-        } catch (err) {
-            setAvatarPreview(getAvatarSrc(user?.avatar || ""));
-            notify.error(err?.response?.data?.message || err?.message || "Không thể cập nhật ảnh đại diện.");
-        } finally {
-            URL.revokeObjectURL(localPreviewUrl);
-            e.target.value = "";
-            setAvatarUploading(false);
-        }
-    };
-
     return (
         <div className="min-h-screen bg-slate-50 pt-28 pb-20 font-body">
             <div className="container mx-auto px-4 max-w-6xl">
@@ -261,26 +135,13 @@ const ProfilePage = () => {
                             <div className="p-8 text-center border-b border-slate-50">
                                 <div className="relative inline-block mb-4">
                                     <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border-4 border-white shadow-lg overflow-hidden">
-                                        {avatarPreview ? (
-                                            <img src={getAvatarSrc(avatarPreview)} alt={user.name} className="w-full h-full object-cover" />
+                                        {user?.avatar ? (
+                                            <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
                                         ) : (
                                             <FaUser size={40} />
                                         )}
                                     </div>
-                                    <input
-                                        ref={avatarInputRef}
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleAvatarFileChange}
-                                        className="hidden"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => avatarInputRef.current?.click()}
-                                        disabled={avatarUploading}
-                                        className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full shadow-lg hover:scale-110 transition-transform disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
-                                        title="Đổi ảnh đại diện"
-                                    >
+                                    <button className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full shadow-lg hover:scale-110 transition-transform">
                                         <FaCamera size={12} />
                                     </button>
                                 </div>
@@ -443,46 +304,15 @@ const ProfilePage = () => {
                                             <div className="w-16 h-10 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 flex items-center justify-center text-white/40 italic font-black">VISA</div>
                                         </div>
                                         <p className="text-slate-400 text-sm font-medium max-w-md">
-                                            Nạp qua VNPay; hoàn hàng / hoàn hủy đơn cũng được cộng vào ví.
+                                            Số dư ví hiển thị các khoản hoàn hàng, hoàn hủy đơn và thanh toán bằng ví.
                                         </p>
                                     </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-6">
-                                    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 md:p-8">
-                                        <h4 className="font-black text-slate-900 mb-2 flex items-center gap-2">
-                                            <span className="text-primary">●</span> Nạp qua VNPay
-                                        </h4>
-                                        <p className="text-xs text-slate-500 mb-4">Chuyển hướng sang cổng thanh toán; tiền vào ví khi giao dịch thành công.</p>
-                                        <div className="flex flex-wrap gap-3 items-end">
-                                            <div className="flex-1 min-w-[140px]">
-                                                <label className="text-xs font-bold text-slate-400 uppercase">Số tiền (đ)</label>
-                                                <input
-                                                    type="text"
-                                                    inputMode="numeric"
-                                                    value={formatAmountInput(topupAmountVnpay)}
-                                                    onChange={(e) => setTopupAmountVnpay(e.target.value.replace(/\D/g, ""))}
-                                                    placeholder="Ví dụ: 100.000"
-                                                    className="w-full mt-1 px-4 py-3 rounded-xl border border-slate-200 font-bold text-slate-500 placeholder:text-slate-300"
-                                                />
-                                            </div>
-                                            <button
-                                                type="button"
-                                                disabled={topupSubmitting}
-                                                onClick={handleVnpayTopup}
-                                                className="px-6 py-3 rounded-xl bg-slate-900 text-white font-black text-sm hover:bg-primary transition-colors disabled:opacity-50"
-                                            >
-                                                {topupSubmitting ? "…" : "Thanh toán VNPay"}
-                                            </button>
-                                        </div>
-                                    </div>
-
                                 </div>
 
                                 <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 md:p-10">
                                     <div className="mb-8">
                                         <h3 className="text-2xl font-display font-black text-slate-900 mb-2">Lịch sử giao dịch</h3>
-                                        <p className="text-slate-400 text-sm">Nạp tiền, thanh toán đơn và hoàn tiền (ví / hủy đơn VNPay) hiển thị tại đây.</p>
+                                        <p className="text-slate-400 text-sm">Theo dõi các hoạt động nạp tiền và thanh toán gần đây.</p>
                                     </div>
                                     <div className="space-y-1">
                                         {walletLoading && walletTx.length === 0 ? (
@@ -500,8 +330,6 @@ const ProfilePage = () => {
                                                           ? `Thanh toán đơn bằng ví${shortId ? ` · #${shortId}` : ""}`
                                                           : tx.type === "order_cancel_refund"
                                                             ? `Hoàn ví (hủy đơn)${shortId ? ` · #${shortId}` : ""}`
-                                                            : tx.type === "order_line_cancel_refund"
-                                                              ? `Hoàn ví (hủy / điều chỉnh dòng đơn)${shortId ? ` · #${shortId}` : ""}`
                                                             : tx.type === "topup_vnpay"
                                                               ? "Nạp tiền VNPay"
                                                               : tx.type === "topup_bank"
@@ -514,7 +342,6 @@ const ProfilePage = () => {
                                                 const credit =
                                                     tx.type === "return_refund" ||
                                                     tx.type === "order_cancel_refund" ||
-                                                    tx.type === "order_line_cancel_refund" ||
                                                     tx.type === "topup_vnpay" ||
                                                     tx.type === "topup_bank";
                                                 return (

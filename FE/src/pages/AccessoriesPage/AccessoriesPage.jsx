@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { FaEye, FaHeart, FaRegHeart, FaStar } from "react-icons/fa";
+import { Link } from "react-router-dom";
+import { FaEye, FaHeart, FaRegHeart } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchProducts, getAllCategories, getReviewStatsByProduct } from "../../api";
+import { fetchProducts, getAllCategories } from "../../api";
 import { getProductPriceInfo } from "../../utils/pricing.js";
 import { isProductOutOfStock } from "../../utils/stock.js";
 import {
@@ -12,7 +12,6 @@ import {
   getVariantSoleValue,
 } from "../../utils/variantAttributes";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
-import notify from "../../utils/notify";
 
 const PAGE_STEP = 12;
 
@@ -81,57 +80,7 @@ const getProductMinPrice = (product) => {
   return 0;
 };
 
-const isProductOnRealSale = (product) => {
-  if (!product) return false;
-  const amount = (value) => Number(value) || 0;
-  if (amount(product.saleDiscountAmount) > 0) return true;
-  if (
-    Array.isArray(product.variants) &&
-    product.variants.some((variant) => amount(variant?.saleDiscountAmount) > 0)
-  ) {
-    return true;
-  }
-  return false;
-};
-
-const matchRatingFilter = (product, selectedRating) => {
-  if (!selectedRating) return true;
-  const currentRating = Number(
-    product?.rating ??
-      product?.averageRating ??
-      product?.avgRating ??
-      product?.reviewStats?.average ??
-      0,
-  );
-  if (selectedRating === "5") return currentRating === 5;
-  const minRating = Number(selectedRating);
-  if (!Number.isFinite(minRating)) return true;
-  return currentRating >= minRating && currentRating < 5;
-};
-
-const getResolvedProductRating = (product, ratingMap = {}) => {
-  const id = String(product?._id || "");
-  const fromStats = Number(ratingMap[id]);
-  if (Number.isFinite(fromStats) && fromStats > 0) return fromStats;
-  const fromProduct = Number(
-    product?.rating ??
-      product?.averageRating ??
-      product?.avgRating ??
-      product?.reviewStats?.average ??
-      0,
-  );
-  return Number.isFinite(fromProduct) ? fromProduct : 0;
-};
-
 const normalizeValue = (value) => String(value || "").trim().toLowerCase();
-
-const normalizeLooseValue = (value) =>
-  String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/[^a-z0-9]/g, "");
 
 const getProductLaceColors = (product) => {
   const colors = [];
@@ -181,20 +130,6 @@ const getProductVariantSizes = (product) => {
     });
   }
   return [...new Set(vals)];
-};
-
-const detectProductAccessoryKind = (product) => {
-  const textHint = `${product?.name || ""} ${product?.categoryId?.name || ""} ${product?.categoryId?.slug || ""} ${
-    product?.description || ""
-  }`;
-  const byText = inferAccessorySubKind(textHint, textHint);
-  if (byText === "shoelace" || byText === "insole") return byText;
-
-  if (getProductShoelaceLengths(product).length > 0) return "shoelace";
-  if (getProductSoleValues(product).length > 0) return "insole";
-  if (getProductVariantSizes(product).length > 0) return "insole";
-
-  return "other";
 };
 
 /** Sort length labels: numeric first (120, 120cm), then locale. */
@@ -255,8 +190,7 @@ const VerticalOptionFilter = ({ title, allLabel, options, value, onChange, radio
             type="radio"
             name={name}
             checked={value === ""}
-            onClick={() => onChange("")}
-            onChange={() => {}}
+            onChange={() => onChange("")}
             className="h-4 w-4 accent-[#8ca587]"
           />
           {allLabel}
@@ -267,8 +201,7 @@ const VerticalOptionFilter = ({ title, allLabel, options, value, onChange, radio
               type="radio"
               name={name}
               checked={value === opt}
-              onClick={() => onChange(value === opt ? "" : opt)}
-              onChange={() => {}}
+              onChange={() => onChange(opt)}
               className="h-4 w-4 accent-[#8ca587]"
             />
             {opt}
@@ -281,21 +214,14 @@ const VerticalOptionFilter = ({ title, allLabel, options, value, onChange, radio
 
 const AccessoriesPage = () => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const location = useLocation();
   const wishlistItems = useSelector((state) => state.wishlist.items || []);
-  const user = useSelector((state) => state.user);
   const [products, setProducts] = useState([]);
-  const [productRatingMap, setProductRatingMap] = useState({});
   const [loading, setLoading] = useState(true);
-  const [accessoryTypeFilter, setAccessoryTypeFilter] = useState("all");
-  const [minPriceFilter, setMinPriceFilter] = useState(0);
-  const [maxPriceFilter, setMaxPriceFilter] = useState(0);
+  const [categoryFilterId, setCategoryFilterId] = useState("");
   const [colorFilter, setColorFilter] = useState("");
   const [lengthFilter, setLengthFilter] = useState("");
   const [soleFilter, setSoleFilter] = useState("");
-  const [sizeFilter, setSizeFilter] = useState("");
-  const [ratingFilter, setRatingFilter] = useState("");
+  // const [sizeFilter, setSizeFilter] = useState("");
   const [sort, setSort] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_STEP);
 
@@ -335,51 +261,43 @@ const AccessoriesPage = () => {
     load();
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    const ids = (Array.isArray(products) ? products : [])
-      .map((p) => String(p?._id || ""))
-      .filter(Boolean)
-      .filter((id) => productRatingMap[id] == null);
-    if (!ids.length) return undefined;
-
-    const loadRatingStats = async () => {
-      const entries = await Promise.all(
-        ids.map(async (id) => {
-          try {
-            const stats = await getReviewStatsByProduct(id);
-            const avg = Number(stats?.data?.average ?? stats?.average ?? 0);
-            return [id, Number.isFinite(avg) ? avg : 0];
-          } catch {
-            return [id, 0];
-          }
-        }),
-      );
-      if (cancelled) return;
-      setProductRatingMap((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
-    };
-    loadRatingStats();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [products, productRatingMap]);
+  const categoryOptions = useMemo(() => {
+    const map = new Map();
+    products.forEach((p) => {
+      const id = String(p?.categoryId?._id ?? p?.categoryId ?? "");
+      const cat = p?.categoryId;
+      const name = cat?.name || p?.category || "";
+      const slug = cat?.slug != null && String(cat.slug).trim() !== "" ? String(cat.slug).trim() : "";
+      if (id && name && !map.has(id)) map.set(id, { name, slug });
+    });
+    return [
+      { id: "", label: "TẤT CẢ PHỤ KIỆN", name: "", slug: "" },
+      ...[...map.entries()].map(([id, meta]) => ({
+        id,
+        label: String(meta.name).toUpperCase(),
+        name: meta.name,
+        slug: meta.slug,
+      })),
+    ];
+  }, [products]);
 
   const selectedAccessoryKind = useMemo(() => {
-    return accessoryTypeFilter || "all";
-  }, [accessoryTypeFilter]);
+    if (!categoryFilterId) return "all";
+    const opt = categoryOptions.find((o) => o.id === categoryFilterId);
+    return inferAccessorySubKind(opt?.name || "", opt?.slug || "");
+  }, [categoryFilterId, categoryOptions]);
 
   const productsForFilterOptions = useMemo(() => {
-    if (!accessoryTypeFilter || accessoryTypeFilter === "all") return products;
-    return products.filter((p) => detectProductAccessoryKind(p) === accessoryTypeFilter);
-  }, [products, accessoryTypeFilter]);
+    if (!categoryFilterId) return products;
+    return products.filter((p) => String(p?.categoryId?._id ?? p?.categoryId ?? "") === categoryFilterId);
+  }, [products, categoryFilterId]);
 
   useEffect(() => {
     if (selectedAccessoryKind === "insole") setLengthFilter("");
-    if (selectedAccessoryKind === "shoelace") {
-      setSizeFilter("");
-      setSoleFilter("");
-    }
+    // if (selectedAccessoryKind === "shoelace") {
+    //   setSizeFilter("");
+    //   setSoleFilter("");
+    // }
   }, [selectedAccessoryKind]);
 
   const colorOptions = useMemo(() => {
@@ -400,18 +318,18 @@ const AccessoriesPage = () => {
     return [...set].sort((a, b) => a.localeCompare(b, "vi"));
   }, [productsForFilterOptions]);
 
-  const sizeOptions = useMemo(() => {
-    const set = new Set();
-    productsForFilterOptions.forEach((p) => getProductVariantSizes(p).forEach((v) => set.add(v)));
-    return [...set].sort(sortLengthLabels);
-  }, [productsForFilterOptions]);
+  // const sizeOptions = useMemo(() => {
+  //   const set = new Set();
+  //   productsForFilterOptions.forEach((p) => getProductVariantSizes(p).forEach((v) => set.add(v)));
+  //   return [...set].sort(sortLengthLabels);
+  // }, [productsForFilterOptions]);
 
   const showLengthFilter =
     (selectedAccessoryKind === "all" || selectedAccessoryKind === "other" || selectedAccessoryKind === "shoelace") &&
     lengthOptions.length > 0;
-  const showSizeFilter =
-    (selectedAccessoryKind === "all" || selectedAccessoryKind === "other" || selectedAccessoryKind === "insole") &&
-    sizeOptions.length > 0;
+  // const showSizeFilter =
+  //   (selectedAccessoryKind === "all" || selectedAccessoryKind === "other" || selectedAccessoryKind === "insole") &&
+  //   sizeOptions.length > 0;
   const showSoleFilter =
     (selectedAccessoryKind === "all" || selectedAccessoryKind === "other" || selectedAccessoryKind === "insole") &&
     soleOptions.length > 0;
@@ -419,53 +337,18 @@ const AccessoriesPage = () => {
   const colorSectionTitle =
     selectedAccessoryKind === "shoelace" ? FILTER_LABELS.laceColor : FILTER_LABELS.genericColor;
 
-  const maxAvailablePrice = useMemo(() => {
-    if (!products.length) return 0;
-    return Math.max(...products.map((p) => getProductMinPrice(p)));
-  }, [products]);
-
-  const minRangePercent = useMemo(() => {
-    const max = Number(maxAvailablePrice || 0);
-    const val = Number(minPriceFilter || 0);
-    if (!Number.isFinite(max) || max <= 0) return 0;
-    const clamped = Math.min(Math.max(0, val), max);
-    return Math.round((clamped / max) * 100);
-  }, [maxAvailablePrice, minPriceFilter]);
-
-  const maxRangePercent = useMemo(() => {
-    const max = Number(maxAvailablePrice || 0);
-    const val = Number(maxPriceFilter || 0);
-    if (!Number.isFinite(max) || max <= 0) return 0;
-    const clamped = Math.min(Math.max(0, val), max);
-    return Math.round((clamped / max) * 100);
-  }, [maxAvailablePrice, maxPriceFilter]);
-
-  useEffect(() => {
-    setMinPriceFilter(0);
-    setMaxPriceFilter(maxAvailablePrice || 0);
-  }, [maxAvailablePrice]);
-
   const filteredProducts = useMemo(() => {
     let data = [...products];
 
-    if (accessoryTypeFilter && accessoryTypeFilter !== "all") {
-      data = data.filter((p) => detectProductAccessoryKind(p) === accessoryTypeFilter);
-    }
-
-    if (maxPriceFilter > 0) {
-      data = data.filter((p) => {
-        const price = getProductMinPrice(p);
-        return price >= minPriceFilter && price <= maxPriceFilter;
-      });
+    if (categoryFilterId) {
+      data = data.filter(
+        (p) => String(p?.categoryId?._id ?? p?.categoryId ?? "") === categoryFilterId,
+      );
     }
 
     if (colorFilter) {
       data = data.filter((p) =>
-        getProductLaceColors(p).some((c) => {
-          const a = normalizeLooseValue(c);
-          const b = normalizeLooseValue(colorFilter);
-          return a === b || a.includes(b) || b.includes(a);
-        }),
+        getProductLaceColors(p).some((c) => normalizeValue(c) === normalizeValue(colorFilter)),
       );
     }
 
@@ -481,20 +364,11 @@ const AccessoriesPage = () => {
       );
     }
 
-    if (sizeFilter && showSizeFilter) {
-      data = data.filter((p) =>
-        getProductVariantSizes(p).some((v) => normalizeValue(v) === normalizeValue(sizeFilter)),
-      );
-    }
-
-    if (ratingFilter) {
-      data = data.filter((p) =>
-        matchRatingFilter(
-          { ...p, rating: getResolvedProductRating(p, productRatingMap) },
-          ratingFilter,
-        ),
-      );
-    }
+    // if (sizeFilter && showSizeFilter) {
+    //   data = data.filter((p) =>
+    //     getProductVariantSizes(p).some((v) => normalizeValue(v) === normalizeValue(sizeFilter)),
+    //   );
+    // }
 
     if (sort === "priceAsc") data.sort((a, b) => getProductMinPrice(a) - getProductMinPrice(b));
     else if (sort === "priceDesc") data.sort((a, b) => getProductMinPrice(b) - getProductMinPrice(a));
@@ -504,24 +378,18 @@ const AccessoriesPage = () => {
     return data;
   }, [
     products,
-    accessoryTypeFilter,
-    minPriceFilter,
-    maxPriceFilter,
+    categoryFilterId,
     colorFilter,
     lengthFilter,
     soleFilter,
-    sizeFilter,
     showLengthFilter,
     showSoleFilter,
-    showSizeFilter,
     sort,
-    ratingFilter,
-    productRatingMap,
   ]);
 
   // useEffect(() => {
   //   setVisibleCount(PAGE_STEP);
-  // }, [accessoryTypeFilter, colorFilter, lengthFilter, soleFilter, sizeFilter, sort]);
+  // }, [categoryFilterId, priceBracket, colorFilter, lengthFilter, soleFilter, sizeFilter, sort]);
 
   const visibleList = useMemo(
     () => filteredProducts.slice(0, visibleCount),
@@ -538,14 +406,11 @@ const AccessoriesPage = () => {
 
   const clearFilters = () => {
     setSort("");
-    setAccessoryTypeFilter("all");
-    setMinPriceFilter(0);
-    setMaxPriceFilter(maxAvailablePrice || 0);
+    setCategoryFilterId("");
     setColorFilter("");
-    setLengthFilter("");
-    setSoleFilter("");
-    setSizeFilter("");
-    setRatingFilter("");
+    // setLengthFilter("");
+    // setSoleFilter("");
+    // setSizeFilter("");
   };
 
   const wishlistIds = useMemo(
@@ -555,114 +420,40 @@ const AccessoriesPage = () => {
 
   return (
     <main className="min-h-screen bg-[#f5f5f4] pt-12 pb-10 text-neutral-900">
-      <style>{`
-        .price-range-slider {
-          position: relative;
-          height: 18px;
-        }
-        .price-range-track {
-          position: absolute;
-          top: 50%;
-          left: 0;
-          right: 0;
-          height: 8px;
-          border-radius: 999px;
-          background: linear-gradient(90deg, #dfe5e1 0%, #d3dbd5 100%);
-          transform: translateY(-50%);
-        }
-        .price-range-selected {
-          position: absolute;
-          top: 50%;
-          height: 8px;
-          border-radius: 999px;
-          background: linear-gradient(90deg, #4f6758 0%, #647d6d 100%);
-          box-shadow: 0 2px 6px rgba(56, 73, 63, 0.22);
-          transform: translateY(-50%);
-          left: var(--min-pct);
-          right: calc(100% - var(--max-pct));
-        }
-        .price-range-input {
-          position: absolute;
-          left: 0;
-          top: 0;
-          width: 100%;
-          -webkit-appearance: none;
-          appearance: none;
-          height: 18px;
-          border-radius: 999px;
-          background: transparent;
-          outline: none;
-          pointer-events: none;
-        }
-        .price-range-input::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 18px;
-          height: 18px;
-          border-radius: 999px;
-          background: #546d5d;
-          border: 2px solid #ffffff;
-          box-shadow: 0 2px 8px rgba(40, 55, 47, 0.22), 0 0 0 2px rgba(255, 255, 255, 0.68);
-          cursor: pointer;
-          pointer-events: auto;
-        }
-        .price-range-input::-moz-range-thumb {
-          width: 18px;
-          height: 18px;
-          border-radius: 999px;
-          background: #546d5d;
-          border: 2px solid #ffffff;
-          box-shadow: 0 2px 8px rgba(40, 55, 47, 0.22), 0 0 0 2px rgba(255, 255, 255, 0.68);
-          cursor: pointer;
-          pointer-events: auto;
-        }
-        .price-range-input::-moz-range-track {
-          background: transparent;
-        }
-      `}</style>
       <section className="container mx-auto max-w-7xl px-4">
+        <div className="mb-3 border-b border-neutral-200 pb-2">
+          <h1 className="font-display text-3xl font-bold leading-[1.15] tracking-tight text-black md:text-5xl lg:text-[2.75rem]">
+            PHỤ KIỆN
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm md:text-sm text-neutral-600">
+            Hoàn thiện phong cách của bạn với tất cả mọi thứ ngoài đôi giày — từ vớ, mũ đến dụng cụ chăm sóc.
+          </p>
+        </div>
+
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
           <aside className="w-full lg:w-[248px] lg:shrink-0 space-y-6">
             <div>
-              <h3 className={filterHeadingClass}>Loại phụ kiện</h3>
+              <h3 className={filterHeadingClass}>Danh mục</h3>
               <div className="space-y-3">
-                <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
-                  <input
-                    type="radio"
-                    name="accessory-type"
-                    checked={accessoryTypeFilter === "all"}
-                    onClick={() => setAccessoryTypeFilter("all")}
-                    onChange={() => {}}
-                    className="h-4 w-4 accent-[#8ca587]"
-                  />
-                  TẤT CẢ PHỤ KIỆN
-                </label>
-                <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
-                  <input
-                    type="radio"
-                    name="accessory-type"
-                    checked={accessoryTypeFilter === "shoelace"}
-                    onClick={() =>
-                      setAccessoryTypeFilter((prev) => (prev === "shoelace" ? "all" : "shoelace"))
-                    }
-                    onChange={() => {}}
-                    className="h-4 w-4 accent-[#8ca587]"
-                  />
-                  DÂY GIÀY
-                </label>
-                <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
-                  <input
-                    type="radio"
-                    name="accessory-type"
-                    checked={accessoryTypeFilter === "insole"}
-                    onClick={() =>
-                      setAccessoryTypeFilter((prev) => (prev === "insole" ? "all" : "insole"))
-                    }
-                    onChange={() => {}}
-                    className="h-4 w-4 accent-[#8ca587]"
-                  />
-                  LÓT GIÀY
-                </label>
+                {categoryOptions.map((opt) => {
+                  const value = opt.id;
+                  const checked = categoryFilterId === value;
+                  return (
+                    <label
+                      key={opt.id || "all-cat"}
+                      className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700"
+                    >
+                      <input
+                        type="radio"
+                        name="accessory-category"
+                        checked={checked}
+                        onChange={() => setCategoryFilterId(value)}
+                        className="h-4 w-4 accent-[#8ca587]"
+                      />
+                      {opt.label}
+                    </label>
+                  );
+                })}
               </div>
             </div>
 
@@ -688,7 +479,7 @@ const AccessoriesPage = () => {
               />
             )}
 
-            {showSizeFilter && (
+            {/* {showSizeFilter && (
               <VerticalOptionFilter
                 title={FILTER_LABELS.sizeSection}
                 allLabel={FILTER_LABELS.allSizes}
@@ -697,55 +488,7 @@ const AccessoriesPage = () => {
                 onChange={setSizeFilter}
                 radioName="accessory-size"
               />
-            )}
-
-            <div>
-              <h3 className={filterHeadingClass}>Khoảng giá</h3>
-              <div className="mb-2 ml-auto w-fit rounded-lg border border-[#d9e0da] bg-[#f7faf8] px-2.5 py-1.5 text-right">
-                <p className="text-[10px] font-medium tracking-[0.08em] text-[#708276]">Khoảng tiền</p>
-                <p className="mt-0.5 text-xs font-semibold text-[#3f5648]">
-                  {Number(minPriceFilter || 0).toLocaleString("vi-VN")}đ -{" "}
-                  {Number(maxPriceFilter || 0).toLocaleString("vi-VN")}đ
-                </p>
-              </div>
-              <div
-                className="price-range-slider"
-                style={{ "--min-pct": `${minRangePercent}%`, "--max-pct": `${maxRangePercent}%` }}
-              >
-                <div className="price-range-track" />
-                <div className="price-range-selected" />
-                <input
-                  type="range"
-                  min={0}
-                  max={maxAvailablePrice || 1}
-                  value={minPriceFilter}
-                  onChange={(e) => {
-                    const next = Number(e.target.value);
-                    setMinPriceFilter(Math.min(next, maxPriceFilter));
-                  }}
-                  className="price-range-input"
-                />
-                <input
-                  type="range"
-                  min={0}
-                  max={maxAvailablePrice || 1}
-                  value={maxPriceFilter}
-                  onChange={(e) => {
-                    const next = Number(e.target.value);
-                    setMaxPriceFilter(Math.max(next, minPriceFilter));
-                  }}
-                  className="price-range-input"
-                />
-              </div>
-              <div className="mt-2 flex items-center justify-between text-xs font-semibold text-[#3f5648]">
-                <span className="rounded-full border border-[#d9e0da] bg-[#f7faf8] px-2.5 py-1">
-                  {Number(minPriceFilter || 0).toLocaleString("vi-VN")}đ
-                </span>
-                <span className="rounded-full border border-[#d9e0da] bg-[#f7faf8] px-2.5 py-1">
-                  {Number(maxPriceFilter || 0).toLocaleString("vi-VN")}đ
-                </span>
-              </div>
-            </div>
+            )} */}
 
             {colorOptions.length > 0 && (
               <div>
@@ -756,8 +499,7 @@ const AccessoriesPage = () => {
                       type="radio"
                       name="accessory-color"
                       checked={colorFilter === ""}
-                      onClick={() => setColorFilter("")}
-                      onChange={() => {}}
+                      onChange={() => setColorFilter("")}
                       className="h-4 w-4 accent-[#8ca587]"
                     />
                     Tất cả màu
@@ -768,8 +510,7 @@ const AccessoriesPage = () => {
                         type="radio"
                         name="accessory-color"
                         checked={colorFilter === c}
-                        onClick={() => setColorFilter((prev) => (prev === c ? "" : c))}
-                        onChange={() => {}}
+                        onChange={() => setColorFilter(c)}
                         className="h-4 w-4 accent-[#8ca587]"
                       />
                       <span className="inline-flex items-center gap-2">
@@ -785,28 +526,6 @@ const AccessoriesPage = () => {
                 </div>
               </div>
             )}
-
-            <div>
-              <h3 className={filterHeadingClass}>Đánh giá</h3>
-              <div className="space-y-3">
-                {[
-                  { id: "3", label: "Từ 3 sao" },
-                  { id: "5", label: "5 sao" },
-                ].map((item) => (
-                  <label key={item.id} className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
-                    <input
-                      type="radio"
-                      name="accessory-rating"
-                      checked={ratingFilter === item.id}
-                      onClick={() => setRatingFilter((prev) => (prev === item.id ? "" : item.id))}
-                      onChange={() => {}}
-                      className="h-4 w-4 accent-[#8ca587]"
-                    />
-                    {item.label}
-                  </label>
-                ))}
-              </div>
-            </div>
 
             <button
               type="button"
@@ -860,10 +579,7 @@ const AccessoriesPage = () => {
                     const image = getImageUrl(item?.image || item?.srcImages?.[0]);
                     const priceInfo = getProductPriceInfo(item);
                     const categoryText = item?.categoryId?.name || item?.category || "Phụ kiện";
-                    const resolvedRating = getResolvedProductRating(item, productRatingMap);
-                    const roundedRating = Math.round(Math.min(5, Math.max(0, resolvedRating)));
                     const outOfStock = isProductOutOfStock(item);
-                    const isRealSale = isProductOnRealSale(item);
                     return (
                       <Link
                         key={item._id}
@@ -876,13 +592,6 @@ const AccessoriesPage = () => {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              if (!user?.login || !user?.token) {
-                                notify.warning("Vui lòng đăng nhập để thêm sản phẩm vào yêu thích.");
-                                navigate("/login", {
-                                  state: { from: location.pathname + location.search },
-                                });
-                                return;
-                              }
                               dispatch(toggleWishlist(item));
                             }}
                             className="absolute right-2 top-2 z-20 rounded-full bg-white/90 p-2 shadow ring-1 ring-neutral-200 transition hover:scale-105"
@@ -894,13 +603,6 @@ const AccessoriesPage = () => {
                               <FaRegHeart className="text-neutral-400" size={14} />
                             )}
                           </button>
-                          {isRealSale && (
-                            <span className="absolute left-2 top-2 z-20 rounded bg-[#D0021B] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
-                              {Number(priceInfo?.discountPercent || 0) > 0
-                                ? `-${Number(priceInfo.discountPercent)}%`
-                                : "Sale"}
-                            </span>
-                          )}
                           {image ? (
                             <>
                               <img
@@ -918,7 +620,7 @@ const AccessoriesPage = () => {
                               {outOfStock && (
                                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
                                   <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-black/65 px-3 text-center text-lg font-semibold text-white shadow-lg">
-                                    Hết hàng
+                                    Bán hết
                                   </span>
                                 </div>
                               )}
@@ -932,17 +634,6 @@ const AccessoriesPage = () => {
                           <p className="mt-0.5 line-clamp-1 text-[11px] uppercase tracking-[0.08em] text-neutral-500">
                             {categoryText}
                           </p>
-                          <div className="mt-1 flex items-center gap-1">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <FaStar
-                                key={star}
-                                className={`text-[11px] ${star <= roundedRating ? "text-amber-400" : "text-neutral-300"}`}
-                              />
-                            ))}
-                            <span className="ml-1 text-[11px] text-neutral-500">
-                              ({resolvedRating > 0 ? resolvedRating.toFixed(1) : "0.0"})
-                            </span>
-                          </div>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <span className="text-base font-bold text-neutral-900">
                               {Number(priceInfo?.effectivePrice || 0).toLocaleString("vi-VN")}đ
