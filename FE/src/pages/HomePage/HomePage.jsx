@@ -6,6 +6,7 @@ import BannerSlider from "../../components/BannerSlider/BannerSlider";
 import {
   getFeaturedProducts,
   getBestSellers,
+  getTopSellingProducts,
   getNewArrivals,
   getHomeRecommendations,
   fetchProducts,
@@ -34,6 +35,30 @@ const prioritizeShoes = (items = [], limit = 8) => {
   const accessories = list.filter((p) => isAccessoryProduct(p));
   return [...shoes, ...accessories].slice(0, limit);
 };
+
+const isProductOnRealSale = (product) => {
+  if (!product) return false;
+  const amount = (value) => Number(value) || 0;
+  if (amount(product.saleDiscountAmount) > 0) return true;
+  if (
+    Array.isArray(product.variants) &&
+    product.variants.some((variant) => amount(variant?.saleDiscountAmount) > 0)
+  ) {
+    return true;
+  }
+  return false;
+};
+
+const getSoldScore = (product) => {
+  const baseSold = Number(product?.soldCount || product?.sold || 0);
+  const variantSold = Array.isArray(product?.variants)
+    ? product.variants.reduce((sum, variant) => sum + Number(variant?.sold || 0), 0)
+    : 0;
+  return baseSold + variantSold;
+};
+
+const getCreatedTimestamp = (product) =>
+  new Date(product?.createdAt || product?.updatedAt || 0).getTime();
 
 const pickForRecommendation = ({
   recommendations = [],
@@ -84,6 +109,7 @@ const HomePage = () => {
   const [newProducts, setNewProducts] = useState([]);
   const [accessoryProducts, setAccessoryProducts] = useState([]);
   const [recommendedProducts, setRecommendedProducts] = useState([]);
+  const [saleProductIds, setSaleProductIds] = useState(new Set());
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [sort, setSort] = useState("new");
@@ -92,9 +118,15 @@ const HomePage = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [featuredRes, bestRes, newRes, recommendationRes, allProductRes] = await Promise.all([
+        const allTimeStart = new Date("2000-01-01T00:00:00.000Z");
+        const [featuredRes, bestRes, topSellingRes, newRes, recommendationRes, allProductRes] = await Promise.all([
           getFeaturedProducts(8),
-          getBestSellers(8),
+          getBestSellers(40),
+          getTopSellingProducts({
+            limit: 8,
+            startDate: allTimeStart.toISOString(),
+            endDate: new Date().toISOString(),
+          }).catch(() => ({ data: [] })),
           getNewArrivals(8),
           getHomeRecommendations(8).catch(() => []),
           fetchProducts({ limit: 120, page: 0 }).catch(() => ({ data: [] })),
@@ -104,9 +136,26 @@ const HomePage = () => {
 
         const featured = featuredRes?.data ?? [];
         const best = bestRes?.data ?? [];
+        const topSelling = topSellingRes?.data ?? [];
         const newArr = newRes?.data ?? [];
 
-        setHotProducts(best.length > 0 ? best : featured.length > 0 ? featured : newArr);
+        const allProducts = Array.isArray(allProductRes?.data) ? allProductRes.data : [];
+        const bestSellerFromAll = allProducts
+          .filter((p) => !isAccessoryProduct(p))
+          .sort((a, b) => {
+            const soldA = getSoldScore(a);
+            const soldB = getSoldScore(b);
+            return soldB - soldA;
+          })
+          .slice(0, 24);
+        const bestSellerFromApi = [...topSelling]
+          .filter((p) => !isAccessoryProduct(p))
+          .sort((a, b) => getSoldScore(b) - getSoldScore(a))
+          .slice(0, 24);
+        const bestSellerFallback = [...best]
+          .filter((p) => !isAccessoryProduct(p))
+          .sort((a, b) => getSoldScore(b) - getSoldScore(a))
+          .slice(0, 24);
         setRecommendedProducts(
           pickForRecommendation({
             recommendations: recommendationRes,
@@ -118,25 +167,36 @@ const HomePage = () => {
           }),
         );
 
-        const allProducts = Array.isArray(allProductRes?.data) ? allProductRes.data : [];
-        const accessoryFromAll = allProducts.filter(isAccessoryProduct);
-        const newestNonAccessory = allProducts
-          .filter((p) => !isAccessoryProduct(p))
-          .sort((a, b) => {
-            const tA = new Date(a?.createdAt || a?.updatedAt || 0).getTime();
-            const tB = new Date(b?.createdAt || b?.updatedAt || 0).getTime();
-            return tB - tA;
-          })
-          .slice(0, 8);
-        setNewProducts(
-          newestNonAccessory.length > 0
-            ? newestNonAccessory
-            : newArr.filter((p) => !isAccessoryProduct(p)).length > 0
-              ? newArr.filter((p) => !isAccessoryProduct(p))
-              : featured.length > 0
-                ? featured
-                : best,
+        setSaleProductIds(
+          new Set(
+            allProducts
+              .filter((product) => isProductOnRealSale(product))
+              .map((product) => String(product?._id || "")),
+          ),
         );
+        const accessoryFromAll = allProducts.filter(isAccessoryProduct);
+        const newestShoesFromAll = allProducts.filter((p) => !isAccessoryProduct(p));
+        const newestShoesFromApi = newArr.filter((p) => !isAccessoryProduct(p));
+        const newestShoePool = [...newestShoesFromAll, ...newestShoesFromApi];
+        const newestShoeMap = new Map();
+        newestShoePool.forEach((item) => {
+          const id = String(item?._id || "");
+          if (!id || newestShoeMap.has(id)) return;
+          newestShoeMap.set(id, item);
+        });
+        const newestShoes = [...newestShoeMap.values()]
+          .sort((a, b) => getCreatedTimestamp(b) - getCreatedTimestamp(a))
+          .slice(0, 8);
+        setNewProducts(newestShoes);
+
+        const newestIds = new Set(newestShoes.map((item) => String(item?._id || "")));
+        const hotPool = (bestSellerFromApi.length > 0
+          ? bestSellerFromApi
+          : bestSellerFromAll.length > 0
+            ? bestSellerFromAll
+            : bestSellerFallback
+        ).filter((item) => !newestIds.has(String(item?._id || "")));
+        setHotProducts(hotPool.slice(0, 8));
         setAccessoryProducts(accessoryFromAll.slice(0, 8));
 
         if (featured.length > 0 || best.length > 0 || newArr.length > 0) {
@@ -148,7 +208,12 @@ const HomePage = () => {
           const allRes = await fetchProducts({ limit: 24, page: 0 });
           const list = allRes?.data ?? [];
           setProducts(list);
-          setHotProducts(list.slice(0, 8));
+          setHotProducts(
+            [...list]
+              .filter((p) => !isAccessoryProduct(p))
+              .sort((a, b) => getSoldScore(b) - getSoldScore(a))
+              .slice(0, 8),
+          );
           setNewProducts(list.slice(8, 16));
           if (!allProducts.length) {
             setAccessoryProducts(list.filter(isAccessoryProduct).slice(0, 8));
@@ -265,7 +330,44 @@ const HomePage = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {newDisplay.map((p) => (
-                <Product key={p._id} product={p} compactCartCta hoverStyle="catalog" />
+                <Product
+                  key={p._id}
+                  product={p}
+                  compactCartCta
+                  hoverStyle="catalog"
+                  showSalePercentBadge={saleProductIds.has(String(p?._id || ""))}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {((!isFiltering && hotDisplay.length > 0) || isFiltering) && (
+          <section>
+            <div className="flex items-end justify-between mb-8">
+              <div>
+                {!isFiltering && (
+                  <span className="text-convot-sage font-bold tracking-widest uppercase text-xs mb-2 flex items-center gap-2">
+                    <FaFire /> Hot
+                  </span>
+                )}
+                <h2 className="text-2xl md:text-3xl font-display font-bold text-convot-charcoal">
+                  {isFiltering ? "Kết quả" : "Sản phẩm hot"}
+                </h2>
+              </div>
+              <Link to="/product" className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-convot-sage hover:underline">
+                Xem tất cả <FaArrowRight className="text-xs" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {hotDisplay.map((p) => (
+                <Product
+                  key={p._id}
+                  product={p}
+                  compactCartCta
+                  hoverStyle="catalog"
+                  showSalePercentBadge={saleProductIds.has(String(p?._id || ""))}
+                />
               ))}
             </div>
           </section>
@@ -286,7 +388,40 @@ const HomePage = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {recommendedProducts.slice(0, 8).map((p) => (
-                <Product key={p._id} product={p} compactCartCta hoverStyle="catalog" />
+                <Product
+                  key={p._id}
+                  product={p}
+                  compactCartCta
+                  hoverStyle="catalog"
+                  showSalePercentBadge={saleProductIds.has(String(p?._id || ""))}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!isFiltering && accessoryProducts.length > 0 && (
+          <section>
+            <div className="flex items-end justify-between mb-8">
+              <div>
+                <span className="text-convot-sage font-bold tracking-widest uppercase text-xs mb-2 flex items-center gap-2">
+                  <FaGem /> Khác
+                </span>
+                <h2 className="text-2xl md:text-3xl font-display font-bold text-convot-charcoal">Sản phẩm khác</h2>
+              </div>
+              <Link to="/accessories" className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-convot-sage hover:underline">
+                Xem tất cả <FaArrowRight className="text-xs" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {accessoryProducts.map((p) => (
+                <Product
+                  key={p._id}
+                  product={p}
+                  compactCartCta
+                  hoverStyle="catalog"
+                  showSalePercentBadge={saleProductIds.has(String(p?._id || ""))}
+                />
               ))}
             </div>
           </section>
@@ -319,52 +454,6 @@ const HomePage = () => {
             </div>
           </div>
         </section>
-
-        {((!isFiltering && hotDisplay.length > 0) || isFiltering) && (
-          <section>
-            <div className="flex items-end justify-between mb-8">
-              <div>
-                {!isFiltering && (
-                  <span className="text-convot-sage font-bold tracking-widest uppercase text-xs mb-2 flex items-center gap-2">
-                    <FaFire /> Hot
-                  </span>
-                )}
-                <h2 className="text-2xl md:text-3xl font-display font-bold text-convot-charcoal">
-                  {isFiltering ? "Kết quả" : "Sản phẩm hot"}
-                </h2>
-              </div>
-              <Link to="/product" className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-convot-sage hover:underline">
-                Xem tất cả <FaArrowRight className="text-xs" />
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {hotDisplay.map((p) => (
-                <Product key={p._id} product={p} compactCartCta hoverStyle="catalog" />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {!isFiltering && accessoryProducts.length > 0 && (
-          <section>
-            <div className="flex items-end justify-between mb-8">
-              <div>
-                <span className="text-convot-sage font-bold tracking-widest uppercase text-xs mb-2 flex items-center gap-2">
-                  <FaGem /> Khác
-                </span>
-                <h2 className="text-2xl md:text-3xl font-display font-bold text-convot-charcoal">Sản phẩm khác</h2>
-              </div>
-              <Link to="/accessories" className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-convot-sage hover:underline">
-                Xem tất cả <FaArrowRight className="text-xs" />
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {accessoryProducts.map((p) => (
-                <Product key={p._id} product={p} compactCartCta hoverStyle="catalog" />
-              ))}
-            </div>
-          </section>
-        )}
       </div>
     </main>
   );

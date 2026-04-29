@@ -54,7 +54,7 @@ export default function RelatedProducts({
                   {outOfStock && (
                     <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/20">
                       <span className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-black/65 px-2 text-center text-sm font-semibold text-white shadow-lg">
-                        Bán hết
+                        Hết hàng
                       </span>
                     </div>
                   )}

@@ -78,6 +78,9 @@ const appendQuery = (baseUrl, queryWithoutQuestion) => {
 };
 
 const MIN_TOPUP = 10000;
+const getRequestUserId = (req) =>
+  req?.user?.id || req?.user?._id || req?.user?.userId || null;
+
 const maxTopup = () =>
   Math.min(
     500_000_000,
@@ -121,6 +124,10 @@ const creditTopupWithOptionalTransaction = async (topUpId) => {
 
 exports.createVnpayTopupUrl = async (req, res) => {
   try {
+    const userId = getRequestUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: "Vui lòng đăng nhập để tiếp tục" });
+    }
     const amount = Math.round(Number(req.body?.amount));
     const returnUrl = req.body?.returnUrl;
     const cancelUrl = req.body?.cancelUrl;
@@ -132,7 +139,7 @@ exports.createVnpayTopupUrl = async (req, res) => {
     }
 
     const topUp = await WalletTopUp.create({
-      userId: req.user.id,
+      userId,
       amount,
       method: "vnpay",
       status: "pending",
@@ -270,18 +277,114 @@ exports.vnpayTopupIpn = async (req, res) => {
   }
 };
 
+
+exports.getBankInfo = async (req, res) => {
+  try {
+    res.status(200).json({
+      bankName: process.env.WALLET_BANK_NAME || "",
+      accountNumber: process.env.WALLET_BANK_ACCOUNT || "",
+      accountOwner: process.env.WALLET_BANK_OWNER || "",
+      branch: process.env.WALLET_BANK_BRANCH || "",
+      note:
+        process.env.WALLET_BANK_NOTE ||
+        "Ghi đúng nội dung chuyển khoản để được xử lý nhanh.",
+    });
+  } catch (err) {
+    res.status(500).json({ message: err?.message || "Internal server error" });
+  }
+};
+
+exports.createBankTopupRequest = async (req, res) => {
+  try {
+    const userId = getRequestUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: "Vui lòng đăng nhập để tiếp tục" });
+    }
+    const amount = Math.round(Number(req.body?.amount));
+    const hi = maxTopup();
+    if (!Number.isFinite(amount) || amount < MIN_TOPUP || amount > hi) {
+      return res.status(422).json({
+        message: `Số tiền từ ${MIN_TOPUP.toLocaleString("vi-VN")}đ đến ${hi.toLocaleString("vi-VN")}đ`,
+      });
+    }
+
+    const referenceCode = WalletTopUp.generateReferenceCode(userId);
+    const topUp = await WalletTopUp.create({
+      userId,
+      amount,
+      method: "bank_transfer",
+      status: "awaiting_transfer",
+      referenceCode,
+    });
+
+    const bank = {
+      bankName: process.env.WALLET_BANK_NAME || "",
+      accountNumber: process.env.WALLET_BANK_ACCOUNT || "",
+      accountOwner: process.env.WALLET_BANK_OWNER || "",
+      branch: process.env.WALLET_BANK_BRANCH || "",
+      note:
+        process.env.WALLET_BANK_NOTE ||
+        "Ghi đúng nội dung chuyển khoản.",
+    };
+
+    res.status(201).json({ topUp, bank });
+  } catch (err) {
+    const statusCode = err?.statusCode || 500;
+    res.status(statusCode).json({
+      message: err?.message || err?.error || "Internal server error",
+    });
+  }
+};
+
+exports.markBankTopupSent = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const userId = getRequestUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: "Vui lòng đăng nhập để tiếp tục" });
+    }
+    const topUp = await WalletTopUp.findOneAndUpdate(
+      {
+      _id: id,
+      userId,
+      method: "bank_transfer",
+      status: "awaiting_transfer",
+      },
+      {
+        status: "awaiting_admin",
+        userMarkedSentAt: new Date(),
+      },
+      { new: true },
+    ).lean();
+
+    if (!topUp) {
+      return res.status(400).json({
+        message: "Không tìm thấy yêu cầu hoặc đã xử lý",
+      });
+    }
+
+    res.status(200).json(topUp);
+  } catch (err) {
+    res.status(500).json({ message: err?.message || "Internal server error" });
+  }
+};
+
 exports.listMyTopups = async (req, res) => {
   try {
+    const userId = getRequestUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: "Vui lòng đăng nhập để tiếp tục" });
+    }
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
-      WalletTopUp.find({ userId: req.user.id })
+      WalletTopUp.find({ userId })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      WalletTopUp.countDocuments({ userId: req.user.id }),
+      WalletTopUp.countDocuments({ userId }),
     ]);
     res.status(200).json({
       data,
@@ -297,35 +400,92 @@ exports.listMyTopups = async (req, res) => {
 
 exports.adminListTopupTransactions = async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
-    const skip = (page - 1) * limit;
-    const topupTypes = ["topup_vnpay", "topup_bank"];
-    const typeScope = String(req.query.type || "all").trim().toLowerCase();
-    const filter =
-      typeScope === "topup"
-        ? { type: { $in: topupTypes } }
-        : {};
+    const items = await WalletTopUp.find({})
+      .sort({ createdAt: -1 })
+      .populate("userId", "name email phone")
+      .lean();
+    res.status(200).json({ data: items });
+  } catch (err) {
+    res.status(500).json({ message: err?.message || "Internal server error" });
+  }
+};
 
-    const [items, total] = await Promise.all([
-      WalletTransaction.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .populate("userId", "name email phone")
-        .populate("topUpId", "amount method status referenceCode createdAt")
-        .populate("orderId", "_id totalAmount status paymentMethod createdAt")
-        .lean(),
-      WalletTransaction.countDocuments(filter),
-    ]);
+exports.adminListWalletTransactions = async (req, res) => {
+  try {
+    const items = await WalletTransaction.find({
+      type: {
+        $in: [
+          "topup_vnpay",
+          "return_refund",
+          "order_cancel_refund",
+          "order_line_cancel_refund",
+        ],
+      },
+    })
+      .sort({ createdAt: -1 })
+      .populate("userId", "name email phone")
+      .populate("orderId", "_id")
+      .lean();
+    res.status(200).json({ data: items });
+  } catch (err) {
+    res.status(500).json({ message: err?.message || "Internal server error" });
+  }
+};
 
-    res.status(200).json({
-      data: items,
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit) || 0,
-    });
+exports.adminConfirmBankTopup = async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const { id } = req.params;
+    const topUp = await WalletTopUp.findById(id).session(session);
+    if (!topUp || topUp.method !== "bank_transfer") {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ message: "Không tìm thấy yêu cầu nạp CK" });
+    }
+    if (topUp.status !== "awaiting_admin") {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        message: "Chỉ xác nhận được khi khách đã bấm 'Tôi đã chuyển khoản'",
+      });
+    }
+
+    const adminId = req.user?.id || req.user?._id;
+    const conf =
+      adminId && mongoose.Types.ObjectId.isValid(String(adminId))
+        ? new mongoose.Types.ObjectId(String(adminId))
+        : undefined;
+    await creditWalletForTopUp(topUp, session, conf ? { confirmedBy: conf } : {});
+
+    await session.commitTransaction();
+    session.endSession();
+    const out = await WalletTopUp.findById(id).lean();
+    res.status(200).json(out);
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    res.status(500).json({ message: err?.message || "Internal server error" });
+  }
+};
+
+exports.adminRejectBankTopup = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const note = String(req.body?.note || "").trim();
+    const updated = await WalletTopUp.findOneAndUpdate(
+      {
+        _id: id,
+        method: "bank_transfer",
+        status: { $in: ["awaiting_transfer", "awaiting_admin"] },
+      },
+      { status: "rejected", adminNote: note },
+      { new: true },
+    );
+    if (!updated) {
+      return res.status(400).json({ message: "Không thể từ chối yêu cầu này" });
+    }
+    res.status(200).json(updated);
   } catch (err) {
     res.status(500).json({ message: err?.message || "Internal server error" });
   }

@@ -1,5 +1,8 @@
 const reviewService = require("../services/ReviewService");
 
+const getRequestUserId = (req) =>
+  req?.user?._id || req?.user?.id || req?.user?.userId || null;
+
 // ── Helper: gửi lỗi theo status ─────────────────────────────
 const handleError = (res, err) => {
   const status = err.status || 500;
@@ -83,10 +86,11 @@ const createReview = async (req, res) => {
 
 const updateReview = async (req, res) => {
   try {
+    const userId = getRequestUserId(req);
     const data = await reviewService.updateReview(
       req.params.id,
       req.body,
-      req.user._id,
+      userId,
     );
     return res.status(200).json({ status: "OK", data });
   } catch (e) {
@@ -96,9 +100,10 @@ const updateReview = async (req, res) => {
 
 const deleteReview = async (req, res) => {
   try {
+    const userId = getRequestUserId(req);
     const data = await reviewService.deleteReview(
       req.params.id,
-      req.user._id,
+      userId,
       req.user.role,
     );
     return res.status(200).json({ status: "OK", ...data });
@@ -109,7 +114,8 @@ const deleteReview = async (req, res) => {
 
 const toggleLike = async (req, res) => {
   try {
-    const data = await reviewService.toggleLike(req.params.id, req.user._id);
+    const userId = getRequestUserId(req);
+    const data = await reviewService.toggleLike(req.params.id, userId);
     return res.status(200).json({ status: "OK", ...data });
   } catch (e) {
     return handleError(res, e);
@@ -118,7 +124,8 @@ const toggleLike = async (req, res) => {
 
 const toggleDislike = async (req, res) => {
   try {
-    const data = await reviewService.toggleDislike(req.params.id, req.user._id);
+    const userId = getRequestUserId(req);
+    const data = await reviewService.toggleDislike(req.params.id, userId);
     return res.status(200).json({ status: "OK", ...data });
   } catch (e) {
     return handleError(res, e);
@@ -127,10 +134,11 @@ const toggleDislike = async (req, res) => {
 
 const addReply = async (req, res) => {
   try {
+    const userId = getRequestUserId(req);
     const data = await reviewService.addReply(
       req.params.id,
       req.body,
-      req.user._id,
+      userId,
       req.user.role,
     );
     return res.status(201).json({ status: "OK", ...data });
@@ -141,10 +149,11 @@ const addReply = async (req, res) => {
 
 const deleteReply = async (req, res) => {
   try {
+    const userId = getRequestUserId(req);
     const data = await reviewService.deleteReply(
       req.params.id,
       req.params.replyId,
-      req.user._id,
+      userId,
       req.user.role,
     );
     return res.status(200).json({ status: "OK", ...data });
@@ -161,6 +170,33 @@ const adminGetReviews = async (req, res) => {
   try {
     const data = await reviewService.adminGetReviews(req.query);
     return res.status(200).json({ status: "OK", ...data });
+  } catch (e) {
+    return handleError(res, e);
+  }
+};
+
+const adminReviewStatsSummary = async (req, res) => {
+  try {
+    const data = await reviewService.adminReviewTotalCount();
+    return res.status(200).json({ status: "OK", ...data });
+  } catch (e) {
+    return handleError(res, e);
+  }
+};
+
+const getReviewAutoReplySettings = async (req, res) => {
+  try {
+    const data = await reviewService.getReviewAutoReplySettings();
+    return res.status(200).json({ status: "OK", data });
+  } catch (e) {
+    return handleError(res, e);
+  }
+};
+
+const patchReviewAutoReplySettings = async (req, res) => {
+  try {
+    const data = await reviewService.updateReviewAutoReplySettings(req.body);
+    return res.status(200).json({ status: "OK", data });
   } catch (e) {
     return handleError(res, e);
   }
@@ -202,6 +238,9 @@ module.exports = {
   addReply,
   deleteReply,
   adminGetReviews,
+  adminReviewStatsSummary,
+  getReviewAutoReplySettings,
+  patchReviewAutoReplySettings,
   approveReview,
   rejectReview,
 };

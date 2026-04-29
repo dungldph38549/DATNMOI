@@ -25,6 +25,7 @@ router.get("/", (req, res) => {
 router.get("/featured", PC.getFeaturedProducts);
 router.get("/new-arrivals", PC.getNewArrivals);
 router.get("/best-sellers", PC.getBestSellers);
+router.get("/top-selling", PC.getTopSellingProducts);
 router.get("/search", PC.searchProducts);
 router.get("/filter", PC.getByBrandAndCategory);
 router.get("/category/:categoryId", PC.getProductsByCategory);

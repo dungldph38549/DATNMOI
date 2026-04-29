@@ -17,14 +17,15 @@ import axiosInstance from "./axiosConfig";
 
 export const addToCartAPI = async (payload) => {
   // Back-end: POST /api/cart/:userId/items
-  // payload: { userId, productId, qty, sku?, size? }
-  const { userId, productId, qty, sku, size } = payload || {};
+  // payload: { userId, productId, qty, sku?, size?, color? }
+  const { userId, productId, qty, sku, size, color } = payload || {};
   if (!userId || !productId) throw new Error("Missing userId or productId");
   const res = await axiosInstance.post(`/cart/${userId}/items`, {
     productId,
     qty,
     sku: sku ?? null,
     size: size ?? null,
+    color: color ?? null,
   });
   return res.data;
 };
@@ -69,6 +70,45 @@ export const getWalletTransactions = async (page = 1, limit = 20) => {
 export const adminListTopupTransactions = async (page = 1, limit = 20) => {
   const res = await axiosInstance.get("/wallet/admin/topups/transactions", {
     params: { page, limit },
+  });
+  return res.data;
+};
+
+/** Admin: lịch sử giao dịch ví (nạp VNPay + hoàn tiền) */
+export const adminListWalletTransactions = async (page = 1, limit = 100) => {
+  const res = await axiosInstance.get("/wallet/admin/transactions", {
+    params: { page, limit },
+  });
+  return res.data;
+};
+
+/** Khách: tạo yêu cầu nạp ví chuyển khoản */
+export const createWalletBankTopupRequest = async (amount) => {
+  const res = await axiosInstance.post("/wallet/topup/bank", { amount });
+  return res.data;
+};
+
+export const createContact = async (payload) => {
+  const res = await axiosInstance.post("/contact", payload);
+  return res.data;
+};
+
+/** Khách: xác nhận đã chuyển khoản (chờ admin duyệt) */
+export const markWalletBankTopupSent = async (id) => {
+  const res = await axiosInstance.post(`/wallet/topup/bank/${id}/mark-sent`);
+  return res.data;
+};
+
+/** Admin: xác nhận nạp CK và cộng ví */
+export const adminConfirmBankTopup = async (id) => {
+  const res = await axiosInstance.post(`/wallet/admin/topups/bank/${id}/confirm`);
+  return res.data;
+};
+
+/** Admin: từ chối yêu cầu nạp CK */
+export const adminRejectBankTopup = async (id, note) => {
+  const res = await axiosInstance.post(`/wallet/admin/topups/bank/${id}/reject`, {
+    note,
   });
   return res.data;
 };
@@ -138,6 +178,24 @@ export const getNewArrivals = async (limit = 10) => {
  */
 export const getBestSellers = async (limit = 10) => {
   const res = await axiosInstance.get(`/product/best-sellers?limit=${limit}`);
+  return res.data;
+};
+
+/**
+ * Lấy top sản phẩm bán chạy theo đơn hàng
+ * GET /api/product/top-selling?limit=8&startDate=&endDate=
+ * Mặc định BE: từ đầu tháng hiện tại đến hiện tại
+ */
+export const getTopSellingProducts = async ({
+  limit = 8,
+  startDate,
+  endDate,
+} = {}) => {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (startDate) params.set("startDate", String(startDate));
+  if (endDate) params.set("endDate", String(endDate));
+  const res = await axiosInstance.get(`/product/top-selling?${params.toString()}`);
   return res.data;
 };
 
@@ -253,9 +311,11 @@ export const getAllProducts = async ({
   limit = 10,
   isListProductRemoved = false,
   filter = {},
+  reviewsFirst = false,
 } = {}) => {
+  const rf = reviewsFirst ? "&reviewsFirst=1" : "";
   const res = await axiosInstance.get(
-    `/product/admin/get-all?page=${page}&limit=${limit}&isListProductRemoved=${isListProductRemoved}&filter=${encodeURIComponent(JSON.stringify(filter))}`,
+    `/product/admin/get-all?page=${page}&limit=${limit}&isListProductRemoved=${isListProductRemoved}&filter=${encodeURIComponent(JSON.stringify(filter))}${rf}`,
   );
   return res.data;
 };
@@ -466,18 +526,19 @@ export const cancelOrderByUser = async (id, cancelReason) => {
 };
 
 /** Hủy một dòng sản phẩm (đơn chờ xử lý / đã xác nhận). Trả về { order, history } */
-export const cancelOrderLineByUser = async (orderId, lineIndex) => {
+export const cancelOrderLineByUser = async (orderId, lineIndex, cancelReason) => {
   const res = await axiosInstance.post(`/order/${orderId}/cancel-line`, {
     lineIndex,
+    cancelReason,
   });
   return res.data;
 };
 
 /** Admin: hủy một dòng sản phẩm — cùng quy tắc với khách */
-export const cancelOrderLineByAdmin = async (orderId, lineIndex) => {
+export const cancelOrderLineByAdmin = async (orderId, lineIndex, cancelReason) => {
   const res = await axiosInstance.post(
     `/order/admin/${orderId}/cancel-line`,
-    { lineIndex },
+    { lineIndex, cancelReason },
   );
   return res.data;
 };
@@ -739,6 +800,27 @@ export const getAdminReviews = async ({ status, productId, page, limit } = {}) =
   return res.data;
 };
 
+/** Tổng số đánh giá chưa xóa (toàn hệ thống). GET /api/admin/reviews/stats-summary */
+export const getAdminReviewTotalCount = async () => {
+  const res = await axiosInstance.get("/admin/reviews/stats-summary");
+  return res.data;
+};
+
+/** Cài đặt phản hồi tự động cho đánh giá mới */
+export const getAdminReviewAutoReplySettings = async () => {
+  const res = await axiosInstance.get("/admin/reviews/auto-reply-settings");
+  const body = res.data;
+  if (body?.status === "OK" && body.data != null) return body.data;
+  return body?.data ?? body;
+};
+
+export const patchAdminReviewAutoReplySettings = async (payload) => {
+  const res = await axiosInstance.patch("/admin/reviews/auto-reply-settings", payload);
+  const body = res.data;
+  if (body?.status === "OK" && body.data != null) return body.data;
+  return body?.data ?? body;
+};
+
 export const approveAdminReview = async (id) => {
   const res = await axiosInstance.patch(`/admin/reviews/${id}/approve`);
   return res.data;
@@ -784,5 +866,11 @@ export const toggleBanner = async (id) => {
 
 export const reorderBanners = async (items) => {
   const res = await axiosInstance.patch("/banner/reorder", { items });
+  return res.data;
+};
+
+// ================== Review API ==================
+export const addReviewReply = async (reviewId, content) => {
+  const res = await axiosInstance.post(`/reviews/${reviewId}/replies`, { content });
   return res.data;
 };

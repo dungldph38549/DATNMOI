@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaEye, FaHeart, FaRegHeart } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProducts } from "../../api";
@@ -7,6 +7,7 @@ import { getProductPriceInfo } from "../../utils/pricing.js";
 import { isProductOutOfStock } from "../../utils/stock.js";
 import { getVariantColorValue } from "../../utils/variantAttributes";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
+import notify from "../../utils/notify";
 
 const PAGE_STEP = 12;
 
@@ -72,7 +73,10 @@ const getSubLabel = (p) => {
 
 const SalePage = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const location = useLocation();
   const wishlistItems = useSelector((state) => state.wishlist.items || []);
+  const user = useSelector((state) => state.user);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [visibleCount, setVisibleCount] = useState(PAGE_STEP);
@@ -195,6 +199,13 @@ const SalePage = () => {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
+                            if (!user?.login || !user?.token) {
+                              notify.warning("Vui lòng đăng nhập để thêm sản phẩm vào yêu thích.");
+                              navigate("/login", {
+                                state: { from: location.pathname + location.search },
+                              });
+                              return;
+                            }
                             dispatch(toggleWishlist(item));
                           }}
                           className="absolute right-2 top-2 z-20 rounded-full bg-white/90 p-2 shadow ring-1 ring-neutral-200 transition hover:scale-105"
@@ -223,7 +234,7 @@ const SalePage = () => {
                             {outOfStock && (
                               <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
                                 <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-black/65 px-3 text-center text-lg font-semibold text-white shadow-lg">
-                                  Bán hết
+                                  Hết hàng
                                 </span>
                               </div>
                             )}

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Form, Input, Switch } from "antd";
+import { useEffect, useState } from "react";
+import { Form, Input, Select, Switch } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAllUser, updateUserById, createUserByAdmin } from "../api/index";
 
@@ -38,6 +38,27 @@ const toSingleLine = (value = "") =>
   String(value)
     .replace(/\s+/g, " ")
     .trim();
+
+const isUserBanned = (user) => {
+  if (!user || typeof user !== "object") return false;
+  if (typeof user.isActive === "boolean") return !user.isActive;
+  return !!user.isBanned;
+};
+
+const toAvatarUrl = (avatar) => {
+  if (!avatar || typeof avatar !== "string") return "";
+  if (
+    avatar.startsWith("http://") ||
+    avatar.startsWith("https://") ||
+    avatar.startsWith("data:") ||
+    avatar.startsWith("blob:")
+  ) {
+    return avatar;
+  }
+  // Backend serves uploaded files from /uploads
+  const normalized = avatar.startsWith("/") ? avatar.slice(1) : avatar;
+  return `http://localhost:3002/uploads/${normalized}`;
+};
 
 const roleBadgeBase = {
   padding: "3px 10px",
@@ -166,9 +187,10 @@ const Avatar = ({ name, avatar }) => {
     .slice(0, 2)
     .join("")
     .toUpperCase();
-  return avatar ? (
+  const avatarUrl = toAvatarUrl(avatar);
+  return avatarUrl ? (
     <img
-      src={avatar}
+      src={avatarUrl}
       alt={name}
       style={{
         width: 38,
@@ -414,6 +436,8 @@ const Users = ({ mode = "customers" }) => {
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [customerStatusFilter, setCustomerStatusFilter] = useState("all");
+  const [customerJoinedFilter, setCustomerJoinedFilter] = useState("all");
   const [selectedUser, setSelectedUser] = useState(null);
   const [roleValue, setRoleValue] = useState("customer");
   const [showCreateStaff, setShowCreateStaff] = useState(false);
@@ -425,6 +449,7 @@ const Users = ({ mode = "customers" }) => {
     role: "staff",
   });
   const [form] = Form.useForm();
+  const watchedIsBanned = Form.useWatch("isBanned", form);
   const queryClient = useQueryClient();
   const limit = 10;
 
@@ -476,6 +501,10 @@ const Users = ({ mode = "customers" }) => {
     setTimeout(() => setToast(null), 3000);
   };
 
+  useEffect(() => {
+    setPage(1);
+  }, [search, customerStatusFilter, customerJoinedFilter]);
+
   // ── Mở modal edit ─────────────────────────────────────────
   const handleEdit = (user) => {
     setSelectedUser(user);
@@ -487,7 +516,8 @@ const Users = ({ mode = "customers" }) => {
     }
     form.setFieldsValue({
       password: "",
-      isBanned: user.isBanned || false,
+      isBanned: isUserBanned(user),
+      banReason: user.banReason || "",
       voucherUsageLimit:
         user.voucherUsageLimit === null || user.voucherUsageLimit === undefined
           ? ""
@@ -498,6 +528,7 @@ const Users = ({ mode = "customers" }) => {
   // ── Submit modal ──────────────────────────────────────────
   const handleSubmit = (values) => {
     const voucherLimitRaw = String(values.voucherUsageLimit || "").trim();
+    const banReason = String(values.banReason || "").trim();
     let voucherUsageLimit = null;
     if (voucherLimitRaw !== "") {
       const parsed = Number(voucherLimitRaw);
@@ -507,6 +538,10 @@ const Users = ({ mode = "customers" }) => {
       }
       voucherUsageLimit = Math.floor(parsed);
     }
+    if (values.isBanned && banReason.length < 5) {
+      showToast("Vui lòng nhập lý do khóa ít nhất 5 ký tự", "error");
+      return;
+    }
 
     updateUser({
       id: selectedUser._id,
@@ -514,6 +549,7 @@ const Users = ({ mode = "customers" }) => {
         ...(values.password ? { password: values.password } : {}),
         role: roleValue,
         isBanned: values.isBanned,
+        banReason: values.isBanned ? banReason : "",
         voucherUsageLimit,
       },
     });
@@ -538,6 +574,25 @@ const Users = ({ mode = "customers" }) => {
         u.phone?.toLowerCase().includes(q)
       );
     })
+    .filter((u) => {
+      if (isStaffPage) return true;
+      if (customerStatusFilter === "active") return !isUserBanned(u);
+      if (customerStatusFilter === "banned") return isUserBanned(u);
+      return true;
+    })
+    .filter((u) => {
+      if (isStaffPage || customerJoinedFilter === "all") return true;
+      const created = new Date(u?.createdAt || 0).getTime();
+      if (!Number.isFinite(created)) return false;
+      const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+      if (customerJoinedFilter === "new_30d") {
+        return Date.now() - created <= THIRTY_DAYS_MS;
+      }
+      if (customerJoinedFilter === "older_30d") {
+        return Date.now() - created > THIRTY_DAYS_MS;
+      }
+      return true;
+    })
     .sort((a, b) => {
       if (!isStaffPage) return 0;
       const ra = String(a?.role || "").toLowerCase();
@@ -549,6 +604,25 @@ const Users = ({ mode = "customers" }) => {
       const tb = new Date(b?.createdAt || 0).getTime();
       return tb - ta;
     });
+  const customerStats = !isStaffPage
+    ? (() => {
+      const totalCustomers = Number(data?.data?.total || 0);
+      const activeOnPage = users.filter((u) => !isUserBanned(u)).length;
+      const bannedOnPage = users.filter((u) => isUserBanned(u)).length;
+      const now = Date.now();
+      const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+      const newIn30DaysOnPage = users.filter((u) => {
+        const created = new Date(u?.createdAt || 0).getTime();
+        return Number.isFinite(created) && now - created <= THIRTY_DAYS_MS;
+      }).length;
+      return {
+        totalCustomers,
+        activeOnPage,
+        bannedOnPage,
+        newIn30DaysOnPage,
+      };
+    })()
+    : null;
 
   // ── Loading / error states ────────────────────────────────
   if (isLoading)
@@ -796,6 +870,61 @@ const Users = ({ mode = "customers" }) => {
           )}
         </div>
 
+        {!isStaffPage && customerStats && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+              marginBottom: 18,
+            }}
+          >
+            {[
+              {
+                label: "Tổng khách hàng",
+                value: customerStats.totalCustomers,
+                hint: "Toàn hệ thống",
+              },
+              {
+                label: "Đang hoạt động",
+                value: customerStats.activeOnPage,
+                hint: "Trong trang hiện tại",
+              },
+              {
+                label: "Bị khóa",
+                value: customerStats.bannedOnPage,
+                hint: "Trong trang hiện tại",
+              },
+              {
+                label: "Mới 30 ngày",
+                value: customerStats.newIn30DaysOnPage,
+                hint: "Trong trang hiện tại",
+              },
+            ].map((item) => (
+              <div
+                key={item.label}
+                style={{
+                  background: T.card,
+                  borderRadius: 14,
+                  border: `1px solid ${T.border}`,
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                  padding: "14px 16px",
+                }}
+              >
+                <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 8 }}>
+                  {item.label}
+                </div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: T.text, lineHeight: 1 }}>
+                  {Number(item.value || 0).toLocaleString("vi-VN")}
+                </div>
+                <div style={{ fontSize: 11, color: T.textMuted, marginTop: 6 }}>
+                  {item.hint}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {isStaffPage && (
           <div
             style={{
@@ -963,30 +1092,59 @@ const Users = ({ mode = "customers" }) => {
               }}
             />
           </div>
-          <button
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "9px 16px",
-              borderRadius: 10,
-              border: `1.5px solid ${T.border}`,
-              background: "#fff",
-              color: T.textMid,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-            }}
-          >
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: 18 }}
-            >
-              filter_list
-            </span>
-            Bộ lọc
-          </button>
+          {!isStaffPage && (
+            <>
+              <div style={{ minWidth: 170 }}>
+                <Select
+                  size="middle"
+                  value={customerStatusFilter}
+                  onChange={setCustomerStatusFilter}
+                  style={{ width: "100%" }}
+                  options={[
+                    { value: "all", label: "Tất cả trạng thái" },
+                    { value: "active", label: "Đang hoạt động" },
+                    { value: "banned", label: "Bị khóa" },
+                  ]}
+                />
+              </div>
+              <div style={{ minWidth: 180 }}>
+                <Select
+                  size="middle"
+                  value={customerJoinedFilter}
+                  onChange={setCustomerJoinedFilter}
+                  style={{ width: "100%" }}
+                  options={[
+                    { value: "all", label: "Tất cả thời gian" },
+                    { value: "new_30d", label: "Mới trong 30 ngày" },
+                    { value: "older_30d", label: "Trên 30 ngày" },
+                  ]}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomerStatusFilter("all");
+                  setCustomerJoinedFilter("all");
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "9px 12px",
+                  borderRadius: 10,
+                  border: `1.5px solid ${T.border}`,
+                  background: "#fff",
+                  color: T.textMid,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                }}
+              >
+                Xóa lọc
+              </button>
+            </>
+          )}
         </div>
 
         {/* Table */}
@@ -1173,7 +1331,7 @@ const Users = ({ mode = "customers" }) => {
                       </td>
                       {/* Trạng thái */}
                       <td style={{ padding: "14px 18px" }}>
-                        <StatusDot isBanned={user.isBanned} />
+                        <StatusDot isBanned={isUserBanned(user)} />
                       </td>
                       {/* Thao tác */}
                       <td style={{ padding: "14px 18px" }}>
@@ -1366,6 +1524,32 @@ const Users = ({ mode = "customers" }) => {
                 <div
                   style={{ borderTop: `1px solid ${T.border}`, paddingTop: 16 }}
                 >
+                  {watchedIsBanned && (
+                    <div style={{ marginBottom: 14 }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: T.textMid,
+                          marginBottom: 6,
+                        }}
+                      >
+                        Lý do khóa tài khoản
+                      </div>
+                      <Form.Item name="banReason" noStyle>
+                        <Input.TextArea
+                          rows={3}
+                          placeholder="Nhập lý do khóa (tối thiểu 5 ký tự)..."
+                          style={{
+                            borderRadius: 10,
+                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                            fontSize: 13,
+                          }}
+                        />
+                      </Form.Item>
+                    </div>
+                  )}
+
                   {/* Giới hạn voucher theo tài khoản */}
                   <div style={{ marginBottom: 14 }}>
                     <div

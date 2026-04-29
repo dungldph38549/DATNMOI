@@ -14,7 +14,25 @@ import { getProductPriceInfo } from "../../utils/pricing.js";
 import notify from "../../utils/notify";
 import { isProductOutOfStock } from "../../utils/stock.js";
 
-const Product = ({ product, ratingValue, compactCartCta = false, hoverStyle = "default" }) => {
+const Product = ({
+  product,
+  ratingValue,
+  compactCartCta = false,
+  hoverStyle = "default",
+  showSalePercentBadge = true,
+}) => {
+  const isProductOnRealSale = useMemo(() => {
+    const amount = (value) => Number(value) || 0;
+    if (amount(product?.saleDiscountAmount) > 0) return true;
+    if (
+      Array.isArray(product?.variants) &&
+      product.variants.some((variant) => amount(variant?.saleDiscountAmount) > 0)
+    ) {
+      return true;
+    }
+    return false;
+  }, [product]);
+
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const user = useSelector((state) => state.user);
@@ -177,7 +195,7 @@ const Product = ({ product, ratingValue, compactCartCta = false, hoverStyle = "d
         {isOutOfStock && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
             <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-black/65 px-3 text-center text-lg font-semibold text-white shadow-lg">
-              Bán hết
+              Hết hàng
             </span>
           </div>
         )}
@@ -192,7 +210,7 @@ const Product = ({ product, ratingValue, compactCartCta = false, hoverStyle = "d
         )}
 
         {/* SALE */}
-        {cardPriceInfo.hasSale && (
+        {cardPriceInfo.hasSale && isProductOnRealSale && showSalePercentBadge && (
           <div className="absolute top-10 left-3">
             <span className="bg-red-500 text-white px-2 py-1 text-xs rounded">
               -{cardPriceInfo.discountPercent}%
@@ -204,10 +222,14 @@ const Product = ({ product, ratingValue, compactCartCta = false, hoverStyle = "d
       <div className="p-4">
         <h3 className="font-semibold text-sm">{product.name}</h3>
 
-        <div className="text-yellow-400 flex">
-          {[...Array(5)].map((_, i) => (
-            <FaStar key={i} />
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <FaStar
+              key={star}
+              className={star <= Math.round(ratingOutOf5.value) ? "text-yellow-400" : "text-neutral-300"}
+            />
           ))}
+          <span className="ml-1 text-xs text-neutral-500">({ratingOutOf5.label})</span>
         </div>
 
         <div className="mt-2">

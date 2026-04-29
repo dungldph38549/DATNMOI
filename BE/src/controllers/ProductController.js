@@ -1,4 +1,5 @@
 const Product = require("../models/ProductModel.js");
+const Order = require("../models/OrderModel.js");
 const ProductService = require("../services/ProductService");
 const { successResponse, errorResponse } = require("../utils/response.js");
 const { enrichProductPricing } = require("../utils/salePricing");
@@ -79,12 +80,18 @@ exports.getProducts = async (req, res) => {
 // ================================================================
 exports.getAllProducts = async (req, res) => {
   try {
-    const { limit, page, filter, isListProductRemoved } = req.query;
+    const { limit, page, filter, isListProductRemoved, reviewsFirst } = req.query;
+    const rf =
+      reviewsFirst === "1" ||
+      reviewsFirst === "true" ||
+      reviewsFirst === 1 ||
+      reviewsFirst === true;
     const result = await ProductService.getAllProductsAdmin(
       Number(limit) || 10,
       Number(page) || 0,
       filter,
       isListProductRemoved,
+      rf,
     );
     res.json(result);
   } catch (err) {
@@ -476,6 +483,109 @@ exports.getBestSellers = async (req, res) => {
       .lean();
 
     successResponse({ res, data: products.map((item) => enrichProductPricing(item)) });
+  } catch (err) {
+    errorResponse({ res, message: err.message, statusCode: 500 });
+  }
+};
+
+// ================================================================
+// TOP SELLING (THEO ĐƠN HÀNG) — dùng cho Home
+// GET /api/product/top-selling?limit=8&startDate=&endDate=
+// Mặc định: từ đầu tháng hiện tại đến hiện tại
+// ================================================================
+exports.getTopSellingProducts = async (req, res) => {
+  try {
+    const { startDate, endDate, limit = 8 } = req.query;
+    const now = new Date();
+    const start = startDate
+      ? new Date(startDate)
+      : new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = endDate ? new Date(endDate) : now;
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 8, 40));
+
+    const rows = await Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: start, $lte: end },
+          status: { $nin: ["canceled", "return-request", "accepted"] },
+        },
+      },
+      { $unwind: { path: "$products", preserveNullAndEmptyArrays: false } },
+      {
+        $match: {
+          "products.productId": { $ne: null },
+          "products.lineStatus": { $ne: "canceled" },
+        },
+      },
+      {
+        $group: {
+          _id: "$products.productId",
+          soldQty: { $sum: { $ifNull: ["$products.quantity", 0] } },
+        },
+      },
+      { $sort: { soldQty: -1 } },
+      { $limit: safeLimit * 3 },
+      {
+        $lookup: {
+          from: "products",
+          localField: "_id",
+          foreignField: "_id",
+          as: "product",
+        },
+      },
+      { $unwind: { path: "$product", preserveNullAndEmptyArrays: false } },
+      {
+        $match: {
+          "product.isDeleted": { $ne: true },
+          "product.isActive": true,
+          "product.isVisible": true,
+          "product.status": { $ne: "inactive" },
+        },
+      },
+      {
+        $lookup: {
+          from: "brands",
+          localField: "product.brandId",
+          foreignField: "_id",
+          as: "brand",
+        },
+      },
+      {
+        $lookup: {
+          from: "categories",
+          localField: "product.categoryId",
+          foreignField: "_id",
+          as: "category",
+        },
+      },
+      {
+        $addFields: {
+          "product.brandId": {
+            $cond: [
+              { $gt: [{ $size: "$brand" }, 0] },
+              { _id: { $arrayElemAt: ["$brand._id", 0] }, name: { $arrayElemAt: ["$brand.name", 0] }, logo: { $arrayElemAt: ["$brand.logo", 0] } },
+              "$product.brandId",
+            ],
+          },
+          "product.categoryId": {
+            $cond: [
+              { $gt: [{ $size: "$category" }, 0] },
+              { _id: { $arrayElemAt: ["$category._id", 0] }, name: { $arrayElemAt: ["$category.name", 0] } },
+              "$product.categoryId",
+            ],
+          },
+          "product.soldCount": "$soldQty",
+        },
+      },
+      { $replaceRoot: { newRoot: "$product" } },
+      { $sort: { soldCount: -1 } },
+      { $limit: safeLimit },
+    ]);
+
+    successResponse({
+      res,
+      data: rows.map((item) => enrichProductPricing(item)),
+    });
   } catch (err) {
     errorResponse({ res, message: err.message, statusCode: 500 });
   }

@@ -66,6 +66,7 @@ const userSchema = new mongoose.Schema(
       index: true,
     },
     isActive: { type: Boolean, default: true, index: true },
+    banReason: { type: String, trim: true, default: "" },
 
     // Staff specific fields
     employeeId: { type: String, unique: true, sparse: true, index: true },

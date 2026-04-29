@@ -12,7 +12,9 @@ const OrderRouter = require("./OrderRouter");
 const CartRouter = require("./CartRouter");
 const ChatRouter = require("./ChatRouter");
 const WalletRouter = require("./WalletRouter");
+// Giữ lại cả Banner và Contact
 const BannerRouter = require("./BannerRouter");
+const ContactRouter = require("./ContactRouter");
 
 const routes = (app) => {
   app.use("/api/product", ProductRouter);
@@ -29,7 +31,9 @@ const routes = (app) => {
   app.use("/api/cart", CartRouter);
   app.use("/api/chat", ChatRouter);
   app.use("/api/wallet", WalletRouter);
+  // Khai báo sử dụng cho cả hai
   app.use("/api/banner", BannerRouter);
+  app.use("/api/contact", ContactRouter);
 };
 
 module.exports = routes;

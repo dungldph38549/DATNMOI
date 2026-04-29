@@ -88,6 +88,11 @@ const orderSchema = new mongoose.Schema(
           type: String,
           enum: ["user", "admin"],
         },
+        cancelReason: {
+          type: String,
+          default: null,
+          trim: true,
+        },
       },
     ],
     discount: {
@@ -95,6 +100,15 @@ const orderSchema = new mongoose.Schema(
       default: 0,
     },
     voucherCode: {
+      type: String,
+      default: null,
+    },
+    voucherTargetProductId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      default: null,
+    },
+    voucherTargetSku: {
       type: String,
       default: null,
     },

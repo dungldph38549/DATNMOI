@@ -48,6 +48,25 @@ const ORDER_STATUSES_EXCLUDED_FROM_REVENUE = [
   "accepted",
 ];
 
+/** Thứ Hai 00:00 UTC của tuần ISO `week` trong năm ISO `isoWeekYear` (khớp Mongo $isoWeek / $isoWeekYear). */
+function isoWeekMondayUtcMs(isoWeekYear, week) {
+  const jan4 = Date.UTC(isoWeekYear, 0, 4);
+  let dow = new Date(jan4).getUTCDay();
+  if (dow === 0) dow = 7;
+  const week1Monday = jan4 - (dow - 1) * 86400000;
+  return week1Monday + (week - 1) * 7 * 86400000;
+}
+
+/** Hiển thị Thứ 2 → Chủ nhật (UTC) cho nhãn biểu đồ. */
+function formatIsoWeekRangeLabelVi(isoWeekYear, week) {
+  const m0 = isoWeekMondayUtcMs(isoWeekYear, week);
+  const m6 = m0 + 6 * 86400000;
+  const fmt = (ms) => {
+    const d = new Date(ms);
+    return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  };
+  return `${fmt(m0)} → ${fmt(m6)}`;
+}
 
 // Khi không khai báo VNP_* trong .env sẽ dùng fallback bên dưới.
 // Chỉ truyền host (không thêm /paymentv2/...): thư viện tự nối endpoint thanh toán.
@@ -142,6 +161,7 @@ exports.createOrder = async (req, res) => {
       email,
       products,
       voucherCode,
+      voucherTarget,
       vnpReturnUrl,
       vnpCancelUrl,
     } = req.body;
@@ -198,7 +218,7 @@ exports.createOrder = async (req, res) => {
         .json({ message: "Danh sách sản phẩm không hợp lệ" });
     }
 
-    const shippingFee = shippingMethod === "fast" ? 30000 : 0;
+    const shippingFee = 0; // Đã bỏ giao hàng hỏa tốc, tất cả đều là 0đ
     const mappedProducts = [];
 
     // Đầu tiên kiểm tra và chuẩn hóa dữ liệu sản phẩm
@@ -320,6 +340,17 @@ exports.createOrder = async (req, res) => {
         return res.status(422).json({ message: "Voucher không tồn tại" });
       }
 
+      if (voucherDoc.ownerUserId) {
+        const ownerId = String(voucherDoc.ownerUserId);
+        if (!userId || String(userId) !== ownerId) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(422).json({
+            message: "Voucher này không áp dụng cho tài khoản hiện tại",
+          });
+        }
+      }
+
       if (voucherDoc.status !== "active") {
         await session.abortTransaction();
         session.endSession();
@@ -360,9 +391,8 @@ exports.createOrder = async (req, res) => {
         });
       }
 
-      const usageLimit = Number(voucherDoc.usageLimit ?? 0); // 0 = unlimited
       const usedCount = Number(voucherDoc.usedCount ?? 0);
-      if (usageLimit !== 0 && usedCount >= usageLimit) {
+      if (usedCount >= 1) {
         await session.abortTransaction();
         session.endSession();
         return res.status(422).json({ message: "Voucher đã hết lượt sử dụng" });
@@ -403,7 +433,7 @@ exports.createOrder = async (req, res) => {
         ? voucherDoc.applicableProductIds.map((id) => String(id))
         : [];
       const hasProductScope = applicableIds.length > 0;
-      const eligibleItems = hasProductScope
+      let eligibleItems = hasProductScope
         ? mappedProducts.filter((item) =>
             applicableIds.includes(String(item.productId)),
           )
@@ -421,9 +451,49 @@ exports.createOrder = async (req, res) => {
         });
       }
 
+      if (voucherDoc.ownerUserId) {
+        const targetProductId = String(voucherTarget?.productId || "").trim();
+        const targetSku = String(voucherTarget?.sku || "")
+          .trim()
+          .toUpperCase();
+
+        if (!targetProductId) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(422).json({
+            message: "Voucher cá nhân yêu cầu chọn sản phẩm áp dụng giảm giá",
+          });
+        }
+
+        const matched = eligibleItems.find((item) => {
+          if (String(item.productId) !== targetProductId) return false;
+          if (!targetSku) return true;
+          return String(item.sku || "")
+            .trim()
+            .toUpperCase() === targetSku;
+        });
+
+        if (!matched) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(422).json({
+            message: "Sản phẩm chọn áp dụng voucher không hợp lệ",
+          });
+        }
+
+        eligibleItems = [matched];
+      }
+
+      const voucherDiscountBase = voucherDoc.ownerUserId
+        ? Number(eligibleItems[0]?.price || 0)
+        : eligibleItems.reduce(
+            (sum, item) =>
+              sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
+            0,
+          );
       discountAmount = computeFinalVoucherDiscountAmount(
         voucherDoc,
-        eligibleSubtotal,
+        voucherDiscountBase,
       );
     }
 
@@ -460,6 +530,10 @@ exports.createOrder = async (req, res) => {
       products: mappedProducts,
       discount: discountAmount,
       voucherCode: normalizedVoucherCode,
+      voucherTargetProductId: voucherTarget?.productId || null,
+      voucherTargetSku: voucherTarget?.sku
+        ? String(voucherTarget.sku).trim().toUpperCase()
+        : null,
       shippingFee,
       totalAmount: finalTotal,
       paymentStatus: "unpaid",
@@ -506,11 +580,16 @@ exports.createOrder = async (req, res) => {
     }
 
     if (voucherDoc) {
-      await Voucher.findOneAndUpdate(
-        { _id: voucherDoc._id },
+      const lockVoucher = await Voucher.findOneAndUpdate(
+        { _id: voucherDoc._id, usedCount: { $lt: 1 } },
         { $inc: { usedCount: 1 } },
-        { session },
+        { session, new: true },
       );
+      if (!lockVoucher) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(422).json({ message: "Voucher đã hết lượt sử dụng" });
+      }
     }
 
     await OrderStatusHistory.create(
@@ -1125,12 +1204,28 @@ function assertUserOwnsOrderForLineCancel(order, reqUser) {
   return false;
 }
 
+const MIN_CANCEL_LINE_REASON_LEN = 5;
+
+function normalizeCancelLineReason(raw) {
+  const t =
+    typeof raw === "string" ? raw.trim() : String(raw ?? "").trim();
+  if (t.length < MIN_CANCEL_LINE_REASON_LEN) {
+    const e = new Error(
+      `Vui lòng nhập lý do hủy (tối thiểu ${MIN_CANCEL_LINE_REASON_LEN} ký tự).`,
+    );
+    e.statusCode = 422;
+    throw e;
+  }
+  return t.slice(0, 2000);
+}
+
 async function cancelOrderLineCore({
   orderId,
   lineIndex,
   canceledBy,
   reqUser,
   requireOwnership,
+  cancelReason,
 }) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -1175,13 +1270,7 @@ async function cancelOrderLineCore({
       throw e;
     }
 
-    if (order.paymentMethod === "vnpay" && order.paymentStatus === "paid") {
-      const e = new Error(
-        "Đơn đã thanh toán VNPay — không hủy từng dòng trên hệ thống. Liên hệ shop.",
-      );
-      e.statusCode = 400;
-      throw e;
-    }
+    const reasonText = normalizeCancelLineReason(cancelReason);
 
     const oldSub = sumActiveSubtotal(order.products);
     const oldTotal = Math.round(Number(order.totalAmount) || 0);
@@ -1209,6 +1298,7 @@ async function cancelOrderLineCore({
     line.lineStatus = "canceled";
     line.canceledAt = new Date();
     line.canceledBy = canceledBy;
+    line.cancelReason = reasonText;
 
     const activeAfter = (order.products || []).filter(isLineActive);
     const newSub = sumActiveSubtotal(order.products);
@@ -1235,7 +1325,7 @@ async function cancelOrderLineCore({
     const newTotal = Math.round(Number(order.totalAmount) || 0);
 
     if (
-      order.paymentMethod === "wallet" &&
+      (order.paymentMethod === "wallet" || order.paymentMethod === "vnpay") &&
       order.paymentStatus === "paid" &&
       order.userId
     ) {
@@ -1260,7 +1350,7 @@ async function cancelOrderLineCore({
           oldStatus: prevOrderStatus,
           newStatus: historyNewStatus,
           orderId: order._id,
-          note: `Hủy dòng #${idx + 1} — ${canceledBy === "admin" ? "Admin" : "Khách hàng"}`,
+          note: `Hủy dòng #${idx + 1} — ${canceledBy === "admin" ? "Admin" : "Khách hàng"}. Lý do: ${reasonText}`,
         },
       ],
       { session },
@@ -1284,12 +1374,14 @@ exports.cancelOrderLineByUser = async (req, res) => {
   try {
     const { id } = req.params;
     const lineIndex = req.body?.lineIndex ?? req.body?.line_index;
+    const cancelReason = req.body?.cancelReason ?? req.body?.reason;
     const order = await cancelOrderLineCore({
       orderId: id,
       lineIndex,
       canceledBy: "user",
       reqUser: req.user,
       requireOwnership: true,
+      cancelReason,
     });
     const history = await OrderStatusHistory.find({ orderId: order._id }).sort({
       createdAt: -1,
@@ -1307,12 +1399,14 @@ exports.cancelOrderLineByAdmin = async (req, res) => {
   try {
     const { id } = req.params;
     const lineIndex = req.body?.lineIndex ?? req.body?.line_index;
+    const cancelReason = req.body?.cancelReason ?? req.body?.reason;
     const order = await cancelOrderLineCore({
       orderId: id,
       lineIndex,
       canceledBy: "admin",
       reqUser: req.user,
       requireOwnership: false,
+      cancelReason,
     });
     const history = await OrderStatusHistory.find({ orderId: order._id }).sort({
       createdAt: -1,
@@ -1396,10 +1490,16 @@ exports.deleteOrder = async (req, res) => {
 exports.dashboard = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    const start = startDate
+    let start = startDate
       ? new Date(startDate)
       : new Date(new Date().getFullYear(), 0, 1);
-    const end = endDate ? new Date(endDate) : new Date();
+    let end = endDate ? new Date(endDate) : new Date();
+
+    // Cùng một mốc hoặc end <= start (vd. RangePicker hai ngày cùng 00:00) → coi là 1 ngày đầy đủ
+    if (end.getTime() <= start.getTime()) {
+      end = new Date(start);
+      end.setHours(23, 59, 59, 999);
+    }
 
     const revenueMatch = (s, e) => ({
       createdAt: { $gte: s, $lte: e },
@@ -1439,6 +1539,7 @@ exports.dashboard = async (req, res) => {
     let comparisonPeriod = null;
     let revenueChangePercent = null;
     let ordersChangePercent = null;
+    let canceledOrdersChangePercent = null;
 
     let current;
     if (spanMs > 0) {
@@ -1449,9 +1550,11 @@ exports.dashboard = async (req, res) => {
         end: prevEnd.toISOString(),
       };
       const roundPct = (cur, prev) => {
-        if (prev === 0 && cur === 0) return 0;
-        if (prev === 0) return null;
-        return Math.round(((cur - prev) / prev) * 1000) / 10;
+        const c = Number(cur) || 0;
+        const p = Number(prev) || 0;
+        if (p === 0 && c === 0) return 0;
+        if (p === 0) return c > 0 ? 100 : 0;
+        return Math.round(((c - p) / p) * 1000) / 10;
       };
       const [cur, prev] = await Promise.all([
         loadMetrics(start, end),
@@ -1460,6 +1563,10 @@ exports.dashboard = async (req, res) => {
       current = cur;
       revenueChangePercent = roundPct(cur.totalRevenue, prev.totalRevenue);
       ordersChangePercent = roundPct(cur.totalOrders, prev.totalOrders);
+      canceledOrdersChangePercent = roundPct(
+        cur.canceledOrders,
+        prev.canceledOrders,
+      );
     } else {
       current = await loadMetrics(start, end);
     }
@@ -1473,6 +1580,7 @@ exports.dashboard = async (req, res) => {
       comparisonPeriod,
       revenueChangePercent,
       ordersChangePercent,
+      canceledOrdersChangePercent,
     };
 
     res.status(200).json({
@@ -1508,7 +1616,10 @@ exports.revenue = async (req, res) => {
     const groupMap = {
       year: { $year: "$createdAt" },
       month: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
-      week: { year: { $year: "$createdAt" }, week: { $isoWeek: "$createdAt" } },
+      week: {
+        year: { $isoWeekYear: "$createdAt" },
+        week: { $isoWeek: "$createdAt" },
+      },
       hour: {
         year: { $year: "$createdAt" },
         month: { $month: "$createdAt" },
@@ -1529,48 +1640,131 @@ exports.revenue = async (req, res) => {
       ],
     };
 
-    const results = await Order.aggregate([
+    const serializeGroupKey = (id) =>
+      typeof id === "object" && id !== null ? JSON.stringify(id) : String(id);
 
-      {
-        $match: {
-          createdAt: { $gte: start, $lte: end },
-          status: { $nin: ORDER_STATUSES_EXCLUDED_FROM_REVENUE },
-        },
-      },
-
-      { $match: revenueMatch },
-
-      {
-        $group: {
-          _id: groupId,
-          totalRevenue: { $sum: "$totalAmount" },
-          totalOrders: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
-    const formattedResults = results.map((item) => {
+    const formatBucketName = (idValue) => {
       let name = "";
-      if (unit === "day" && typeof item._id === "string") {
-        const d = new Date(item._id);
+      if (unit === "day" && typeof idValue === "string") {
+        const d = new Date(idValue);
         name = `${d.getDate()}/${d.getMonth() + 1}`;
       } else {
         const nameMap = {
-          year: `${item._id}`,
-          month: `${item._id.month}/${item._id.year}`,
-          week: `Tuần ${item._id.week}/${item._id.year}`,
-          hour: `${String(item._id.hour).padStart(2, "0")}:00`,
+          year: `${idValue}`,
+          month: `${idValue.month}/${idValue.year}`,
+          week: (() => {
+            const y = idValue.year;
+            const w = idValue.week;
+            const range =
+              y != null && w != null
+                ? formatIsoWeekRangeLabelVi(Number(y), Number(w))
+                : "";
+            return range
+              ? `Tuần ${w} (${range})`
+              : `Tuần ${w}/${y}`;
+          })(),
+          hour: `${String(idValue.hour).padStart(2, "0")}:00`,
         };
-        name = nameMap[unit] || item._id?.toString() || "N/A";
+        name = nameMap[unit] || idValue?.toString() || "N/A";
       }
-      return { ...item, name };
+      return name;
+    };
+
+    const [revenueResults, orderResults] = await Promise.all([
+      Order.aggregate([
+        { $match: revenueMatch },
+        {
+          $group: {
+            _id: groupId,
+            totalRevenue: { $sum: "$totalAmount" },
+            paidOrders: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+      Order.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: start, $lte: end },
+          },
+        },
+        {
+          $group: {
+            _id: groupId,
+            totalOrders: { $sum: 1 },
+            canceledOrders: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "canceled"] }, 1, 0],
+              },
+            },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+    ]);
+
+    const merged = new Map();
+
+    for (const item of revenueResults) {
+      const key = serializeGroupKey(item._id);
+      merged.set(key, {
+        _id: item._id,
+        name: formatBucketName(item._id),
+        totalRevenue: item.totalRevenue || 0,
+        paidOrders: item.paidOrders || 0,
+        totalOrders: 0,
+        canceledOrders: 0,
+      });
+    }
+
+    for (const item of orderResults) {
+      const key = serializeGroupKey(item._id);
+      const current = merged.get(key) || {
+        _id: item._id,
+        name: formatBucketName(item._id),
+        totalRevenue: 0,
+        paidOrders: 0,
+        totalOrders: 0,
+        canceledOrders: 0,
+      };
+      current.totalOrders = item.totalOrders || 0;
+      current.canceledOrders = item.canceledOrders || 0;
+      merged.set(key, current);
+    }
+
+    const buildSortKey = (idValue) => {
+      if (unit === "day" && typeof idValue === "string") return idValue;
+      if (unit === "year") return `${idValue}`;
+      if (unit === "month")
+        return `${idValue.year}-${String(idValue.month).padStart(2, "0")}`;
+      if (unit === "week")
+        return `${idValue.year}-${String(idValue.week).padStart(2, "0")}`;
+      if (unit === "hour") {
+        return `${idValue.year}-${String(idValue.month).padStart(2, "0")}-${String(
+          idValue.day,
+        ).padStart(2, "0")} ${String(idValue.hour).padStart(2, "0")}:00`;
+      }
+      return String(idValue);
+    };
+
+    const formattedResults = Array.from(merged.values()).sort((a, b) =>
+      buildSortKey(a._id).localeCompare(buildSortKey(b._id), "vi-VN", {
+        numeric: true,
+      }),
+    );
+
+    const normalizedResults = formattedResults.map((item) => {
+      return {
+        ...item,
+        // Giữ tương thích ngược: một số chỗ cũ đọc totalOrders từ revenue endpoint
+        totalOrdersRevenueMatched: item.paidOrders || 0,
+      };
     });
 
     res.status(200).json({
       status: "ok",
       message: "Successfully fetched revenue data",
-      data: formattedResults,
+      data: normalizedResults,
     });
   } catch (err) {
     res.status(500).json({

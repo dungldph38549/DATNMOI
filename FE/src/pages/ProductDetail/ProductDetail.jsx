@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
@@ -67,8 +67,6 @@ const ProductDetail = () => {
   const [relatedLoading, setRelatedLoading] = useState(false);
 
   const [reviews, setReviews] = useState([]);
-  /** Đánh giá của user cho SP (mỗi lần mua tối đa một bản ghi) */
-  const [myReviews, setMyReviews] = useState([]);
   const [reviewStats, setReviewStats] = useState(null);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   /** all | 1..5 | comment | media */
@@ -77,6 +75,8 @@ const ProductDetail = () => {
   const [checkingStock, setCheckingStock] = useState(false);
   const [stockInfo, setStockInfo] = useState(null);
   const [qtyNotice, setQtyNotice] = useState("");
+  const relatedSectionRef = useRef(null);
+  const previousVisualSelectionRef = useRef("");
 
   const PLACEHOLDER_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='28' font-family='Plus Jakarta Sans'>No Image</text></svg>";
 
@@ -90,12 +90,17 @@ const ProductDetail = () => {
   const getVariantSizeValue = useCallback((variant) => {
     const attrs = variant?.attributes;
     if (!attrs) return null;
-    if (typeof attrs.get === "function") return attrs.get("Size") ?? attrs.get("size") ?? attrs.get("SIZE") ?? null;
-    if (typeof attrs === "object") {
-      if (attrs.Size != null) return attrs.Size;
-      if (attrs.size != null) return attrs.size;
-      const foundKey = Object.keys(attrs).find((k) => String(k).toLowerCase() === "size");
-      if (foundKey) return attrs[foundKey];
+    const normalizeAttrKey = (k) =>
+      String(k || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d");
+    const wanted = new Set(["Size", "size"].map(normalizeAttrKey));
+    const entries = typeof attrs.entries === "function" ? Array.from(attrs.entries()) : Object.entries(attrs);
+    for (const [k, v] of entries) {
+      if (!wanted.has(normalizeAttrKey(k))) continue;
+      if (v != null && String(v).trim() !== "") return v;
     }
     return null;
   }, []);
@@ -108,12 +113,17 @@ const ProductDetail = () => {
   const getVariantColorValue = useCallback((variant) => {
     const attrs = variant?.attributes;
     if (!attrs) return null;
-    if (typeof attrs.get === "function") return attrs.get("Color") ?? attrs.get("color") ?? attrs.get("COLOR") ?? null;
-    if (typeof attrs === "object") {
-      if (attrs.Color != null) return attrs.Color;
-      if (attrs.color != null) return attrs.color;
-      const foundKey = Object.keys(attrs).find((k) => String(k).toLowerCase() === "color");
-      if (foundKey) return attrs[foundKey];
+    const normalizeAttrKey = (k) =>
+      String(k || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d");
+    const wanted = new Set(["Color", "color", "Màu", "Mau"].map(normalizeAttrKey));
+    const entries = typeof attrs.entries === "function" ? Array.from(attrs.entries()) : Object.entries(attrs);
+    for (const [k, v] of entries) {
+      if (!wanted.has(normalizeAttrKey(k))) continue;
+      if (v != null && String(v).trim() !== "") return v;
     }
     return null;
   }, []);
@@ -122,6 +132,15 @@ const ProductDetail = () => {
     const val = getVariantColorValue(variant);
     return val != null ? String(val) : "";
   }, [getVariantColorValue]);
+
+  const normalizeVariantValue = useCallback((value) => {
+    return String(value ?? "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d");
+  }, []);
 
   const hasVariants = Array.isArray(product?.variants) && product.variants.length > 0;
   const isAccessoryProduct = String(
@@ -158,17 +177,24 @@ const ProductDetail = () => {
     if (!hasVariants || !selectedSize || !Array.isArray(product?.variants)) return null;
     const withSize = product.variants.filter((v) => {
       const label = getVariantSizeLabel(v);
-      return label != null && String(label) === String(selectedSize);
+      return (
+        label != null &&
+        normalizeVariantValue(label) === normalizeVariantValue(selectedSize)
+      );
     });
     if (!withSize.length) return null;
     const hasColorInThisSize = withSize.some((v) => (getVariantColorLabel(v) ?? "").trim() !== "");
     if (!hasColorInThisSize) return withSize[0] ?? null;
     if (selectedColor) {
-      const exact = withSize.find((v) => String(getVariantColorLabel(v) ?? "") === String(selectedColor));
+      const exact = withSize.find(
+        (v) =>
+          normalizeVariantValue(getVariantColorLabel(v) ?? "") ===
+          normalizeVariantValue(selectedColor),
+      );
       if (exact) return exact;
     }
     return withSize.find((v) => (v?.stock ?? 0) > 0) ?? withSize[0] ?? null;
-  }, [product, selectedSize, selectedColor, hasVariants, getVariantSizeLabel, getVariantColorLabel]);
+  }, [product, selectedSize, selectedColor, hasVariants, getVariantSizeLabel, getVariantColorLabel, normalizeVariantValue]);
 
   const selectedSku = selectedVariant?.sku ?? null;
   const selectedSizeValue = getVariantSizeValue(selectedVariant) ?? null;
@@ -187,7 +213,7 @@ const ProductDetail = () => {
     return getProductPriceInfo(product);
   }, [product, selectedVariant, hasVariants]);
 
-  /** Trung bình sao từ API (tất cả đánh giá đã duyệt); khi chưa tải xong thì tạm dùng dữ liệu sản phẩm nếu có */
+  /** Trung bình sao từ API (đánh giá hiển thị công khai); khi chưa tải xong thì tạm dùng dữ liệu sản phẩm nếu có */
   const ratingAverage = useMemo(() => {
     if (reviewStats != null) {
       const a = Number(reviewStats.average);
@@ -226,25 +252,79 @@ const ProductDetail = () => {
 
   const thumbnails = useMemo(() => {
     if (!product) return [];
+    const normalizeForMatch = (value) =>
+      String(value || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+    const selectedColorNormalized = normalizeForMatch(selectedColor);
+
     const fromProduct = [
       product.image,
       ...(Array.isArray(product.srcImages) ? product.srcImages : []),
     ].filter(Boolean);
-    const fromVariant =
-      selectedVariant && Array.isArray(selectedVariant.images)
-        ? selectedVariant.images.filter(Boolean)
+
+    // Ưu tiên ảnh của biến thể đang chọn (nếu có).
+    const fromVariant = selectedVariant
+      ? [
+          ...(Array.isArray(selectedVariant.images)
+            ? selectedVariant.images
+            : []),
+          selectedVariant.image,
+        ].filter(Boolean)
+      : [];
+
+    // Fallback tiếp theo: gom ảnh từ tất cả biến thể cùng màu đã chọn.
+    const fromSameColorVariants =
+      !fromVariant.length && selectedColorNormalized && Array.isArray(product?.variants)
+        ? product.variants
+            .filter(
+              (v) =>
+                normalizeForMatch(getVariantColorLabel(v)) ===
+                selectedColorNormalized,
+            )
+            .flatMap((v) => [
+              ...(Array.isArray(v?.images) ? v.images : []),
+              v?.image,
+            ])
+            .filter(Boolean)
         : [];
-    const merged = [...fromVariant, ...fromProduct];
+
+    // Nếu biến thể chưa có ảnh riêng, cố gắng map ảnh theo tên màu trong filename/path.
+    const fromColorMatchedProduct =
+      !fromVariant.length && !fromSameColorVariants.length && selectedColorNormalized
+        ? fromProduct.filter((img) =>
+            normalizeForMatch(img).includes(selectedColorNormalized),
+          )
+        : [];
+
+    const merged = [
+      ...fromVariant,
+      ...fromSameColorVariants,
+      ...fromColorMatchedProduct,
+      ...fromProduct,
+    ];
     return Array.from(new Set(merged));
-  }, [product, selectedVariant]);
+  }, [product, selectedVariant, selectedColor]);
 
   /** Khi đổi size/màu (SKU), cập nhật ảnh chính theo gallery biến thể; giữ ảnh đang xem nếu vẫn còn trong danh sách. */
   useEffect(() => {
     if (!product || thumbnails.length === 0) return;
-    setMainImage((prev) =>
-      prev && thumbnails.includes(prev) ? prev : thumbnails[0],
-    );
-  }, [product, thumbnails, selectedSku]);
+    const currentSelectionKey = `${String(selectedSku || "")}::${String(
+      selectedColor || "",
+    )}`;
+    const selectionChanged =
+      previousVisualSelectionRef.current !== currentSelectionKey;
+    previousVisualSelectionRef.current = currentSelectionKey;
+
+    setMainImage((prev) => {
+      if (selectionChanged) return thumbnails[0];
+      return prev && thumbnails.includes(prev) ? prev : thumbnails[0];
+    });
+  }, [product, thumbnails, selectedSku, selectedColor]);
 
   useEffect(() => {
     if (!hasVariants || !availableSizes.length || selectedSize) return;
@@ -258,8 +338,16 @@ const ProductDetail = () => {
     const colors = product.variants
       .map((v) => getVariantColorLabel(v))
       .filter((c) => c != null && String(c).trim() !== "");
-    return Array.from(new Set(colors.map((c) => String(c))));
-  }, [product, hasVariants, getVariantColorLabel]);
+    const seen = new Set();
+    const normalizedUnique = [];
+    for (const c of colors.map((c) => String(c).trim())) {
+      const key = normalizeVariantValue(c);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      normalizedUnique.push(c);
+    }
+    return normalizedUnique;
+  }, [product, hasVariants, getVariantColorLabel, normalizeVariantValue]);
 
   /** 
    * Logic chọn size: Ưu tiên giữ màu hiện tại. 
@@ -267,12 +355,20 @@ const ProductDetail = () => {
    */
   const handleSizeClick = (size) => {
     const next = String(size);
-    if (String(selectedSize ?? "") !== next) {
+    if (normalizeVariantValue(selectedSize ?? "") !== normalizeVariantValue(next)) {
       setSizeZoomNonce((n) => n + 1);
     }
     setSelectedSize(size);
-    const variantsInSize = product.variants.filter(v => String(getVariantSizeLabel(v)) === String(size));
-    const hasCurrentColor = variantsInSize.some(v => String(getVariantColorLabel(v)) === String(selectedColor));
+    const variantsInSize = product.variants.filter(
+      (v) =>
+        normalizeVariantValue(getVariantSizeLabel(v)) ===
+        normalizeVariantValue(size),
+    );
+    const hasCurrentColor = variantsInSize.some(
+      (v) =>
+        normalizeVariantValue(getVariantColorLabel(v)) ===
+        normalizeVariantValue(selectedColor),
+    );
     
     if (!hasCurrentColor && variantsInSize.length > 0) {
       const firstInStock = variantsInSize.find(v => (v.stock ?? 0) > 0) || variantsInSize[0];
@@ -286,8 +382,16 @@ const ProductDetail = () => {
    */
   const handleColorClick = (color) => {
     setSelectedColor(color);
-    const variantsInColor = product.variants.filter(v => String(getVariantColorLabel(v)) === String(color));
-    const hasCurrentSize = variantsInColor.some(v => String(getVariantSizeLabel(v)) === String(selectedSize));
+    const variantsInColor = product.variants.filter(
+      (v) =>
+        normalizeVariantValue(getVariantColorLabel(v)) ===
+        normalizeVariantValue(color),
+    );
+    const hasCurrentSize = variantsInColor.some(
+      (v) =>
+        normalizeVariantValue(getVariantSizeLabel(v)) ===
+        normalizeVariantValue(selectedSize),
+    );
 
     if (!hasCurrentSize && variantsInColor.length > 0) {
       const firstInStock = variantsInColor.find(v => (v.stock ?? 0) > 0) || variantsInColor[0];
@@ -395,7 +499,6 @@ const ProductDetail = () => {
             mineList = [];
           }
         }
-        setMyReviews(mineList);
         const mineIds = new Set(mineList.map((m) => String(m?._id)));
         let mergedReviews = [
           ...mineList,
@@ -419,7 +522,6 @@ const ProductDetail = () => {
         setReviewStats(res?.stats ?? null);
       } catch (err) {
         setReviews([]);
-        setMyReviews([]);
         setReviewStats(null);
       } finally {
         setReviewsLoading(false);
@@ -427,11 +529,6 @@ const ProductDetail = () => {
     };
     run();
   }, [product, user?.login, reviewListFilter]);
-
-  const myReviewIdSet = useMemo(
-    () => new Set(myReviews.map((m) => String(m?._id))),
-    [myReviews],
-  );
 
   const reviewDistribution = useMemo(() => {
     const d = reviewStats?.distribution;
@@ -455,6 +552,9 @@ const ProductDetail = () => {
     }
     const sizeToSave = hasVariants ? selectedSizeValue : null;
     const skuToSave = hasVariants ? selectedSku : null;
+    const colorToSave = hasVariants
+      ? (String(getVariantColorLabel(selectedVariant) || "").trim() || null)
+      : null;
 
     if (hasVariants && !skuToSave) { notify.warning("Vui lòng chọn kích cỡ!"); return false; }
     if (stockInfo?.available === false) { notify.warning("Sản phẩm đã hết, vui lòng mua sản phẩm khác."); return false; }
@@ -497,12 +597,19 @@ const ProductDetail = () => {
       productId: product._id, name: product.name, image: product.image,
       price: displayPrice,
       originalPrice: Number(selectedPriceInfo.originalPrice || displayPrice),
-      qty: qtySafe, sku: skuToSave, size: sizeToSave
+      qty: qtySafe, sku: skuToSave, size: sizeToSave, color: colorToSave,
     }));
 
     try {
       if (user?.login && user?.id) {
-        await addToCartAPI({ userId: user.id, productId: product._id, qty: qtySafe, sku: skuToSave ?? null, size: sizeToSave ?? null });
+        await addToCartAPI({
+          userId: user.id,
+          productId: product._id,
+          qty: qtySafe,
+          sku: skuToSave ?? null,
+          size: sizeToSave ?? null,
+          color: colorToSave ?? null,
+        });
       }
     } catch (err) { }
     return true;
@@ -515,6 +622,11 @@ const ProductDetail = () => {
 
   const handleToggleWishlist = () => {
     if (!product) return;
+    if (!user?.login || !user?.token) {
+      notify.warning("Vui lòng đăng nhập để thêm sản phẩm vào yêu thích.");
+      navigate("/login", { state: { from: `/product/${product._id}` } });
+      return;
+    }
     dispatch(toggleWishlist(product));
   };
 
@@ -527,6 +639,9 @@ const ProductDetail = () => {
     }
     const sizeToSave = hasVariants ? selectedSizeValue : null;
     const skuToSave = hasVariants ? selectedSku : null;
+    const colorToSave = hasVariants
+      ? (String(getVariantColorLabel(selectedVariant) || "").trim() || null)
+      : null;
 
     if (hasVariants && !skuToSave) {
       notify.warning("Vui lòng chọn kích cỡ!");
@@ -582,6 +697,7 @@ const ProductDetail = () => {
       qty: qtySafe,
       sku: skuToSave,
       size: sizeToSave,
+      color: colorToSave,
     };
     const buyNowAction = addToCart({
       ...buyNowItem,
@@ -598,10 +714,16 @@ const ProductDetail = () => {
     });
   };
 
-  const stockCountDisplay = stockInfo?.countInStock ?? product?.countInStock ?? product?.stock ?? 0;
-  const maxSelectableQty = Math.max(0, Number(stockCountDisplay || 0));
+  const stockStatePending = hasVariants && (!selectedSku || checkingStock || stockInfo == null);
+  const stockCountDisplay = stockStatePending
+    ? null
+    : (stockInfo?.countInStock ?? product?.countInStock ?? product?.stock ?? 0);
+  const maxSelectableQty = Math.max(
+    0,
+    Number(stockCountDisplay ?? product?.countInStock ?? product?.stock ?? 0),
+  );
   const canIncreaseQty = maxSelectableQty <= 0 ? false : quantity < maxSelectableQty;
-  const isOutOfStock = maxSelectableQty <= 0 || stockInfo?.available === false;
+  const isOutOfStock = !stockStatePending && (maxSelectableQty <= 0 || stockInfo?.available === false);
   useEffect(() => {
     if (!showSizeGuide) return undefined;
     const prevOverflow = document.body.style.overflow;
@@ -637,6 +759,13 @@ const ProductDetail = () => {
       return s;
     }
     return s;
+  };
+
+  const scrollToRelatedProducts = () => {
+    relatedSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   };
 
   if (!product) return (
@@ -704,11 +833,26 @@ const ProductDetail = () => {
                     alt={product.name}
                   />
                 </div>
+                {isOutOfStock && (
+                  <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/20">
+                    <span className="inline-flex h-28 w-28 items-center justify-center rounded-full bg-black/65 px-3 text-center text-xl font-semibold text-white shadow-lg">
+                      Hết hàng
+                    </span>
+                  </div>
+                )}
                 {product.isNew && (
                   <span className="absolute left-5 top-5 rounded-full bg-convot-charcoal px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white">
                     Mới
                   </span>
                 )}
+                <button
+                  type="button"
+                  onClick={scrollToRelatedProducts}
+                  className="absolute bottom-4 left-4 z-30 inline-flex items-center gap-2 rounded-2xl bg-white/95 px-4 py-2 text-sm font-semibold text-convot-charcoal shadow-md transition hover:bg-white"
+                >
+                  <span className="text-red-500">🛍️</span>
+                  Sản phẩm tương tự
+                </button>
               </div>
             </div>
           </div>
@@ -764,6 +908,11 @@ const ProductDetail = () => {
                 <FaCheckCircle className="text-emerald-600" /> Còn hàng
               </p>
             )}
+            {isOutOfStock && (
+              <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-red-600">
+                Hết hàng
+              </p>
+            )}
 
             {hasVariants && !isAccessoryProduct && (
               <div className="mt-8">
@@ -786,7 +935,9 @@ const ProductDetail = () => {
                     const isTotalOutOfStock = allVariantsInSize.every((vv) => (vv.stock ?? 0) <= 0);
 
                     const variantWithCurrentColor = allVariantsInSize.find(
-                      (vv) => String(getVariantColorLabel(vv)) === String(selectedColor),
+                      (vv) =>
+                        normalizeVariantValue(getVariantColorLabel(vv)) ===
+                        normalizeVariantValue(selectedColor),
                     );
                     const isUnavailableInCurrentColor = !variantWithCurrentColor || (variantWithCurrentColor.stock ?? 0) <= 0;
 
@@ -831,12 +982,16 @@ const ProductDetail = () => {
                     const isTotalOutOfStock = allVariantsInColor.every((vv) => (vv.stock ?? 0) <= 0);
 
                     const variantWithCurrentSize = allVariantsInColor.find(
-                      (vv) => String(getVariantSizeLabel(vv)) === String(selectedSize),
+                      (vv) =>
+                        normalizeVariantValue(getVariantSizeLabel(vv)) ===
+                        normalizeVariantValue(selectedSize),
                     );
                     const isUnavailableInCurrentSize =
                       !variantWithCurrentSize || (variantWithCurrentSize.stock ?? 0) <= 0;
 
-                    const isSelected = String(selectedColor || "") === String(color);
+                    const isSelected =
+                      normalizeVariantValue(selectedColor || "") ===
+                      normalizeVariantValue(color);
                     return (
                       <button
                         key={color}
@@ -889,7 +1044,11 @@ const ProductDetail = () => {
                   +
                 </button>
               </div>
-              <span className="text-sm text-neutral-500">{Math.max(0, maxSelectableQty)} sản phẩm có sẵn</span>
+              <span className="text-sm text-neutral-500">
+                {stockStatePending
+                  ? "Đang kiểm tra tồn kho..."
+                  : `${Math.max(0, maxSelectableQty)} sản phẩm có sẵn`}
+              </span>
             </div>
 
             {qtyNotice && <p className="mt-3 text-sm font-medium text-red-600">{qtyNotice}</p>}
@@ -1103,11 +1262,6 @@ const ProductDetail = () => {
                                       </p>
                                     );
                                   })()}
-                                  {myReviewIdSet.has(String(r?._id)) && (
-                                    <span className={`inline-block mt-2 text-[10px] font-bold px-2 py-0.5 rounded ${r?.status === "approved" ? "bg-green-100 text-green-700" : r?.status === "rejected" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
-                                      {r?.status === "approved" ? "Đã duyệt" : r?.status === "rejected" ? "Bị từ chối" : "Chờ duyệt"}
-                                    </span>
-                                  )}
                                   {r.title && <p className="font-bold text-slate-900 mt-3 text-sm">{r.title}</p>}
                                   {parsed.kv.length > 0 && (
                                     <div className="mt-2 space-y-1">
@@ -1155,7 +1309,7 @@ const ProductDetail = () => {
             </div>
         </section>
 
-        <section className="mt-12 w-full border-t border-neutral-200 pt-10">
+        <section ref={relatedSectionRef} className="mt-12 w-full border-t border-neutral-200 pt-10">
               <h3 className="font-display text-base font-semibold tracking-wide text-convot-charcoal">
                 Các sản phẩm khác
               </h3>

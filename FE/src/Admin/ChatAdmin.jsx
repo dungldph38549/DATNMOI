@@ -15,10 +15,29 @@ const fmtTime = (ts) => {
   }
 };
 
+const fmtDayLabel = (ts) => {
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return "";
+  const today = new Date();
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  const day = d.getDate();
+  const ty = today.getFullYear();
+  const tm = today.getMonth();
+  const td = today.getDate();
+  if (y === ty && m === tm && day === td) return "Hôm nay";
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (y === yesterday.getFullYear() && m === yesterday.getMonth() && day === yesterday.getDate()) {
+    return "Hôm qua";
+  }
+  return d.toLocaleDateString("vi-VN");
+};
+
 const bubbleStyle = {
   user: {
-    background: "#f49d25",
-    color: "#fff",
+    background: "#e2e8f0",
+    color: "#0f172a",
     borderTopLeftRadius: 6,
     borderTopRightRadius: 14,
     borderBottomLeftRadius: 14,
@@ -34,8 +53,8 @@ const bubbleStyle = {
     borderBottomRightRadius: 14,
   },
   admin: {
-    background: "#F1F5F9",
-    color: "#0F172A",
+    background: "#1677ff",
+    color: "#ffffff",
     borderTopLeftRadius: 14,
     borderTopRightRadius: 6,
     borderBottomLeftRadius: 14,
@@ -86,9 +105,11 @@ export default function ChatAdmin() {
   const token = getAdminToken();
   const socketRef = useRef(null);
   const selectedCustomerIdRef = useRef(null);
+  const seenCustomerIdsRef = useRef(new Set());
 
   const [inboxLoading, setInboxLoading] = useState(false);
   const [inbox, setInbox] = useState([]);
+  const [inboxSearch, setInboxSearch] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
@@ -109,6 +130,21 @@ export default function ChatAdmin() {
   const selectedChatTitle = selectedInboxEntry
     ? customerDisplayName(selectedInboxEntry, selectedCustomerId)
     : "";
+  const filteredInbox = useMemo(() => {
+    const q = String(inboxSearch || "").trim().toLowerCase();
+    if (!q) return inbox;
+    return inbox.filter((item) => {
+      const name = customerDisplayName(item, item?.customerId).toLowerCase();
+      const email = String(item?.customer?.email || "").toLowerCase();
+      const last = String(item?.lastMessage || "").toLowerCase();
+      return name.includes(q) || email.includes(q) || last.includes(q);
+    });
+  }, [inbox, inboxSearch]);
+
+  useEffect(() => {
+    if (!selectedCustomerId) return;
+    seenCustomerIdsRef.current.add(String(selectedCustomerId));
+  }, [selectedCustomerId]);
 
   const loadInbox = async () => {
     setInboxLoading(true);
@@ -230,12 +266,13 @@ export default function ChatAdmin() {
   return (
     <div
       style={{
+        padding: 24,
         flex: 1,
         minHeight: 0,
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        background: "#F8F7F5",
+        background: "#f8fafc",
       }}
     >
       <div
@@ -245,7 +282,7 @@ export default function ChatAdmin() {
           border: "1px solid #E2E8F0",
           borderRadius: 16,
           padding: 20,
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
           marginBottom: 16,
           display: "flex",
           alignItems: "center",
@@ -254,7 +291,7 @@ export default function ChatAdmin() {
         }}
       >
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0F172A" }}>Chat Inbox</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0F172A" }}>Chat khách hàng</h2>
           <p style={{ margin: "6px 0 0", color: "#94A3B8", fontSize: 13 }}>
             Tin nhắn từ khách — trả lời trực tiếp qua chat (không dùng AI tự động)
           </p>
@@ -279,12 +316,13 @@ export default function ChatAdmin() {
           style={{
             background: "#fff",
             border: "1px solid #E2E8F0",
-            borderRadius: 14,
+            borderRadius: 16,
             overflow: "hidden",
             display: "flex",
             flexDirection: "column",
             minHeight: 0,
             minWidth: 0,
+            boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
           }}
         >
           <div
@@ -292,46 +330,82 @@ export default function ChatAdmin() {
               flexShrink: 0,
               padding: "12px 14px",
               borderBottom: "1px solid #F1F5F9",
-              background: "#F8FAFC",
+              background: "#ffffff",
             }}
           >
             <b style={{ color: "#0F172A" }}>Danh sách</b>
+            <Input
+              value={inboxSearch}
+              onChange={(e) => setInboxSearch(e.target.value)}
+              placeholder="Tìm khách, email, nội dung..."
+              size="small"
+              style={{ marginTop: 8 }}
+            />
           </div>
           <div style={{ ...scrollPane, flex: 1 }}>
-            {inbox.length === 0 && (
+            {filteredInbox.length === 0 && (
               <div style={{ padding: 18, color: "#94A3B8", fontSize: 13 }}>
                 Chưa có hội thoại
               </div>
             )}
-            {inbox.map((item, rowIdx) => {
+            {filteredInbox.map((item, rowIdx) => {
               const idStr = String(item.customerId ?? "").trim();
               const active = idStr === String(selectedCustomerId ?? "").trim();
+              const unreadCount = Number(item?.unreadCount || 0) > 0
+                ? Number(item.unreadCount)
+                : (!active && item?.senderRole !== "admin" ? 1 : 0);
+              const seen = seenCustomerIdsRef.current.has(idStr);
+              const showUnread = !active && !seen && unreadCount > 0;
               return (
                 <button
                   key={idStr || `inbox-row-${rowIdx}`}
                   type="button"
-                  onClick={() => setSelectedCustomerId(idStr)}
+                  onClick={() => {
+                    seenCustomerIdsRef.current.add(idStr);
+                    setSelectedCustomerId(idStr);
+                  }}
                   style={{
                     width: "100%",
                     textAlign: "left",
                     padding: "12px 14px",
                     border: "none",
                     cursor: "pointer",
-                    background: active ? "rgba(244,157,37,0.10)" : "transparent",
+                    background: active ? "#eff6ff" : "transparent",
                     borderBottom: "1px solid #F1F5F9",
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 800, color: "#0F172A", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <div style={{ fontWeight: showUnread ? 900 : 700, color: "#0F172A", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {customerDisplayName(item, idStr)}
                       </div>
-                      <div style={{ marginTop: 4, color: "#64748B", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <div style={{ marginTop: 4, color: "#64748B", fontSize: 12, fontWeight: showUnread ? 700 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {item.lastMessage || "—"}
                       </div>
                     </div>
                     <div style={{ color: "#94A3B8", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
                       {fmtTime(item.lastTimestamp)}
+                      {showUnread && (
+                        <span
+                          style={{
+                            marginLeft: 6,
+                            minWidth: 16,
+                            height: 16,
+                            borderRadius: 999,
+                            padding: "0 5px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: "#1677ff",
+                            color: "#fff",
+                            fontSize: 10,
+                            fontWeight: 800,
+                            verticalAlign: "middle",
+                          }}
+                        >
+                          {unreadCount}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </button>
@@ -344,12 +418,13 @@ export default function ChatAdmin() {
           style={{
             background: "#fff",
             border: "1px solid #E2E8F0",
-            borderRadius: 14,
+            borderRadius: 16,
             overflow: "hidden",
             display: "flex",
             flexDirection: "column",
             minHeight: 0,
             minWidth: 0,
+            boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
           }}
         >
           <div
@@ -357,7 +432,7 @@ export default function ChatAdmin() {
               flexShrink: 0,
               padding: "12px 14px",
               borderBottom: "1px solid #F1F5F9",
-              background: "#F8FAFC",
+              background: "#ffffff",
             }}
           >
             <b style={{ color: "#0F172A" }}>
@@ -370,7 +445,7 @@ export default function ChatAdmin() {
               ...scrollPane,
               flex: 1,
               padding: 14,
-              background: "#FAFAF8",
+              background: "#f8fafc",
             }}
           >
             {selectedCustomerId && messages.length === 0 && (
@@ -378,36 +453,56 @@ export default function ChatAdmin() {
                 Chưa có tin nhắn
               </div>
             )}
-            {messages.map((m) => {
+            {messages.map((m, idx) => {
               const isAdmin = m.senderRole === "admin";
               const bubbleKey =
               m.senderRole === "ai" ? "ai"  : m.senderRole === "admin"? "admin" : "user";
+              const prev = idx > 0 ? messages[idx - 1] : null;
+              const prevDay = prev ? new Date(prev.timestamp).toDateString() : "";
+              const currentDay = new Date(m.timestamp).toDateString();
               return (
-                <div
-                  key={m._id}
-                  style={{ display: "flex", justifyContent: isAdmin ? "flex-end" : "flex-start", marginBottom: 10 }}
-                >
+                <React.Fragment key={m._id}>
+                  {currentDay !== prevDay && (
+                    <div style={{ display: "flex", justifyContent: "center", margin: "8px 0 10px" }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "#64748b",
+                          background: "#e2e8f0",
+                          borderRadius: 999,
+                          padding: "4px 10px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {fmtDayLabel(m.timestamp)}
+                      </span>
+                    </div>
+                  )}
                   <div
-                    style={{
-                      maxWidth: "82%",
-                      padding: "10px 12px",
-                      fontSize: 13,
-                      lineHeight: 1.35,
-                      wordBreak: "break-word",
-                      ...bubbleStyle[bubbleKey],
-                    }}
+                    style={{ display: "flex", justifyContent: isAdmin ? "flex-end" : "flex-start", marginBottom: 10 }}
                   >
-                    {m.senderRole === "ai" && (
-                      <div style={{ fontSize: 10, fontWeight: 800, opacity: 0.75, marginBottom: 4 }}>
-                        Tin tự động (lưu trong lịch sử)
+                    <div
+                      style={{
+                        maxWidth: "82%",
+                        padding: "10px 12px",
+                        fontSize: 13,
+                        lineHeight: 1.35,
+                        wordBreak: "break-word",
+                        ...bubbleStyle[bubbleKey],
+                      }}
+                    >
+                      {m.senderRole === "ai" && (
+                        <div style={{ fontSize: 10, fontWeight: 800, opacity: 0.75, marginBottom: 4 }}>
+                          Tin tự động (lưu trong lịch sử)
+                        </div>
+                      )}
+                      {m.message}
+                      <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4 }}>
+                        {fmtTime(m.timestamp)}
                       </div>
-                    )}
-                    {m.message}
-                    <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4 }}>
-                      {fmtTime(m.timestamp)}
                     </div>
                   </div>
-                </div>
+                </React.Fragment>
               );
             })}
           </div>

@@ -3,8 +3,10 @@
 // Toàn bộ business logic — controller chỉ đọc req/res
 // ================================================================
 const Review = require("../models/Review");
+const ReviewAutoReplySettings = require("../models/ReviewAutoReplySettings");
 const Order = require("../models/OrderModel");
 const Product = require("../models/ProductModel");
+const User = require("../models/UserModel");
 const mongoose = require("mongoose");
 
 const attrEntries = (attrs) => {
@@ -385,7 +387,7 @@ const createReview = async (
       content: content?.trim() || null,
       images: images || [],
       orderId: verifiedOrderId,
-      status: "pending",
+      status: "approved",
       verifiedPurchase: true,
       variantLabel,
       productSnapshot,
@@ -407,7 +409,71 @@ const createReview = async (
     throw e;
   }
   await review.populate("userId", "name avatar");
+  const rid = review._id;
+  setImmediate(() => {
+    tryAutoReplyAfterReviewCreate(rid).catch((err) => {
+      console.error("tryAutoReplyAfterReviewCreate:", err?.message || err);
+    });
+  });
   return review;
+};
+
+const getReviewAutoReplySettings = async () => {
+  const doc = await ReviewAutoReplySettings.getSingleton();
+  return {
+    autoReplyEnabled: !!doc.autoReplyEnabled,
+    autoReplyMessage: doc.autoReplyMessage || "",
+  };
+};
+
+const updateReviewAutoReplySettings = async (body = {}) => {
+  const enabled = !!body.autoReplyEnabled;
+  let messageText = String(body.autoReplyMessage ?? "").trim();
+  if (messageText.length > 500) messageText = messageText.slice(0, 500);
+  const doc = await ReviewAutoReplySettings.findOneAndUpdate(
+    {},
+    {
+      $set: {
+        autoReplyEnabled: enabled,
+        autoReplyMessage: messageText,
+      },
+    },
+    { new: true, upsert: true, setDefaultsOnInsert: true },
+  );
+  return {
+    autoReplyEnabled: !!doc.autoReplyEnabled,
+    autoReplyMessage: doc.autoReplyMessage || "",
+  };
+};
+
+const tryAutoReplyAfterReviewCreate = async (reviewId) => {
+  if (!isValid(reviewId)) return;
+  const settings = await ReviewAutoReplySettings.getSingleton();
+  if (!settings.autoReplyEnabled) return;
+  const msg = String(settings.autoReplyMessage || "").trim();
+  if (!msg) return;
+
+  let adminUserId = null;
+  const envId = process.env.REVIEW_AUTO_REPLY_USER_ID;
+  if (envId && mongoose.isValidObjectId(envId)) {
+    const exists = await User.findById(envId).select("_id").lean();
+    if (exists) adminUserId = exists._id;
+  }
+  if (!adminUserId) {
+    const u = await User.findOne({ role: "admin" })
+      .sort({ createdAt: 1 })
+      .select("_id")
+      .lean();
+    adminUserId = u?._id;
+  }
+  if (!adminUserId) return;
+
+  const fresh = await Review.findOne({ _id: reviewId, isDeleted: false });
+  if (!fresh) return;
+  const reps = Array.isArray(fresh.replies) ? fresh.replies : [];
+  if (reps.some((r) => r && !r.isDeleted && r.role === "admin")) return;
+
+  await addReply(reviewId, { content: msg }, adminUserId, "admin");
 };
 
 // ── PATCH /api/reviews/:id ───────────────────────────────────
@@ -514,6 +580,12 @@ const getStats = async (productId) => {
   return Review.getStats(productId);
 };
 
+// ── [ADMIN] GET /api/admin/reviews/stats-summary ─────────────
+const adminReviewTotalCount = async () => {
+  const totalReviews = await Review.countDocuments({ isDeleted: false });
+  return { totalReviews };
+};
+
 // ── [ADMIN] GET /api/admin/reviews ───────────────────────────
 const adminGetReviews = async ({ page = 1, limit = 20, status, productId }) => {
   const filter = { isDeleted: false };
@@ -576,4 +648,7 @@ module.exports = {
   approveReview,
   rejectReview,
   adminGetReviews,
+  adminReviewTotalCount,
+  getReviewAutoReplySettings,
+  updateReviewAutoReplySettings,
 };

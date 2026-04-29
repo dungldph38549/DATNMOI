@@ -6,6 +6,7 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs"); // Dùng bcryptjs đồng bộ với bản 69d302
 const bcryptNative = require("bcrypt");
 const User = require("../models/UserModel");
+const Voucher = require("../models/VoucherModel");
 
 // ── Helper: Validate ObjectId ──────────────────────────────────
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -40,6 +41,49 @@ const normalizeEmail = (email = "") => String(email).trim().toLowerCase();
 const escapeRegex = (str = "") =>
   String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const createWelcomeVoucherCode = (userId) => {
+  const suffix = String(userId || "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(-6)
+    .toUpperCase();
+  const random4 = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `WELCOME50-${suffix || "USER"}-${random4}`;
+};
+
+const issuePersonalWelcomeVoucher = async (user) => {
+  if (!user?._id) return null;
+  const startDate = new Date();
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + 30);
+
+  for (let i = 0; i < 5; i += 1) {
+    const code = createWelcomeVoucherCode(user._id);
+    try {
+      const created = await Voucher.create({
+        code,
+        description:
+          "Voucher chào mừng thành viên mới: Phạm vi áp dụng: Toàn bộ sản phẩm. Điều kiện: Mỗi đơn hàng chỉ áp dụng cho 1 sản phẩm.",
+        discountType: "percent",
+        discountValue: 50,
+        minOrderValue: 0,
+        maxDiscountAmount: 0,
+        startDate,
+        endDate,
+        usageLimit: 1,
+        usedCount: 0,
+        status: "active",
+        applicableProductIds: [],
+        ownerUserId: user._id,
+      });
+      return created;
+    } catch (err) {
+      if (err?.code === 11000) continue;
+      throw err;
+    }
+  }
+  throw new Error("Không thể tạo mã voucher cá nhân duy nhất");
+};
+
 // ================================================================
 // AUTH (ĐĂNG KÝ, ĐĂNG NHẬP, GOOGLE, REFRESH)
 // ================================================================
@@ -63,6 +107,15 @@ const registerUser = async (newUserData) => {
     password,
     phone,
   });
+
+  try {
+    await issuePersonalWelcomeVoucher(createdUser);
+  } catch (voucherError) {
+    console.error(
+      "[UserService] Không thể cấp voucher chào mừng:",
+      voucherError?.message || voucherError,
+    );
+  }
 
   return {
     status: "OK",
@@ -177,6 +230,14 @@ const googleLoginOrRegister = async (googleUser) => {
       avatar,
       isAdmin: false,
     });
+    try {
+      await issuePersonalWelcomeVoucher(user);
+    } catch (voucherError) {
+      console.error(
+        "[UserService] Không thể cấp voucher chào mừng (Google):",
+        voucherError?.message || voucherError,
+      );
+    }
   } else if (!user.googleId) {
     user.googleId = googleId;
     user.avatar = avatar;
@@ -278,6 +339,7 @@ const updateUser = async (id, payload) => {
     isAdmin,
     isStaff,
     isBanned,
+    banReason,
     // cho phép gửi thẳng role nếu frontend có (dự phòng)
     role: requestedRole,
     ...rest
@@ -297,6 +359,15 @@ const updateUser = async (id, payload) => {
 
   // Map isBanned -> isActive
   if (typeof isBanned === "boolean") {
+    if (isBanned) {
+      const reason = String(banReason || "").trim();
+      if (reason.length < 5) {
+        throw { status: 422, message: "Lý do khóa tài khoản tối thiểu 5 ký tự" };
+      }
+      updateData.banReason = reason;
+    } else {
+      updateData.banReason = "";
+    }
     updateData.isActive = !isBanned;
   }
 

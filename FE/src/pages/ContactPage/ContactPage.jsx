@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { createContact } from "../../api";
 
 const inputClass =
   "w-full rounded-2xl border border-neutral-200 bg-neutral-50/80 px-5 py-3.5 text-sm font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-convot-sage focus:bg-white focus:ring-2 focus:ring-convot-sage/15";
@@ -8,6 +9,68 @@ const infoCard =
   "flex gap-4 rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-sm transition hover:border-convot-sage/30 hover:shadow-md";
 
 const ContactPage = () => {
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    subject: "",
+    message: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState({ type: "", text: "" });
+
+  const onChangeField = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    if (submitting) return;
+    setFeedback({ type: "", text: "" });
+
+    const payload = {
+      name: String(form.name || "").trim(),
+      email: String(form.email || "").trim(),
+      subject: String(form.subject || "").trim(),
+      message: String(form.message || "").trim(),
+    };
+
+    if (!payload.name || !payload.email || !payload.subject || !payload.message) {
+      setFeedback({
+        type: "error",
+        text: "Vui lòng nhập đầy đủ họ tên, email, tiêu đề và nội dung.",
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await createContact(payload);
+      const autoReplySent = Boolean(res?.autoReplySent);
+      setFeedback(
+        autoReplySent
+          ? {
+              type: "success",
+              text: "Đã gửi tin nhắn thành công. Kiểm tra email để nhận xác nhận từ SneakerConverse.",
+            }
+          : {
+              type: "success",
+              text: `Đã gửi liên hệ thành công. Email xác nhận chưa gửi được: ${
+                res?.autoReplyReason || "SMTP chưa cấu hình hoặc cấu hình chưa đúng."
+              }`,
+            },
+      );
+      setForm({ name: "", email: "", subject: "", message: "" });
+    } catch (error) {
+      setFeedback({
+        type: "error",
+        text: error?.response?.data?.message || "Không gửi được liên hệ. Vui lòng thử lại.",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-convot-cream pb-16 pt-8 font-body text-neutral-800 md:pt-12">
       <div className="container mx-auto max-w-7xl px-4">
@@ -47,7 +110,7 @@ const ContactPage = () => {
                 Điền form bên dưới — chúng tôi sẽ liên hệ qua email hoặc điện thoại bạn đã nhập.
               </p>
 
-              <form className="mt-8 space-y-5" onSubmit={(e) => e.preventDefault()}>
+              <form className="mt-8 space-y-5" onSubmit={onSubmit}>
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                   <div className="space-y-2">
                     <label htmlFor="contact-name" className="text-sm font-bold text-neutral-700">
@@ -60,6 +123,8 @@ const ContactPage = () => {
                       placeholder="Nguyễn Văn A"
                       autoComplete="name"
                       className={inputClass}
+                      value={form.name}
+                      onChange={onChangeField}
                     />
                   </div>
                   <div className="space-y-2">
@@ -73,6 +138,8 @@ const ContactPage = () => {
                       placeholder="ban@email.com"
                       autoComplete="email"
                       className={inputClass}
+                      value={form.email}
+                      onChange={onChangeField}
                     />
                   </div>
                 </div>
@@ -87,6 +154,8 @@ const ContactPage = () => {
                     name="subject"
                     placeholder="Ví dụ: Hỏi về đơn hàng, đổi size…"
                     className={inputClass}
+                    value={form.subject}
+                    onChange={onChangeField}
                   />
                 </div>
 
@@ -100,15 +169,28 @@ const ContactPage = () => {
                     rows={5}
                     placeholder="Nhập chi tiết nội dung cần hỗ trợ…"
                     className={`${inputClass} resize-none`}
+                    value={form.message}
+                    onChange={onChangeField}
                   />
                 </div>
 
+                {feedback.text ? (
+                  <p
+                    className={`text-sm font-medium ${
+                      feedback.type === "error" ? "text-red-600" : "text-emerald-700"
+                    }`}
+                  >
+                    {feedback.text}
+                  </p>
+                ) : null}
+
                 <button
                   type="submit"
+                  disabled={submitting}
                   className="inline-flex h-12 items-center gap-2 rounded-full bg-convot-sage px-8 text-sm font-bold text-white shadow-md transition hover:bg-[#7a9680]"
                 >
                   <span className="material-symbols-outlined text-[20px]">send</span>
-                  Gửi lời nhắn
+                  {submitting ? "Đang gửi..." : "Gửi lời nhắn"}
                 </button>
               </form>
             </div>

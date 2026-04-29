@@ -1,70 +1,113 @@
 import React from "react";
-import { Table, Button, Tag } from "antd";
+import { Table, Button, Select } from "antd";
 import { useQuery } from "@tanstack/react-query";
-import { adminListTopupTransactions } from "../api/index";
+import {
+  adminListTopupTransactions,
+  adminListWalletTransactions,
+} from "../api/index";
 
-const formatMoney = (v) => `${Number(v || 0).toLocaleString("vi-VN")}đ`;
-
-const shortId = (v) => String(v || "").slice(-8).toUpperCase();
-
-const txTypeLabel = (type) => {
-  switch (type) {
-    case "topup_vnpay":
-      return "Nạp ví qua VNPay";
-    case "topup_bank":
-      return "Nạp ví chuyển khoản";
-    case "order_payment":
-      return "Thanh toán đơn hàng";
-    case "order_cancel_refund":
-      return "Hoàn ví do hủy đơn";
-    case "order_line_cancel_refund":
-      return "Hoàn ví do hủy dòng hàng";
-    case "return_refund":
-      return "Hoàn tiền hoàn hàng";
-    default:
-      return "Giao dịch ví";
-  }
-};
-
-const methodLabel = (row) => {
-  const method = row?.topUpId?.method;
-  if (method === "vnpay") return "VNPay";
-  if (method === "bank_transfer") return "Chuyển khoản";
-  if (row?.type === "order_payment") {
-    const paymentMethod = String(row?.orderId?.paymentMethod || "").toLowerCase();
-    if (paymentMethod === "wallet") return "Thanh toán bằng ví";
-    if (paymentMethod === "vnpay") return "Thanh toán VNPay";
-    if (paymentMethod === "cod") return "Thanh toán COD";
-  }
-  return "Hệ thống ví";
-};
-
-const purposeLabel = (row) => {
-  const oid = row?.orderId?._id || row?.orderId;
-  if (row?.type === "order_payment" && oid) {
-    return `Thanh toán cho đơn #${shortId(oid)}`;
-  }
-  if (
-    (row?.type === "order_cancel_refund" ||
-      row?.type === "order_line_cancel_refund" ||
-      row?.type === "return_refund") &&
-    oid
-  ) {
-    return `Hoàn tiền liên quan đơn #${shortId(oid)}`;
-  }
-  if (row?.type === "topup_vnpay" || row?.type === "topup_bank") {
-    return "Cộng số dư ví người dùng";
-  }
-  return row?.note || "Giao dịch ví";
+const QUERY_KEY = ["admin-wallet-transactions"];
+const typeStyle = (type) => {
+  const map = {
+    topup_vnpay: {
+      text: "Nạp tiền VNPay",
+      textColor: "#389e0d",
+      bg: "#f6ffed",
+      border: "#95de64",
+    },
+    return_refund: {
+      text: "Hoàn hàng / hoàn tiền",
+      textColor: "#1677ff",
+      bg: "#e6f4ff",
+      border: "#91caff",
+    },
+    order_cancel_refund: {
+      text: "Hoàn ví do hủy đơn",
+      textColor: "#1677ff",
+      bg: "#e6f4ff",
+      border: "#91caff",
+    },
+    order_line_cancel_refund: {
+      text: "Hoàn ví do hủy dòng đơn",
+      textColor: "#1677ff",
+      bg: "#e6f4ff",
+      border: "#91caff",
+    },
+  };
+  return map[type] || { text: type || "—", textColor: "#475569", bg: "#fafafa", border: "#d9d9d9" };
 };
 
 const WalletTopups = () => {
+  const [typeFilter, setTypeFilter] = React.useState("all");
+
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["admin-wallet-topup-transactions"],
-    queryFn: () => adminListTopupTransactions(1, 100),
+    queryKey: QUERY_KEY,
+    queryFn: async () => {
+      const [topupsRes, txRes] = await Promise.all([
+        adminListTopupTransactions(1, 100),
+        adminListWalletTransactions(1, 100),
+      ]);
+      return {
+        topups: Array.isArray(topupsRes?.data) ? topupsRes.data : [],
+        tx: Array.isArray(txRes?.data) ? txRes.data : [],
+      };
+    },
   });
 
-  const rows = data?.data || [];
+  const allRows = React.useMemo(() => {
+    const txRows = (Array.isArray(data?.tx) ? data.tx : []).map((row) => ({
+      ...row,
+      _rowId: `tx-${row._id}`,
+      _source: "tx",
+    }));
+    const txTopupIds = new Set(
+      txRows
+        .map((row) => row?.topUpId)
+        .filter(Boolean)
+        .map((id) => String(id)),
+    );
+    const topupRows = (Array.isArray(data?.topups) ? data.topups : [])
+      .filter((row) => row?.method === "vnpay")
+      .filter((row) => {
+        const topupId = String(row?._id || "");
+        // Nếu đã có bản ghi WalletTransaction cho topup này thì ưu tiên bản ghi tx để tránh trùng.
+        return !txTopupIds.has(topupId);
+      })
+      .map((row) => ({
+        ...row,
+        _rowId: `topup-${row._id}`,
+        _source: "topup",
+        type: "topup_vnpay",
+        note: row?.status === "completed" ? "Nạp tiền VNPay" : "Yêu cầu nạp VNPay",
+      }));
+    const list = [...txRows, ...topupRows].sort(
+      (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
+    );
+    return list;
+  }, [data?.tx, data?.topups]);
+
+  const filteredRows = React.useMemo(() => {
+    return allRows.filter((row) => {
+      const matchType = typeFilter === "all" || row.type === typeFilter;
+      return matchType;
+    });
+  }, [allRows, typeFilter]);
+
+  const stats = React.useMemo(() => {
+    const topupCount = allRows.filter((r) => r.type === "topup_vnpay").length;
+    const refundCount = allRows.filter((r) =>
+      ["return_refund", "order_cancel_refund", "order_line_cancel_refund"].includes(r.type),
+    ).length;
+    const pendingCount = allRows.filter(
+      (r) => r._source === "topup" && r.status !== "completed",
+    ).length;
+    return {
+      total: allRows.length,
+      topupCount,
+      refundCount,
+      pendingCount,
+    };
+  }, [allRows]);
 
   const columns = [
     {
@@ -84,67 +127,67 @@ const WalletTopups = () => {
       },
     },
     {
+      title: "Loại giao dịch",
+      dataIndex: "type",
+      width: 220,
+      render: (type) => {
+        const item = typeStyle(type);
+        return (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              padding: "2px 10px",
+              borderRadius: 999,
+              border: `1px solid ${item.border}`,
+              background: item.bg,
+              color: item.textColor,
+              fontWeight: 600,
+              fontSize: 12,
+              lineHeight: "18px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {item.text}
+          </span>
+        );
+      },
+    },
+    {
       title: "Số tiền",
       dataIndex: "amount",
       width: 140,
-      render: (v) => <span style={{ fontWeight: 700 }}>{formatMoney(v)}</span>,
-    },
-    {
-      title: "Loại giao dịch",
-      dataIndex: "type",
-      width: 190,
-      render: (v) => {
-        const color =
-          v === "order_payment" ? "volcano" : v?.includes("refund") ? "green" : "gold";
-        return <Tag color={color}>{txTypeLabel(v)}</Tag>;
-      },
-    },
-    {
-      title: "Phương thức",
-      width: 170,
-      render: (_, r) => methodLabel(r),
-    },
-    {
-      title: "Mục đích / Thanh toán cho",
-      key: "purpose",
-      render: (_, r) => (
-        <div style={{ lineHeight: 1.35 }}>
-          <div style={{ fontWeight: 600, color: "#0f172a" }}>{purposeLabel(r)}</div>
-          {r?.orderId?._id ? (
-            <div style={{ fontSize: 12, color: "#64748b" }}>
-              Trạng thái đơn: {r?.orderId?.status || "—"}
-            </div>
-          ) : null}
-        </div>
+      render: (v) => (
+        <span style={{ fontWeight: 700 }}>
+          {`${Number(v || 0).toLocaleString("vi-VN")}đ`}
+        </span>
       ),
     },
     {
-      title: "Nội dung CK",
-      key: "referenceCode",
+      title: "Nội dung",
+      key: "note",
       render: (_, r) => (
         <code style={{ fontSize: 12, background: "#f1f5f9", padding: "2px 6px" }}>
-          {r?.topUpId?.referenceCode || "—"}
+          {r?.note
+            || (r?.orderId?._id ? `Order #${String(r.orderId._id).slice(-6).toUpperCase()}` : "—")}
         </code>
       ),
-    },
-    {
-      title: "Trạng thái",
-      key: "status",
-      width: 130,
-      render: (_, r) => {
-        const status = r?.topUpId?.status;
-        if (!status || status === "completed") return <Tag color="green">Thành công</Tag>;
-        if (status === "pending" || status === "awaiting_admin") {
-          return <Tag color="orange">Đang xử lý</Tag>;
-        }
-        return <Tag color="red">{status}</Tag>;
-      },
     },
     {
       title: "Thời gian",
       dataIndex: "createdAt",
       width: 180,
       render: (d) => (d ? new Date(d).toLocaleString("vi-VN") : "—"),
+    },
+    {
+      title: "Kết quả",
+      key: "result",
+      width: 160,
+      render: (_, r) => (
+        <span style={{ color: "#64748b", fontSize: 12 }}>
+          {r?._source === "topup" ? (r?.status === "completed" ? "Đã cộng ví" : "Đang xử lý") : "Đã cộng ví"}
+        </span>
+      ),
     },
   ];
 
@@ -161,9 +204,11 @@ const WalletTopups = () => {
         }}
       >
         <div>
-          <h2 style={{ margin: 0, fontWeight: 800, color: "#0f172a" }}>Lịch sử giao dịch ví</h2>
+          <h2 style={{ margin: 0, fontWeight: 800, color: "#0f172a" }}>
+            Lịch sử giao dịch ví
+          </h2>
           <p style={{ color: "#64748b", margin: "6px 0 0", fontSize: 13 }}>
-            Hiển thị cả nạp ví, thanh toán đơn bằng ví và các giao dịch hoàn tiền.
+            Bao gồm nạp VNPay và các giao dịch hoàn tiền/hoàn hàng.
           </p>
         </div>
         <Button onClick={() => refetch()} type="primary">
@@ -172,9 +217,74 @@ const WalletTopups = () => {
       </div>
       {isError ? (
         <p style={{ color: "#dc2626", marginBottom: 12, fontSize: 13 }}>
-          Không tải được giao dịch nạp ví: {error?.response?.data?.message || error?.message || "Lỗi không xác định"}.
+          Không tải được dữ liệu:{" "}
+          {error?.response?.data?.message || error?.message || "Lỗi không xác định"}.
         </p>
       ) : null}
+      <div
+        style={{
+          marginBottom: 16,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: 12,
+        }}
+      >
+        {[
+          { label: "Tổng giao dịch", value: stats.total },
+          { label: "Nạp VNPay", value: stats.topupCount },
+          { label: "Hoàn tiền/hoàn hàng", value: stats.refundCount },
+          { label: "Đang xử lý", value: stats.pendingCount },
+        ].map((item) => (
+          <div
+            key={item.label}
+            style={{
+              background: "#fff",
+              borderRadius: 14,
+              border: "1px solid #e2e8f0",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              padding: "12px 14px",
+            }}
+          >
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>{item.label}</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", lineHeight: 1 }}>
+              {item.value}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div
+        style={{
+          marginBottom: 16,
+          display: "flex",
+          gap: 12,
+          flexWrap: "wrap",
+          alignItems: "end",
+        }}
+      >
+        <div style={{ minWidth: 220 }}>
+          <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>Loại giao dịch</div>
+          <Select
+            value={typeFilter}
+            onChange={setTypeFilter}
+            style={{ width: "100%" }}
+            options={[
+              { value: "all", label: "Tất cả giao dịch" },
+              { value: "topup_vnpay", label: "Nạp VNPay" },
+              { value: "return_refund", label: "Hoàn hàng/hoàn tiền" },
+              { value: "order_cancel_refund", label: "Hoàn ví do hủy đơn" },
+              { value: "order_line_cancel_refund", label: "Hoàn ví do hủy dòng đơn" },
+            ]}
+          />
+        </div>
+        <Button
+          type="default"
+          onClick={() => {
+            setTypeFilter("all");
+          }}
+        >
+          Xóa lọc
+        </Button>
+      </div>
       <div
         style={{
           background: "#fff",
@@ -185,12 +295,12 @@ const WalletTopups = () => {
         }}
       >
         <Table
-          rowKey="_id"
+          rowKey="_rowId"
           loading={isLoading}
           columns={columns}
-          dataSource={rows}
+          dataSource={filteredRows}
           pagination={{ pageSize: 15 }}
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1100 }}
         />
       </div>
     </div>

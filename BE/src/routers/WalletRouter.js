@@ -24,11 +24,36 @@ router.post(
   authMiddleware,
   walletTopUpController.createVnpayTopupUrl,
 );
+router.post(
+  "/topup/bank",
+  authMiddleware,
+  walletTopUpController.createBankTopupRequest,
+);
+router.post(
+  "/topup/bank/:id/mark-sent",
+  authMiddleware,
+  walletTopUpController.markBankTopupSent,
+);
 router.get("/topups", authMiddleware, walletTopUpController.listMyTopups);
 router.get(
   "/admin/topups/transactions",
   authAdminMiddleware,
   walletTopUpController.adminListTopupTransactions,
+);
+router.get(
+  "/admin/transactions",
+  authAdminMiddleware,
+  walletTopUpController.adminListWalletTransactions,
+);
+router.post(
+  "/admin/topups/bank/:id/confirm",
+  authAdminMiddleware,
+  walletTopUpController.adminConfirmBankTopup,
+);
+router.post(
+  "/admin/topups/bank/:id/reject",
+  authAdminMiddleware,
+  walletTopUpController.adminRejectBankTopup,
 );
 
 module.exports = router;

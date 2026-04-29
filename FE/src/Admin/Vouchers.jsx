@@ -1,6 +1,28 @@
 import React, { useState, useMemo } from "react";
-import { Table, Button, Modal, Form, Input, InputNumber, DatePicker, Select, message, Space, Row, Col, Checkbox } from "antd";
+import {
+  Table,
+  Button,
+  Modal,
+  Form,
+  Input,
+  InputNumber,
+  DatePicker,
+  Select,
+  message,
+  Space,
+  Row,
+  Col,
+  Checkbox,
+  Tag,
+  Tooltip,
+} from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  GiftOutlined,
+} from "@ant-design/icons";
 import {
   getAllVouchers,
   createVoucher,
@@ -9,6 +31,18 @@ import {
   getAllProducts,
 } from "../api/index";
 import dayjs from "dayjs";
+
+const T = {
+  primary: "#D97706",
+  primarySoft: "rgba(217,119,6,0.10)",
+  primaryStrong: "#B45309",
+  text: "#0F172A",
+  textMuted: "#64748B",
+  border: "#E2E8F0",
+  bg: "#F6F8FC",
+  card: "#ffffff",
+  dark: "#111827",
+};
 
 export default function Vouchers() {
   const queryClient = useQueryClient();
@@ -27,6 +61,8 @@ export default function Vouchers() {
   });
 
   const list = data?.data ?? (Array.isArray(data) ? data : []);
+  const totalVouchers = list.length;
+  const latestVoucher = useMemo(() => list?.[0]?.code || "Chưa có", [list]);
   const productList = Array.isArray(productData?.data)
     ? productData.data
     : Array.isArray(productData?.data?.data)
@@ -133,7 +169,26 @@ export default function Vouchers() {
   };
 
   const columns = [
-    { title: "Mã", dataIndex: "code", key: "code", width: 120 },
+    {
+      title: "Mã",
+      dataIndex: "code",
+      key: "code",
+      width: 130,
+      render: (value) => (
+        <Tag
+          style={{
+            marginRight: 0,
+            borderRadius: 999,
+            borderColor: "#FDE68A",
+            background: T.primarySoft,
+            color: "#92400E",
+            fontWeight: 700,
+          }}
+        >
+          {value}
+        </Tag>
+      ),
+    },
     { title: "Mô tả", dataIndex: "description", key: "description", ellipsis: true },
     {
       title: "Giảm giá",
@@ -183,42 +238,152 @@ export default function Vouchers() {
     {
       title: "Thao tác",
       key: "action",
-      width: 120,
+      width: 140,
       render: (_, record) => (
-        <>
-          <Button type="link" size="small" onClick={() => openEdit(record)}>
-            Sửa
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            danger
-            onClick={() => {
-              if (window.confirm("Xóa voucher này?"))
-                deleteMutation.mutate(record._id);
-            }}
-          >
-            Xóa
-          </Button>
-        </>
+        <Space size={6}>
+          <Tooltip title="Chỉnh sửa voucher">
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => openEdit(record)}
+              style={{ borderRadius: 8, borderColor: "#D1D5DB", color: "#334155" }}
+            />
+          </Tooltip>
+          <Tooltip title="Xóa voucher">
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              style={{ borderRadius: 8 }}
+              onClick={() => {
+                if (window.confirm("Xóa voucher này?")) deleteMutation.mutate(record._id);
+              }}
+            />
+          </Tooltip>
+        </Space>
       ),
     },
   ];
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 style={{ margin: 0 }}>Quản lý Voucher</h2>
-        <Button type="primary" onClick={openCreate}>
-          Thêm voucher
-        </Button>
+    <div
+      style={{
+        padding: 24,
+        background: T.bg,
+        minHeight: "100%",
+        fontFamily: "'Plus Jakarta Sans', sans-serif",
+      }}
+    >
+      <div
+        style={{
+          background: T.card,
+          border: "1px solid rgba(148, 163, 184, 0.25)",
+          borderRadius: 20,
+          padding: 22,
+          marginBottom: 18,
+          boxShadow: "0 12px 30px rgba(15, 23, 42, 0.05)",
+          backgroundImage:
+            "radial-gradient(circle at 100% -10%, rgba(253, 230, 138, 0.35) 0%, rgba(255, 255, 255, 0) 40%)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 16,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <h2
+              style={{
+                margin: 0,
+                color: T.dark,
+                fontSize: 26,
+                lineHeight: 1.2,
+                letterSpacing: "-0.01em",
+              }}
+            >
+              Quản lý Voucher
+            </h2>
+            <p style={{ margin: "8px 0 0", color: T.textMuted, fontSize: 14 }}>
+              Quản lý mã ưu đãi và phạm vi áp dụng cho đơn hàng
+            </p>
+          </div>
+          <Button
+            type="primary"
+            onClick={openCreate}
+            icon={<PlusOutlined />}
+            style={{
+              borderRadius: 999,
+              fontWeight: 700,
+              background: T.primary,
+              borderColor: T.primary,
+              height: 42,
+              paddingInline: 18,
+              boxShadow: "0 10px 20px rgba(217,119,6,0.32)",
+            }}
+          >
+            Thêm voucher
+          </Button>
+        </div>
+        <div style={{ marginTop: 16, display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div
+            style={{
+              minWidth: 165,
+              borderRadius: 14,
+              border: "1px solid rgba(245,158,11,0.45)",
+              background: T.primarySoft,
+              color: "#92400E",
+              padding: "10px 12px",
+            }}
+          >
+            <div style={{ fontSize: 12, opacity: 0.85 }}>Tổng voucher</div>
+            <div style={{ marginTop: 2, fontSize: 20, fontWeight: 800 }}>{totalVouchers}</div>
+          </div>
+          <div
+            style={{
+              minWidth: 190,
+              borderRadius: 14,
+              border: `1px solid ${T.border}`,
+              background: "#FFFFFF",
+              color: T.textMuted,
+              padding: "10px 12px",
+            }}
+          >
+            <div style={{ fontSize: 12 }}>Mới nhất</div>
+            <div style={{ marginTop: 2, fontSize: 18, fontWeight: 700, color: T.text }}>
+              {latestVoucher}
+            </div>
+          </div>
+        </div>
       </div>
-      <Table
-        rowKey="_id"
-        loading={isLoading}
-        dataSource={list}
-        columns={columns}
-      />
+      <div
+        style={{
+          background: T.card,
+          border: "1px solid rgba(148, 163, 184, 0.25)",
+          borderRadius: 18,
+          overflow: "hidden",
+          boxShadow: "0 10px 24px rgba(15, 23, 42, 0.05)",
+        }}
+      >
+        <Table
+          rowKey="_id"
+          loading={isLoading}
+          dataSource={list}
+          columns={columns}
+          locale={{
+            emptyText: (
+              <div style={{ padding: "28px 0", color: T.textMuted }}>
+                <GiftOutlined style={{ fontSize: 20, marginBottom: 8 }} />
+                <div>Chưa có voucher nào. Bắt đầu bằng cách thêm voucher đầu tiên.</div>
+              </div>
+            ),
+          }}
+          style={{ background: "#fff" }}
+        />
+      </div>
       <Modal
         title={editingId ? "Sửa voucher" : "Thêm voucher"}
         open={modalOpen}
@@ -230,6 +395,14 @@ export default function Vouchers() {
           setProductSearch("");
         }}
         footer={null}
+        centered
+        styles={{
+          content: { borderRadius: 18, overflow: "hidden", border: "1px solid rgba(148, 163, 184, 0.25)" },
+          header: {
+            background: "linear-gradient(180deg, rgba(251,191,36,0.12), rgba(255,255,255,1))",
+            paddingBottom: 14,
+          },
+        }}
       >
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item name="code" label="Mã" rules={[{ required: true }]}>
@@ -378,7 +551,12 @@ export default function Vouchers() {
             <Select options={[{ value: "active", label: "Hoạt động" }, { value: "inactive", label: "Tạm tắt" }]} />
           </Form.Item>
           <Form.Item>
-            <Button type="primary" htmlType="submit" loading={createMutation.isPending || updateMutation.isPending}>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={createMutation.isPending || updateMutation.isPending}
+              style={{ borderRadius: 10, fontWeight: 700, background: T.primary, borderColor: T.primaryStrong }}
+            >
               {editingId ? "Cập nhật" : "Tạo"}
             </Button>
           </Form.Item>

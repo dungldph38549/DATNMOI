@@ -65,11 +65,10 @@ walletTopUpSchema.statics.generateReferenceCode = function generateReferenceCode
   return `NAP${random}`;
 };
 
-walletTopUpSchema.pre("validate", function autoReferenceCode(next) {
+walletTopUpSchema.pre("validate", function autoReferenceCode() {
   if (this.method === "bank_transfer" && !String(this.referenceCode || "").trim()) {
     this.referenceCode = this.constructor.generateReferenceCode(this.userId);
   }
-  next();
 });
 
 module.exports = mongoose.model("WalletTopUp", walletTopUpSchema);

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { FaHeart, FaShoppingCart, FaTrash, FaArrowRight, FaTimes } from "react-icons/fa";
@@ -11,6 +11,7 @@ import { isProductOutOfStock } from "../../utils/stock.js";
 const WishlistPage = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
+    const [theme, setTheme] = useState("sporty");
     const items = useSelector((state) => state.wishlist.items || []);
     const cartItems = useSelector((state) => state.cart.items || []);
     const user = useSelector((state) => state.user);
@@ -107,135 +108,179 @@ const WishlistPage = () => {
         }));
     };
 
+    const isSporty = theme === "sporty";
+
     return (
-        <div className="min-h-screen bg-[#f7f6f3] font-body pt-12 pb-16">
-            <div className="container mx-auto px-4 max-w-7xl">
-                <section className="mb-10">
-                    <div className="flex items-start justify-between gap-4">
+        <div
+            className={`min-h-screen font-body pb-16 pt-10 md:pt-12 ${
+                isSporty
+                    ? "bg-gradient-to-b from-[#090909] via-[#111111] to-[#161616]"
+                    : "bg-gradient-to-b from-[#fbf8f2] via-[#f8f5ee] to-[#f6f2ea]"
+            }`}
+        >
+            <div className="container mx-auto max-w-7xl px-4">
+                <section
+                    className={`mb-8 rounded-3xl p-6 md:p-8 ${
+                        isSporty
+                            ? "border border-[#2e2e2e] bg-gradient-to-r from-[#131313] via-[#191919] to-[#202020] text-white shadow-[0_16px_45px_rgba(0,0,0,0.45)]"
+                            : "border border-[#e8dcc8] bg-[#fffdf9] text-neutral-900 shadow-[0_12px_38px_rgba(68,51,24,0.08)]"
+                    }`}
+                >
+                    <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
                         <div className="max-w-3xl">
-                            <h1 className="font-display text-3xl font-bold leading-[1.15] tracking-tight text-black md:text-5xl lg:text-[2.75rem] mb-3">
-                                SẢN PHẨM YÊU THÍCH.
+                            <span
+                                className={`mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${
+                                    isSporty
+                                        ? "border border-[#3a3a3a] bg-[#1b1b1b] text-[#ff6b6b]"
+                                        : "border border-[#e8dcc8] bg-[#fdf4e6] text-[#8b6a32]"
+                                }`}
+                            >
+                                <FaHeart size={10} className={isSporty ? "text-[#ff4d4f]" : "text-[#b88a3b]"} />
+                                Danh sách yêu thích
+                            </span>
+                            <h1 className={`font-display text-3xl font-bold leading-tight md:text-5xl ${isSporty ? "text-white" : "text-[#2a2116]"}`}>
+                                Bộ sưu tập của bạn
                             </h1>
-                            <p className="mt-1 max-w-2xl text-sm md:text-sm text-neutral-600">
-                                Nơi lưu giữ những thiết kế làm đắc của bạn. Danh sách được cá nhân hóa dựa trên gu thẩm mỹ và những lựa chọn tinh tuyển từ các bộ sưu tập mới nhất.
+                            <p className={`mt-3 max-w-2xl text-sm leading-relaxed md:text-[15px] ${isSporty ? "text-neutral-300" : "text-[#6c5a3d]"}`}>
+                                Lưu lại những đôi giày bạn muốn sở hữu. Tất cả sản phẩm được sắp xếp để bạn thêm vào giỏ nhanh hơn.
                             </p>
                         </div>
-                        {items.length > 0 && (
-                            <button
-                                onClick={() => dispatch(clearWishlist())}
-                                className="shrink-0 mt-1 text-sm text-neutral-500 hover:text-neutral-900 transition-colors inline-flex items-center gap-2"
-                            >
-                                <FaTrash size={12} />
-                                Xóa tất cả
-                            </button>
-                        )}
+
+                        <div className="flex flex-wrap items-center gap-3">
+                            <div className={`rounded-2xl px-4 py-3 ${isSporty ? "border border-[#3a3a3a] bg-[#1a1a1a]" : "border border-[#e8dcc8] bg-[#fff8ee]"}`}>
+                                <p className={`text-[11px] uppercase tracking-[0.12em] ${isSporty ? "text-[#ff8585]" : "text-[#8b6a32]"}`}>Tổng mục</p>
+                                <p className={`mt-1 text-2xl font-semibold ${isSporty ? "text-white" : "text-[#2a2116]"}`}>{items.length}</p>
+                            </div>
+                            <div className={`inline-flex rounded-xl p-1 ${isSporty ? "border border-[#353535] bg-[#1b1b1b]" : "border border-[#e8dcc8] bg-[#f8f2e8]"}`}>
+                                <button
+                                    onClick={() => setTheme("luxury")}
+                                    className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${!isSporty ? "bg-white text-[#2a2116] shadow-sm" : "text-neutral-300 hover:text-white"}`}
+                                >
+                                    Luxury
+                                </button>
+                                <button
+                                    onClick={() => setTheme("sporty")}
+                                    className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${isSporty ? "bg-[#ff3b30] text-white" : "text-[#6c5a3d] hover:text-[#2a2116]"}`}
+                                >
+                                    Sporty
+                                </button>
+                            </div>
+                            {items.length > 0 && (
+                                <button
+                                    onClick={() => dispatch(clearWishlist())}
+                                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm transition-colors ${
+                                        isSporty
+                                            ? "border border-[#4a2a2a] bg-[#2a1717] text-[#ffb5b5] hover:bg-[#3a1d1d] hover:text-white"
+                                            : "border border-[#e8dcc8] bg-white text-[#6c5a3d] hover:bg-[#fff8ee] hover:text-[#2a2116]"
+                                    }`}
+                                >
+                                    <FaTrash size={12} />
+                                    Xóa tất cả
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </section>
 
                 {items.length === 0 ? (
-                    <div className="bg-white rounded-3xl border border-neutral-200 p-16 text-center">
-                        <div className="w-20 h-20 rounded-full bg-neutral-100 mx-auto flex items-center justify-center mb-6">
-                            <FaHeart className="text-neutral-400 text-3xl" />
+                    <div className={`rounded-3xl p-14 text-center ${isSporty ? "border border-[#2f2f2f] bg-[#151515] shadow-[0_12px_32px_rgba(0,0,0,0.45)]" : "border border-[#e8dcc8] bg-[#fffdf9] shadow-[0_10px_30px_rgba(68,51,24,0.08)]"}`}>
+                        <div className={`mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full ${isSporty ? "bg-[#231414]" : "bg-[#fbf2e2]"}`}>
+                            <FaHeart className={`text-3xl ${isSporty ? "text-[#ff6b6b]" : "text-[#b88a3b]"}`} />
                         </div>
-                        <h2 className="text-2xl font-black text-neutral-900 mb-3">Danh sách yêu thích trống</h2>
-                        <p className="text-neutral-500 mb-8 max-w-xl mx-auto">
+                        <h2 className={`mb-3 text-2xl font-black ${isSporty ? "text-white" : "text-[#2a2116]"}`}>Danh sách yêu thích trống</h2>
+                        <p className={`mx-auto mb-8 max-w-xl ${isSporty ? "text-neutral-300" : "text-[#6c5a3d]"}`}>
                             Bạn chưa có sản phẩm nào trong danh sách yêu thích. Khám phá bộ sưu tập mới và lưu lại những mẫu bạn muốn sở hữu.
                         </p>
                         <Link
                             to="/product"
-                            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-neutral-900 text-white text-sm font-semibold hover:bg-neutral-700 transition-colors"
+                            className={`inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition-colors ${
+                                isSporty ? "bg-[#ff3b30] hover:bg-[#e73026]" : "bg-[#2a2116] hover:bg-[#453521]"
+                            }`}
                         >
                             Khám phá ngay
                             <FaArrowRight size={12} />
                         </Link>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-12 gap-7">
-                        {items.map((item, index) => {
-                            const isFeature = index === 2;
+                    <div className="grid grid-cols-12 gap-5 md:gap-6">
+                        {items.map((item) => {
                             const outOfStock = isProductOutOfStock(item);
                             return (
-                                <article
-                                    key={item._id}
-                                    className={`group col-span-12 sm:col-span-6 ${isFeature ? "lg:col-span-6" : "lg:col-span-3"}`}
-                                >
-                                    <div className="relative rounded-md overflow-hidden bg-neutral-200">
-                                        <Link to={`/product/${item._id}`} className="block">
-                                            <img
-                                                src={getImageUrl(item.image || item.srcImages?.[0])}
-                                                alt={item.name}
-                                                className={`w-full object-cover transition-transform duration-500 group-hover:scale-[1.02] ${isFeature ? "h-[300px] md:h-[380px]" : "h-[260px] md:h-[300px]"}`}
-                                            />
-                                        </Link>
-                                        {outOfStock && (
-                                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
-                                                <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-black/65 px-3 text-center text-lg font-semibold text-white shadow-lg">
-                                                    Bán hết
-                                                </span>
-                                            </div>
-                                        )}
-
-                                        <button
-                                            onClick={() => handleRemove(item._id)}
-                                            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/85 text-neutral-700 hover:bg-white hover:text-neutral-900 shadow flex items-center justify-center transition-colors"
-                                            aria-label="Xóa khỏi yêu thích"
-                                        >
-                                            <FaTimes size={12} />
-                                        </button>
-
-                                        {isFeature && (
-                                            <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black/75 via-black/35 to-transparent text-white">
-                                                <p className="text-[10px] tracking-[0.2em] uppercase text-white/70 mb-2">Limitless Collection</p>
-                                                <h3 className="text-3xl font-black mb-3 leading-tight line-clamp-2">{item.name}</h3>
-                                                <button
-                                                    onClick={() => handleMoveToCart(item)}
-                                                    className={`px-4 py-2 rounded-full text-xs font-bold inline-flex items-center gap-2 transition-colors ${
-                                                        outOfStock
-                                                            ? "cursor-not-allowed bg-white/60 text-neutral-500"
-                                                            : "bg-white text-neutral-900 hover:bg-neutral-200"
-                                                    }`}
-                                                    disabled={outOfStock}
-                                                >
-                                                    <FaShoppingCart size={12} />
-                                                    {outOfStock ? "Hết hàng" : "Thêm vào giỏ"}
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {!isFeature && (
-                                        <div className="pt-3">
-                                            <Link to={`/product/${item._id}`} className="block font-semibold text-[28px] text-neutral-900 leading-tight line-clamp-2 hover:text-neutral-700 transition-colors">
-                                                {item.name}
+                                <article key={item._id} className="group col-span-12 sm:col-span-6 lg:col-span-4">
+                                    <div
+                                        className={`h-full overflow-hidden rounded-3xl transition-all duration-300 hover:-translate-y-1 ${
+                                            isSporty
+                                                ? "border border-[#2c2c2c] bg-[#161616] shadow-[0_10px_25px_rgba(0,0,0,0.4)] hover:border-[#3a3a3a] hover:shadow-[0_18px_38px_rgba(0,0,0,0.5)]"
+                                                : "border border-[#e8dcc8] bg-[#fffdf9] shadow-[0_8px_22px_rgba(68,51,24,0.08)] hover:shadow-[0_16px_36px_rgba(68,51,24,0.14)]"
+                                        }`}
+                                    >
+                                        <div className={`relative overflow-hidden ${isSporty ? "bg-[#0f0f0f]" : "bg-[#f7f1e6]"}`}>
+                                            <Link to={`/product/${item._id}`} className="block">
+                                                <img
+                                                    src={getImageUrl(item.image || item.srcImages?.[0])}
+                                                    alt={item.name}
+                                                    className="h-[280px] w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+                                                />
                                             </Link>
-                                            <p className="text-xs text-neutral-400 mt-1">
+
+                                            {outOfStock && (
+                                                <span className={`absolute left-3 top-3 rounded-full px-3 py-1 text-xs font-semibold text-white ${isSporty ? "bg-[#b42318]" : "bg-[#2a2116]"}`}>
+                                                    Hết hàng
+                                                </span>
+                                            )}
+
+                                            <button
+                                                onClick={() => handleRemove(item._id)}
+                                                className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full shadow transition-colors ${
+                                                    isSporty
+                                                        ? "bg-black/65 text-neutral-200 hover:bg-black/85 hover:text-white"
+                                                        : "bg-white/90 text-[#6c5a3d] hover:bg-white hover:text-[#2a2116]"
+                                                }`}
+                                                aria-label="Xóa khỏi yêu thích"
+                                            >
+                                                <FaTimes size={12} />
+                                            </button>
+                                        </div>
+
+                                        <div className="p-5">
+                                            <p className={`mb-2 text-[11px] font-medium uppercase tracking-[0.08em] ${isSporty ? "text-[#ff8e8e]" : "text-[#9a7b45]"}`}>
                                                 {item?.category?.name || item?.category || "Lifestyle / Performance"}
                                             </p>
-                                            <div className="flex items-center justify-between mt-3">
-                                                <p className="text-xl font-bold text-neutral-900">
+                                            <Link
+                                                to={`/product/${item._id}`}
+                                                className={`block min-h-[56px] text-2xl font-semibold leading-tight transition-colors line-clamp-2 ${
+                                                    isSporty
+                                                        ? "text-white hover:text-[#ffb3b3]"
+                                                        : "text-[#2a2116] hover:text-[#5b4630]"
+                                                }`}
+                                            >
+                                                {item.name}
+                                            </Link>
+
+                                            <div className="mt-5 flex items-center justify-between gap-3">
+                                                <p className={`text-2xl font-bold ${isSporty ? "text-white" : "text-[#2a2116]"}`}>
                                                     {getDisplayPrice(item)}
                                                 </p>
                                                 <button
                                                     onClick={() => handleMoveToCart(item)}
-                                                    className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
+                                                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
                                                         outOfStock
-                                                            ? "cursor-not-allowed border-neutral-200 text-neutral-300"
-                                                            : "border-neutral-300 text-neutral-800 hover:bg-neutral-900 hover:text-white hover:border-neutral-900"
+                                                            ? (isSporty
+                                                                ? "cursor-not-allowed bg-[#252525] text-[#6f6f6f]"
+                                                                : "cursor-not-allowed bg-[#f2ebdf] text-[#b8a385]")
+                                                            : (isSporty
+                                                                ? "bg-[#ff3b30] text-white hover:bg-[#e73026]"
+                                                                : "bg-[#2a2116] text-white hover:bg-[#453521]")
                                                     }`}
                                                     disabled={outOfStock}
                                                     title="Thêm vào giỏ hàng"
                                                 >
-                                                    <FaShoppingCart size={14} />
+                                                    <FaShoppingCart size={13} />
+                                                    Thêm
                                                 </button>
                                             </div>
                                         </div>
-                                    )}
-
-                                    {isFeature && (
-                                        <p className="text-xl font-bold text-neutral-900 mt-3">
-                                            {getDisplayPrice(item)}
-                                        </p>
-                                    )}
+                                    </div>
                                 </article>
                             );
                         })}

@@ -59,6 +59,24 @@ const normalizeApplicableProductIds = (value) => {
   return Array.from(unique.values());
 };
 
+const normalizeOwnerUserId = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw || !mongoose.Types.ObjectId.isValid(raw)) return null;
+  return new mongoose.Types.ObjectId(raw);
+};
+
+const isAdminOrStaff = (user) => Boolean(user?.isAdmin || user?.isStaff);
+
+const canUserUseVoucher = (voucherDoc, actorUser) => {
+  const ownerId = voucherDoc?.ownerUserId ? String(voucherDoc.ownerUserId) : "";
+  if (!ownerId) return true;
+  if (isAdminOrStaff(actorUser)) return true;
+  if (!actorUser?.id) return false;
+  return String(actorUser.id) === ownerId;
+};
+
+const normalizeSku = (value) => String(value || "").trim().toUpperCase();
+
 const createVoucher = async (newVoucher) => {
   try {
     if (!newVoucher || typeof newVoucher !== "object") {
@@ -77,9 +95,9 @@ const createVoucher = async (newVoucher) => {
       maxDiscountAmount,
       startDate,
       endDate,
-      usageLimit,
       status,
       applicableProductIds,
+      ownerUserId,
     } = newVoucher;
 
     if (!code || discountValue === undefined || !startDate || !endDate) {
@@ -97,10 +115,6 @@ const createVoucher = async (newVoucher) => {
     const numericMaxDiscount =
       maxDiscountAmount !== undefined && maxDiscountAmount !== null
         ? Number(maxDiscountAmount)
-        : 0;
-    const numericUsageLimit =
-      usageLimit !== undefined && usageLimit !== null
-        ? Number(usageLimit)
         : 0;
 
     if (Number.isNaN(numericDiscountValue) || numericDiscountValue < 0) {
@@ -121,13 +135,6 @@ const createVoucher = async (newVoucher) => {
       return {
         status: "ERR",
         message: "maxDiscountAmount must be a non-negative number",
-      };
-    }
-
-    if (Number.isNaN(numericUsageLimit) || numericUsageLimit < 0) {
-      return {
-        status: "ERR",
-        message: "usageLimit must be a non-negative number",
       };
     }
 
@@ -161,9 +168,10 @@ const createVoucher = async (newVoucher) => {
       maxDiscountAmount: numericMaxDiscount,
       startDate,
       endDate,
-      usageLimit: numericUsageLimit,
+      usageLimit: 1,
       status: status || "active",
       applicableProductIds: normalizeApplicableProductIds(applicableProductIds),
+      ownerUserId: normalizeOwnerUserId(ownerUserId),
     });
 
     return {
@@ -176,9 +184,19 @@ const createVoucher = async (newVoucher) => {
   }
 };
 
-const getAllVouchers = async () => {
+const getAllVouchers = async (actorUser = null) => {
   try {
-    const vouchers = await Voucher.find().sort({ createdAt: -1 });
+    const query = isAdminOrStaff(actorUser)
+      ? {}
+      : actorUser?.id
+        ? {
+            $or: [
+              { ownerUserId: null },
+              { ownerUserId: new mongoose.Types.ObjectId(actorUser.id) },
+            ],
+          }
+        : { ownerUserId: null };
+    const vouchers = await Voucher.find(query).sort({ createdAt: -1 });
     return {
       status: "OK",
       message: "SUCCESS",
@@ -189,7 +207,7 @@ const getAllVouchers = async () => {
   }
 };
 
-const getVoucherDetail = async (voucherId) => {
+const getVoucherDetail = async (voucherId, actorUser = null) => {
   try {
     if (!voucherId || !mongoose.Types.ObjectId.isValid(voucherId)) {
       return {
@@ -200,6 +218,12 @@ const getVoucherDetail = async (voucherId) => {
 
     const voucher = await Voucher.findById(voucherId);
     if (!voucher) {
+      return {
+        status: "ERR",
+        message: "Voucher not found",
+      };
+    }
+    if (!canUserUseVoucher(voucher, actorUser)) {
       return {
         status: "ERR",
         message: "Voucher not found",
@@ -216,15 +240,21 @@ const getVoucherDetail = async (voucherId) => {
   }
 };
 
-const previewVoucherDiscount = async (body) => {
+const previewVoucherDiscount = async (body, actorUser = null) => {
   try {
-    const { code, items } = body || {};
+    const { code, items, voucherTarget } = body || {};
     const normalizedCode = String(code || "").trim().toUpperCase();
     if (!normalizedCode) {
       return { status: "ERR", message: "Thiếu mã voucher" };
     }
 
     const lineItems = Array.isArray(items) ? items : [];
+    const normalizedItems = lineItems.map((item) => ({
+      productId: String(item?.productId || item?._id || "").trim(),
+      sku: normalizeSku(item?.sku),
+      price: Number(item?.price) || 0,
+      quantity: Number(item?.quantity ?? item?.qty) || 0,
+    }));
     const computedSubtotal = lineItems.reduce(
       (sum, item) =>
         sum +
@@ -236,6 +266,9 @@ const previewVoucherDiscount = async (body) => {
     const voucherDoc = await Voucher.findOne({ code: normalizedCode });
     if (!voucherDoc) {
       return { status: "ERR", message: "Voucher không tồn tại" };
+    }
+    if (!canUserUseVoucher(voucherDoc, actorUser)) {
+      return { status: "ERR", message: "Voucher này không áp dụng cho tài khoản hiện tại" };
     }
     if (voucherDoc.status !== "active") {
       return { status: "ERR", message: "Voucher không hoạt động" };
@@ -269,9 +302,8 @@ const previewVoucherDiscount = async (body) => {
       };
     }
 
-    const usageLimit = Number(voucherDoc.usageLimit ?? 0);
     const usedCount = Number(voucherDoc.usedCount ?? 0);
-    if (usageLimit !== 0 && usedCount >= usageLimit) {
+    if (usedCount >= 1) {
       return { status: "ERR", message: "Voucher đã hết lượt sử dụng" };
     }
 
@@ -279,6 +311,20 @@ const previewVoucherDiscount = async (body) => {
       ? voucherDoc.applicableProductIds.map((id) => String(id))
       : [];
     const hasProductScope = applicableIds.length > 0;
+
+    const eligibleTargets = normalizedItems
+      .filter((item) => {
+        if (!item.productId || item.quantity <= 0) return false;
+        if (!hasProductScope) return true;
+        return applicableIds.includes(item.productId);
+      })
+      .map((item) => ({
+        productId: item.productId,
+        sku: item.sku || null,
+        quantity: item.quantity,
+        unitPrice: item.price,
+        lineTotal: item.price * item.quantity,
+      }));
 
     const eligibleSubtotal = hasProductScope
       ? lineItems.reduce((sum, item) => {
@@ -299,22 +345,65 @@ const previewVoucherDiscount = async (body) => {
       };
     }
 
-    const discountAmount = computeFinalVoucherDiscountAmount(
-      voucherDoc,
-      eligibleSubtotal,
-    );
+    const isPersonalVoucher = Boolean(voucherDoc.ownerUserId);
+    const selectedTargetProductId = String(voucherTarget?.productId || "").trim();
+    const selectedTargetSku = normalizeSku(voucherTarget?.sku);
+
+    let discountBaseAmount = eligibleSubtotal;
+    let selectedTarget = null;
+
+    if (isPersonalVoucher) {
+      if (!selectedTargetProductId) {
+        return {
+          status: "OK",
+          message: "SUCCESS",
+          data: {
+            discountAmount: 0,
+            requiresProductSelection: true,
+            eligibleTargets,
+          },
+        };
+      }
+
+      selectedTarget =
+        eligibleTargets.find((target) => {
+          if (target.productId !== selectedTargetProductId) return false;
+          if (!selectedTargetSku) return true;
+          return normalizeSku(target.sku) === selectedTargetSku;
+        }) || null;
+
+      if (!selectedTarget) {
+        return {
+          status: "ERR",
+          message: "Sản phẩm chọn áp dụng voucher không hợp lệ",
+        };
+      }
+
+      // Voucher cá nhân chỉ giảm cho 1 đơn vị sản phẩm được chọn.
+      discountBaseAmount = Number(selectedTarget.unitPrice || 0);
+    }
+
+    const discountAmount = computeFinalVoucherDiscountAmount(voucherDoc, discountBaseAmount);
 
     return {
       status: "OK",
       message: "SUCCESS",
-      data: { discountAmount },
+      data: {
+        discountAmount,
+        requiresProductSelection: isPersonalVoucher,
+        isPersonalVoucher,
+        hasProductScope,
+        isWholeOrderVoucher: !isPersonalVoucher && !hasProductScope,
+        eligibleTargets,
+        selectedTarget,
+      },
     };
   } catch (e) {
     return { status: "ERR", message: e.message || "Lỗi tính giảm giá" };
   }
 };
 
-const getVoucherByCode = async (code) => {
+const getVoucherByCode = async (code, actorUser = null) => {
   try {
     const normalizedCode = String(code || "").trim().toUpperCase();
     if (!normalizedCode) {
@@ -326,6 +415,12 @@ const getVoucherByCode = async (code) => {
 
     const voucher = await Voucher.findOne({ code: normalizedCode });
     if (!voucher) {
+      return {
+        status: "ERR",
+        message: "Voucher not found",
+      };
+    }
+    if (!canUserUseVoucher(voucher, actorUser)) {
       return {
         status: "ERR",
         message: "Voucher not found",
@@ -425,16 +520,7 @@ const updateVoucher = async (voucherId, updateData) => {
       payload.maxDiscountAmount = num;
     }
 
-    if (updateData.usageLimit !== undefined) {
-      const num = Number(updateData.usageLimit);
-      if (Number.isNaN(num) || num < 0) {
-        return {
-          status: "ERR",
-          message: "usageLimit must be a non-negative number",
-        };
-      }
-      payload.usageLimit = num;
-    }
+    payload.usageLimit = 1;
 
     if (payload.code) {
       const duplicate = await Voucher.findOne({
