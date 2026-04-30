@@ -8,7 +8,7 @@ import {
 } from "../../api";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 import { FaStar, FaStarHalfAlt, FaShoppingCart, FaCheckCircle, FaShippingFast, FaShieldAlt, FaHeart, FaRegHeart, FaRulerCombined, FaTimes, FaThumbsUp, FaChevronDown } from "react-icons/fa";
-import { getProductPriceInfo } from "../../utils/pricing.js";
+import { getProductPriceInfo, getProductPriceRange } from "../../utils/pricing.js";
 import notify from "../../utils/notify";
 import {
   getOrderStatusLabelForReview,
@@ -886,11 +886,6 @@ const ProductDetail = () => {
             </h1>
 
             <div className="mt-6 flex flex-wrap items-baseline gap-3">
-              {selectedPriceInfo.hasSale && (
-                <span className="text-lg text-neutral-400 line-through">
-                  {Number(selectedPriceInfo.originalPrice).toLocaleString("vi-VN")}đ
-                </span>
-              )}
               <span className="text-3xl font-medium text-convot-charcoal md:text-[2rem]">
                 {Number(displayPrice).toLocaleString("vi-VN")}đ
               </span>
@@ -1353,7 +1348,7 @@ const ProductDetail = () => {
                 <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 md:grid-cols-4">
                   {(relatedProducts || []).slice(0, 8).map((p) => {
                     const img = p?.image || p?.srcImages?.[0] || "";
-                    const priceInfo = getProductPriceInfo(p);
+                    const { minPrice, maxPrice } = getProductPriceRange(p);
                     return (
                       <Link
                         key={p._id}
@@ -1371,7 +1366,9 @@ const ProductDetail = () => {
                           {p.name}
                         </p>
                         <p className="mt-0.5 text-center text-xs text-neutral-500 tabular-nums">
-                          {Number(priceInfo.effectivePrice).toLocaleString("vi-VN")}đ
+                          {minPrice === maxPrice
+                            ? `${Number(minPrice || 0).toLocaleString("vi-VN")}đ`
+                            : `${Number(minPrice || 0).toLocaleString("vi-VN")} - ${Number(maxPrice || 0).toLocaleString("vi-VN")}đ`}
                         </p>
                       </Link>
                     );

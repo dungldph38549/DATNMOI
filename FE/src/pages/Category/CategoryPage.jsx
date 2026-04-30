@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import ProductFilterSidebar from "../../components/ProductFilterSidebar/ProductFilterSidebar";
 import Product from "../../components/Product/Product";
 import { fetchProducts } from "../../api";
+import { getProductPriceRange } from "../../utils/pricing.js";
 
 const CategoryPage = () => {
   const [selectedSize, setSelectedSize] = useState(null);
@@ -49,16 +50,7 @@ const CategoryPage = () => {
   };
 
   const getMinPrice = (p) => {
-    const pr = p?.priceRange;
-    if (pr && (pr.min != null || pr.max != null)) return Number(pr.min ?? 0) || 0;
-    if (typeof p?.price === "number") return p.price;
-    if (Array.isArray(p?.variants) && p.variants.length > 0) {
-      const prices = p.variants
-        .map((v) => Number(v?.price))
-        .filter((n) => Number.isFinite(n));
-      if (prices.length > 0) return Math.min(...prices);
-    }
-    return 0;
+    return Number(getProductPriceRange(p).minPrice || 0);
   };
 
   useEffect(() => {

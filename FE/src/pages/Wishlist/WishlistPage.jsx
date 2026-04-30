@@ -7,6 +7,7 @@ import { addToCart } from "../../redux/cart/cartSlice";
 import notify from "../../utils/notify";
 import { getStocks } from "../../api";
 import { isProductOutOfStock } from "../../utils/stock.js";
+import { getProductPriceRange } from "../../utils/pricing.js";
 
 const WishlistPage = () => {
     const navigate = useNavigate();
@@ -26,26 +27,9 @@ const WishlistPage = () => {
     };
 
     const getDisplayPrice = (p) => {
-        // 1. Price Range
-        const pr = p?.priceRange;
-        if (pr && (pr.min != null || pr.max != null)) {
-            const min = Number(pr.min ?? p?.price ?? 0);
-            return `${min.toLocaleString("vi-VN")}₫`;
-        }
-
-        // 2. Variants
-        if (Array.isArray(p?.variants) && p.variants.length > 0) {
-            const prices = p.variants
-                .map((v) => Number(v?.price))
-                .filter((n) => Number.isFinite(n));
-            if (prices.length > 0) {
-                return `${Math.min(...prices).toLocaleString("vi-VN")}₫`;
-            }
-        }
-
-        // 3. Single Price
-        const single = Number(p?.price || 0);
-        return `${single.toLocaleString("vi-VN")}₫`;
+        const { minPrice, maxPrice } = getProductPriceRange(p);
+        if (minPrice === maxPrice) return `${Number(minPrice || 0).toLocaleString("vi-VN")}₫`;
+        return `${Number(minPrice || 0).toLocaleString("vi-VN")} - ${Number(maxPrice || 0).toLocaleString("vi-VN")}₫`;
     };
 
     const handleRemove = (id) => {
