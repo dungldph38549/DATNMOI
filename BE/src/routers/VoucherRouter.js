@@ -1,21 +1,50 @@
 const express = require("express");
 const router = express.Router();
 const VoucherController = require("../controllers/VoucherController");
-const { optionalAuthMiddleware } = require("../middlewares/authMiddleware");
+const {
+  optionalAuthMiddleware,
+  authAdminMiddleware,
+} = require("../middlewares/authMiddleware");
 
-// POST /api/voucher/create
-router.post("/create", VoucherController.createVoucher);
-// POST /api/voucher/preview — tính tiền giảm (không lộ trần giảm cho client)
-router.post("/preview", optionalAuthMiddleware, VoucherController.previewVoucherDiscount);
-// GET /api/voucher
-router.get("/", optionalAuthMiddleware, VoucherController.getAllVouchers);
-// GET /api/voucher/code/:code
-router.get("/code/:code", optionalAuthMiddleware, VoucherController.getVoucherByCode);
-// GET /api/voucher/:id
-router.get("/:id", optionalAuthMiddleware, VoucherController.getVoucherDetail);
-// PUT /api/voucher/:id
-router.put("/:id", VoucherController.updateVoucher);
-// DELETE /api/voucher/:id
-router.delete("/:id", VoucherController.deleteVoucher);
+// Thứ tự: route tĩnh trước /:id
+router.get(
+  "/admin",
+  authAdminMiddleware,
+  VoucherController.getAllVouchersAdmin,
+);
+router.post(
+  "/apply",
+  optionalAuthMiddleware,
+  VoucherController.applyVoucher,
+);
+router.post(
+  "/preview",
+  optionalAuthMiddleware,
+  VoucherController.previewVoucherDiscount,
+);
+router.post("/", authAdminMiddleware, VoucherController.createVoucher);
+router.post("/create", authAdminMiddleware, VoucherController.createVoucher);
+router.patch(
+  "/:id/toggle",
+  authAdminMiddleware,
+  VoucherController.toggleVoucherActive,
+);
+router.get(
+  "/code/:code",
+  optionalAuthMiddleware,
+  VoucherController.getVoucherByCode,
+);
+router.get(
+  "/",
+  optionalAuthMiddleware,
+  VoucherController.getActiveVouchersPublic,
+);
+router.get(
+  "/:id",
+  optionalAuthMiddleware,
+  VoucherController.getVoucherDetail,
+);
+router.put("/:id", authAdminMiddleware, VoucherController.updateVoucher);
+router.delete("/:id", authAdminMiddleware, VoucherController.deleteVoucher);
 
 module.exports = router;

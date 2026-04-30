@@ -17,8 +17,17 @@ import axiosInstance from "./axiosConfig";
 
 export const addToCartAPI = async (payload) => {
   // Back-end: POST /api/cart/:userId/items
-  // payload: { userId, productId, qty, sku?, size?, color? }
-  const { userId, productId, qty, sku, size, color } = payload || {};
+  const {
+    userId,
+    productId,
+    qty,
+    sku,
+    size,
+    color,
+    image,
+    variantId,
+    colorHex,
+  } = payload || {};
   if (!userId || !productId) throw new Error("Missing userId or productId");
   const res = await axiosInstance.post(`/cart/${userId}/items`, {
     productId,
@@ -26,6 +35,9 @@ export const addToCartAPI = async (payload) => {
     sku: sku ?? null,
     size: size ?? null,
     color: color ?? null,
+    image: image ?? null,
+    variantId: variantId ?? null,
+    colorHex: colorHex ?? null,
   });
   return res.data;
 };
@@ -283,6 +295,42 @@ export const getProductRecommendations = async (productId, limit = 4) => {
 export const getHomeRecommendations = async (limit = 8) => {
   const res = await axiosInstance.get(`/product/recommendations/home?limit=${limit}`);
   return res?.data?.data ?? res?.data ?? [];
+};
+
+/** GET /api/recommend — gợi ý scoring (tab: all | banchay | moi | danhgia | hot) */
+export const fetchRecommendProducts = async ({
+  userId,
+  limit = 10,
+  offset = 0,
+  tab = "all",
+  recentIds = [],
+} = {}) => {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  params.set("offset", String(offset));
+  params.set("tab", String(tab));
+  if (userId) params.set("userId", String(userId));
+  if (Array.isArray(recentIds) && recentIds.length) {
+    params.set("recentIds", recentIds.filter(Boolean).join(","));
+  }
+  const res = await axiosInstance.get(`/recommend?${params.toString()}`);
+  return res.data;
+};
+
+export const fetchRecommendByProduct = async (productId, { limit = 6, tab = "all" } = {}) => {
+  if (!productId) return { data: [], meta: {} };
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  params.set("tab", String(tab));
+  const res = await axiosInstance.get(
+    `/recommend/by-product/${encodeURIComponent(productId)}?${params.toString()}`,
+  );
+  return res.data;
+};
+
+export const fetchRecommendTrending = async (limit = 8) => {
+  const res = await axiosInstance.get(`/recommend/trending?limit=${limit}`);
+  return res.data;
 };
 
 export const trackViewedProduct = async (productId) => {
@@ -588,10 +636,20 @@ export const getAllOrders = async (page = 0, limit = 10, options = {}) => {
 
 // ================== Voucher API ==================
 
-export const getAllVouchers = async () => {
+/** Voucher đang hiệu lực (public / theo user) */
+export const getActiveVouchers = async () => {
   const res = await axiosInstance.get("/voucher");
   return res.data;
 };
+
+/** Admin: toàn bộ voucher */
+export const getAdminVouchers = async () => {
+  const res = await axiosInstance.get("/voucher/admin");
+  return res.data;
+};
+
+/** @deprecated — dùng getAdminVouchers trong admin, getActiveVouchers ở trang khách */
+export const getAllVouchers = getAdminVouchers;
 
 export const getVoucherDetail = async (id) => {
   const res = await axiosInstance.get(`/voucher/${id}`);
@@ -599,7 +657,7 @@ export const getVoucherDetail = async (id) => {
 };
 
 export const createVoucher = async (payload) => {
-  const res = await axiosInstance.post("/voucher/create", payload);
+  const res = await axiosInstance.post("/voucher", payload);
   return res.data;
 };
 
@@ -610,6 +668,16 @@ export const updateVoucher = async (id, payload) => {
 
 export const deleteVoucher = async (id) => {
   const res = await axiosInstance.delete(`/voucher/${id}`);
+  return res.data;
+};
+
+export const toggleVoucherActive = async (id) => {
+  const res = await axiosInstance.patch(`/voucher/${id}/toggle`);
+  return res.data;
+};
+
+export const applyVoucherToOrder = async (payload) => {
+  const res = await axiosInstance.post("/voucher/apply", payload);
   return res.data;
 };
 

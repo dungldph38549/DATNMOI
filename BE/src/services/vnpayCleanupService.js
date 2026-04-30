@@ -1,5 +1,4 @@
 const Order = require("../models/OrderModel");
-const Voucher = require("../models/VoucherModel");
 const OrderStatusHistory = require("../models/orderStatusHistory");
 const Product = require("../models/ProductModel");
 const { restoreVariantStockBySku } = require("../utils/stockRestore");
@@ -48,13 +47,6 @@ const cleanupUnpaidVnpayOrders = async ({
         } catch {
           // Ignore non-variant restore errors to keep cleanup resilient.
         }
-      }
-
-      if (order.voucherCode) {
-        await Voucher.findOneAndUpdate(
-          { code: String(order.voucherCode).trim().toUpperCase() },
-          { $inc: { usedCount: -1 } },
-        );
       }
 
       await Order.findByIdAndUpdate(order._id, {

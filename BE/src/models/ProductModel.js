@@ -1,23 +1,28 @@
 const mongoose = require("mongoose");
 
-/** Chuỗi ổn định để so sánh hai biến thể có cùng tổ hợp thuộc tính hay không */
-const variantAttributesSignature = (attrs) => {
-  if (!attrs) return "[]";
-  const entries =
-    attrs instanceof Map
-      ? Array.from(attrs.entries())
-      : typeof attrs === "object"
-        ? Object.entries(attrs)
-        : [];
-  const normalized = entries
-    .map(([k, val]) => [String(k).trim(), String(val ?? "").trim()])
-    .filter(([k]) => k)
-    .sort((a, b) => a[0].localeCompare(b[0]));
-  return JSON.stringify(normalized);
-};
-
-// ── Variant schema ─────────────────────────────────────────────
+// ── Variant schema (Size × Màu: giá / ảnh / tồn riêng) ────────
 const variantSchema = new mongoose.Schema({
+  size: {
+    type: String,
+    required: [true, "Size biến thể là bắt buộc"],
+    trim: true,
+  },
+  colorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Color",
+    required: [true, "Màu (colorId) là bắt buộc cho biến thể"],
+    index: true,
+  },
+  colorName: {
+    type: String,
+    required: [true, "Tên màu hiển thị là bắt buộc"],
+    trim: true,
+  },
+  colorHex: {
+    type: String,
+    default: "",
+    trim: true,
+  },
   sku: {
     type: String,
     required: [true, "SKU của biến thể là bắt buộc"],
@@ -42,12 +47,7 @@ const variantSchema = new mongoose.Schema({
     min: 0,
     set: (v) => (Number.isFinite(Number(v)) ? Number(v) : 0),
   },
-  attributes: {
-    type: Map,
-    of: String,
-    required: [true, "Thuộc tính của biến thể là bắt buộc"],
-  },
-  images:   [{ type: String, trim: true }],
+  images: [{ type: String, trim: true }],
   isActive: { type: Boolean, default: true },
 });
 
@@ -229,38 +229,33 @@ productSchema.pre("validate", function () {
   if (!this.variants || !this.variants.length)
     throw new Error("Sản phẩm có biến thể phải có ít nhất 1 biến thể.");
 
-  const expectedAttrs = this.attributes || [];
-
+  const pairKeys = [];
   for (const v of this.variants) {
-    if (!v.price || v.price <= 0)
-      throw new Error("Tất cả biến thể phải có giá > 0.");
+    if (!v.price || Number(v.price) <= 0)
+      throw new Error("Tất cả biến thể phải có giá lớn hơn 0.");
 
-    if (expectedAttrs.length > 0) {
-      const keys = v.attributes ? Array.from(v.attributes.keys()) : [];
-      if (
-        keys.length !== expectedAttrs.length ||
-        !expectedAttrs.every((k) => keys.includes(k))
-      )
-        throw new Error(
-          `Biến thể phải có đầy đủ thuộc tính: [${expectedAttrs.join(", ")}]`
-        );
+    if (!v.size || !String(v.size).trim())
+      throw new Error("Mỗi biến thể phải có size hợp lệ.");
 
-      if (Array.from(v.attributes.values()).some((val) => !val?.trim()))
-        throw new Error("Không được để giá trị thuộc tính biến thể trống.");
-    }
+    if (!v.colorId)
+      throw new Error("Mỗi biến thể phải chọn màu (colorId).");
+
+    if (!v.colorName || !String(v.colorName).trim())
+      throw new Error("Mỗi biến thể phải có tên màu (colorName).");
+
+    const sizeNorm = String(v.size).trim();
+    const colorNorm = String(v.colorId);
+    const pair = `${sizeNorm}::${colorNorm}`;
+    if (pairKeys.includes(pair))
+      throw new Error(
+        "Không được có hai biến thể trùng cặp (size + màu). Vui lòng gộp tồn kho hoặc đổi size/màu.",
+      );
+    pairKeys.push(pair);
   }
 
   const skus = this.variants.map((v) => v.sku);
-  const dup  = skus.find((s, i) => skus.indexOf(s) !== i);
+  const dup = skus.find((s, i) => skus.indexOf(s) !== i);
   if (dup) throw new Error(`SKU "${dup}" bị trùng trong cùng sản phẩm.`);
-
-  const attrSigs = this.variants.map((v) => variantAttributesSignature(v.attributes));
-  const dupAttr = attrSigs.find((s, i) => attrSigs.indexOf(s) !== i);
-  if (dupAttr !== undefined) {
-    throw new Error(
-      "Có ít nhất hai biến thể trùng hoàn toàn (cùng tổ hợp thuộc tính). Vui lòng gộp tồn kho hoặc đổi giá trị thuộc tính.",
-    );
-  }
 
   if (Array.isArray(this.saleRules) && this.saleRules.length > 0) {
     for (const rule of this.saleRules) {

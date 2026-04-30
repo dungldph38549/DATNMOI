@@ -9,7 +9,7 @@ import {
   FaTag,
   FaTruck,
 } from "react-icons/fa";
-import { getAllVouchers } from "../../api";
+import { getActiveVouchers } from "../../api";
 import notify from "../../utils/notify";
 
 const ICONS = [FaTruck, FaTag, FaPercent, FaGift];
@@ -84,7 +84,7 @@ const VoucherPage = () => {
     const load = async () => {
       try {
         setLoading(true);
-        const res = await getAllVouchers();
+        const res = await getActiveVouchers();
         if (cancelled) return;
         const arr = Array.isArray(res?.data) ? res.data : Array.isArray(res?.data?.data) ? res.data.data : [];
         setVouchers(arr);

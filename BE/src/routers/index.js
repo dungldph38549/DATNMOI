@@ -15,6 +15,7 @@ const WalletRouter = require("./WalletRouter");
 // Giữ lại cả Banner và Contact
 const BannerRouter = require("./BannerRouter");
 const ContactRouter = require("./ContactRouter");
+const RecommendRouter = require("./RecommendRouter");
 
 const routes = (app) => {
   app.use("/api/product", ProductRouter);
@@ -34,6 +35,7 @@ const routes = (app) => {
   // Khai báo sử dụng cho cả hai
   app.use("/api/banner", BannerRouter);
   app.use("/api/contact", ContactRouter);
+  app.use("/api/recommend", RecommendRouter);
 };
 
 module.exports = routes;

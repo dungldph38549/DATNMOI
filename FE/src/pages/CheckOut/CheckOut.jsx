@@ -14,7 +14,7 @@ import {
   getProductById,
   updateCustomerById,
   getWalletBalance,
-  getAllVouchers,
+  getActiveVouchers,
 } from "../../api";
 import { FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaCreditCard, FaTruck, FaMoneyBillWave, FaShieldAlt, FaWallet, FaTicketAlt, FaCheck } from "react-icons/fa";
 import notify from "../../utils/notify";
@@ -385,7 +385,6 @@ const CheckOut = () => {
       return false;
     }
 
-    const collectedSet = new Set(collectedVoucherCodes);
     const expiredSet = new Set(expiredVoucherCodes);
     if (expiredSet.has(normalizedCode)) {
       setVoucherError("Mã này đã hết hạn.");
@@ -393,19 +392,13 @@ const CheckOut = () => {
       setDiscount(0);
       return false;
     }
-    if (!collectedSet.has(normalizedCode)) {
-      setVoucherError("Bạn chưa thu thập mã này. Vào trang Voucher để thu thập trước.");
-      setAppliedVoucher(null);
-      setDiscount(0);
-      return false;
-    }
-
     try {
       setVoucherChecking(true);
       const result = await previewVoucherDiscount({
         code: normalizedCode,
         items: voucherPreviewItems(),
         voucherTarget: selectedTarget,
+        guestId: !isLoggedIn ? String(user?.id || "").trim() || undefined : undefined,
       });
       if (result?.status === "ERR" || result?.status === "Err") {
         if (isExpiredVoucherError(result?.message)) {
@@ -514,6 +507,7 @@ const CheckOut = () => {
                 code,
                 items: voucherPreviewItems(),
                 voucherTarget: null,
+                guestId: !isLoggedIn ? String(user?.id || "").trim() || undefined : undefined,
               });
               if (result?.status === "ERR" || result?.status === "Err") {
                 if (isExpiredVoucherError(result?.message)) {
@@ -559,7 +553,7 @@ const CheckOut = () => {
 
     (async () => {
       try {
-        const data = await getAllVouchers();
+        const data = await getActiveVouchers();
         if (cancelled) return;
         const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
         const next = {};
@@ -569,7 +563,11 @@ const CheckOut = () => {
           next[code] = v;
         });
         const usedCodes = list
-          .filter((v) => Number(v?.usedCount ?? 0) >= 1)
+          .filter((v) => {
+            const lim = Number(v?.usageLimit ?? 1);
+            if (lim === 0) return false;
+            return Number(v?.usedCount ?? 0) >= lim;
+          })
           .map((v) => String(v?.code || "").trim().toUpperCase())
           .filter(Boolean);
         if (usedCodes.length > 0) {
@@ -602,6 +600,7 @@ const CheckOut = () => {
             quantity: Number(i.qty || 0),
           })),
           voucherTarget: appliedVoucherTarget,
+          guestId: !isLoggedIn ? String(user?.id || "").trim() || undefined : undefined,
         });
         if (cancelled) return;
         if (result?.status === "ERR" || result?.status === "Err") {
@@ -842,9 +841,6 @@ const CheckOut = () => {
         }
         if (payUrl) {
           hasPlacedOrderRef.current = true;
-          if (appliedVoucher?.code) {
-            markVoucherAsExpired(appliedVoucher.code);
-          }
           persistCheckoutInfo(); await updateProfileIfLoggedIn();
           dispatch(removeManyFromCart(checkoutItems.map((i) => i.cartKey || i.productId)));
           window.location.href = payUrl; return;
@@ -964,7 +960,10 @@ const CheckOut = () => {
   };
 
   return (
-    <div className="min-h-screen font-body pb-14 pt-8 bg-[#f7f3ec]">
+    <div
+      className="min-h-screen font-body pb-14 pt-8 bg-[#f7f3ec]"
+      style={{ fontFamily: "'Lexend', var(--font-body, system-ui), sans-serif" }}
+    >
       <div className="mx-auto px-4 max-w-7xl">
         <div className="grid grid-cols-1 xl:grid-cols-[1.45fr_0.9fr] gap-8 items-start">
           <div className="order-2 xl:order-1">
@@ -1273,6 +1272,49 @@ const CheckOut = () => {
           </div>
 
           <aside className="order-1 xl:order-2 xl:sticky xl:top-6 xl:max-h-[calc(100vh-48px)] xl:overflow-y-auto custom-scrollbar pr-1">
+            <div className="bg-white/90 backdrop-blur-sm border border-[#e8e4db] rounded-[12px] p-5 shadow-md mb-4">
+              <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
+                <FaTicketAlt className="text-[#f49d25]" aria-hidden />
+                Mã giảm giá
+              </h3>
+              <div className="flex gap-2 flex-wrap">
+                <input
+                  type="text"
+                  className="flex-1 min-w-[140px] border border-[#e8e4db] rounded-[12px] px-3 py-2.5 text-sm outline-none focus:border-[#f49d25] uppercase"
+                  placeholder="Nhập mã voucher"
+                  value={voucherCode}
+                  onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                  disabled={voucherChecking}
+                />
+                <button
+                  type="button"
+                  onClick={onApplyVoucher}
+                  disabled={voucherChecking || !String(voucherCode || "").trim()}
+                  className="px-4 py-2.5 rounded-[12px] bg-[#f49d25] text-white text-sm font-bold hover:opacity-95 disabled:opacity-50"
+                >
+                  {voucherChecking ? "…" : "Áp dụng"}
+                </button>
+                {appliedVoucher && (
+                  <button
+                    type="button"
+                    onClick={onRemoveVoucher}
+                    className="w-10 h-10 rounded-[12px] border border-slate-200 text-slate-500 font-bold hover:bg-slate-50"
+                    title="Bỏ voucher"
+                    aria-label="Bỏ voucher"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              {voucherError && (
+                <p className="text-xs font-medium text-red-500 mt-2">{voucherError}</p>
+              )}
+              {hasVoucherDiscount && (
+                <p className="text-xs text-emerald-700 mt-2 font-medium">
+                  Đã giảm {voucherDiscountAmountLabel}
+                </p>
+              )}
+            </div>
             <div className="bg-white/90 backdrop-blur-sm border border-[#e8e4db] rounded-2xl p-5 shadow-md">
               <h2 className="text-2xl font-bold text-slate-800 mb-4">Sản phẩm</h2>
               <div className="rounded-xl border border-[#ece7dd] bg-white overflow-hidden">
@@ -1370,10 +1412,20 @@ const CheckOut = () => {
               </div>
 
               <div className="mt-4 pt-4 border-t border-[#efebe3] space-y-2 text-sm">
-                <div className="flex justify-between text-slate-600">
+                <div className="flex justify-between text-slate-600 items-baseline gap-2">
                   <span>Tạm tính</span>
-                  <span className="font-semibold text-slate-800">{formatMoney(subtotal)}</span>
+                  <span
+                    className={`font-semibold text-slate-800 ${hasVoucherDiscount ? "line-through text-slate-400 text-sm" : ""}`}
+                  >
+                    {formatMoney(subtotal)}
+                  </span>
                 </div>
+                {hasVoucherDiscount && (
+                  <div className="flex justify-between text-[#f49d25] font-semibold">
+                    <span>Sau giảm</span>
+                    <span>{formatMoney(Math.max(0, subtotal - discount))}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-slate-600">
                   <span>Phí vận chuyển</span>
                   <span className="font-semibold text-slate-800">{shipping === 0 ? "Miễn phí" : formatMoney(shipping)}</span>
@@ -1389,7 +1441,7 @@ const CheckOut = () => {
               <div className="mt-4 pt-4 border-t border-[#efebe3]">
                 <div className="flex justify-between items-end">
                   <span className="text-base font-semibold text-slate-700">Tổng tiền</span>
-                  <span className="text-3xl leading-none font-black text-[#ee4d2d]">{formatMoney(total)}</span>
+                  <span className="text-3xl leading-none font-black text-[#f49d25]">{formatMoney(total)}</span>
                 </div>
               </div>
 
@@ -1493,7 +1545,13 @@ const CheckOut = () => {
                 ) : (
                   collectedVoucherCodes
                     .filter((code) => !expiredVoucherCodes.includes(code))
-                    .filter((code) => Number(voucherMetaByCode[code]?.usedCount ?? 0) < 1)
+                    .filter((code) => {
+                      const m = voucherMetaByCode[code];
+                      const lim = Number(m?.usageLimit ?? 1);
+                      const used = Number(m?.usedCount ?? 0);
+                      if (lim === 0) return true;
+                      return used < lim;
+                    })
                     .map((code) => {
                     const selected = String(draftVoucherCode || "").trim().toUpperCase() === code;
                     const info = voucherAvailability[code];
@@ -1503,18 +1561,26 @@ const CheckOut = () => {
                     const dimmed = unavailable || unknown;
                     const estimatedDiscount = info?.status === "available" ? Number(info?.discountAmount || 0) : 0;
                     const metaIsPersonal = Boolean(meta?.ownerUserId);
-                    const metaHasProductScope = Array.isArray(meta?.applicableProductIds) && meta.applicableProductIds.length > 0;
+                    const metaProd =
+                      (Array.isArray(meta?.applicableProducts) && meta.applicableProducts.length > 0) ||
+                      (Array.isArray(meta?.applicableProductIds) && meta.applicableProductIds.length > 0);
+                    const metaCat =
+                      Array.isArray(meta?.applicableCategories) &&
+                      meta.applicableCategories.length > 0;
+                    const metaHasProductScope = metaProd || metaCat;
                     const metaIsWholeOrder = !metaIsPersonal && !metaHasProductScope;
                     const canShowEstimatedDiscount = checkoutItems.length === 1 && metaIsWholeOrder;
+                    const vType = meta?.type || meta?.discountType || "percent";
+                    const vVal = meta?.value ?? meta?.discountValue;
                     const discountLabel =
-                      meta?.discountType === "percent"
-                        ? `Giảm ${Number(meta?.discountValue || 0)}%`
-                        : meta?.discountValue != null
-                          ? `Giảm ${formatMoney(meta?.discountValue)}`
+                      vType === "percent"
+                        ? `Giảm ${Number(vVal || 0)}%`
+                        : vVal != null
+                          ? `Giảm ${formatMoney(vVal)}`
                           : null;
                     const minOrderLabel =
-                      meta?.minOrderAmount != null && Number(meta.minOrderAmount) > 0
-                        ? `Đơn tối thiểu ${formatMoney(meta.minOrderAmount)}`
+                      meta?.minOrderValue != null && Number(meta.minOrderValue) > 0
+                        ? `Đơn tối thiểu ${formatMoney(meta.minOrderValue)}`
                         : null;
                     const expiryLabel =
                       meta?.endDate

@@ -40,7 +40,10 @@ const parseStoredCartItems = () => {
       sku:
         i.sku == null ? null : String(i.sku).trim().toUpperCase(),
       size: i.size ?? null,
-      color: i.color ?? null,
+      color: i.color ?? i.colorName ?? null,
+      colorName: i.colorName ?? i.color ?? null,
+      colorHex: i.colorHex ?? null,
+      variantId: i.variantId ?? null,
       cartKey:
         i.cartKey ??
         buildCartKey({
@@ -95,10 +98,16 @@ const cartSlice = createSlice({
       const sku =
         skuRaw == null ? null : String(skuRaw).trim().toUpperCase();
       const size = payload.size ?? null;
+      const colorRaw = payload.colorName ?? payload.color;
       const color =
-        payload.color == null || String(payload.color).trim() === ""
+        colorRaw == null || String(colorRaw).trim() === ""
           ? null
-          : String(payload.color).trim();
+          : String(colorRaw).trim();
+      const colorHex =
+        payload.colorHex == null || String(payload.colorHex).trim() === ""
+          ? null
+          : String(payload.colorHex).trim();
+      const variantId = payload.variantId ?? null;
       const forceCartKey =
         payload.cartKey != null && String(payload.cartKey).trim() !== ""
           ? String(payload.cartKey).trim()
@@ -112,11 +121,16 @@ const cartSlice = createSlice({
       if (existing) {
         existing.qty += qty;
         if (price) existing.price = price;
-        if (image) existing.image = image;
         if (originalPrice != null && Number.isFinite(originalPrice)) {
           existing.originalPrice = originalPrice;
         }
-        if (color != null) existing.color = color;
+        if (color != null) {
+          existing.color = color;
+          existing.colorName = color;
+        }
+        if (colorHex != null) existing.colorHex = colorHex;
+        if (variantId != null) existing.variantId = variantId;
+        if (payload.image) existing.image = payload.image;
       } else {
         state.items.push({
           cartKey,
@@ -129,6 +143,9 @@ const cartSlice = createSlice({
           sku,
           size,
           color,
+          colorName: color,
+          colorHex,
+          variantId,
         });
       }
 
@@ -170,8 +187,18 @@ const cartSlice = createSlice({
       saveCart(state);
     },
     updateCartVariant: (state, action) => {
-      const { cartKey, sku, size, price, originalPrice, color, image } =
-        action.payload || {};
+      const {
+        cartKey,
+        sku,
+        size,
+        price,
+        originalPrice,
+        color,
+        colorName,
+        colorHex,
+        image,
+        variantId,
+      } = action.payload || {};
       if (!cartKey) return;
       const item = state.items.find((i) => i.cartKey === cartKey);
       if (!item) return;
@@ -184,10 +211,15 @@ const cartSlice = createSlice({
         size == null || String(size).trim() === ""
           ? null
           : String(size).trim();
+      const colorSrc = colorName ?? color;
       const normalizedColor =
-        color == null || String(color).trim() === ""
+        colorSrc == null || String(colorSrc).trim() === ""
           ? null
-          : String(color).trim();
+          : String(colorSrc).trim();
+      const normalizedHex =
+        colorHex == null || String(colorHex).trim() === ""
+          ? null
+          : String(colorHex).trim();
 
       const nextCartKey = buildCartKey({
         productId: item.productId,
@@ -198,14 +230,15 @@ const cartSlice = createSlice({
       item.sku = normalizedSku;
       item.size = normalizedSize;
       item.color = normalizedColor;
+      item.colorName = normalizedColor;
+      if (normalizedHex != null) item.colorHex = normalizedHex;
+      if (variantId != null) item.variantId = variantId;
+      if (image != null && String(image).trim() !== "") item.image = String(image).trim();
       if (price != null && Number.isFinite(Number(price))) {
         item.price = Number(price);
       }
       if (originalPrice != null && Number.isFinite(Number(originalPrice))) {
         item.originalPrice = Number(originalPrice);
-      }
-      if (image != null && String(image).trim() !== "") {
-        item.image = String(image).trim();
       }
       item.cartKey = nextCartKey;
 

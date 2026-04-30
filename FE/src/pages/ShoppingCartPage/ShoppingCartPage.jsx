@@ -206,22 +206,25 @@ const ShoppingCartPage = () => {
       const product = data?.data ?? data;
       const variants = Array.isArray(product?.variants) ? product.variants : [];
       const normalized = variants.map((v) => {
+        let size = v?.size != null ? String(v.size).trim() : null;
+        let color = v?.colorName != null ? String(v.colorName).trim() : null;
         const attrs = v?.attributes;
-        let size = null;
-        let color = null;
-        if (attrs && typeof attrs.get === "function") {
+        if (!size && attrs && typeof attrs.get === "function") {
           size = attrs.get("Size") ?? attrs.get("size") ?? null;
+        } else if (!size && attrs && typeof attrs === "object") {
+          const foundSize = Object.keys(attrs).find(
+            (k) => String(k).toLowerCase() === "size",
+          );
+          size = foundSize ? attrs[foundSize] : null;
+        }
+        if (!color && attrs && typeof attrs.get === "function") {
           color =
             attrs.get("Color") ??
             attrs.get("color") ??
             attrs.get("Màu") ??
             attrs.get("Mau") ??
             null;
-        } else if (attrs && typeof attrs === "object") {
-          const foundSize = Object.keys(attrs).find(
-            (k) => String(k).toLowerCase() === "size",
-          );
-          size = foundSize ? attrs[foundSize] : null;
+        } else if (!color && attrs && typeof attrs === "object") {
           const foundColor = Object.keys(attrs).find((k) => {
             const lk = String(k).toLowerCase();
             return lk === "color" || lk === "màu" || lk === "mau";
@@ -233,10 +236,16 @@ const ShoppingCartPage = () => {
           color != null && String(color).trim() !== ""
             ? String(color).trim()
             : "";
+        const img =
+          Array.isArray(v?.images) && v.images[0] ? v.images[0] : null;
+        const colorHex = v?.colorHex != null ? String(v.colorHex).trim() : "";
         return {
           size: label,
           color: colorStr,
           sku: v?.sku ? String(v.sku).trim().toUpperCase() : null,
+          variantId: v?._id ?? null,
+          colorHex: colorHex || null,
+          image: img,
           stock: Number(v?.stock ?? 0),
           price: Number(v?.effectivePrice ?? v?.price ?? 0),
           originalPrice: Number(v?.originalPrice ?? v?.price ?? 0),
@@ -289,6 +298,10 @@ const ShoppingCartPage = () => {
         sku: selectedOption.sku || null,
         size: selectedOption.size || null,
         color: selectedOption.color || null,
+        colorName: selectedOption.color || null,
+        colorHex: selectedOption.colorHex || null,
+        image: selectedOption.image || null,
+        variantId: selectedOption.variantId || null,
         price: selectedOption.price,
         originalPrice: selectedOption.originalPrice,
         image: selectedOption.image || null,
@@ -409,11 +422,18 @@ const ShoppingCartPage = () => {
                             <div>
                               <Link to={`/product/${item.productId}`} className="font-display font-bold text-lg text-slate-800 hover:text-primary transition-colors line-clamp-2 leading-tight mb-1">{item.name}</Link>
                               <button onClick={() => openVariantModal(item)} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 rounded-lg text-xs font-bold text-neutral-600 hover:bg-neutral-200 transition-colors uppercase tracking-wide">
-                                <span className="text-left">
-                                  Size: {item.size || "Mặc định"}
-                                  {item.color ? (
-                                    <span className="block normal-case font-semibold text-neutral-500 mt-0.5">
-                                      Màu: {item.color}
+                                <span className="text-left inline-flex flex-col items-start gap-1">
+                                  <span>Size: {item.size || "Mặc định"}</span>
+                                  {item.color || item.colorName ? (
+                                    <span className="inline-flex items-center gap-2 normal-case font-semibold text-neutral-500">
+                                      {item.colorHex ? (
+                                        <span
+                                          className="h-4 w-4 shrink-0 rounded-[6px] border border-black/10"
+                                          style={{ background: item.colorHex }}
+                                          aria-hidden
+                                        />
+                                      ) : null}
+                                      Màu: {item.colorName || item.color}
                                     </span>
                                   ) : null}
                                 </span>

@@ -1,8 +1,12 @@
 const mongoose = require("mongoose");
 const Cart = require("../models/CartModel");
 const Product = require("../models/ProductModel");
+const { findVariantBySku } = require("../utils/variantHelpers.js");
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+
+const normSkuKey = (s) =>
+  s == null || String(s).trim() === "" ? "" : String(s).trim().toUpperCase();
 
 const ensureCart = async (userId) => {
   let cart = await Cart.findOne({ user: userId });
@@ -48,7 +52,16 @@ const getCart = async (req, res, next) => {
 const addItem = async (req, res, next) => {
   try {
     const { userId } = req.params;
-    const { productId, qty, sku, size, color } = req.body || {};
+    const {
+      productId,
+      qty,
+      sku,
+      size,
+      color,
+      image: bodyImage,
+      variantId,
+      colorHex,
+    } = req.body || {};
 
     if (!isValidObjectId(userId)) {
       return res
@@ -107,7 +120,7 @@ const addItem = async (req, res, next) => {
     };
 
     if (sku && product?.hasVariants) {
-      const variant = product.variants.find((v) => v.sku === sku);
+      const variant = findVariantBySku(product.variants, sku);
       if (!variant) {
         return res.status(400).json({
           status: "ERR",
@@ -116,11 +129,17 @@ const addItem = async (req, res, next) => {
       }
       availableStock = variant.stock ?? 0;
       variantPrice = variant.price ?? product.price;
-      // Map attributes trong Mongoose có thể là Map hoặc object tuỳ trường hợp
-      const maybeGet = variant?.attributes?.get?.("Size");
-      variantSize = size ?? maybeGet ?? variant?.attributes?.Size ?? null;
-      const fromVariant = pickColorFromAttrs(variant?.attributes);
-      variantColor = variantColor ?? fromVariant ?? null;
+      variantSize =
+        size ??
+        (variant.size != null ? String(variant.size) : null) ??
+        variant?.attributes?.get?.("Size") ??
+        variant?.attributes?.Size ??
+        null;
+      variantColor =
+        variantColor ??
+        (variant.colorName != null ? String(variant.colorName).trim() : null) ??
+        pickColorFromAttrs(variant?.attributes) ??
+        null;
     } else {
       // Không có SKU → lấy tồn kho tổng sản phẩm
       availableStock = product.stock ?? product.countInStock ?? product?.totalStock ?? 0;
@@ -128,9 +147,13 @@ const addItem = async (req, res, next) => {
       if (availableStock === 0 && product?.hasVariants && Array.isArray(product.variants)) {
         availableStock = product.variants.reduce((sum, v) => sum + (v.stock ?? 0), 0);
         if (!variantPrice && product.variants[0]) variantPrice = product.variants[0].price ?? product.price;
-        if (!variantSize && product.variants[0]?.attributes) {
-          const firstSize = product.variants[0]?.attributes?.get?.("Size");
-          variantSize = firstSize ?? product.variants[0]?.attributes?.Size ?? null;
+        if (!variantSize && product.variants[0]) {
+          const v0 = product.variants[0];
+          variantSize =
+            v0.size ??
+            v0?.attributes?.get?.("Size") ??
+            v0?.attributes?.Size ??
+            null;
         }
       }
     }
@@ -144,27 +167,53 @@ const addItem = async (req, res, next) => {
 
     const cart = await ensureCart(userId);
 
-    const existing = cart.items.find(
-      (item) => String(item.product) === String(productId),
-    );
+    const wantSku = product?.hasVariants ? normSkuKey(sku) : "";
+    const existing = cart.items.find((item) => {
+      if (String(item.product) !== String(productId)) return false;
+      if (!product?.hasVariants) return normSkuKey(item.sku) === "";
+      return normSkuKey(item.sku) === wantSku;
+    });
+
+    const variantForLine =
+      sku && product?.hasVariants
+        ? findVariantBySku(product.variants, sku)
+        : null;
+    const lineImageRaw =
+      (bodyImage && String(bodyImage).trim()) ||
+      (variantForLine?.images && variantForLine.images[0]) ||
+      product.image;
+    const lineImage = String(lineImageRaw || "").trim() || product.image;
+    const lineVariantId =
+      variantId && isValidObjectId(variantId)
+        ? variantId
+        : variantForLine?._id ?? null;
+    const lineColorHex =
+      colorHex != null && String(colorHex).trim() !== ""
+        ? String(colorHex).trim()
+        : variantForLine?.colorHex ?? null;
 
     if (existing) {
       const newQty = existing.qty + quantity;
       // Nếu thêm cùng sản phẩm nhưng SKU thay đổi → cập nhật SKU/size/price cho đúng biến thể.
-      if (sku && existing.sku !== sku) {
+      if (sku && normSkuKey(existing.sku) !== wantSku) {
         existing.sku = sku;
         existing.size = variantSize;
         existing.color = variantColor;
         existing.price = variantPrice ?? existing.price;
-      } else if (sku && existing.sku === sku && variantColor != null) {
+        existing.image = lineImage;
+        existing.variantId = lineVariantId;
+        existing.colorHex = lineColorHex;
+      } else if (sku && normSkuKey(existing.sku) === wantSku && variantColor != null) {
         existing.color = variantColor;
+        if (lineColorHex) existing.colorHex = lineColorHex;
+        if (lineImage) existing.image = lineImage;
       }
 
       // Tính lại availableStock theo SKU hiện tại nếu có.
       const currentSku = sku ?? existing.sku;
       let currentAvailableStock = availableStock;
       if (currentSku && product?.hasVariants) {
-        const variant = product.variants.find((v) => v.sku === currentSku);
+        const variant = findVariantBySku(product.variants, currentSku);
         currentAvailableStock = variant?.stock ?? 0;
       }
 
@@ -179,10 +228,12 @@ const addItem = async (req, res, next) => {
       cart.items.push({
         product: product._id,
         sku: product?.hasVariants ? sku ?? null : null,
+        variantId: product?.hasVariants ? lineVariantId : null,
         size: product?.hasVariants ? variantSize : null,
         color: product?.hasVariants ? variantColor : null,
+        colorHex: product?.hasVariants ? lineColorHex : null,
         name: product.name,
-        image: product.image,
+        image: lineImage,
         price: product?.hasVariants ? variantPrice ?? product.price : product.price,
         qty: quantity,
       });

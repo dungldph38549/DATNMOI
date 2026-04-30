@@ -12,6 +12,10 @@ const cartItemSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    variantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
     // Size hiển thị (tuỳ chọn, để UI/đơn hàng dễ hiểu hơn)
     size: {
       type: String,
@@ -20,6 +24,11 @@ const cartItemSchema = new mongoose.Schema(
     color: {
       type: String,
       default: null,
+    },
+    colorHex: {
+      type: String,
+      default: null,
+      trim: true,
     },
     name: {
       type: String,

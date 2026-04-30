@@ -20,19 +20,49 @@ const toNum = (val, fallback = 0) => {
   return isNaN(n) || n < 0 ? fallback : n;
 };
 
-const normalizeVariants = (variants) =>
-  (variants || []).map((v) => ({
-    sku: (v.sku || "").toString().trim(),
-    price: toNum(v.price, 0),
-    stock: toNum(v.stock, 0),
-    sold: toNum(v.sold, 0),
-    attributes:
-      v.attributes instanceof Map
-        ? v.attributes
-        : new Map(Object.entries(v.attributes || {})),
-    images: Array.isArray(v.images) ? v.images : [],
-    isActive: v.isActive !== false,
-  }));
+const normalizeVariants = (variants) => {
+  const list = (variants || []).map((v) => {
+    let colorId = v.colorId;
+    if (colorId && typeof colorId === "object" && colorId._id) {
+      colorId = colorId._id;
+    }
+    const cid =
+      colorId && mongoose.Types.ObjectId.isValid(String(colorId))
+        ? new mongoose.Types.ObjectId(String(colorId))
+        : null;
+
+    return {
+      sku: String(v.sku || "")
+        .trim()
+        .toUpperCase(),
+      price: toNum(v.price, 0),
+      stock: toNum(v.stock, 0),
+      sold: toNum(v.sold, 0),
+      size: String(v.size ?? "").trim(),
+      colorId: cid,
+      colorName: String(v.colorName ?? "").trim(),
+      colorHex: String(v.colorHex ?? "").trim(),
+      images: Array.isArray(v.images)
+        ? v.images.filter((x) => typeof x === "string" && String(x).trim() !== "")
+        : [],
+      isActive: v.isActive !== false,
+    };
+  });
+
+  const seenPair = new Set();
+  for (const row of list) {
+    if (!row.size || !row.colorId) continue;
+    const pair = `${row.size}::${String(row.colorId)}`;
+    if (seenPair.has(pair)) {
+      throw new Error(
+        "Không được có hai biến thể trùng cặp (size + màu). Vui lòng gộp tồn kho hoặc đổi size/màu.",
+      );
+    }
+    seenPair.add(pair);
+  }
+
+  return list;
+};
 
 const normalizeSaleRulesInput = (saleRules) =>
   normalizeSaleRules(Array.isArray(saleRules) ? saleRules : []);
@@ -383,6 +413,7 @@ const getProductById = async (id) => {
   const product = await Product.findById(id)
     .populate("brandId", "name logo")
     .populate("categoryId", "name")
+    .populate("variants.colorId", "name code rgb")
     .lean();
   return product ? enrichProductPricing(product) : null;
 };

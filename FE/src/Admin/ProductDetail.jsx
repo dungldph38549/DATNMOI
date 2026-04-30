@@ -11,6 +11,7 @@ import {
   uploadImages,
   getAllCategories,
   getAllSizes,
+  getAllColors,
 } from "./../api/index";
 
 // Backend đang chạy tại 3002. Nếu build/ENV bị lệch (vẫn còn 3001), ảnh sẽ request sai port và lỗi ERR_CONNECTION_REFUSED.
@@ -176,20 +177,104 @@ const generateNextVariantSku = (productName, existingSkus = []) => {
   return `${prefix}${String(next).padStart(2, "0")}`;
 };
 
-/** Khớp logic BE `variantAttributesSignature`: không cho hai biến thể cùng tổ hợp thuộc tính */
-const variantAttributesSignature = (attrsObj) => {
-  const entries = Object.entries(attrsObj || {})
-    .map(([k, v]) => [String(k).trim(), String(v ?? "").trim()])
-    .filter(([k]) => k)
-    .sort((a, b) => a[0].localeCompare(b[0]));
-  return JSON.stringify(entries);
+const slugifyColorKey = (s) =>
+  String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "-")
+    .slice(0, 48);
+
+const legacyVariantAttr = (v, kind) => {
+  const a = v?.attributes;
+  if (!a) return "";
+  const o = typeof a.get === "function" ? Object.fromEntries(a) : { ...a };
+  if (kind === "size") return String(o.Size || o.size || "").trim();
+  return String(o.Color || o.color || o["Màu"] || o.Mau || "").trim();
 };
 
-/** Gợi ý thuộc tính biến thể — chỉ Size & Color; vẫn có thể gõ thêm (mode tags) cho SP cũ */
-const VARIANT_ATTRIBUTE_PRESET_OPTIONS = [
-  { value: "Size", label: "Size — Kích cỡ" },
-  { value: "Color", label: "Color — Màu sắc" },
-];
+const matrixFromProductVariants = (variants) => {
+  const sizes = [];
+  const colorMap = new Map();
+  const cells = {};
+  for (const v of variants || []) {
+    const sz = String(v.size ?? "").trim() || legacyVariantAttr(v, "size");
+    if (!sz) continue;
+    if (!sizes.includes(sz)) sizes.push(sz);
+    const cidRaw = v.colorId?._id ?? v.colorId;
+    const cid = cidRaw ? String(cidRaw) : "";
+    const cname =
+      String(v.colorName ?? "").trim() || legacyVariantAttr(v, "color") || "Màu";
+    const chex =
+      String(v.colorHex ?? "").trim() ||
+      (v.colorId && typeof v.colorId === "object"
+        ? String(v.colorId.code || "").trim()
+        : "");
+    const rowKey =
+      cid && /^[a-f\d]{24}$/i.test(cid) ? cid : `legacy-${slugifyColorKey(cname)}`;
+    if (!colorMap.has(rowKey)) {
+      colorMap.set(rowKey, {
+        key: rowKey,
+        colorId: cid,
+        colorName: cname,
+        colorHex: chex,
+      });
+    }
+    const ck = `${rowKey}::${sz}`;
+    cells[ck] = {
+      sku: v.sku,
+      price: v.price ?? 0,
+      stock: v.stock ?? 0,
+      images: Array.isArray(v.images) ? v.images : [],
+      isActive: v.isActive !== false,
+    };
+  }
+  return { sizes, colorRows: Array.from(colorMap.values()), cells };
+};
+
+const collectMatrixSkus = (matrix) => {
+  const out = [];
+  for (const row of matrix.colorRows || []) {
+    for (const size of matrix.sizes || []) {
+      const c = matrix.cells?.[`${row.key}::${size}`];
+      if (c?.sku) out.push(String(c.sku));
+    }
+  }
+  return out;
+};
+
+const buildVariantsPayloadFromMatrix = (matrix) => {
+  const variants = [];
+  for (const row of matrix.colorRows || []) {
+    if (!row.colorId || !/^[a-f\d]{24}$/i.test(String(row.colorId))) {
+      throw new Error(
+        `Màu "${row.colorName}" chưa gắn colorId hợp lệ. Vui lòng xóa dòng legacy và thêm lại từ danh sách màu.`,
+      );
+    }
+    for (const size of matrix.sizes || []) {
+      const cell = matrix.cells?.[`${row.key}::${size}`];
+      if (!cell || !String(cell.sku || "").trim()) continue;
+      const price = Number(cell.price);
+      if (!Number.isFinite(price) || price <= 0) {
+        throw new Error(
+          `Ô ${row.colorName} / size ${size}: giá phải lớn hơn 0.`,
+        );
+      }
+      variants.push({
+        size: String(size).trim(),
+        colorId: row.colorId,
+        colorName: row.colorName,
+        colorHex: row.colorHex || "",
+        sku: String(cell.sku).trim().toUpperCase(),
+        price,
+        stock: Math.max(0, Number(cell.stock) || 0),
+        images: Array.isArray(cell.images) ? cell.images.filter(Boolean) : [],
+        isActive: cell.isActive !== false,
+      });
+    }
+  }
+  return variants;
+};
 
 // ================================================================
 // ProductDetail — Card only (no Sidebar / header / layout wrapper)
@@ -201,6 +286,14 @@ const ProductDetail = ({ productId = null, onClose }) => {
   const [featured, setFeatured] = useState(false);
   const [hasVar, setHasVar] = useState(false);
   const [saleEnabled, setSaleEnabled] = useState(false);
+  /** Lưới biến thể: cột = size, hàng = màu */
+  const [varMatrix, setVarMatrix] = useState({
+    sizes: [],
+    colorRows: [],
+    cells: {},
+  });
+  const [newSizeDraft, setNewSizeDraft] = useState("");
+  const [newColorIdDraft, setNewColorIdDraft] = useState(undefined);
 
   const { data: productData } = useQuery({
     queryKey: ["admin-product-detail", productId],
@@ -218,6 +311,16 @@ const ProductDetail = ({ productId = null, onClose }) => {
     queryFn: getAllSizes,
     keepPreviousData: true,
   });
+  const { data: colorsRes } = useQuery({
+    queryKey: ["admin-colors"],
+    queryFn: getAllColors,
+    keepPreviousData: true,
+  });
+  const colorOptions = Array.isArray(colorsRes?.data)
+    ? colorsRes.data
+    : Array.isArray(colorsRes)
+      ? colorsRes
+      : [];
 
   const mutation = useMutation({
     mutationFn: productId !== "create" ? updateProduct : createProduct,
@@ -298,8 +401,17 @@ const ProductDetail = ({ productId = null, onClose }) => {
         saleEndAt: activeSale?.endAt ? String(activeSale.endAt).slice(0, 16) : "",
         salePriority: activeSale?.priority ?? 0,
       });
+      if (isHasVariants && Array.isArray(productData.variants)) {
+        setVarMatrix(matrixFromProductVariants(productData.variants));
+      }
     }
   }, [productData, form]);
+
+  useEffect(() => {
+    if (productId === "create") {
+      setVarMatrix({ sizes: [], colorRows: [], cells: {} });
+    }
+  }, [productId]);
 
   const handleMainUpload = async (file) => {
     const fd = new FormData();
@@ -325,7 +437,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
     form.setFieldsValue({ srcImages: curr.filter((_, i) => i !== idx) });
   };
 
-  const handleVariantImagesUpload = async (variantIndex, fileList) => {
+  const handleMatrixCellImagesUpload = async (rowKey, size, fileList) => {
     const files = Array.from(fileList || []);
     if (!files.length) return;
     try {
@@ -334,34 +446,153 @@ const ProductDetail = ({ productId = null, onClose }) => {
       const result = await uploadImages(fd);
       const uploaded = Array.isArray(result?.paths) ? result.paths : [];
       if (!uploaded.length) return;
-      const variants = form.getFieldValue("variants") || [];
-      const next = [...variants];
-      const existing = Array.isArray(next?.[variantIndex]?.images)
-        ? next[variantIndex].images
-        : [];
-      next[variantIndex] = {
-        ...next[variantIndex],
-        images: Array.from(
-          new Set([...existing.filter(Boolean), ...uploaded.filter(Boolean)]),
-        ),
-      };
-      form.setFieldValue("variants", next);
-    } catch (err) {
+      const ck = `${rowKey}::${size}`;
+      setVarMatrix((m) => {
+        const prev = m.cells[ck] || {};
+        const existing = Array.isArray(prev.images) ? prev.images : [];
+        return {
+          ...m,
+          cells: {
+            ...m.cells,
+            [ck]: {
+              ...prev,
+              images: Array.from(
+                new Set([...existing.filter(Boolean), ...uploaded.filter(Boolean)]),
+              ),
+            },
+          },
+        };
+      });
+    } catch {
       Swal.fire("Upload thất bại", "Không thể tải ảnh biến thể.", "error");
     }
   };
 
-  const handleRemoveVariantImage = (variantIndex, imageIndex) => {
-    const variants = form.getFieldValue("variants") || [];
-    const next = [...variants];
-    const existing = Array.isArray(next?.[variantIndex]?.images)
-      ? next[variantIndex].images
-      : [];
-    next[variantIndex] = {
-      ...next[variantIndex],
-      images: existing.filter((_, i) => i !== imageIndex),
+  const handleRemoveMatrixCellImage = (rowKey, size, imageIndex) => {
+    const ck = `${rowKey}::${size}`;
+    setVarMatrix((m) => {
+      const prev = m.cells[ck] || {};
+      const existing = Array.isArray(prev.images) ? prev.images : [];
+      return {
+        ...m,
+        cells: {
+          ...m.cells,
+          [ck]: { ...prev, images: existing.filter((_, i) => i !== imageIndex) },
+        },
+      };
+    });
+  };
+
+  const addMatrixSize = (sizeRaw) => {
+    const size = String(sizeRaw || "").trim();
+    if (!size) {
+      Swal.fire("Thiếu size", "Vui lòng chọn hoặc nhập size.", "warning");
+      return;
+    }
+    if (varMatrix.sizes.includes(size)) return;
+    const name = form.getFieldValue("name") || "SP";
+    setVarMatrix((m) => {
+      const nextSizes = [...m.sizes, size];
+      const nextCells = { ...m.cells };
+      let skus = collectMatrixSkus({ ...m, cells: nextCells });
+      for (const row of m.colorRows) {
+        const ck = `${row.key}::${size}`;
+        if (!nextCells[ck]) {
+          const sku = generateNextVariantSku(name, skus);
+          skus = [...skus, sku];
+          nextCells[ck] = {
+            sku,
+            price: Math.max(0, Number(form.getFieldValue("price")) || 0),
+            stock: 0,
+            images: [],
+          };
+        }
+      }
+      return { ...m, sizes: nextSizes, cells: nextCells };
+    });
+    setNewSizeDraft("");
+  };
+
+  const removeMatrixSize = (size) => {
+    setVarMatrix((m) => {
+      const cells = { ...m.cells };
+      for (const row of m.colorRows) {
+        delete cells[`${row.key}::${size}`];
+      }
+      return { ...m, sizes: m.sizes.filter((s) => s !== size), cells };
+    });
+  };
+
+  const addMatrixColorRow = (colorDoc) => {
+    if (!colorDoc?._id) return;
+    if (varMatrix.sizes.length === 0) {
+      Swal.fire(
+        "Thêm size trước",
+        "Vui lòng thêm ít nhất một cột size trước khi thêm màu.",
+        "info",
+      );
+      return;
+    }
+    const key = String(colorDoc._id);
+    if (varMatrix.colorRows.some((r) => r.key === key)) {
+      Swal.fire("Trùng màu", "Màu này đã có trong lưới.", "warning");
+      return;
+    }
+    const row = {
+      key,
+      colorId: key,
+      colorName: colorDoc.name,
+      colorHex: colorDoc.code || "",
     };
-    form.setFieldValue("variants", next);
+    const name = form.getFieldValue("name") || "SP";
+    setVarMatrix((m) => {
+      const nextRows = [...m.colorRows, row];
+      const nextCells = { ...m.cells };
+      let skus = collectMatrixSkus({ ...m, cells: nextCells });
+      for (const size of m.sizes) {
+        const ck = `${row.key}::${size}`;
+        if (!nextCells[ck]) {
+          const sku = generateNextVariantSku(name, skus);
+          skus = [...skus, sku];
+          nextCells[ck] = {
+            sku,
+            price: Math.max(0, Number(form.getFieldValue("price")) || 0),
+            stock: 0,
+            images: [],
+          };
+        }
+      }
+      return { ...m, colorRows: nextRows, cells: nextCells };
+    });
+    setNewColorIdDraft(undefined);
+  };
+
+  const removeMatrixColorRow = (rowKey) => {
+    setVarMatrix((m) => {
+      const cells = { ...m.cells };
+      for (const size of m.sizes) {
+        delete cells[`${rowKey}::${size}`];
+      }
+      return {
+        ...m,
+        colorRows: m.colorRows.filter((r) => r.key !== rowKey),
+        cells,
+      };
+    });
+  };
+
+  const updateMatrixCellField = (rowKey, size, field, value) => {
+    const ck = `${rowKey}::${size}`;
+    setVarMatrix((m) => {
+      const prev = m.cells[ck] || {};
+      return {
+        ...m,
+        cells: {
+          ...m.cells,
+          [ck]: { ...prev, [field]: value },
+        },
+      };
+    });
   };
 
   const onFinish = (values) => {
@@ -376,7 +607,25 @@ const ProductDetail = ({ productId = null, onClose }) => {
     // Luôn lấy variants từ form state để giữ được các field bổ sung như `images`
     // (Form.List có thể làm rơi field không được render bằng Form.Item trong `values`).
     if (hasVar) {
-      payload.variants = form.getFieldValue("variants") || [];
+      try {
+        payload.variants = buildVariantsPayloadFromMatrix(varMatrix);
+      } catch (e) {
+        Swal.fire(
+          "Biến thể không hợp lệ",
+          e?.message || "Vui lòng kiểm tra lưới size × màu.",
+          "error",
+        );
+        return;
+      }
+      if (!payload.variants.length) {
+        Swal.fire(
+          "Thiếu biến thể",
+          "Vui lòng thêm size, màu và điền SKU + giá cho từng ô trong lưới.",
+          "error",
+        );
+        return;
+      }
+      payload.attributes = [];
     }
     payload.saleRules = saleEnabled && Number(values.saleValue) > 0
       ? [
@@ -392,44 +641,6 @@ const ProductDetail = ({ productId = null, onClose }) => {
           },
         ]
       : [];
-
-    // Normalize attributes/variants để tránh lỗi validate khi FE bị trùng tag/whitespace.
-    if (hasVar) {
-      const normalizedAttrs = (payload.attributes || [])
-        .map((a) => `${a}`.trim())
-        .filter(Boolean);
-      const uniqueAttrs = Array.from(new Set(normalizedAttrs));
-
-      payload.attributes = uniqueAttrs;
-      if (Array.isArray(payload.variants)) {
-        payload.variants = payload.variants.map((v) => {
-          const attrsObj = v?.attributes || {};
-          const remapped = {};
-          Object.entries(attrsObj).forEach(([k, val]) => {
-            const nk = `${k}`.trim();
-            if (!nk) return;
-            remapped[nk] = val;
-          });
-          const normalizedImages = Array.isArray(v?.images)
-            ? v.images.filter((img) => typeof img === "string" && img.trim() !== "")
-            : [];
-          return { ...v, attributes: remapped, images: normalizedImages };
-        });
-        const sigs = payload.variants.map((v) => variantAttributesSignature(v.attributes));
-        const seen = new Set();
-        for (const s of sigs) {
-          if (seen.has(s)) {
-            Swal.fire(
-              "Trùng biến thể",
-              "Hai biến thể không được trùng hoàn toàn cùng tổ hợp thuộc tính (màu, size…). Vui lòng gộp hoặc đổi giá trị.",
-              "error",
-            );
-            return;
-          }
-          seen.add(s);
-        }
-      }
-    }
 
     // createProduct expects `payload` directly
     // updateProduct expects `{ id, payload }`
@@ -458,6 +669,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
   return (
     <>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
         .material-symbols-outlined { font-family:'Material Symbols Outlined'; font-style:normal; line-height:1; text-transform:none; display:inline-block; white-space:nowrap; }
         .sneaker-input:focus { border-color:#f49d25 !important; box-shadow:0 0 0 3px rgba(244,157,37,0.12); }
@@ -470,7 +682,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
 
       <div
         style={{
-          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          fontFamily: "'Lexend', 'Plus Jakarta Sans', sans-serif",
           background: "#F8F7F5",
           padding: 28,
         }}
@@ -715,444 +927,407 @@ const ProductDetail = ({ productId = null, onClose }) => {
                   />
                 </div>
 
-                {hasVar && (
+                                {hasVar && (
                   <>
-                    <div style={{ marginBottom: 16 }}>
-                      <FieldLabel>Thuộc tính biến thể</FieldLabel>
-                      <Form.Item name="attributes">
-                        <Select
-                          mode="tags"
-                          placeholder="Chọn từ danh sách hoặc gõ tên thuộc tính"
-                          style={{ width: "100%" }}
-                          options={VARIANT_ATTRIBUTE_PRESET_OPTIONS}
-                          showSearch
-                          optionFilterProp="label"
-                          filterOption={(input, option) => {
-                            const q = String(input || "").trim().toLowerCase();
-                            if (!q) return true;
-                            const label = String(option?.label ?? "").toLowerCase();
-                            const value = String(option?.value ?? "").toLowerCase();
-                            return label.includes(q) || value.includes(q);
-                          }}
-                          maxTagCount="responsive"
-                          tokenSeparators={[","]}
-                          onChange={(vals) => {
-                            const normalized = (vals || [])
-                              .flatMap((v) => String(v).split(","))
-                              .map((v) => v.trim())
-                              .filter(Boolean);
-                            form.setFieldValue(
-                              "attributes",
-                              Array.from(new Set(normalized)),
-                            );
-                          }}
-                        />
-                      </Form.Item>
-                    </div>
-
-                    <Form.Item
-                      shouldUpdate={(p, c) => p.attributes !== c.attributes}
+                    <p
+                      style={{
+                        fontFamily: "'Lexend', sans-serif",
+                        fontSize: 13,
+                        color: "#64748B",
+                        marginBottom: 12,
+                      }}
                     >
-                      {({ getFieldValue }) => {
-                        const attributes = getFieldValue("attributes") || [];
-                        const sizeOptions = sizes?.data || [];
-                        const hasColorAttribute = attributes.some((attr) => {
-                          const key = normalizeAttr(attr);
-                          return (
-                            key === "color" ||
-                            key === "mau" ||
-                            key.includes("mau sac") ||
-                            key.includes("color")
-                          );
-                        });
-                        return (
-                          <Form.List name="variants">
-                            {(fields, { add, remove }) => {
-                              const handleAddVariant = () => {
-                                const name = form.getFieldValue("name");
-                                const current = form.getFieldValue("variants") || [];
-                                const existingSkus = current.map((v) => v?.sku);
-                                const sku = generateNextVariantSku(name, existingSkus);
-                                const attrObj = {};
-                                attributes.forEach((a) => {
-                                  attrObj[a] = undefined;
-                                });
-                                const basePrice = form.getFieldValue("price");
-                                add({
-                                  sku,
-                                  price:
-                                    typeof basePrice === "number" && basePrice > 0
-                                      ? basePrice
-                                      : undefined,
-                                  stock: 0,
-                                  attributes: attrObj,
-                                  images: [],
-                                });
-                              };
-                              return (
-                              <>
+                      Lưới biến thể: <b>cột = Size</b>, <b>hàng = Màu</b>. Mỗi ô có SKU, giá, tồn và ảnh riêng.
+                    </p>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 12,
+                        marginBottom: 16,
+                        alignItems: "flex-end",
+                      }}
+                    >
+                      <div style={{ flex: "1 1 200px" }}>
+                        <FieldLabel>Thêm size</FieldLabel>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <Select
+                            showSearch
+                            allowClear
+                            placeholder="Chọn size"
+                            style={{ flex: 1, borderRadius: 12 }}
+                            value={newSizeDraft || undefined}
+                            onChange={(v) => setNewSizeDraft(v || "")}
+                            options={(sizes?.data || []).map((s) => ({
+                              label: s.name,
+                              value: s.name,
+                            }))}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => addMatrixSize(newSizeDraft)}
+                            style={{
+                              padding: "8px 14px",
+                              borderRadius: 12,
+                              border: "none",
+                              background: "#f49d25",
+                              color: "#fff",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              fontFamily: "'Lexend', sans-serif",
+                            }}
+                          >
+                            Thêm size
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{ flex: "1 1 240px" }}>
+                        <FieldLabel>Thêm màu</FieldLabel>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <Select
+                            showSearch
+                            allowClear
+                            placeholder="Chọn màu danh mục"
+                            style={{ flex: 1, borderRadius: 12 }}
+                            value={newColorIdDraft}
+                            onChange={(id) => setNewColorIdDraft(id)}
+                            options={colorOptions.map((c) => ({
+                              label: `${c.name} (${c.code})`,
+                              value: c._id,
+                            }))}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const c = colorOptions.find(
+                                (x) => String(x._id) === String(newColorIdDraft),
+                              );
+                              if (c) addMatrixColorRow(c);
+                            }}
+                            style={{
+                              padding: "8px 14px",
+                              borderRadius: 12,
+                              border: "none",
+                              background: "#f49d25",
+                              color: "#fff",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              fontFamily: "'Lexend', sans-serif",
+                            }}
+                          >
+                            Thêm màu
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        marginBottom: 14,
+                        padding: "12px 14px",
+                        borderRadius: 12,
+                        border: "1px solid #E2E8F0",
+                        background: "#FFFBF5",
+                        fontFamily: "'Lexend', sans-serif",
+                        fontWeight: 700,
+                        color: "#0F172A",
+                      }}
+                    >
+                      Tổng tồn kho:{" "}
+                      {Object.values(varMatrix.cells).reduce(
+                        (acc, c) => acc + (Number(c?.stock) || 0),
+                        0,
+                      ).toLocaleString("vi-VN")}
+                    </div>
+                    <div
+                      style={{
+                        overflowX: "auto",
+                        borderRadius: 12,
+                        border: "1px solid #E2E8F0",
+                        background: "#fff",
+                      }}
+                    >
+                      <table
+                        style={{
+                          width: "100%",
+                          borderCollapse: "collapse",
+                          fontSize: 12,
+                          fontFamily: "'Lexend', sans-serif",
+                        }}
+                      >
+                        <thead>
+                          <tr style={{ background: "#F8FAFC" }}>
+                            <th
+                              style={{
+                                padding: 10,
+                                textAlign: "left",
+                                minWidth: 140,
+                                borderBottom: "1px solid #E2E8F0",
+                              }}
+                            >
+                              Màu
+                            </th>
+                            {varMatrix.sizes.map((sz) => (
+                              <th
+                                key={sz}
+                                style={{
+                                  padding: 10,
+                                  borderBottom: "1px solid #E2E8F0",
+                                  verticalAlign: "top",
+                                  minWidth: 168,
+                                }}
+                              >
                                 <div
                                   style={{
-                                    border: "1.5px solid #E2E8F0",
-                                    borderRadius: 14,
-                                    overflow: "hidden",
+                                    fontWeight: 800,
+                                    color: "#f49d25",
+                                    marginBottom: 4,
                                   }}
                                 >
-                                  <table
-                                    style={{
-                                      width: "100%",
-                                      borderCollapse: "collapse",
-                                      fontSize: 13,
-                                    }}
-                                  >
-                                    <thead>
-                                      <tr
-                                        style={{
-                                          background: "#F8FAFC",
-                                          borderBottom: "1.5px solid #E2E8F0",
-                                        }}
-                                      >
-                                        {[
-                                          "SKU (tự sinh)",
-                                          "Giá (₫)",
-                                          "Tồn kho",
-                                          ...attributes,
-                                          ...(hasColorAttribute
-                                            ? ["Ảnh biến thể"]
-                                            : []),
-                                          "",
-                                        ].map((h) => (
-                                          <th
-                                            key={h}
-                                            style={{
-                                              padding: "10px 16px",
-                                              textAlign: "left",
-                                              fontSize: 11,
-                                              fontWeight: 700,
-                                              color: "#94A3B8",
-                                              textTransform: "uppercase",
-                                              letterSpacing: "0.05em",
-                                              whiteSpace: "nowrap",
-                                            }}
-                                          >
-                                            {h}
-                                          </th>
-                                        ))}
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {fields.length === 0 && (
-                                        <tr>
-                                          <td
-                                            colSpan={
-                                              3 +
-                                              attributes.length +
-                                              1 +
-                                              (hasColorAttribute ? 1 : 0)
-                                            }
-                                            style={{
-                                              padding: 28,
-                                              textAlign: "center",
-                                              color: "#CBD5E1",
-                                              fontSize: 13,
-                                            }}
-                                          >
-                                            Chưa có biến thể — nhấn "Thêm biến
-                                            thể" bên dưới
-                                          </td>
-                                        </tr>
-                                      )}
-                                      {fields.map((field, index) => (
-                                        <tr
-                                          key={field.key}
-                                          className="variant-row"
-                                          style={{
-                                            borderBottom: "1px solid #F1F5F9",
-                                          }}
-                                        >
-                                          <td style={{ padding: "8px 16px" }}>
-                                            <Form.Item
-                                              name={[index, "sku"]}
-                                              rules={[{ required: true }]}
-                                            >
-                                              <input
-                                                className="sneaker-input"
-                                                style={{
-                                                  ...inputStyle,
-                                                  padding: "6px 10px",
-                                                  fontSize: 12,
-                                                  fontFamily: "monospace",
-                                                  width: 110,
-                                                }}
-                                                placeholder="Tự sinh"
-                                                title="Mã gợi ý khi thêm biến thể; có thể sửa tay"
-                                              />
-                                            </Form.Item>
-                                          </td>
-                                          <td style={{ padding: "8px 16px" }}>
-                                            <Form.Item
-                                              name={[index, "price"]}
-                                              rules={[
-                                                {
-                                                  required: true,
-                                                  type: "number",
-                                                  min: 1,
-                                                },
-                                              ]}
-                                            >
-                                              <InputNumber
-                                                formatter={(v) =>
-                                                  `${v}`.replace(
-                                                    /\B(?=(\d{3})+(?!\d))/g,
-                                                    ",",
-                                                  )
-                                                }
-                                                style={{
-                                                  width: 120,
-                                                  borderRadius: 10,
-                                                }}
-                                              />
-                                            </Form.Item>
-                                          </td>
-                                          <td style={{ padding: "8px 16px" }}>
-                                            <Form.Item
-                                              name={[index, "stock"]}
-                                              rules={[
-                                                {
-                                                  required: true,
-                                                  type: "number",
-                                                  min: 0,
-                                                },
-                                              ]}
-                                            >
-                                              <InputNumber
-                                                style={{
-                                                  width: 80,
-                                                  borderRadius: 10,
-                                                }}
-                                              />
-                                            </Form.Item>
-                                          </td>
-                                          {attributes.map((attr) => (
-                                            <td
-                                              key={attr}
-                                              style={{ padding: "8px 16px" }}
-                                            >
-                                              <Form.Item
-                                                name={[
-                                                  index,
-                                                  "attributes",
-                                                  attr,
-                                                ]}
-                                                rules={[{ required: true }]}
-                                              >
-                                                {[
-                                                  "size",
-                                                  "kich thuoc",
-                                                  "kích thước",
-                                                ].some((k) =>
-                                                  normalizeAttr(attr).includes(
-                                                    normalizeAttr(k),
-                                                  ),
-                                                ) ? (
-                                                  <Select
-                                                    placeholder="Chọn size"
-                                                    style={{ width: 120 }}
-                                                    options={sizeOptions.map(
-                                                      (s) => ({
-                                                        value: s.name,
-                                                        label: s.name,
-                                                      }),
-                                                    )}
-                                                  />
-                                                ) : (
-                                                  <input
-                                                    className="sneaker-input"
-                                                    style={{
-                                                      ...inputStyle,
-                                                      padding: "6px 10px",
-                                                      fontSize: 12,
-                                                      width: 90,
-                                                    }}
-                                                    placeholder={attr}
-                                                  />
-                                                )}
-                                              </Form.Item>
-                                            </td>
-                                          ))}
-                                          {hasColorAttribute && (
-                                            <td style={{ padding: "8px 16px", minWidth: 220 }}>
-                                              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                                <label
-                                                  style={{
-                                                    display: "inline-flex",
-                                                    alignItems: "center",
-                                                    justifyContent: "center",
-                                                    gap: 4,
-                                                    width: "fit-content",
-                                                    padding: "6px 10px",
-                                                    borderRadius: 8,
-                                                    border: "1px dashed #f49d25",
-                                                    background: "rgba(244,157,37,0.05)",
-                                                    color: "#f49d25",
-                                                    fontSize: 12,
-                                                    fontWeight: 600,
-                                                    cursor: "pointer",
-                                                  }}
-                                                >
-                                                  <PlusOutlined style={{ fontSize: 12 }} />
-                                                  Tải ảnh
-                                                  <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    multiple
-                                                    style={{ display: "none" }}
-                                                    onChange={async (e) => {
-                                                      await handleVariantImagesUpload(index, e.target.files);
-                                                      e.target.value = "";
-                                                    }}
-                                                  />
-                                                </label>
-                                                {(() => {
-                                                  const variantImages = Array.isArray(
-                                                    getFieldValue(["variants", index, "images"]),
-                                                  )
-                                                    ? getFieldValue(["variants", index, "images"])
-                                                    : [];
-                                                  if (!variantImages.length) {
-                                                    return (
-                                                      <span style={{ fontSize: 11, color: "#94A3B8" }}>
-                                                        Chưa có ảnh riêng
-                                                      </span>
-                                                    );
-                                                  }
-                                                  return (
-                                                    <div
-                                                      style={{
-                                                        display: "grid",
-                                                        gridTemplateColumns: "repeat(4, 1fr)",
-                                                        gap: 6,
-                                                      }}
-                                                    >
-                                                      {variantImages.map((imgPath, imgIdx) => (
-                                                        <div
-                                                          key={`${field.key}-${imgIdx}`}
-                                                          style={{
-                                                            position: "relative",
-                                                            aspectRatio: "1/1",
-                                                            borderRadius: 8,
-                                                            overflow: "hidden",
-                                                            border: "1px solid #E2E8F0",
-                                                            background: "#F8FAFC",
-                                                          }}
-                                                        >
-                                                          <img
-                                                            src={toUploadUrl(imgPath)}
-                                                            alt={`variant-${index}-${imgIdx}`}
-                                                            style={{
-                                                              width: "100%",
-                                                              height: "100%",
-                                                              objectFit: "cover",
-                                                            }}
-                                                          />
-                                                          <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                              handleRemoveVariantImage(index, imgIdx)
-                                                            }
-                                                            style={{
-                                                              position: "absolute",
-                                                              top: 2,
-                                                              right: 2,
-                                                              width: 16,
-                                                              height: 16,
-                                                              borderRadius: "50%",
-                                                              border: "none",
-                                                              background: "#EF4444",
-                                                              color: "#fff",
-                                                              fontSize: 10,
-                                                              cursor: "pointer",
-                                                              lineHeight: "16px",
-                                                              padding: 0,
-                                                            }}
-                                                          >
-                                                            ×
-                                                          </button>
-                                                        </div>
-                                                      ))}
-                                                    </div>
-                                                  );
-                                                })()}
-                                              </div>
-                                            </td>
-                                          )}
-                                          <td
-                                            style={{
-                                              padding: "8px 16px",
-                                              textAlign: "center",
-                                            }}
-                                          >
-                                            <button
-                                              type="button"
-                                              onClick={() => remove(index)}
-                                              style={{
-                                                background: "none",
-                                                border: "none",
-                                                cursor: "pointer",
-                                                color: "#CBD5E1",
-                                                padding: 4,
-                                                borderRadius: 6,
-                                                transition: "color 0.15s",
-                                              }}
-                                              onMouseEnter={(e) =>
-                                                (e.currentTarget.style.color =
-                                                  "#EF4444")
-                                              }
-                                              onMouseLeave={(e) =>
-                                                (e.currentTarget.style.color =
-                                                  "#CBD5E1")
-                                              }
-                                            >
-                                              <DeleteOutlined
-                                                style={{ fontSize: 16 }}
-                                              />
-                                            </button>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
+                                  {sz}
                                 </div>
                                 <button
                                   type="button"
-                                  onClick={handleAddVariant}
+                                  onClick={() => removeMatrixSize(sz)}
                                   style={{
-                                    marginTop: 12,
-                                    width: "100%",
-                                    padding: "10px",
-                                    border: "1.5px dashed #f49d25",
-                                    borderRadius: 12,
-                                    background: "rgba(244,157,37,0.04)",
-                                    color: "#f49d25",
-                                    fontWeight: 700,
-                                    fontSize: 13,
+                                    fontSize: 11,
+                                    border: "none",
+                                    background: "transparent",
+                                    color: "#EF4444",
                                     cursor: "pointer",
-                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    gap: 6,
+                                    textDecoration: "underline",
                                   }}
                                 >
-                                  <PlusOutlined /> Thêm biến thể mới
+                                  Xóa cột
                                 </button>
-                              </>
-                              );
-                            }}
-                          </Form.List>
-                        );
-                      }}
-                    </Form.Item>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {varMatrix.colorRows.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={Math.max(1, 1 + varMatrix.sizes.length)}
+                                style={{
+                                  padding: 24,
+                                  textAlign: "center",
+                                  color: "#94A3B8",
+                                }}
+                              >
+                                Thêm size và màu để tạo ô trong lưới.
+                              </td>
+                            </tr>
+                          ) : (
+                            varMatrix.colorRows.map((row) => (
+                              <tr
+                                key={row.key}
+                                style={{ borderTop: "1px solid #F1F5F9" }}
+                              >
+                                <td
+                                  style={{
+                                    padding: 10,
+                                    verticalAlign: "top",
+                                    background: "#FAFAFA",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "flex-start",
+                                      gap: 10,
+                                    }}
+                                  >
+                                    <span
+                                      title={row.colorHex || ""}
+                                      style={{
+                                        width: 22,
+                                        height: 22,
+                                        borderRadius: 8,
+                                        background: row.colorHex || "#CBD5E1",
+                                        border: "1px solid #E2E8F0",
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                    <div style={{ minWidth: 0 }}>
+                                      <div style={{ fontWeight: 700, color: "#0F172A" }}>
+                                        {row.colorName}
+                                      </div>
+                                      {!/^[a-f\d]{24}$/i.test(String(row.colorId)) ? (
+                                        <div style={{ color: "#dc2626", fontSize: 11, marginTop: 4 }}>
+                                          Dòng cũ — xóa và thêm lại màu từ danh mục.
+                                        </div>
+                                      ) : null}
+                                      <button
+                                        type="button"
+                                        onClick={() => removeMatrixColorRow(row.key)}
+                                        style={{
+                                          marginTop: 6,
+                                          fontSize: 11,
+                                          border: "none",
+                                          background: "transparent",
+                                          color: "#EF4444",
+                                          cursor: "pointer",
+                                          textDecoration: "underline",
+                                        }}
+                                      >
+                                        Xóa hàng màu
+                                      </button>
+                                    </div>
+                                  </div>
+                                </td>
+                                {varMatrix.sizes.map((sz) => {
+                                  const ck = `${row.key}::${sz}`;
+                                  const cell = varMatrix.cells[ck] || {};
+                                  const imgs = Array.isArray(cell.images) ? cell.images : [];
+                                  return (
+                                    <td
+                                      key={ck}
+                                      style={{
+                                        padding: 8,
+                                        verticalAlign: "top",
+                                        borderLeft: "1px solid #F1F5F9",
+                                      }}
+                                    >
+                                      <input
+                                        className="sneaker-input"
+                                        value={cell.sku || ""}
+                                        onChange={(e) =>
+                                          updateMatrixCellField(row.key, sz, "sku", e.target.value)
+                                        }
+                                        placeholder="SKU"
+                                        style={{
+                                          ...inputStyle,
+                                          fontSize: 11,
+                                          padding: "6px 8px",
+                                          marginBottom: 6,
+                                          width: "100%",
+                                          boxSizing: "border-box",
+                                        }}
+                                      />
+                                      <InputNumber
+                                        value={cell.price}
+                                        min={1}
+                                        onChange={(v) =>
+                                          updateMatrixCellField(row.key, sz, "price", v)
+                                        }
+                                        formatter={(v) =>
+                                          `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                                        }
+                                        style={{
+                                          width: "100%",
+                                          borderRadius: 12,
+                                          marginBottom: 6,
+                                        }}
+                                      />
+                                      <InputNumber
+                                        value={cell.stock}
+                                        min={0}
+                                        onChange={(v) =>
+                                          updateMatrixCellField(row.key, sz, "stock", v)
+                                        }
+                                        style={{ width: "100%", borderRadius: 12, marginBottom: 6 }}
+                                      />
+                                      <label
+                                        style={{
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          gap: 4,
+                                          padding: "4px 8px",
+                                          borderRadius: 8,
+                                          border: "1px dashed #f49d25",
+                                          background: "rgba(244,157,37,0.06)",
+                                          color: "#f49d25",
+                                          fontSize: 11,
+                                          fontWeight: 600,
+                                          cursor: "pointer",
+                                          marginBottom: 6,
+                                        }}
+                                      >
+                                        <PlusOutlined style={{ fontSize: 11 }} />
+                                        Ảnh
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          multiple
+                                          style={{ display: "none" }}
+                                          onChange={async (e) => {
+                                            await handleMatrixCellImagesUpload(
+                                              row.key,
+                                              sz,
+                                              e.target.files,
+                                            );
+                                            e.target.value = "";
+                                          }}
+                                        />
+                                      </label>
+                                      {imgs.length ? (
+                                        <div
+                                          style={{
+                                            display: "grid",
+                                            gridTemplateColumns: "repeat(3, 1fr)",
+                                            gap: 4,
+                                          }}
+                                        >
+                                          {imgs.map((imgPath, imgIdx) => (
+                                            <div
+                                              key={`${ck}-img-${imgIdx}`}
+                                              style={{
+                                                position: "relative",
+                                                aspectRatio: "1/1",
+                                                borderRadius: 8,
+                                                overflow: "hidden",
+                                                border: "1px solid #E2E8F0",
+                                              }}
+                                            >
+                                              <img
+                                                src={toUploadUrl(imgPath)}
+                                                alt=""
+                                                style={{
+                                                  width: "100%",
+                                                  height: "100%",
+                                                  objectFit: "cover",
+                                                }}
+                                              />
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  handleRemoveMatrixCellImage(row.key, sz, imgIdx)
+                                                }
+                                                style={{
+                                                  position: "absolute",
+                                                  top: 2,
+                                                  right: 2,
+                                                  width: 16,
+                                                  height: 16,
+                                                  borderRadius: "50%",
+                                                  border: "none",
+                                                  background: "#EF4444",
+                                                  color: "#fff",
+                                                  fontSize: 10,
+                                                  cursor: "pointer",
+                                                  lineHeight: "14px",
+                                                  padding: 0,
+                                                }}
+                                              >
+                                                ×
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <span style={{ fontSize: 10, color: "#94A3B8" }}>
+                                          Chưa có ảnh
+                                        </span>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </>
                 )}
               </SectionCard>
