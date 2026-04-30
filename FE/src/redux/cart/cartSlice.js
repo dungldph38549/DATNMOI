@@ -112,6 +112,7 @@ const cartSlice = createSlice({
       if (existing) {
         existing.qty += qty;
         if (price) existing.price = price;
+        if (image) existing.image = image;
         if (originalPrice != null && Number.isFinite(originalPrice)) {
           existing.originalPrice = originalPrice;
         }
@@ -169,7 +170,7 @@ const cartSlice = createSlice({
       saveCart(state);
     },
     updateCartVariant: (state, action) => {
-      const { cartKey, sku, size, price, originalPrice, color } =
+      const { cartKey, sku, size, price, originalPrice, color, image } =
         action.payload || {};
       if (!cartKey) return;
       const item = state.items.find((i) => i.cartKey === cartKey);
@@ -202,6 +203,9 @@ const cartSlice = createSlice({
       }
       if (originalPrice != null && Number.isFinite(Number(originalPrice))) {
         item.originalPrice = Number(originalPrice);
+      }
+      if (image != null && String(image).trim() !== "") {
+        item.image = String(image).trim();
       }
       item.cartKey = nextCartKey;
 

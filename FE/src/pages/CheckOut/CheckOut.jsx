@@ -26,6 +26,13 @@ const cartVariantSummary = (item) =>
     .filter((x) => x != null && String(x).trim() !== "")
     .join(" · ");
 
+const toCartImageUrl = (img) => {
+  const value = String(img || "").trim();
+  if (!value) return "https://via.placeholder.com/80/f0f0f0/999?text=No+Image";
+  if (value.startsWith("http")) return value;
+  return `http://localhost:3002/uploads/${value.startsWith("/") ? value.slice(1) : value}`;
+};
+
 const CheckOut = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -669,6 +676,37 @@ const CheckOut = () => {
     if (!found) return "";
     return `${found.name}${cartVariantSummary(found) ? ` (${cartVariantSummary(found)})` : ""}`;
   }, [appliedVoucherTarget, checkoutItems]);
+  const selectedVoucherTargetItem = useMemo(() => {
+    if (!appliedVoucherTarget?.productId) return null;
+    return (
+      checkoutItems.find((item) => {
+        const pid = String(item.productId || item._id || "");
+        if (pid !== String(appliedVoucherTarget.productId)) return false;
+        if (!appliedVoucherTarget?.sku) return true;
+        return (
+          String(item?.sku || "").trim().toUpperCase() ===
+          String(appliedVoucherTarget.sku || "").trim().toUpperCase()
+        );
+      }) || null
+    );
+  }, [appliedVoucherTarget, checkoutItems]);
+  const voucherDiscountTargetItem = useMemo(() => {
+    if (selectedVoucherTargetItem) return selectedVoucherTargetItem;
+    if (!hasVoucherDiscount) return null;
+    // Fallback: backend có thể không trả voucherTarget tường minh.
+    // Nếu giỏ chỉ có 1 dòng, xem như dòng đó được trừ.
+    if (checkoutItems.length === 1) return checkoutItems[0];
+    // Với voucher theo phạm vi sản phẩm nhưng không kèm target cụ thể, tạm ưu tiên dòng đầu.
+    if (appliedVoucher && appliedVoucher.isWholeOrderVoucher === false && checkoutItems.length > 0) {
+      return checkoutItems[0];
+    }
+    return null;
+  }, [
+    selectedVoucherTargetItem,
+    hasVoucherDiscount,
+    checkoutItems,
+    appliedVoucher,
+  ]);
 
   const validateForm = () => {
     let newErrors = {};
@@ -1123,10 +1161,30 @@ const CheckOut = () => {
                       </div>
                     )}
                     {voucherError && <p className="text-xs font-medium text-red-500">{voucherError}</p>}
-                    {discount > 0 && selectedVoucherTargetLabel && (
-                      <p className="text-xs text-slate-600">
-                        Áp dụng cho sản phẩm: <b>{selectedVoucherTargetLabel}</b>
-                      </p>
+                    {discount > 0 && voucherDiscountTargetItem && (
+                      <div className="rounded-lg border border-[#d7e7ff] bg-[#f3f8ff] p-2.5">
+                        <p className="text-[11px] font-semibold text-slate-600">
+                          Sản phẩm được trừ voucher
+                        </p>
+                        <div className="mt-1.5 flex items-start gap-2.5">
+                          <img
+                            src={toCartImageUrl(voucherDiscountTargetItem.image)}
+                            alt={voucherDiscountTargetItem.name}
+                            className="h-11 w-11 rounded-md border border-[#dbe5f4] object-cover"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="line-clamp-1 text-xs font-semibold text-slate-800">
+                              {voucherDiscountTargetItem.name}
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                              Phân loại: {cartVariantSummary(voucherDiscountTargetItem) || "Mặc định"}
+                            </p>
+                            <p className="text-[11px] font-semibold text-green-700">
+                              Giảm trên sản phẩm này: -{voucherDiscountAmountLabel}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     )}
                     {expiredVoucherCodes.length > 0 && (
                       <p className="text-[11px] text-slate-400">
@@ -1265,10 +1323,29 @@ const CheckOut = () => {
                         : "Chưa áp dụng"}
                     </span>
                   </div>
-                  {hasVoucherDiscount && selectedVoucherTargetLabel && (
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="font-semibold">Sản phẩm được giảm:</span>
-                      <span className="text-right">{selectedVoucherTargetLabel}</span>
+                  {hasVoucherDiscount && voucherDiscountTargetItem && (
+                    <div className="rounded-md border border-[#d7e7ff] bg-[#f3f8ff] p-2.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                        Sản phẩm được trừ
+                      </p>
+                      <div className="mt-2 flex items-start gap-2.5">
+                        <img
+                          src={toCartImageUrl(voucherDiscountTargetItem.image)}
+                          alt={voucherDiscountTargetItem.name}
+                          className="h-10 w-10 rounded border border-[#dbe5f4] object-cover"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-1 text-xs font-semibold text-slate-800">
+                            {voucherDiscountTargetItem.name}
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            {cartVariantSummary(voucherDiscountTargetItem) || "Mặc định"}
+                          </p>
+                          <p className="text-[11px] font-semibold text-green-700">
+                            Trừ: -{voucherDiscountAmountLabel}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
                   {hasVoucherDiscount && (
@@ -1279,7 +1356,7 @@ const CheckOut = () => {
                       </span>
                     </div>
                   )}
-                  {hasVoucherDiscount && !selectedVoucherTargetLabel && (
+                  {hasVoucherDiscount && !voucherDiscountTargetItem && (
                     <div className="flex items-start justify-between gap-2">
                       <span className="font-semibold">Phạm vi voucher:</span>
                       <span className="text-right">

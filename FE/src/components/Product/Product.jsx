@@ -10,7 +10,7 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../redux/cart/cartSlice";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
-import { getProductPriceInfo } from "../../utils/pricing.js";
+import { getProductPriceInfo, getProductPriceRange } from "../../utils/pricing.js";
 import notify from "../../utils/notify";
 import { isProductOutOfStock } from "../../utils/stock.js";
 
@@ -51,46 +51,9 @@ const Product = ({
     Array.isArray(product?.variants) && product.variants.length > 0;
   const isOutOfStock = useMemo(() => isProductOutOfStock(product), [product]);
 
-  const { minPrice, maxPrice } = useMemo(() => {
-    const pr = product?.priceRange;
-    if (pr && (pr.min != null || pr.max != null)) {
-      return {
-        minPrice: Number(pr.min ?? product?.price ?? 0) || 0,
-        maxPrice: Number(pr.max ?? product?.price ?? 0) || 0,
-      };
-    }
-
-    const prices = Array.isArray(product?.variants)
-      ? product.variants
-          .filter((v) => v && v.price != null)
-          .map((v) => Number(v.price))
-          .filter((n) => Number.isFinite(n))
-      : [];
-
-    if (prices.length > 0) {
-      return { minPrice: Math.min(...prices), maxPrice: Math.max(...prices) };
-    }
-
-    const single = Number(product?.price ?? 0);
-    return {
-      minPrice: Number.isFinite(single) ? single : 0,
-      maxPrice: Number.isFinite(single) ? single : 0,
-    };
-  }, [product]);
+  const { minPrice, maxPrice } = useMemo(() => getProductPriceRange(product), [product]);
 
   const cardPriceInfo = useMemo(() => getProductPriceInfo(product), [product]);
-
-  const { minOriginal, maxOriginal } = useMemo(() => {
-    const or = product?.originalPriceRange;
-    if (or && (or.min != null || or.max != null)) {
-      return {
-        minOriginal: Number(or.min ?? 0) || 0,
-        maxOriginal: Number(or.max ?? or.min ?? 0) || 0,
-      };
-    }
-    const o = Number(cardPriceInfo.originalPrice ?? 0);
-    return { minOriginal: o, maxOriginal: o };
-  }, [product, cardPriceInfo.originalPrice]);
 
   const ratingOutOf5 = useMemo(() => {
     let raw =
@@ -233,13 +196,10 @@ const Product = ({
         </div>
 
         <div className="mt-2">
-          {cardPriceInfo.hasSale && (
-            <span className="line-through text-gray-400 mr-2">
-              {formatPrice(cardPriceInfo.originalPrice)}₫
-            </span>
-          )}
           <span className="text-red-500 font-bold">
-            {formatPrice(cardPriceInfo.effectivePrice)}₫
+            {minPrice === maxPrice
+              ? `${formatPrice(minPrice)}₫`
+              : `${formatPrice(minPrice)} - ${formatPrice(maxPrice)}₫`}
           </span>
         </div>
 

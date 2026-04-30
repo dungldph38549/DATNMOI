@@ -3,26 +3,13 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaEye, FaHeart, FaRegHeart } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProducts } from "../../api";
-import { getProductPriceInfo } from "../../utils/pricing.js";
+import { getProductPriceInfo, getProductPriceRange } from "../../utils/pricing.js";
 import { isProductOutOfStock } from "../../utils/stock.js";
 import { getVariantColorValue } from "../../utils/variantAttributes";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 import notify from "../../utils/notify";
 
 const PAGE_STEP = 12;
-
-const getProductMinPrice = (product) => {
-  const pr = product?.priceRange;
-  if (pr && (pr.min != null || pr.max != null)) return Number(pr.min ?? 0) || 0;
-  if (typeof product?.price === "number") return product.price;
-  if (Array.isArray(product?.variants) && product.variants.length > 0) {
-    const prices = product.variants
-      .map((v) => Number(v?.price))
-      .filter((n) => Number.isFinite(n));
-    if (prices.length > 0) return Math.min(...prices);
-  }
-  return 0;
-};
 
 const getProductColors = (product) => {
   const colors = [];
@@ -187,9 +174,7 @@ const SalePage = () => {
               <div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 xl:grid-cols-4">
                 {visibleList.map((item) => {
                   const image = getImageUrl(item?.image || item?.srcImages?.[0]);
-                  const priceInfo = getProductPriceInfo(item);
-                  const eff = Number(priceInfo.effectivePrice ?? 0) || getProductMinPrice(item);
-                  const orig = Number(priceInfo.originalPrice ?? 0);
+                  const { minPrice, maxPrice } = getProductPriceRange(item);
                   const outOfStock = isProductOutOfStock(item);
                   return (
                     <Link key={item._id} to={`/product/${item._id}`} className="group block">
@@ -257,13 +242,10 @@ const SalePage = () => {
                         </div>
                         <div className="shrink-0 text-right">
                           <p className="text-sm font-semibold tabular-nums text-[#D0021B] md:text-base">
-                            {eff.toLocaleString("vi-VN")}đ
+                            {minPrice === maxPrice
+                              ? `${Number(minPrice || 0).toLocaleString("vi-VN")}đ`
+                              : `${Number(minPrice || 0).toLocaleString("vi-VN")} - ${Number(maxPrice || 0).toLocaleString("vi-VN")}đ`}
                           </p>
-                          {priceInfo.hasSale && orig > eff && (
-                            <p className="mt-0.5 text-xs tabular-nums text-neutral-400 line-through">
-                              {orig.toLocaleString("vi-VN")}đ
-                            </p>
-                          )}
                         </div>
                       </div>
                     </Link>

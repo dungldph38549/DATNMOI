@@ -593,8 +593,18 @@ const ProductDetail = () => {
       );
     }
 
+    const cartImage =
+      (selectedVariant?.image && String(selectedVariant.image).trim()) ||
+      (Array.isArray(selectedVariant?.images) &&
+        selectedVariant.images.find(
+          (img) => img != null && String(img).trim() !== "",
+        )) ||
+      (mainImage && String(mainImage).trim()) ||
+      (product?.image && String(product.image).trim()) ||
+      "";
+
     dispatch(addToCart({
-      productId: product._id, name: product.name, image: product.image,
+      productId: product._id, name: product.name, image: cartImage,
       price: displayPrice,
       originalPrice: Number(selectedPriceInfo.originalPrice || displayPrice),
       qty: qtySafe, sku: skuToSave, size: sizeToSave, color: colorToSave,
@@ -686,12 +696,22 @@ const ProductDetail = () => {
       );
     }
 
+    const cartImage =
+      (selectedVariant?.image && String(selectedVariant.image).trim()) ||
+      (Array.isArray(selectedVariant?.images) &&
+        selectedVariant.images.find(
+          (img) => img != null && String(img).trim() !== "",
+        )) ||
+      (mainImage && String(mainImage).trim()) ||
+      (product?.image && String(product.image).trim()) ||
+      "";
+
     const buyNowCartKey = buildBuyNowCartKey();
     const buyNowItem = {
       cartKey: buyNowCartKey,
       productId: product._id,
       name: product.name,
-      image: product.image,
+      image: cartImage,
       price: displayPrice,
       originalPrice: Number(selectedPriceInfo.originalPrice || displayPrice),
       qty: qtySafe,

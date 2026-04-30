@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { FaEye, FaHeart, FaRegHeart } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProducts, getAllCategories } from "../../api";
-import { getProductPriceInfo } from "../../utils/pricing.js";
+import { getProductPriceRange } from "../../utils/pricing.js";
 import { isProductOutOfStock } from "../../utils/stock.js";
 import {
   getVariantLaceColorValue,
@@ -577,7 +577,7 @@ const AccessoriesPage = () => {
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
                   {visibleList.map((item) => {
                     const image = getImageUrl(item?.image || item?.srcImages?.[0]);
-                    const priceInfo = getProductPriceInfo(item);
+                    const { minPrice, maxPrice } = getProductPriceRange(item);
                     const categoryText = item?.categoryId?.name || item?.category || "Phụ kiện";
                     const outOfStock = isProductOutOfStock(item);
                     return (
@@ -636,13 +636,10 @@ const AccessoriesPage = () => {
                           </p>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <span className="text-base font-bold text-neutral-900">
-                              {Number(priceInfo?.effectivePrice || 0).toLocaleString("vi-VN")}đ
+                              {minPrice === maxPrice
+                                ? `${Number(minPrice || 0).toLocaleString("vi-VN")}đ`
+                                : `${Number(minPrice || 0).toLocaleString("vi-VN")} - ${Number(maxPrice || 0).toLocaleString("vi-VN")}đ`}
                             </span>
-                            {priceInfo?.hasSale && (
-                              <span className="text-xs text-neutral-400 line-through">
-                                {Number(priceInfo?.originalPrice || 0).toLocaleString("vi-VN")}đ
-                              </span>
-                            )}
                           </div>
                         </div>
                       </Link>

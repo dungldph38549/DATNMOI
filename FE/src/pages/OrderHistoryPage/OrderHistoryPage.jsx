@@ -97,7 +97,27 @@ function orderMatchesTab(order, tabId) {
 }
 
 function productImageUrl(p) {
-  const imgName = p.image || p.productId?.image;
+  const lineSku =
+    p?.sku == null || String(p.sku).trim() === ""
+      ? null
+      : String(p.sku).trim().toUpperCase();
+  const variants = Array.isArray(p?.productId?.variants) ? p.productId.variants : [];
+  const variantMatch = lineSku
+    ? variants.find(
+        (v) =>
+          String(v?.sku || "")
+            .trim()
+            .toUpperCase() === lineSku,
+      )
+    : null;
+  const variantImage =
+    (variantMatch?.image && String(variantMatch.image).trim()) ||
+    (Array.isArray(variantMatch?.images) &&
+      variantMatch.images.find(
+        (img) => img != null && String(img).trim() !== "",
+      )) ||
+    null;
+  const imgName = p.image || variantImage || p.productId?.image;
   if (!imgName) return "https://via.placeholder.com/80/f0f0f0/999?text=SP";
   if (String(imgName).startsWith("http")) return imgName;
   return `http://localhost:3002/uploads/${String(imgName).startsWith("/") ? String(imgName).slice(1) : imgName}`;
