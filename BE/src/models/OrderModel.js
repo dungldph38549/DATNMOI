@@ -112,6 +112,11 @@ const orderSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    /** Đã ghi nhận lượt dùng voucher (usedBy) — VNPay ghi sau khi thanh toán */
+    voucherConsumed: {
+      type: Boolean,
+      default: false,
+    },
     shippingFee: {
       type: Number,
       required: true,
@@ -193,6 +198,10 @@ orderSchema.pre("validate", function () {
     this.invalidate("userId", "Either userId or guestId is required.");
     this.invalidate("guestId", "Either guestId or userId is required.");
   }
+});
+
+orderSchema.pre("save", function () {
+  return Promise.resolve();
 });
 
 module.exports = mongoose.model("Order", orderSchema);

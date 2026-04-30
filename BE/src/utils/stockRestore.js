@@ -1,4 +1,5 @@
 const Product = require("../models/ProductModel");
+const { findVariantBySku } = require("./variantHelpers");
 
 /**
  * Hoàn lại số lượng cho biến thể (theo SKU) sau khi hủy đơn / cleanup.
@@ -13,7 +14,7 @@ const restoreVariantStockBySku = async (item, qty, session = null) => {
   const productDoc = await q;
   if (!productDoc?.hasVariants) return;
 
-  const variant = productDoc.variants?.find((v) => v.sku === item.sku);
+  const variant = findVariantBySku(productDoc.variants, item.sku);
   if (!variant) return;
 
   variant.stock = Number(variant.stock || 0) + Number(qty || 0);

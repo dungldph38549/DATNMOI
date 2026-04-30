@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useSelector } from "react-redux";
 import { FaFire, FaGem, FaArrowRight, FaFilter } from "react-icons/fa";
 import Product from "../../components/Product/Product";
 import BannerSlider from "../../components/BannerSlider/BannerSlider";
+import RecommendSection from "../../components/RecommendSection/RecommendSection";
 import {
   getFeaturedProducts,
   getBestSellers,
@@ -104,6 +106,10 @@ const pickForRecommendation = ({
 };
 
 const HomePage = () => {
+  const reduxUser = useSelector((s) => s.user?.user);
+  const recommendUserId =
+    reduxUser?.login ? String(reduxUser._id || reduxUser.id || "") : null;
+
   const [products, setProducts] = useState([]);
   const [hotProducts, setHotProducts] = useState([]);
   const [newProducts, setNewProducts] = useState([]);
@@ -257,6 +263,8 @@ const HomePage = () => {
   return (
     <main className="min-h-screen bg-convot-cream font-body text-convot-charcoal pb-16 md:pb-24">
       <BannerSlider />
+
+      <RecommendSection userId={recommendUserId || undefined} />
 
       {/* Danh mục */}
       <section className="relative z-10 -mt-6 mb-12 md:mb-16">

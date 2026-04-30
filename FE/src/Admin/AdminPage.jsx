@@ -5,7 +5,7 @@ import Products from "./Products";
 import Categories from "./Categories";
 import Dashboard from "./Dashboard";
 import Users from "./Users";
-import Vouchers from "./Vouchers";
+import VoucherManager from "./VoucherManager";
 import Sizes from "./Sizes";
 import ShoelaceSizes from "./ShoelaceSizes";
 import Colors from "./Colors";
@@ -18,7 +18,7 @@ import BannerManager from "./BannerManager";
 // import StaffManagement from "./StaffManagement";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getAllOrders, adminListTopupTransactions } from "../api/index";
+import { getAllOrders } from "../api/index";
 import { clearUser } from "../redux/user";
 
 const getAdminSession = () => {
@@ -82,7 +82,7 @@ const MENU_ITEMS = {
   "wallet-topups": {
     key: "wallet-topups",
     icon: "account_balance_wallet",
-    label: "Giao dịch nạp ví",
+    label: "Hoàn tiền hoàn hàng (ví)",
   },
   staff: { key: "staff", icon: "badge", label: "Nhân viên" },
 };
@@ -254,31 +254,17 @@ const AdminPage = () => {
     staleTime: 1500,
   });
 
-  const { data: topupData } = useQuery({
-    queryKey: ["admin-topups-badges"],
-    queryFn: () => adminListTopupTransactions(1, 100),
-    refetchInterval: ADMIN_BADGE_REFETCH_MS,
-    placeholderData: (prev) => prev,
-    staleTime: 1500,
-  });
-
   const orders = Array.isArray(orderData) ? orderData : [];
-  const topups = Array.isArray(topupData?.data) ? topupData.data : [];
   const pendingOrdersCount = orders.filter((o) =>
     ["pending", "confirmed", "shipped", "delivered"].includes(o.status),
   ).length;
   const returnRequestsCount = orders.filter(
     (o) => o.status === "return-request",
   ).length;
-  const pendingTopupsCount = topups.filter((t) => {
-    if (t?.method !== "bank_transfer") return false;
-    return ["awaiting_transfer", "awaiting_admin"].includes(t?.status);
-  }).length;
 
   const menuWithBadges = Object.values(MENU_ITEMS).map((item) => {
     if (item.key === "orders") return { ...item, count: pendingOrdersCount };
     if (item.key === "order-returns") return { ...item, count: returnRequestsCount };
-    if (item.key === "wallet-topups") return { ...item, count: pendingTopupsCount };
     return item;
   });
   const menuMap = menuWithBadges.reduce((acc, item) => {
@@ -353,7 +339,7 @@ const AdminPage = () => {
       case "users":
         return <Users mode="customers" />;
       case "vouchers":
-        return <Vouchers />;
+        return <VoucherManager />;
       case "wallet-topups":
         return <WalletTopups />;
       case "sizes":

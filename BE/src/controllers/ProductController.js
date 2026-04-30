@@ -3,6 +3,7 @@ const Order = require("../models/OrderModel.js");
 const ProductService = require("../services/ProductService");
 const { successResponse, errorResponse } = require("../utils/response.js");
 const { enrichProductPricing } = require("../utils/salePricing");
+const { findVariantBySku } = require("../utils/variantHelpers.js");
 
 // ================================================================
 // CREATE — Tạo sản phẩm mới
@@ -245,21 +246,20 @@ exports.getStock = async (req, res) => {
         const { productId, sku } = item;
 
         if (sku) {
-          // Kiểm tra tồn kho theo variant (VD: Nike Air Max size 42 màu đen)
-          const product = await Product.findOne({
-            _id: productId,
-            "variants.sku": sku,
-          });
+          const product = await Product.findById(productId);
 
           if (!product)
             return { productId, sku, countInStock: 0, available: false };
 
-          const variant = product.variants.find((v) => v.sku === sku);
+          const variant = findVariantBySku(product.variants, sku);
+          if (!variant)
+            return { productId, sku, countInStock: 0, available: false };
+
           return {
             productId,
             sku,
-            size: variant?.attributes?.Size || null,
-            color: variant?.attributes?.Color || null,
+            size: variant?.size ?? null,
+            color: variant?.colorName ?? null,
             countInStock: variant?.stock ?? 0,
             available: (variant?.stock ?? 0) > 0,
           };

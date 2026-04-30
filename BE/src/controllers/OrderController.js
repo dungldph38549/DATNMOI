@@ -23,9 +23,16 @@ const {
   buildWalletCancelRefundPatch,
   creditWalletForOrderLineCancel,
 } = require("../services/walletService.js");
+const VoucherService = require("../services/VoucherService.js");
 const {
-  computeFinalVoucherDiscountAmount,
-} = require("../services/VoucherService.js");
+  evaluateVoucherDiscount,
+  useVoucher,
+  releaseVoucherForOrder,
+} = VoucherService;
+const {
+  orderAttributesFromVariant,
+  findVariantBySku,
+} = require("../utils/variantHelpers.js");
 const {
   notifyCustomerOfAdminOrderCancel,
 } = require("../services/orderCancelNotify.js");
@@ -130,7 +137,7 @@ async function restoreStockForAcceptedReturn(order, session) {
     const productDoc = item.productId;
     if (!productDoc) continue;
     if (item.sku && productDoc.hasVariants) {
-      const variant = productDoc.variants?.find((v) => v.sku === item.sku);
+      const variant = findVariantBySku(productDoc.variants, item.sku);
       if (variant) {
         variant.stock = Number(variant.stock || 0) + qty;
         await productDoc.save({ session });
@@ -278,7 +285,7 @@ exports.createOrder = async (req, res) => {
           lineDiscount: pricing.discountAmount,
           appliedSaleRuleId: pricing.saleRule?._id || null,
           appliedSaleName: pricing.saleRule?.name || null,
-          attributes: Object.fromEntries(variant.attributes),
+          attributes: orderAttributesFromVariant(variant),
         });
       } else {
         const availableStock = Number(product.stock ?? 0);
@@ -332,6 +339,7 @@ exports.createOrder = async (req, res) => {
       normalizedVoucherCode = String(voucherCode).trim().toUpperCase();
       voucherDoc = await Voucher.findOne({
         code: normalizedVoucherCode,
+        isDeleted: false,
       }).session(session);
 
       if (!voucherDoc) {
@@ -340,63 +348,53 @@ exports.createOrder = async (req, res) => {
         return res.status(422).json({ message: "Voucher không tồn tại" });
       }
 
-      if (voucherDoc.ownerUserId) {
-        const ownerId = String(voucherDoc.ownerUserId);
-        if (!userId || String(userId) !== ownerId) {
-          await session.abortTransaction();
-          session.endSession();
-          return res.status(422).json({
-            message: "Voucher này không áp dụng cho tài khoản hiện tại",
-          });
-        }
-      }
+      const actorUser = user
+        ? {
+            id: String(user._id),
+            isAdmin: Boolean(user.isAdmin),
+            isStaff: Boolean(user.isStaff),
+          }
+        : userId
+          ? {
+              id: String(userId),
+              isAdmin: false,
+              isStaff: false,
+            }
+          : null;
 
-      if (voucherDoc.status !== "active") {
+      const voucherItems = mappedProducts.map((item) => ({
+        productId: item.productId,
+        sku: item.sku,
+        price: item.price,
+        quantity: item.quantity,
+      }));
+
+      const evaluated = await evaluateVoucherDiscount({
+        voucherDoc,
+        actorUser,
+        userId,
+        guestId: String(guestId || "").trim() || null,
+        items: voucherItems,
+        voucherTarget,
+        orderValueOverride: subtotal,
+      });
+
+      if (evaluated.status === "ERR") {
         await session.abortTransaction();
         session.endSession();
-        return res.status(422).json({ message: "Voucher không hoạt động" });
+        return res.status(422).json({ message: evaluated.message });
       }
 
-      const now = new Date();
-      const start = voucherDoc.startDate
-        ? new Date(voucherDoc.startDate)
-        : null;
-      const end = voucherDoc.endDate ? new Date(voucherDoc.endDate) : null;
-      if (start && now < start) {
-        await session.abortTransaction();
-        session.endSession();
-        const fromStr = start.toLocaleString("vi-VN", {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-        return res.status(422).json({
-          message: `Voucher chưa có hiệu lực. Có thể sử dụng từ ${fromStr}.`,
-        });
-      }
-      if (end && now > end) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(422).json({ message: "Voucher đã hết hạn" });
-      }
-
-      const minOrderValue = Number(voucherDoc.minOrderValue ?? 0);
-      if (subtotal < minOrderValue) {
+      if (evaluated.data?.requiresProductSelection) {
         await session.abortTransaction();
         session.endSession();
         return res.status(422).json({
-          message: `Đơn hàng tối thiểu để dùng voucher là ${minOrderValue.toLocaleString()} đ`,
+          message:
+            "Voucher cá nhân yêu cầu chọn sản phẩm áp dụng giảm giá",
         });
       }
 
-      const usedCount = Number(voucherDoc.usedCount ?? 0);
-      if (usedCount >= 1) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(422).json({ message: "Voucher đã hết lượt sử dụng" });
-      }
+      discountAmount = Number(evaluated.data?.discountAmount ?? 0);
 
       const customAccountLimit = Number(user?.voucherUsageLimit);
       let accountVoucherLimit = 0;
@@ -428,73 +426,6 @@ exports.createOrder = async (req, res) => {
           });
         }
       }
-
-      const applicableIds = Array.isArray(voucherDoc.applicableProductIds)
-        ? voucherDoc.applicableProductIds.map((id) => String(id))
-        : [];
-      const hasProductScope = applicableIds.length > 0;
-      let eligibleItems = hasProductScope
-        ? mappedProducts.filter((item) =>
-            applicableIds.includes(String(item.productId)),
-          )
-        : mappedProducts;
-      const eligibleSubtotal = eligibleItems.reduce(
-        (sum, item) =>
-          sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
-        0,
-      );
-      if (hasProductScope && eligibleSubtotal <= 0) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(422).json({
-          message: "Voucher này không áp dụng cho sản phẩm đã chọn",
-        });
-      }
-
-      if (voucherDoc.ownerUserId) {
-        const targetProductId = String(voucherTarget?.productId || "").trim();
-        const targetSku = String(voucherTarget?.sku || "")
-          .trim()
-          .toUpperCase();
-
-        if (!targetProductId) {
-          await session.abortTransaction();
-          session.endSession();
-          return res.status(422).json({
-            message: "Voucher cá nhân yêu cầu chọn sản phẩm áp dụng giảm giá",
-          });
-        }
-
-        const matched = eligibleItems.find((item) => {
-          if (String(item.productId) !== targetProductId) return false;
-          if (!targetSku) return true;
-          return String(item.sku || "")
-            .trim()
-            .toUpperCase() === targetSku;
-        });
-
-        if (!matched) {
-          await session.abortTransaction();
-          session.endSession();
-          return res.status(422).json({
-            message: "Sản phẩm chọn áp dụng voucher không hợp lệ",
-          });
-        }
-
-        eligibleItems = [matched];
-      }
-
-      const voucherDiscountBase = voucherDoc.ownerUserId
-        ? Number(eligibleItems[0]?.price || 0)
-        : eligibleItems.reduce(
-            (sum, item) =>
-              sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
-            0,
-          );
-      discountAmount = computeFinalVoucherDiscountAmount(
-        voucherDoc,
-        voucherDiscountBase,
-      );
     }
 
     for (const item of mappedProducts) {
@@ -505,7 +436,7 @@ exports.createOrder = async (req, res) => {
       if (!productForStock) {
         throw new Error("Không tìm thấy sản phẩm");
       }
-      const variant = productForStock.variants?.find((v) => v.sku === item.sku);
+      const variant = findVariantBySku(productForStock.variants, item.sku);
       const available = Number(variant?.stock ?? 0);
       if (!variant || available < item.quantity) {
         throw new Error(
@@ -537,6 +468,7 @@ exports.createOrder = async (req, res) => {
       shippingFee,
       totalAmount: finalTotal,
       paymentStatus: "unpaid",
+      voucherConsumed: false,
     });
 
     const savedOrder = await newOrder.save({ session });
@@ -579,16 +511,28 @@ exports.createOrder = async (req, res) => {
       }
     }
 
-    if (voucherDoc) {
-      const lockVoucher = await Voucher.findOneAndUpdate(
-        { _id: voucherDoc._id, usedCount: { $lt: 1 } },
-        { $inc: { usedCount: 1 } },
-        { session, new: true },
-      );
-      if (!lockVoucher) {
+    if (voucherDoc && paymentMethod !== "vnpay") {
+      try {
+        await useVoucher(
+          {
+            code: normalizedVoucherCode,
+            userId,
+            guestId: String(guestId || "").trim() || null,
+            orderId: savedOrder._id,
+          },
+          session,
+        );
+        await Order.findByIdAndUpdate(
+          savedOrder._id,
+          { voucherConsumed: true },
+          { session },
+        );
+      } catch (ve) {
         await session.abortTransaction();
         session.endSession();
-        return res.status(422).json({ message: "Voucher đã hết lượt sử dụng" });
+        return res.status(422).json({
+          message: ve.message || "Không áp dụng được voucher",
+        });
       }
     }
 
@@ -965,6 +909,20 @@ exports.updateOrder = async (req, res) => {
         session,
       );
       Object.assign(updateFields, walletCancelPatch);
+      if (order.voucherCode && order.voucherConsumed) {
+        await releaseVoucherForOrder(
+          {
+            code: String(order.voucherCode).trim().toUpperCase(),
+            orderId: order._id,
+          },
+          session,
+        );
+      }
+      if (order.voucherCode) {
+        updateFields.voucherCode = null;
+        updateFields.discount = 0;
+        updateFields.voucherConsumed = false;
+      }
       updateFields.products = (order.products || []).map((item) => {
         const plain =
           item && typeof item.toObject === "function"
@@ -1152,6 +1110,21 @@ exports.updateOrderById = async (req, res) => {
           item.canceledBy = item.canceledBy || "user";
         }
         o.markModified("products");
+
+        if (o.voucherCode && o.voucherConsumed) {
+          await releaseVoucherForOrder(
+            {
+              code: String(o.voucherCode).trim().toUpperCase(),
+              orderId: o._id,
+            },
+            session,
+          );
+        }
+        if (o.voucherCode) {
+          o.voucherCode = null;
+          o.discount = 0;
+          o.voucherConsumed = false;
+        }
 
         const walletPatch = await buildWalletCancelRefundPatch(o, session);
         Object.assign(o, walletPatch);
@@ -1997,6 +1970,19 @@ exports.vnpayIpn = async (req, res) => {
         paymentStatus: "paid",
         note: "VNPay IPN xác nhận thanh toán",
       });
+      if (order.voucherCode && !order.voucherConsumed) {
+        try {
+          await useVoucher({
+            code: String(order.voucherCode).trim().toUpperCase(),
+            userId: order.userId,
+            guestId: order.guestId ? String(order.guestId).trim() : null,
+            orderId: order._id,
+          });
+          await Order.findByIdAndUpdate(order._id, { voucherConsumed: true });
+        } catch (vErr) {
+          console.error("[VNPay IPN] useVoucher:", vErr?.message || vErr);
+        }
+      }
     }
 
     return res.status(200).json(IpnSuccess);
@@ -2042,14 +2028,16 @@ const cancelUnpaidVnpayOrder = async (orderId) => {
 
   const update = { status: "canceled" };
 
-  // Hoàn lại lượt voucher nếu đã bị trừ khi tạo đơn.
+  if (order.voucherCode && order.voucherConsumed) {
+    await releaseVoucherForOrder({
+      code: String(order.voucherCode).trim().toUpperCase(),
+      orderId: order._id,
+    });
+  }
   if (order.voucherCode) {
-    await Voucher.findOneAndUpdate(
-      { code: String(order.voucherCode).trim().toUpperCase() },
-      { $inc: { usedCount: -1 } },
-    );
     update.voucherCode = null;
     update.discount = 0;
+    update.voucherConsumed = false;
   }
 
   await Order.findByIdAndUpdate(order._id, update);
@@ -2097,6 +2085,22 @@ exports.returnPayment = async (req, res) => {
           paymentStatus: "paid",
           note: "Thanh toán VNPay thành công",
         });
+        if (order.voucherCode && !order.voucherConsumed) {
+          try {
+            await useVoucher({
+              code: String(order.voucherCode).trim().toUpperCase(),
+              userId: order.userId,
+              guestId: order.guestId ? String(order.guestId).trim() : null,
+              orderId: order._id,
+            });
+            await Order.findByIdAndUpdate(orderId, { voucherConsumed: true });
+          } catch (vErr) {
+            console.error(
+              "[VNPay return] useVoucher:",
+              vErr?.message || vErr,
+            );
+          }
+        }
       }
       return res.redirect(`${successUrl}?success=1&orderId=${orderId}`);
     }
