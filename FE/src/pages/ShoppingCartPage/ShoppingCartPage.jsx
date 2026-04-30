@@ -249,6 +249,11 @@ const ShoppingCartPage = () => {
           stock: Number(v?.stock ?? 0),
           price: Number(v?.effectivePrice ?? v?.price ?? 0),
           originalPrice: Number(v?.originalPrice ?? v?.price ?? 0),
+          image:
+            (v?.image && String(v.image).trim()) ||
+            (Array.isArray(v?.images) &&
+              v.images.find((img) => img != null && String(img).trim() !== "")) ||
+            null,
         };
       }).filter((v) => v.sku || v.size);
       setVariantOptionsByProduct((prev) => ({ ...prev, [productId]: normalized }));
@@ -299,6 +304,7 @@ const ShoppingCartPage = () => {
         variantId: selectedOption.variantId || null,
         price: selectedOption.price,
         originalPrice: selectedOption.originalPrice,
+        image: selectedOption.image || null,
       }),
     );
     setVariantModal({

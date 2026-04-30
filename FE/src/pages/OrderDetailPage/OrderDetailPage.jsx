@@ -205,7 +205,29 @@ const buildMergedReviewContent = (quality, diversity) => {
 };
 
 const getReviewProductThumb = (line) => {
-  const imgName = line?.image || line?.productId?.image;
+  const lineSku =
+    line?.sku == null || String(line.sku).trim() === ""
+      ? null
+      : String(line.sku).trim().toUpperCase();
+  const variants = Array.isArray(line?.productId?.variants)
+    ? line.productId.variants
+    : [];
+  const variantMatch = lineSku
+    ? variants.find(
+        (v) =>
+          String(v?.sku || "")
+            .trim()
+            .toUpperCase() === lineSku,
+      )
+    : null;
+  const variantImage =
+    (variantMatch?.image && String(variantMatch.image).trim()) ||
+    (Array.isArray(variantMatch?.images) &&
+      variantMatch.images.find(
+        (img) => img != null && String(img).trim() !== "",
+      )) ||
+    null;
+  const imgName = line?.image || variantImage || line?.productId?.image;
   if (!imgName) return "https://via.placeholder.com/80/f0f0f0/999?text=SP";
   if (typeof imgName === "string" && imgName.startsWith("http")) return imgName;
   return `http://localhost:3002/uploads/${String(imgName).startsWith("/") ? String(imgName).slice(1) : imgName}`;
@@ -865,14 +887,7 @@ const OrderDetailPage = () => {
                   >
                     <div className="h-28 w-28 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
                       <img
-                        src={(() => {
-                          const imgName = p.image || p.productId?.image;
-                          if (!imgName) {
-                            return "https://via.placeholder.com/80/f0f0f0/999?text=SP";
-                          }
-                          if (imgName.startsWith("http")) return imgName;
-                          return `http://localhost:3002/uploads/${imgName.startsWith("/") ? imgName.slice(1) : imgName}`;
-                        })()}
+                        src={getReviewProductThumb(p)}
                         alt={p.productId?.name || p.name || "Sản phẩm"}
                         className="h-full w-full object-cover"
                       />

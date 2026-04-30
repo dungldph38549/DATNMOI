@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { getProductPriceInfo } from "../../utils/pricing.js";
+import { getProductPriceRange } from "../../utils/pricing.js";
 import { isProductOutOfStock } from "../../utils/stock.js";
 
 const PLACEHOLDER_IMG =
@@ -34,7 +34,7 @@ export default function RelatedProducts({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {(products || []).slice(0, 4).map((p) => {
             const img = p?.image || p?.srcImages?.[0] || "";
-            const priceInfo = getProductPriceInfo(p);
+            const { minPrice, maxPrice } = getProductPriceRange(p);
             const outOfStock = isProductOutOfStock(p);
             return (
               <Link
@@ -64,13 +64,10 @@ export default function RelatedProducts({
                     {p.name}
                   </h3>
                   <div>
-                    {priceInfo.hasSale && (
-                      <p className="text-xs text-slate-400 line-through">
-                        {Number(priceInfo.originalPrice).toLocaleString("vi-VN")}₫
-                      </p>
-                    )}
                     <p className="font-black text-secondary">
-                      {Number(priceInfo.effectivePrice).toLocaleString("vi-VN")}₫
+                      {minPrice === maxPrice
+                        ? `${Number(minPrice || 0).toLocaleString("vi-VN")}₫`
+                        : `${Number(minPrice || 0).toLocaleString("vi-VN")} - ${Number(maxPrice || 0).toLocaleString("vi-VN")}₫`}
                     </p>
                   </div>
                 </div>

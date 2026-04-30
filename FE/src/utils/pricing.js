@@ -1,6 +1,3 @@
-/** Đồng bộ với BE `salePricing.js` — giá niêm yết ảo khi không có giảm giá thật (% trên giá bán). */
-const VIRTUAL_LIST_PRICE_MARKUP_PERCENT = 15;
-
 export function toNumber(value, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -19,10 +16,7 @@ function buildPriceInfo(originalRaw, effectiveRaw) {
     };
   }
 
-  if (original <= effective) {
-    const factor = 1 + VIRTUAL_LIST_PRICE_MARKUP_PERCENT / 100;
-    original = Math.round(effective * factor);
-  }
+  if (original <= 0) original = effective;
 
   const discountPercent =
     original > 0 ? Math.round(((original - effective) / original) * 100) : 0;
@@ -79,4 +73,39 @@ export function getProductPriceInfo(product, selectedVariant = null) {
   );
 
   return buildPriceInfo(original, effective);
+}
+
+export function getProductPriceRange(product) {
+  if (!product) return { minPrice: 0, maxPrice: 0 };
+
+  const pr = product?.priceRange;
+  if (pr && (pr.min != null || pr.max != null)) {
+    const min = toNumber(pr.min ?? pr.max ?? product?.price ?? 0, 0);
+    const max = toNumber(pr.max ?? pr.min ?? product?.price ?? 0, 0);
+    return { minPrice: Math.min(min, max), maxPrice: Math.max(min, max) };
+  }
+
+  const variantPrices = Array.isArray(product?.variants)
+    ? product.variants
+        .map((variant) =>
+          toNumber(
+            variant?.effectivePrice ?? variant?.salePrice ?? variant?.price,
+            NaN
+          )
+        )
+        .filter((value) => Number.isFinite(value) && value > 0)
+    : [];
+
+  if (variantPrices.length > 0) {
+    return {
+      minPrice: Math.min(...variantPrices),
+      maxPrice: Math.max(...variantPrices),
+    };
+  }
+
+  const single = toNumber(
+    product?.effectivePrice ?? product?.salePrice ?? product?.price,
+    0
+  );
+  return { minPrice: single, maxPrice: single };
 }
