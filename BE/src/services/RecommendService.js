@@ -166,16 +166,16 @@ function buildTabQuery(tab, now) {
   }
   if (t === "bestseller" || t === "banchay") {
     return {
-      $or: [{ soldCount: { $gt: 0 } }, { sold: { $gt: 0 } }],
-    };
-  }
-  if (t === "hotsale" || t === "hot") {
-    return {
       $or: [
-        { isFeatured: true },
-        { saleRules: { $elemMatch: { status: "active" } } },
+        { soldCount: { $gt: 0 } },
+        { sold: { $gt: 0 } },
+        { "variants.sold": { $gt: 0 } },
       ],
     };
+  }
+  // Hot / sale: không lọc ở DB — voucher áp SP/danh mục chỉ biết sau loadVoucherHotContext + passesTabFilter.
+  if (t === "hotsale" || t === "hot" || t === "sale") {
+    return {};
   }
   return {};
 }
@@ -228,7 +228,8 @@ function passesTabFilter(tab, p, vctx, now) {
   if (t === "new" || t === "moi") return isNewProduct(p, now);
   if (t === "rating" || t === "danhgia") return isHighRated(p);
   if (t === "bestseller" || t === "banchay") return totalSold(p) >= 1;
-  if (t === "hotsale" || t === "hot") return isHotSaleProduct(p, vctx, now);
+  if (t === "hotsale" || t === "hot" || t === "sale")
+    return isHotSaleProduct(p, vctx, now);
   return true;
 }
 
@@ -297,6 +298,28 @@ const getMainRecommendations = async ({
     .lean();
 
   candidates = candidates.filter((p) => passesTabFilter(tab, p, vctx, now));
+
+  const tabNorm = String(tab || "all").toLowerCase();
+  if (
+    candidates.length === 0 &&
+    tabNorm !== "all" &&
+    tabNorm !== "tatca"
+  ) {
+    const looseQuery = {
+      ...baseProductQuery,
+      _id: {
+        $nin: [...exclude]
+          .filter((id) => mongoose.Types.ObjectId.isValid(id))
+          .map((id) => new mongoose.Types.ObjectId(id)),
+      },
+    };
+    candidates = await Product.find(looseQuery)
+      .populate("brandId", "name logo")
+      .populate("categoryId", "name")
+      .limit(450)
+      .lean();
+    candidates = candidates.filter((p) => passesTabFilter("all", p, vctx, now));
+  }
 
   const purchasedMeta = await enrichPurchasedPreferences(userId, prefCat, prefBrand);
 
@@ -399,6 +422,25 @@ const getByProductRecommendations = async ({
     .lean();
 
   candidates = candidates.filter((p) => passesTabFilter(tab, p, vctx, now));
+
+  const tabNormBy = String(tab || "all").toLowerCase();
+  if (
+    candidates.length === 0 &&
+    tabNormBy !== "all" &&
+    tabNormBy !== "tatca"
+  ) {
+    const looseQuery = {
+      ...baseProductQuery,
+      _id: { $ne: pid },
+      $or: or,
+    };
+    candidates = await Product.find(looseQuery)
+      .populate("brandId", "name logo")
+      .populate("categoryId", "name")
+      .limit(200)
+      .lean();
+    candidates = candidates.filter((p) => passesTabFilter("all", p, vctx, now));
+  }
 
   const ctxBase = {
     now,

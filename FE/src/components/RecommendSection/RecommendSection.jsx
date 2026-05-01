@@ -157,7 +157,8 @@ export default function RecommendSection({ userId = null, productId = null }) {
               Dành riêng cho bạn <span aria-hidden>👟</span>
             </h2>
             <p className="mt-1 text-sm text-neutral-600">
-              Gợi ý theo sở thích, bán chạy và ưu đãi — cập nhật liên tục.
+              Ưu tiên theo danh mục/đã xem; bán chạy theo lượt đã bán (kể cả biến thể); hot sale theo SP nổi bật,
+              rule giảm giá hoặc voucher đang hiệu lực.
             </p>
           </div>
         </div>
