@@ -278,8 +278,9 @@ const buildVariantsPayloadFromMatrix = (matrix) => {
 
 // ================================================================
 // ProductDetail — Card only (no Sidebar / header / layout wrapper)
+// saleOnly: mở từ Trung tâm Sale — chỉ chỉnh nổi bật + rule giảm giá
 // ================================================================
-const ProductDetail = ({ productId = null, onClose }) => {
+const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
   const [visible, setVisible] = useState(true);
@@ -295,7 +296,11 @@ const ProductDetail = ({ productId = null, onClose }) => {
   const [newSizeDraft, setNewSizeDraft] = useState("");
   const [newColorIdDraft, setNewColorIdDraft] = useState(undefined);
 
-  const { data: productData } = useQuery({
+  const {
+    data: productData,
+    isLoading: productLoading,
+    isError: productError,
+  } = useQuery({
     queryKey: ["admin-product-detail", productId],
     queryFn: () => getProductById(productId),
     enabled: productId !== null && productId !== "create",
@@ -305,16 +310,19 @@ const ProductDetail = ({ productId = null, onClose }) => {
     queryKey: ["admin-categories"],
     queryFn: () => getAllCategories("all"),
     keepPreviousData: true,
+    enabled: !saleOnly,
   });
   const { data: sizes } = useQuery({
     queryKey: ["admin-sizes"],
     queryFn: getAllSizes,
     keepPreviousData: true,
+    enabled: !saleOnly,
   });
   const { data: colorsRes } = useQuery({
     queryKey: ["admin-colors"],
     queryFn: getAllColors,
     keepPreviousData: true,
+    enabled: !saleOnly,
   });
   const colorOptions = Array.isArray(colorsRes?.data)
     ? colorsRes.data
@@ -327,10 +335,15 @@ const ProductDetail = ({ productId = null, onClose }) => {
     onSuccess: () => {
       Swal.fire(
         "Thành công",
-        `${productId !== "create" ? "Cập nhật" : "Tạo"} sản phẩm thành công!`,
+        saleOnly
+          ? "Đã cập nhật chương trình sale / nổi bật."
+          : `${productId !== "create" ? "Cập nhật" : "Tạo"} sản phẩm thành công!`,
         "success",
       );
       queryClient.invalidateQueries(["admin-products"]);
+      if (saleOnly) {
+        queryClient.invalidateQueries({ queryKey: ["admin-sale-hub-products"] });
+      }
       onClose();
     },
     onError: (err) => {
@@ -595,7 +608,34 @@ const ProductDetail = ({ productId = null, onClose }) => {
     });
   };
 
+  const onFinishSaleOnly = (values) => {
+    if (productId === "create") return;
+    const payload = {
+      isFeatured: featured,
+      saleRules:
+        saleEnabled && Number(values.saleValue) > 0
+          ? [
+              {
+                name: "Sale sản phẩm",
+                scope: "product",
+                discountType: values.saleType || "percent",
+                discountValue: Number(values.saleValue || 0),
+                startAt: values.saleStartAt ? new Date(values.saleStartAt).toISOString() : null,
+                endAt: values.saleEndAt ? new Date(values.saleEndAt).toISOString() : null,
+                priority: Number(values.salePriority || 0),
+                status: "active",
+              },
+            ]
+          : [],
+    };
+    mutation.mutate({ id: productId, payload });
+  };
+
   const onFinish = (values) => {
+    if (saleOnly) {
+      onFinishSaleOnly(values);
+      return;
+    }
     const { brandId: _omitBrand, ...restValues } = values;
     const payload = {
       ...restValues,
@@ -666,6 +706,65 @@ const ProductDetail = ({ productId = null, onClose }) => {
 
   const isEdit = productId !== "create";
 
+  const productLabel =
+    productData?.name || form.getFieldValue("name") || "Sản phẩm";
+  const productThumb = productData?.image
+    ? toUploadUrl(productData.image)
+    : productData?.srcImages?.[0]
+      ? toUploadUrl(productData.srcImages[0])
+      : "";
+
+  if (saleOnly && isEdit && productError) {
+    return (
+      <div style={{ fontFamily: "'Lexend', sans-serif", background: "#F8F7F5", padding: 48, textAlign: "center" }}>
+        <p style={{ color: "#DC2626", fontWeight: 600 }}>Không tải được sản phẩm.</p>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            marginTop: 16,
+            padding: "10px 20px",
+            borderRadius: 999,
+            border: "1.5px solid #E2E8F0",
+            background: "#fff",
+            cursor: "pointer",
+            fontWeight: 600,
+          }}
+        >
+          Quay lại
+        </button>
+      </div>
+    );
+  }
+
+  if (saleOnly && isEdit && (productLoading || !productData)) {
+    return (
+      <div
+        style={{
+          fontFamily: "'Lexend', 'Plus Jakarta Sans', sans-serif",
+          background: "#F8F7F5",
+          padding: 48,
+          textAlign: "center",
+          color: "#94A3B8",
+        }}
+      >
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            border: "3px solid #E2E8F0",
+            borderTopColor: "#f49d25",
+            borderRadius: "50%",
+            animation: "spin 0.8s linear infinite",
+            margin: "0 auto 16px",
+          }}
+        />
+        Đang tải sản phẩm…
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
   return (
     <>
       <style>{`
@@ -711,10 +810,16 @@ const ProductDetail = ({ productId = null, onClose }) => {
                 letterSpacing: "-0.3px",
               }}
             >
-              {isEdit ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}
+              {saleOnly
+                ? "Cấu hình Sale"
+                : isEdit
+                  ? "Chỉnh sửa sản phẩm"
+                  : "Thêm sản phẩm mới"}
             </h1>
             <p style={{ margin: "3px 0 0", color: "#94A3B8", fontSize: 13 }}>
-              Điền thông tin chi tiết cho mẫu giày
+              {saleOnly
+                ? "Chỉ lưu nổi bật và rule giảm giá — các thông tin khác không đổi."
+                : "Điền thông tin chi tiết cho mẫu giày"}
             </p>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
@@ -776,7 +881,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
                   >
                     save
                   </span>
-                  Lưu sản phẩm
+                  {saleOnly ? "Lưu cấu hình sale" : "Lưu sản phẩm"}
                 </>
               )}
             </button>
@@ -791,6 +896,129 @@ const ProductDetail = ({ productId = null, onClose }) => {
           onFinishFailed={onFinishFailed}
           initialValues={{ hasVariants: false, variants: [], attributes: [] }}
         >
+          {saleOnly && isEdit ? (
+            <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 16,
+                  alignItems: "center",
+                  padding: "18px 20px",
+                  background: "#fff",
+                  borderRadius: 16,
+                  border: "1px solid #E2E8F0",
+                }}
+              >
+                {productThumb ? (
+                  <img
+                    src={productThumb}
+                    alt=""
+                    style={{
+                      width: 72,
+                      height: 72,
+                      borderRadius: 12,
+                      objectFit: "cover",
+                      background: "#F1F5F9",
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 72,
+                      height: 72,
+                      borderRadius: 12,
+                      background: "#F1F5F9",
+                    }}
+                  />
+                )}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#0F172A", lineHeight: 1.3 }}>
+                    {productLabel}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 4 }}>
+                    {productData?.categoryId?.name || "—"}
+                    {productData?.hasVariants ? " · Có biến thể" : ""}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#CBD5E1", marginTop: 2, fontFamily: "monospace" }}>
+                    ID: {String(productId).slice(-10)}
+                  </div>
+                </div>
+              </div>
+
+              <SectionCard icon="star" title="Nổi bật (Featured)">
+                <Toggle
+                  checked={featured}
+                  onChange={setFeatured}
+                  label="Sản phẩm nổi bật"
+                  sub="Hiển thị ưu tiên trên trang chủ / gợi ý hot"
+                />
+              </SectionCard>
+
+              <SectionCard icon="local_offer" title="Cấu hình Sale">
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <Toggle
+                    checked={saleEnabled}
+                    onChange={setSaleEnabled}
+                    label="Bật sale cho sản phẩm"
+                    sub="Áp dụng trước voucher tại checkout"
+                  />
+                  {saleEnabled && (
+                    <>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div>
+                          <FieldLabel>Loại giảm</FieldLabel>
+                          <Form.Item name="saleType" initialValue="percent">
+                            <Select
+                              options={[
+                                { label: "Phần trăm (%)", value: "percent" },
+                                { label: "Giảm cố định (đ)", value: "fixed" },
+                              ]}
+                            />
+                          </Form.Item>
+                        </div>
+                        <div>
+                          <FieldLabel>Giá trị giảm</FieldLabel>
+                          <Form.Item
+                            name="saleValue"
+                            rules={[{ required: saleEnabled, type: "number", min: 0 }]}
+                          >
+                            <InputNumber
+                              style={{ width: "100%", borderRadius: 12 }}
+                              placeholder="Nhập giá trị giảm"
+                            />
+                          </Form.Item>
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div>
+                          <FieldLabel>Bắt đầu</FieldLabel>
+                          <Form.Item name="saleStartAt">
+                            <Input type="datetime-local" className="sneaker-input" style={inputStyle} />
+                          </Form.Item>
+                        </div>
+                        <div>
+                          <FieldLabel>Kết thúc</FieldLabel>
+                          <Form.Item name="saleEndAt">
+                            <Input type="datetime-local" className="sneaker-input" style={inputStyle} />
+                          </Form.Item>
+                        </div>
+                      </div>
+                      <div>
+                        <FieldLabel>Độ ưu tiên</FieldLabel>
+                        <Form.Item name="salePriority" initialValue={0}>
+                          <InputNumber style={{ width: "100%", borderRadius: 12 }} min={0} placeholder="0" />
+                        </Form.Item>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </SectionCard>
+
+              <p style={{ margin: 0, fontSize: 12, color: "#94A3B8", lineHeight: 1.5 }}>
+                Sửa tên, giá, tồn kho hoặc biến thể: quay lại mục <strong>Sản phẩm</strong> trong sidebar.
+              </p>
+            </div>
+          ) : (
           <div
             style={{
               display: "grid",
@@ -1633,6 +1861,7 @@ const ProductDetail = ({ productId = null, onClose }) => {
               </SectionCard>
             </div>
           </div>
+          )}
         </Form>
       </div>
     </>
