@@ -616,44 +616,51 @@ const ProductDetail = () => {
       return false;
     }
 
-    const qtySafe = Math.min(quantity, remaining);
-    if (qtySafe < quantity) {
-      notify.warning(
-        `Chỉ còn ${remaining} sản phẩm trong kho (đã có ${alreadyInCart} trong giỏ).`,
-      );
-    }
-
-    dispatch(addToCart({
+    const cartPayload = {
       productId: product._id,
       name: product.name,
       image: variantLineImage,
       price: displayPrice,
       originalPrice: Number(selectedPriceInfo.originalPrice || displayPrice),
-      qty: qtySafe,
       sku: skuToSave,
       size: sizeToSave,
       color: colorToSave,
       variantId: variantIdToSave,
       colorName: colorToSave,
       colorHex: colorHexToSave,
-    }));
+    };
 
     try {
-      if (user?.login && user?.id) {
-        await addToCartAPI({
-          userId: user.id,
-          productId: product._id,
-          qty: qtySafe,
-          sku: skuToSave ?? null,
-          size: sizeToSave ?? null,
-          color: colorToSave ?? null,
-          image: variantLineImage,
-          variantId: variantIdToSave,
-          colorHex: colorHexToSave,
-        });
+      const res = await addToCartAPI({
+        userId: user.id,
+        productId: product._id,
+        qty: quantity,
+        sku: skuToSave ?? null,
+        size: sizeToSave ?? null,
+        color: colorToSave ?? null,
+        image: variantLineImage,
+        variantId: variantIdToSave,
+        colorHex: colorHexToSave,
+      });
+      if (res?.status === "ERR") {
+        notify.error(res?.message || "Không thêm được vào giỏ hàng.");
+        return false;
       }
-    } catch (err) { }
-    return true;
+      const addedRaw = res?.data?.addedQty;
+      const added =
+        Number.isFinite(Number(addedRaw)) && Number(addedRaw) > 0
+          ? Math.floor(Number(addedRaw))
+          : Math.min(quantity, remaining);
+      dispatch(addToCart({ ...cartPayload, qty: added }));
+      if (res?.data?.stockCapped && res?.message) {
+        notify.warning(res.message);
+      }
+      return true;
+    } catch (err) {
+      const msg = err?.response?.data?.message;
+      notify.error(msg || "Không thêm được vào giỏ hàng.");
+      return false;
+    }
   };
 
   const buildBuyNowCartKey = () => {
@@ -1098,7 +1105,7 @@ const ProductDetail = () => {
               </div>
               <span className="text-sm text-neutral-500">
                 {stockStatePending
-                  ? "Đang kiểm tra tồn kho..."
+                  ? "Vui lòng chọn màu và kích cỡ trước"
                   : `${Math.max(0, maxSelectableQty)} sản phẩm có sẵn`}
               </span>
             </div>

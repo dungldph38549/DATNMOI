@@ -158,13 +158,6 @@ const addItem = async (req, res, next) => {
       }
     }
 
-    if (availableStock < quantity) {
-      return res.status(400).json({
-        status: "ERR",
-        message: "Số lượng vượt quá tồn kho",
-      });
-    }
-
     const cart = await ensureCart(userId);
 
     const wantSku = product?.hasVariants ? normSkuKey(sku) : "";
@@ -173,6 +166,21 @@ const addItem = async (req, res, next) => {
       if (!product?.hasVariants) return normSkuKey(item.sku) === "";
       return normSkuKey(item.sku) === wantSku;
     });
+
+    const inCartQty = existing ? Number(existing.qty || 0) : 0;
+    const room = Math.max(0, availableStock - inCartQty);
+    if (room <= 0) {
+      return res.status(400).json({
+        status: "ERR",
+        message:
+          inCartQty > 0
+            ? "Đã đạt số lượng tối đa trong kho cho sản phẩm này (đã có trong giỏ)."
+            : "Sản phẩm đã hết hàng.",
+      });
+    }
+
+    const qtyToAdd = Math.min(quantity, room);
+    const stockCapped = qtyToAdd < quantity;
 
     const variantForLine =
       sku && product?.hasVariants
@@ -193,7 +201,7 @@ const addItem = async (req, res, next) => {
         : variantForLine?.colorHex ?? null;
 
     if (existing) {
-      const newQty = existing.qty + quantity;
+      const newQty = existing.qty + qtyToAdd;
       // Nếu thêm cùng sản phẩm nhưng SKU thay đổi → cập nhật SKU/size/price cho đúng biến thể.
       if (sku && normSkuKey(existing.sku) !== wantSku) {
         existing.sku = sku;
@@ -209,20 +217,6 @@ const addItem = async (req, res, next) => {
         if (lineImage) existing.image = lineImage;
       }
 
-      // Tính lại availableStock theo SKU hiện tại nếu có.
-      const currentSku = sku ?? existing.sku;
-      let currentAvailableStock = availableStock;
-      if (currentSku && product?.hasVariants) {
-        const variant = findVariantBySku(product.variants, currentSku);
-        currentAvailableStock = variant?.stock ?? 0;
-      }
-
-      if (newQty > currentAvailableStock) {
-        return res.status(400).json({
-          status: "ERR",
-          message: "Tổng số lượng trong giỏ vượt quá tồn kho",
-        });
-      }
       existing.qty = newQty;
     } else {
       cart.items.push({
@@ -235,7 +229,7 @@ const addItem = async (req, res, next) => {
         name: product.name,
         image: lineImage,
         price: product?.hasVariants ? variantPrice ?? product.price : product.price,
-        qty: quantity,
+        qty: qtyToAdd,
       });
     }
 
@@ -243,13 +237,18 @@ const addItem = async (req, res, next) => {
 
     return res.status(200).json({
       status: "OK",
-      message: "Đã cập nhật giỏ hàng",
+      message: stockCapped
+        ? `Chỉ thêm được ${qtyToAdd} sản phẩm (tồn kho ${availableStock}, đã có ${inCartQty} trong giỏ).`
+        : "Đã cập nhật giỏ hàng",
       data: {
         _id: cart._id,
         user: cart.user,
         items: cart.items,
         itemsCount: cart.itemsCount,
         subtotal: cart.subtotal,
+        addedQty: qtyToAdd,
+        requestedQty: quantity,
+        stockCapped,
       },
     });
   } catch (err) {
