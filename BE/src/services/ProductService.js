@@ -222,7 +222,7 @@ const getAllProducts = async (
       Product.countDocuments(query),
       Product.find(query)
         .populate("brandId", "name logo")
-        .populate("categoryId", "name")
+        .populate("categoryId", "name slug")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
@@ -309,7 +309,7 @@ const getAllProducts = async (
 
   const populated = await Product.find({ _id: { $in: ids } })
     .populate("brandId", "name logo")
-    .populate("categoryId", "name")
+    .populate("categoryId", "name slug")
     .lean();
 
   const byId = new Map(populated.map((p) => [String(p._id), p]));

@@ -6,6 +6,7 @@ import Categories from "./Categories";
 import Dashboard from "./Dashboard";
 import Users from "./Users";
 import VoucherManager from "./VoucherManager";
+import SaleManager from "./SaleManager";
 import Sizes from "./Sizes";
 import ShoelaceSizes from "./ShoelaceSizes";
 import Colors from "./Colors";
@@ -76,6 +77,7 @@ const MENU_ITEMS = {
     label: "PK dây giày",
   },
   vouchers: { key: "vouchers", icon: "confirmation_number", label: "Voucher" },
+  sale: { key: "sale", icon: "sell", label: "Sale" },
   comments: { key: "comments", icon: "star", label: "Đánh giá" },
   banners: { key: "banners", icon: "view_carousel", label: "Banner trang chủ" },
   users: { key: "users", icon: "group", label: "Khách hàng" },
@@ -104,7 +106,7 @@ const MENU_GROUPS = [
     id: "promo-feedback",
     label: "Ưu đãi và phản hồi",
     icon: "campaign",
-    items: ["vouchers", "comments", "banners", "chat"],
+    items: ["vouchers", "sale", "comments", "banners", "chat"],
   },
   {
     id: "customers-wallet",
@@ -340,6 +342,8 @@ const AdminPage = () => {
         return <Users mode="customers" />;
       case "vouchers":
         return <VoucherManager />;
+      case "sale":
+        return <SaleManager />;
       case "wallet-topups":
         return <WalletTopups />;
       case "sizes":
