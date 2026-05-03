@@ -162,7 +162,7 @@ function AppContent() {
         </Routes>
       </div>
 
-      <FooterComponent />
+      {!isAdminRoute && <FooterComponent />}
     </div>
   );
 }
