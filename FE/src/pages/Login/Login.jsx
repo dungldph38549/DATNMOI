@@ -6,6 +6,7 @@ import { useDispatch } from "react-redux";
 import { clearUser, updateUserInfo } from "../../redux/user/index";
 import { rehydrateCartFromStorage } from "../../redux/cart/cartSlice";
 import { loginUser } from "../../api";
+import { CONVERSE_LOGIN_HERO_IMAGE } from "../../constants/converseHomePromo";
 import { FaEye, FaEyeSlash, FaGoogle, FaFacebookF } from "react-icons/fa";
 
 const Login = () => {
@@ -158,14 +159,28 @@ const Login = () => {
       </div>
 
       {/* RIGHT CONTENT - IMAGE */}
-      <div className="hidden lg:block lg:w-1/2 relative bg-slate-100 p-4">
-        <div className="w-full h-full rounded-[2.5rem] overflow-hidden relative">
-          <img src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=2670&auto=format&fit=crop" alt="Sneaker Collection" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent"></div>
+      <div className="hidden lg:flex lg:w-1/2 lg:min-h-screen lg:shrink-0 bg-slate-100 p-4 pl-2">
+        <div className="relative flex w-full min-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-[2.5rem] ring-1 ring-slate-200/70 shadow-sm">
+          <img
+            src={CONVERSE_LOGIN_HERO_IMAGE}
+            alt="Giày Converse — SneakerConverse"
+            className="absolute inset-0 h-full w-full object-cover object-[center_35%] sm:object-[center_32%]"
+            decoding="async"
+          />
+          <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-slate-900/92 via-slate-900/45 to-slate-900/10" />
+          <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-br from-primary/20 via-transparent to-transparent" />
 
-          <div className="absolute bottom-0 left-0 p-16 text-white text-left">
-            <h2 className="text-4xl xl:text-5xl font-display font-black mb-4 leading-tight">Định hình<br />phong cách<br />của chính bạn.</h2>
-            <p className="text-slate-300 text-lg max-w-md">Khám phá bộ sưu tập sneakers đa dạng, chính hãng 100% với những ưu đãi tốt nhất.</p>
+          <div className="relative z-[2] mt-auto p-10 text-left text-white xl:p-14 2xl:p-16">
+            <h2 className="mb-4 max-w-lg font-display text-4xl font-black leading-tight xl:text-5xl">
+              Định hình
+              <br />
+              phong cách
+              <br />
+              của chính bạn.
+            </h2>
+            <p className="max-w-md text-lg text-slate-200/95">
+              Khám phá bộ sưu tập sneakers đa dạng, chính hãng 100% với những ưu đãi tốt nhất.
+            </p>
           </div>
         </div>
       </div>

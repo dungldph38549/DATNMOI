@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { getPublicBanners } from "../../api";
+import { CONVERSE_BANNER_FALLBACK_IMAGE } from "../../constants/converseHomePromo";
 
 const FALLBACK_BANNERS = [
   {
     _id: "fallback-1",
     title: "SneakerHouse",
     subtitle: "Giay hot, gia tot moi ngay",
-    image:
-      "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?q=85&w=2000&auto=format&fit=crop",
+    image: CONVERSE_BANNER_FALLBACK_IMAGE,
     link: "/product",
   },
 ];
@@ -68,8 +68,8 @@ export default function BannerSlider() {
               loading="lazy"
               className="w-full h-full object-cover min-h-[340px] md:min-h-[460px]"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/10" />
-            <div className="absolute left-5 right-5 bottom-6 md:left-10 md:bottom-10 text-white">
+            <div className="absolute inset-0 bg-gradient-to-t from-convot-charcoal/88 via-convot-charcoal/35 to-transparent" />
+            <div className="absolute left-5 right-5 bottom-6 md:left-10 md:bottom-10 text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.35),0_4px_20px_rgba(26,26,26,0.35)]">
               <h2 className="text-2xl md:text-4xl font-bold leading-tight">{b.title}</h2>
               <p className="mt-2 text-sm md:text-base opacity-95">{b.subtitle}</p>
             </div>

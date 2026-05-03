@@ -4,6 +4,7 @@ import { useSelector } from "react-redux";
 import { FaFire, FaGem, FaArrowRight, FaFilter } from "react-icons/fa";
 import Product from "../../components/Product/Product";
 import BannerSlider from "../../components/BannerSlider/BannerSlider";
+import { CONVERSE_HOME_SPOTLIGHT_IMAGE } from "../../constants/converseHomePromo";
 import {
   getBestSellers,
   getTopSellingProducts,
@@ -406,29 +407,38 @@ const HomePage = () => {
           </section>
         )}
 
-        <section className="rounded-[28px] overflow-hidden border border-convot-sage/15 bg-white shadow-sm">
-          <div className="grid md:grid-cols-2 gap-0">
-            <div className="p-8 md:p-12 flex flex-col justify-center bg-gradient-to-br from-convot-cream to-white">
-              <h3 className="text-2xl md:text-4xl font-display font-bold text-convot-charcoal leading-tight">
-                Nâng tầm
+        <section className="group/spotlight relative w-full overflow-hidden rounded-[22px] border border-convot-sage/15 bg-white shadow-sm ring-1 ring-convot-sage/[0.07]">
+          {/* Tỷ lệ ~1024:364 như banner mẫu; mobile xếp dọc, ảnh gọn */}
+          <div className="grid grid-cols-1 md:grid-cols-2 md:aspect-[1024/364]">
+            <div className="relative order-2 flex flex-col justify-center bg-white px-5 py-5 md:order-1 md:px-8 md:py-4 lg:px-11">
+              <span className="relative mb-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400 md:text-sm">
+                <span className="h-px w-9 bg-neutral-300" aria-hidden />
+                Bộ sưu tập
+              </span>
+              <h3 className="relative font-display text-2xl font-bold leading-[1.08] tracking-tight text-convot-charcoal md:text-3xl lg:text-4xl">
+                Đúng chất
                 <br />
-                hiệu suất
+                <span className="text-convot-sage">Converse</span>
               </h3>
-              <p className="mt-4 text-convot-charcoal/70 text-sm md:text-base leading-relaxed">
-                Công nghệ đệm và upper được chọn lọc — cho từng km bạn chạy thêm.
+              <p className="relative mt-2 max-w-lg text-sm leading-relaxed text-neutral-500 md:mt-3 md:text-base">
+                Canvas, da và phối màu được chọn lọc — phong cách đi học, đi chơi, mỗi ngày.
               </p>
               <Link
                 to="/product"
-                className="mt-8 inline-flex w-fit items-center rounded-full bg-convot-sage px-6 py-3 text-sm font-bold text-white hover:bg-[#7a9680] transition"
+                className="relative mt-4 inline-flex w-fit items-center gap-2 rounded-full bg-convot-sage px-5 py-2.5 text-sm font-bold text-white shadow-sm shadow-convot-sage/25 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#7a9680] md:mt-5 md:px-7 md:py-3 md:text-base"
               >
-                Xem bộ sưu tập chạy bộ
+                Xem bộ sưu tập
+                <FaArrowRight className="text-xs opacity-90 md:text-sm" aria-hidden />
               </Link>
             </div>
-            <div className="relative min-h-[220px] md:min-h-[280px]">
+            <div className="relative order-1 aspect-[2/1] max-h-44 overflow-hidden max-md:w-full md:order-2 md:aspect-auto md:max-h-none md:h-full">
               <img
-                src="https://images.unsplash.com/photo-1556906781-9a412961c28c?q=80&w=1200&auto=format&fit=crop"
-                alt="Khuyến mãi"
-                className="absolute inset-0 w-full h-full object-cover"
+                src={CONVERSE_HOME_SPOTLIGHT_IMAGE}
+                alt="Giày Converse — SneakerConverse"
+                width={1600}
+                height={1067}
+                decoding="async"
+                className="h-full min-h-full w-full object-cover object-center transition duration-[1.05s] ease-out group-hover/spotlight:scale-[1.04]"
               />
             </div>
           </div>

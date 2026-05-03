@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { registerUser } from "../../api";
+import { CONVERSE_LOGIN_HERO_IMAGE } from "../../constants/converseHomePromo";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 const Register = () => {
@@ -40,15 +41,31 @@ const Register = () => {
     <div className="flex min-h-screen bg-white font-body">
 
       {/* LEFT CONTENT - IMAGE */}
-      <div className="hidden lg:block lg:w-1/2 relative bg-slate-100 p-4">
-        <div className="w-full h-full rounded-[2.5rem] overflow-hidden relative">
-          <img src="https://images.unsplash.com/photo-1552066344-2464c1135c32?q=80&w=2670&auto=format&fit=crop" alt="Sneaker Collection" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent"></div>
+      <div className="hidden lg:flex lg:w-1/2 lg:min-h-screen lg:shrink-0 bg-slate-100 p-4 pr-2">
+        <div className="relative flex w-full min-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-[2.5rem] ring-1 ring-slate-200/70 shadow-sm">
+          <img
+            src={CONVERSE_LOGIN_HERO_IMAGE}
+            alt="Giày Converse — SneakerConverse"
+            className="absolute inset-0 h-full w-full object-cover object-[center_35%] sm:object-[center_32%]"
+            decoding="async"
+          />
+          <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-slate-900/92 via-slate-900/45 to-slate-900/10" />
+          <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-br from-primary/20 via-transparent to-transparent" />
 
-          <div className="absolute bottom-0 left-0 p-16 text-white text-left">
-            <div className="inline-block px-4 py-2 bg-white/20 backdrop-blur-md rounded-full text-sm font-bold mb-6 tracking-wide">THAM GIA CÙNG CHÚNG TÔI</div>
-            <h2 className="text-4xl xl:text-5xl font-display font-black mb-4 leading-tight">Mở khóa<br />những đặc quyền<br />không giới hạn.</h2>
-            <p className="text-slate-300 text-lg max-w-md">Trở thành thành viên để nhận voucher giảm giá 10% cho đơn hàng đầu tiên và nhiều hơn thế nữa.</p>
+          <div className="relative z-[2] mt-auto p-10 text-left text-white xl:p-14 2xl:p-16">
+            <div className="mb-6 inline-block rounded-full bg-white/20 px-4 py-2 text-sm font-bold tracking-wide backdrop-blur-md">
+              THAM GIA CÙNG CHÚNG TÔI
+            </div>
+            <h2 className="mb-4 max-w-lg font-display text-4xl font-black leading-tight xl:text-5xl">
+              Mở khóa
+              <br />
+              những đặc quyền
+              <br />
+              không giới hạn.
+            </h2>
+            <p className="max-w-md text-lg text-slate-200/95">
+              Trở thành thành viên để nhận voucher giảm giá 10% cho đơn hàng đầu tiên và nhiều hơn thế nữa.
+            </p>
           </div>
         </div>
       </div>
