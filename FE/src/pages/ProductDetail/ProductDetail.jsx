@@ -19,6 +19,9 @@ import RecommendSection from "../../components/RecommendSection/RecommendSection
 
 const REVIEW_ACCENT = "#1a1a1a";
 
+/** Biến thể không có colorId / colorName / thuộc tính màu — gom một nhóm để vẫn chọn được size */
+const DEFAULT_VARIANT_COLOR_KEY = "n:__default__";
+
 /** Tách nội dung dạng "Nhãn: giá trị" (xuống dòng) và đoạn tự do */
 const parseReviewContentBlocks = (text) => {
   if (!text || typeof text !== "string") return { kv: [], body: "" };
@@ -174,7 +177,7 @@ const ProductDetail = () => {
       const nm = String(v?.colorName ?? "").trim();
       if (nm) return `n:${normalizeVariantValue(nm)}`;
       const cv = getVariantColorValue(v);
-      return cv ? `n:${normalizeVariantValue(cv)}` : "";
+      return cv ? `n:${normalizeVariantValue(cv)}` : DEFAULT_VARIANT_COLOR_KEY;
     },
     [getVariantColorValue, normalizeVariantValue],
   );
@@ -215,10 +218,10 @@ const ProductDetail = () => {
     const map = new Map();
     for (const v of product.variants) {
       const cid = getVariantColorKeyStable(v);
-      if (!cid) continue;
       if (!map.has(cid)) {
         const name =
-          String(v?.colorName ?? getVariantColorLabel(v) ?? "").trim() || "Màu";
+          String(v?.colorName ?? getVariantColorLabel(v) ?? "").trim() ||
+          (cid === DEFAULT_VARIANT_COLOR_KEY ? "Mặc định" : "Màu");
         const hex =
           String(v?.colorHex ?? "").trim() ||
           (typeof v.colorId === "object" && v.colorId?.code
@@ -231,6 +234,13 @@ const ProductDetail = () => {
     }
     return [...map.values()];
   }, [product, hasVariants, getVariantColorKeyStable, getVariantColorLabel]);
+
+  /** Chỉ một nhóm màu (hoặc mặc định) → bỏ bước chọn màu thủ công */
+  useEffect(() => {
+    if (!product || !hasVariants || isAccessoryProduct) return;
+    if (colorOptions.length !== 1) return;
+    setSelectedColorId((prev) => (prev != null ? prev : colorOptions[0].id));
+  }, [product?._id, hasVariants, isAccessoryProduct, colorOptions]);
 
   const sizesForSelectedColor = useMemo(() => {
     if (!product || !hasVariants || !selectedColorId) return [];
@@ -264,6 +274,16 @@ const ProductDetail = () => {
     getVariantColorKeyStable,
     normalizeVariantValue,
   ]);
+
+  /** Giỏ / thanh toán: biến thể thiếu tên màu vẫn có nhãn (vd. "Mặc định") */
+  const cartColorLabel = useMemo(() => {
+    if (!hasVariants || !selectedVariant) return null;
+    const fromVar = String(
+      selectedVariant?.colorName ?? getVariantColorLabel(selectedVariant) ?? "",
+    ).trim();
+    if (fromVar) return fromVar;
+    return colorOptions.find((c) => c.id === selectedColorId)?.name ?? null;
+  }, [hasVariants, selectedVariant, selectedColorId, colorOptions, getVariantColorLabel]);
 
   const selectedSku = selectedVariant?.sku ?? null;
   const selectedSizeValue = getVariantSizeValue(selectedVariant) ?? null;
@@ -573,9 +593,7 @@ const ProductDetail = () => {
     }
     const sizeToSave = hasVariants ? selectedSizeValue : null;
     const skuToSave = hasVariants ? selectedSku : null;
-    const colorToSave = hasVariants
-      ? String(selectedVariant?.colorName ?? getVariantColorLabel(selectedVariant) ?? "").trim() || null
-      : null;
+    const colorToSave = hasVariants ? cartColorLabel : null;
     const variantLineImage =
       hasVariants && selectedVariant
         ? (Array.isArray(selectedVariant.images) && selectedVariant.images[0]) || product.image
@@ -687,9 +705,7 @@ const ProductDetail = () => {
     }
     const sizeToSave = hasVariants ? selectedSizeValue : null;
     const skuToSave = hasVariants ? selectedSku : null;
-    const colorToSave = hasVariants
-      ? String(selectedVariant?.colorName ?? getVariantColorLabel(selectedVariant) ?? "").trim() || null
-      : null;
+    const colorToSave = hasVariants ? cartColorLabel : null;
     const variantLineImage =
       hasVariants && selectedVariant
         ? (Array.isArray(selectedVariant.images) && selectedVariant.images[0]) || product.image
