@@ -293,7 +293,7 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
     colorRows: [],
     cells: {},
   });
-  const [newSizeDraft, setNewSizeDraft] = useState("");
+  const [newSizeDraftMulti, setNewSizeDraftMulti] = useState([]);
   const [newColorIdDraft, setNewColorIdDraft] = useState(undefined);
 
   const {
@@ -496,34 +496,53 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
     });
   };
 
-  const addMatrixSize = (sizeRaw) => {
-    const size = String(sizeRaw || "").trim();
-    if (!size) {
-      Swal.fire("Thiếu size", "Vui lòng chọn hoặc nhập size.", "warning");
+  const addMatrixSizesBulk = (sizesRaw) => {
+    const list = (Array.isArray(sizesRaw) ? sizesRaw : [sizesRaw])
+      .map((s) => String(s || "").trim())
+      .filter(Boolean);
+    const unique = [...new Set(list)];
+    if (!unique.length) {
+      Swal.fire("Thiếu size", "Vui lòng chọn ít nhất một size.", "warning");
       return;
     }
-    if (varMatrix.sizes.includes(size)) return;
+    const toAddPreview = unique.filter((s) => !varMatrix.sizes.includes(s));
+    if (!toAddPreview.length) {
+      Swal.fire(
+        "Không thêm size mới",
+        "Các size bạn chọn đã có trong lưới.",
+        "info",
+      );
+      setNewSizeDraftMulti([]);
+      return;
+    }
     const name = form.getFieldValue("name") || "SP";
     setVarMatrix((m) => {
-      const nextSizes = [...m.sizes, size];
+      const existing = new Set(m.sizes);
+      const toAdd = unique.filter((s) => !existing.has(s));
+      if (!toAdd.length) {
+        return m;
+      }
+      const nextSizes = [...m.sizes, ...toAdd];
       const nextCells = { ...m.cells };
       let skus = collectMatrixSkus({ ...m, cells: nextCells });
-      for (const row of m.colorRows) {
-        const ck = `${row.key}::${size}`;
-        if (!nextCells[ck]) {
-          const sku = generateNextVariantSku(name, skus);
-          skus = [...skus, sku];
-          nextCells[ck] = {
-            sku,
-            price: Math.max(0, Number(form.getFieldValue("price")) || 0),
-            stock: 0,
-            images: [],
-          };
+      for (const size of toAdd) {
+        for (const row of m.colorRows) {
+          const ck = `${row.key}::${size}`;
+          if (!nextCells[ck]) {
+            const sku = generateNextVariantSku(name, skus);
+            skus = [...skus, sku];
+            nextCells[ck] = {
+              sku,
+              price: Math.max(0, Number(form.getFieldValue("price")) || 0),
+              stock: 0,
+              images: [],
+            };
+          }
         }
       }
       return { ...m, sizes: nextSizes, cells: nextCells };
     });
-    setNewSizeDraft("");
+    setNewSizeDraftMulti([]);
   };
 
   const removeMatrixSize = (size) => {
@@ -1176,16 +1195,18 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
                         alignItems: "flex-end",
                       }}
                     >
-                      <div style={{ flex: "1 1 200px" }}>
+                      <div style={{ flex: "1 1 280px" }}>
                         <FieldLabel>Thêm size</FieldLabel>
-                        <div style={{ display: "flex", gap: 8 }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                           <Select
+                            mode="multiple"
                             showSearch
                             allowClear
-                            placeholder="Chọn size"
+                            placeholder="Chọn một hoặc nhiều size"
                             style={{ flex: 1, borderRadius: 12 }}
-                            value={newSizeDraft || undefined}
-                            onChange={(v) => setNewSizeDraft(v || "")}
+                            maxTagCount="responsive"
+                            value={newSizeDraftMulti}
+                            onChange={(vals) => setNewSizeDraftMulti(Array.isArray(vals) ? vals : [])}
                             options={(sizes?.data || []).map((s) => ({
                               label: s.name,
                               value: s.name,
@@ -1193,7 +1214,9 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
                           />
                           <button
                             type="button"
-                            onClick={() => addMatrixSize(newSizeDraft)}
+                            onClick={() => {
+                              addMatrixSizesBulk(newSizeDraftMulti);
+                            }}
                             style={{
                               padding: "8px 14px",
                               borderRadius: 12,
@@ -1203,13 +1226,15 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
                               fontWeight: 700,
                               cursor: "pointer",
                               fontFamily: "'Lexend', sans-serif",
+                              whiteSpace: "nowrap",
+                              flexShrink: 0,
                             }}
                           >
                             Thêm size
                           </button>
                         </div>
                       </div>
-                      <div style={{ flex: "1 1 240px" }}>
+                      <div style={{ flex: "1 1 220px" }}>
                         <FieldLabel>Thêm màu</FieldLabel>
                         <div style={{ display: "flex", gap: 8 }}>
                           <Select
@@ -1220,7 +1245,7 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
                             value={newColorIdDraft}
                             onChange={(id) => setNewColorIdDraft(id)}
                             options={colorOptions.map((c) => ({
-                              label: `${c.name} (${c.code})`,
+                              label: c.name,
                               value: c._id,
                             }))}
                           />

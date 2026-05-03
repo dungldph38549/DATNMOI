@@ -84,7 +84,7 @@ const MENU_ITEMS = {
   "wallet-topups": {
     key: "wallet-topups",
     icon: "account_balance_wallet",
-    label: "Hoàn tiền hoàn hàng (ví)",
+    label: "Hoàn tiền vào ví",
   },
   staff: { key: "staff", icon: "badge", label: "Nhân viên" },
 };

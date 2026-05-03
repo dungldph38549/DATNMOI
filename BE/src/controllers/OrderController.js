@@ -32,6 +32,8 @@ const {
 const {
   orderAttributesFromVariant,
   findVariantBySku,
+  setVariantStockAt,
+  incrementVariantStockAt,
 } = require("../utils/variantHelpers.js");
 const {
   notifyCustomerOfAdminOrderCancel,
@@ -139,8 +141,7 @@ async function restoreStockForAcceptedReturn(order, session) {
     if (item.sku && productDoc.hasVariants) {
       const variant = findVariantBySku(productDoc.variants, item.sku);
       if (variant) {
-        variant.stock = Number(variant.stock || 0) + qty;
-        await productDoc.save({ session });
+        await incrementVariantStockAt(productDoc._id, variant.sku, qty, session);
       }
     } else if (!productDoc.hasVariants) {
       productDoc.stock = Number(productDoc.stock || 0) + qty;
@@ -443,8 +444,12 @@ exports.createOrder = async (req, res) => {
           `Không đủ hàng cho SKU ${item.sku} (khả dụng: ${available})`,
         );
       }
-      variant.stock = available - item.quantity;
-      await productForStock.save({ session });
+      await setVariantStockAt(
+        productForStock._id,
+        variant.sku,
+        available - item.quantity,
+        session,
+      );
     }
 
     const finalTotal = Math.max(0, subtotal - discountAmount + shippingFee);

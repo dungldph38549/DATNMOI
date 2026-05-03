@@ -5,12 +5,45 @@ import { adminListWalletTransactions } from "../api/index";
 
 const QUERY_KEY = ["admin-wallet-return-refunds"];
 
-const typeStyle = () => ({
-  text: "Hoàn tiền hoàn hàng",
-  textColor: "#1677ff",
-  bg: "#e6f4ff",
-  border: "#91caff",
-});
+const REFUND_TYPES = new Set([
+  "return_refund",
+  "order_cancel_refund",
+  "order_line_cancel_refund",
+]);
+
+/** Nhãn + màu badge theo loại giao dịch ví */
+const typeStyle = (type) => {
+  switch (type) {
+    case "return_refund":
+      return {
+        text: "Hoàn tiền hoàn hàng",
+        textColor: "#1677ff",
+        bg: "#e6f4ff",
+        border: "#91caff",
+      };
+    case "order_cancel_refund":
+      return {
+        text: "Hoàn ví do hủy đơn",
+        textColor: "#0891b2",
+        bg: "#ecfeff",
+        border: "#67e8f9",
+      };
+    case "order_line_cancel_refund":
+      return {
+        text: "Hoàn ví hủy dòng hàng",
+        textColor: "#c2410c",
+        bg: "#fff7ed",
+        border: "#fdba74",
+      };
+    default:
+      return {
+        text: type || "—",
+        textColor: "#475569",
+        bg: "#f1f5f9",
+        border: "#cbd5e1",
+      };
+  }
+};
 
 const WalletTopups = () => {
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -18,7 +51,7 @@ const WalletTopups = () => {
     queryFn: async () => {
       const txRes = await adminListWalletTransactions(1, 200);
       const tx = Array.isArray(txRes?.data) ? txRes.data : [];
-      return tx.filter((row) => row?.type === "return_refund");
+      return tx.filter((row) => REFUND_TYPES.has(row?.type));
     },
   });
 
@@ -49,9 +82,9 @@ const WalletTopups = () => {
     {
       title: "Loại giao dịch",
       dataIndex: "type",
-      width: 220,
-      render: () => {
-        const item = typeStyle();
+      width: 240,
+      render: (t) => {
+        const item = typeStyle(t);
         return (
           <span
             style={{
@@ -123,10 +156,10 @@ const WalletTopups = () => {
       >
         <div>
           <h2 style={{ margin: 0, fontWeight: 800, color: "#0f172a" }}>
-            Hoàn tiền hoàn hàng vào ví
+            Hoàn tiền vào ví (hoàn hàng & hủy đơn)
           </h2>
           <p style={{ color: "#64748b", margin: "6px 0 0", fontSize: 13 }}>
-            Chỉ hiển thị các lần admin chấp nhận hoàn hàng và tiền được cộng vào ví khách.
+            Gồm: chấp nhận hoàn hàng, khách hoặc admin hủy đơn đã thanh toán (ví/VNPay), và hoàn ví khi hủy dòng hàng.
           </p>
         </div>
         <Button onClick={() => refetch()} type="primary">
@@ -157,7 +190,7 @@ const WalletTopups = () => {
           }}
         >
           <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>
-            Tổng giao dịch hoàn hàng
+            Tổng giao dịch hoàn vào ví
           </div>
           <div style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", lineHeight: 1 }}>
             {rows.length}
