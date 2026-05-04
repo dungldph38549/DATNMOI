@@ -42,6 +42,12 @@ const parseReviewContentBlocks = (text) => {
 };
 
 /** Lấy Size / Color từ chuỗi phân loại (đánh giá cũ không có snapshot). */
+/** Phản hồi từ shop (admin) trên đánh giá — ẩn reply đã xóa. */
+const shopRepliesFromReview = (r) =>
+  Array.isArray(r?.replies)
+    ? r.replies.filter((x) => x && !x.isDeleted && x.role === "admin")
+    : [];
+
 const parseSizeFromVariantLabel = (label) => {
   if (!label || typeof label !== "string") return null;
   for (const part of label.split("·")) {
@@ -1382,6 +1388,7 @@ const ProductDetail = () => {
                             : "";
                           const sizeLine = `Phân loại hàng: ${purchaseSizeLine || "—"}`;
                           const metaLine = dateStr ? `${dateStr} | ${sizeLine}` : sizeLine;
+                          const shopReplies = shopRepliesFromReview(r);
                           return (
                             <div key={r._id} className="py-5 first:pt-0">
                               <div className="flex gap-3">
@@ -1438,6 +1445,28 @@ const ProductDetail = () => {
                                       {r.images.map((img, idx) => (
                                         <div key={idx} className="w-20 h-20 rounded border border-slate-200 overflow-hidden bg-slate-50">
                                           <img src={getImage(img?.url ?? img)} alt="" className="w-full h-full object-cover" />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {shopReplies.length > 0 && (
+                                    <div className="mt-4 space-y-3">
+                                      {shopReplies.map((reply, idx) => (
+                                        <div
+                                          key={reply?._id || `shop-reply-${idx}`}
+                                          className="rounded-xl border border-amber-200/80 bg-amber-50/90 px-3 py-3 md:px-4"
+                                        >
+                                          <p className="text-[10px] font-black uppercase tracking-wider text-amber-800">
+                                            Phản hồi từ shop
+                                          </p>
+                                          <p className="mt-2 text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
+                                            {reply?.content || "—"}
+                                          </p>
+                                          {reply?.createdAt ? (
+                                            <p className="mt-2 text-xs text-slate-500">
+                                              {new Date(reply.createdAt).toLocaleString("vi-VN")}
+                                            </p>
+                                          ) : null}
                                         </div>
                                       ))}
                                     </div>

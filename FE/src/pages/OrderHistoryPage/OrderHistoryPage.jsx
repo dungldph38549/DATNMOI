@@ -8,6 +8,7 @@ import {
   cancelOrderByUser,
   cancelOrderLineByUser,
   uploadImages,
+  getMyReviewByProduct,
 } from "../../api";
 import {
   FaBoxOpen,
@@ -38,7 +39,13 @@ const STATUS_LABELS = {
 };
 
 const RETURN_STATUSES = new Set(["return-request", "accepted", "rejected"]);
-const REVIEWABLE_STATUSES = new Set(["delivered", "received"]);
+const REVIEWABLE_STATUSES = new Set([
+  "delivered",
+  "received",
+  "return-request",
+  "accepted",
+  "rejected",
+]);
 const IN_PROGRESS_STATUSES = new Set([
   "pending",
   "confirmed",
@@ -170,6 +177,8 @@ const OrderHistoryPage = () => {
   const [returnReasonCode, setReturnReasonCode] = useState("wrong_size");
   const [returnFiles, setReturnFiles] = useState([]);
   const [returnSubmitting, setReturnSubmitting] = useState(false);
+  /** Đơn đủ điều kiện đánh giá: còn ít nhất 1 SP chưa có review (chỉ khi đã đăng nhập). */
+  const [orderHasPendingReview, setOrderHasPendingReview] = useState({});
 
   const isLoggedIn = !!user?.login;
   const userId = isLoggedIn ? user?.id || user?._id : null;
@@ -230,6 +239,45 @@ const OrderHistoryPage = () => {
       clearInterval(intervalId);
     };
   }, [userId, guestId]);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setOrderHasPendingReview({});
+      return;
+    }
+    let cancelled = false;
+    const run = async () => {
+      const reviewable = orders.filter((o) =>
+        REVIEWABLE_STATUSES.has(normalize(o)),
+      );
+      const entries = await Promise.all(
+        reviewable.map(async (order) => {
+          const oid = String(order._id);
+          const lines = (order.products || []).filter(isOrderLineActive);
+          if (lines.length === 0) return [oid, false];
+          let pending = false;
+          for (const p of lines) {
+            const pid = String(p?.productId?._id || p?.productId || "");
+            if (!pid) continue;
+            try {
+              const rev = await getMyReviewByProduct(pid, oid);
+              if (!rev) pending = true;
+            } catch {
+              pending = true;
+            }
+          }
+          return [oid, pending];
+        }),
+      );
+      if (!cancelled) {
+        setOrderHasPendingReview(Object.fromEntries(entries));
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [orders, isLoggedIn]);
 
   const filteredOrders = useMemo(
     () => orders.filter((o) => orderMatchesTab(o, activeTab)),
@@ -514,6 +562,10 @@ const OrderHistoryPage = () => {
             {currentOrders.map((order) => {
               const st = normalize(order);
               const canReviewOrder = REVIEWABLE_STATUSES.has(st);
+              const showReviewButton =
+                canReviewOrder &&
+                (!isLoggedIn ||
+                  orderHasPendingReview[String(order._id)] === true);
               const sub = statusSubline(st);
               const shouldShowStatusNotice = IN_PROGRESS_STATUSES.has(st);
               const lines = order.products;
@@ -741,7 +793,7 @@ const OrderHistoryPage = () => {
                     >
                       Chi tiết
                     </Link>
-                    {canReviewOrder && (
+                    {showReviewButton && (
                       <Link
                         to={`/orders/${order._id}`}
                         state={{ openReview: true }}

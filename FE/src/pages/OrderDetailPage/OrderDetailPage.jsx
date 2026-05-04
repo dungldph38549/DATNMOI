@@ -28,7 +28,13 @@ const STATUS_LABELS = {
 };
 
 const RETURN_STATUSES = new Set(["return-request", "accepted", "rejected", "returned"]);
-const REVIEWABLE_STATUSES = new Set(["delivered", "received"]);
+const REVIEWABLE_STATUSES = new Set([
+  "delivered",
+  "received",
+  "return-request",
+  "accepted",
+  "rejected",
+]);
 const RETURN_REASON_OPTIONS = [
   { value: "wrong_size", label: "Sai size / không vừa", requireImage: false },
   { value: "wrong_item", label: "Giao sai mẫu / sai màu", requireImage: true },
@@ -42,6 +48,11 @@ const formatMoney = (v) => `${Number(v || 0).toLocaleString("vi-VN")}đ`;
 
 const isOrderLineActive = (p) =>
   !p?.lineStatus || p.lineStatus !== "canceled";
+
+const shopRepliesFromReview = (rev) =>
+  Array.isArray(rev?.replies)
+    ? rev.replies.filter((x) => x && !x.isDeleted && x.role === "admin")
+    : [];
 
 const normHistoryStatus = (s) =>
   typeof s === "string" ? s.trim().toLowerCase() : s;
@@ -936,6 +947,7 @@ const OrderDetailPage = () => {
                           );
                           const myReview = myReviewsByProduct[productIdKey];
                           if (myReview) {
+                            const shopReplies = shopRepliesFromReview(myReview);
                             return (
                               <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                                 <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-700">
@@ -954,6 +966,28 @@ const OrderDetailPage = () => {
                                   <p className="mt-1 line-clamp-2 text-xs text-slate-500">
                                     {myReview.content}
                                   </p>
+                                )}
+                                {shopReplies.length > 0 && (
+                                  <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
+                                    {shopReplies.map((reply, ri) => (
+                                      <div
+                                        key={reply?._id || `sr-${ri}`}
+                                        className="rounded-lg border border-amber-200/90 bg-amber-50/80 px-2.5 py-2"
+                                      >
+                                        <p className="text-[10px] font-black uppercase tracking-wide text-amber-900">
+                                          Phản hồi từ shop
+                                        </p>
+                                        <p className="mt-1 text-xs text-slate-800 leading-snug whitespace-pre-wrap">
+                                          {reply?.content || "—"}
+                                        </p>
+                                        {reply?.createdAt ? (
+                                          <p className="mt-1 text-[10px] text-slate-500">
+                                            {new Date(reply.createdAt).toLocaleString("vi-VN")}
+                                          </p>
+                                        ) : null}
+                                      </div>
+                                    ))}
+                                  </div>
                                 )}
                               </div>
                             );

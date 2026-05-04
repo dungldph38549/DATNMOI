@@ -115,8 +115,14 @@ const orderPopulateForReview = { path: "orderId", select: "status" };
 
 const toId = (id) => new mongoose.Types.ObjectId(id);
 const isValid = (id) => mongoose.isValidObjectId(id);
-/** Mỗi lần mua (đơn đã giao / đã nhận) → một đánh giá / sản phẩm. */
-const REVIEW_ELIGIBLE_ORDER_STATUSES = ["delivered", "received"];
+/** Mỗi lần mua (đã giao/nhận hoặc đang xử lý hoàn hàng) → một đánh giá / sản phẩm. */
+const REVIEW_ELIGIBLE_ORDER_STATUSES = [
+  "delivered",
+  "received",
+  "return-request",
+  "accepted",
+  "rejected",
+];
 
 class AppError extends Error {
   constructor(message, status = 400) {
@@ -193,6 +199,27 @@ const getReviewById = async (id) => {
   return review;
 };
 
+const filterActiveReplies = (doc) => {
+  if (!doc) return doc;
+  if (Array.isArray(doc)) {
+    return doc.map((r) => {
+      const next = { ...r };
+      next.replies = next.replies?.filter((rp) => !rp.isDeleted) ?? [];
+      return next;
+    });
+  }
+  const next = { ...doc };
+  next.replies = next.replies?.filter((rp) => !rp.isDeleted) ?? [];
+  return next;
+};
+
+const myReviewPopulateChain = (q) =>
+  q
+    .populate("userId", "name avatar")
+    .populate(productPopulateForReview)
+    .populate(orderPopulateForReview)
+    .populate("replies.userId", "name avatar");
+
 // ── GET /api/reviews/mine?productId=...&orderId=...&all=1 ───
 const getMyReview = async ({ productId, orderId, all }, userId) => {
   const resolvedUserId = userId?._id || userId?.id || userId;
@@ -204,32 +231,24 @@ const getMyReview = async ({ productId, orderId, all }, userId) => {
     isDeleted: false,
   };
   if (all === "1" || all === "true" || all === true) {
-    const list = await Review.find(base)
-      .sort({ createdAt: -1 })
-      .populate("userId", "name avatar")
-      .populate(productPopulateForReview)
-      .populate(orderPopulateForReview)
-      .lean({ virtuals: true });
-    return list;
+    const list = await myReviewPopulateChain(
+      Review.find(base).sort({ createdAt: -1 }),
+    ).lean({ virtuals: true });
+    return filterActiveReplies(list);
   }
   if (orderId && isValid(orderId)) {
-    const review = await Review.findOne({
-      ...base,
-      orderId: toId(orderId),
-    })
-      .populate("userId", "name avatar")
-      .populate(productPopulateForReview)
-      .populate(orderPopulateForReview)
-      .lean({ virtuals: true });
-    return review || null;
+    const review = await myReviewPopulateChain(
+      Review.findOne({
+        ...base,
+        orderId: toId(orderId),
+      }),
+    ).lean({ virtuals: true });
+    return filterActiveReplies(review || null);
   }
-  const review = await Review.findOne(base)
-    .sort({ createdAt: -1 })
-    .populate("userId", "name avatar")
-    .populate(productPopulateForReview)
-    .populate(orderPopulateForReview)
-    .lean({ virtuals: true });
-  return review || null;
+  const review = await myReviewPopulateChain(
+    Review.findOne(base).sort({ createdAt: -1 }),
+  ).lean({ virtuals: true });
+  return filterActiveReplies(review || null);
 };
 
 // ── GET /api/reviews/eligible-orders?productId=... ───────────
@@ -287,7 +306,7 @@ const createReview = async (
     throw new AppError("Rating phải từ 1 đến 5");
   if (!orderId || !isValid(orderId))
     throw new AppError(
-      "Vui lòng chọn lần mua (đơn đã giao / đã nhận hàng). Mỗi lần mua được đánh giá một lần cho sản phẩm.",
+      "Vui lòng chọn lần mua (đơn đã giao / đã nhận hoặc liên quan hoàn hàng). Mỗi lần mua được đánh giá một lần cho sản phẩm.",
       400,
     );
 
@@ -300,7 +319,7 @@ const createReview = async (
     .lean();
   if (!matchedOrder)
     throw new AppError(
-      "Lần mua không hợp lệ: cần đơn đã giao hoặc đã nhận hàng và có sản phẩm này.",
+      "Lần mua không hợp lệ: cần đơn đã giao, đã nhận, hoặc đang/đã xử lý hoàn hàng, và có sản phẩm này.",
       422,
     );
   const orderOwnerId = matchedOrder?.userId ? String(matchedOrder.userId) : "";
