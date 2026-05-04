@@ -216,8 +216,12 @@ const ContactPage = () => {
               </span>
               <div>
                 <h3 className="font-display font-bold text-neutral-900">Điện thoại</h3>
-                <p className="mt-1 text-sm text-neutral-600">0123 456 789</p>
-                <p className="text-sm text-neutral-600">0987 654 321</p>
+                <a
+                  href="tel:0365679004"
+                  className="mt-1 block text-sm font-medium text-convot-sage hover:underline"
+                >
+                  0365679004
+                </a>
               </div>
             </div>
 
@@ -228,16 +232,10 @@ const ContactPage = () => {
               <div>
                 <h3 className="font-display font-bold text-neutral-900">Email</h3>
                 <a
-                  href="mailto:support@sneakerconverse.vn"
+                  href="mailto:dungldph38549@fpt.edu.vn"
                   className="mt-1 block text-sm font-medium text-convot-sage hover:underline"
                 >
-                  support@sneakerconverse.vn
-                </a>
-                <a
-                  href="mailto:contact@sneakerconverse.vn"
-                  className="mt-0.5 block text-sm font-medium text-convot-sage hover:underline"
-                >
-                  contact@sneakerconverse.vn
+                  dungldph38549@fpt.edu.vn
                 </a>
               </div>
             </div>

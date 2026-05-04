@@ -91,7 +91,7 @@ const FooterComponent = () => {
               >
                 <span className="material-symbols-outlined text-[15px] font-light">public</span>
               </a>
-              <a href="mailto:support@sneakerconverse.vn" className={socialBtnClass} aria-label="Thư điện tử">
+              <a href="mailto:dungldph38549@fpt.edu.vn" className={socialBtnClass} aria-label="Thư điện tử">
                 <span className="material-symbols-outlined text-[15px] font-light">alternate_email</span>
               </a>
               <Link to="/contact" className={socialBtnClass} aria-label="Chia sẻ / Liên hệ">

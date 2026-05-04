@@ -299,34 +299,57 @@ const ProductDetail = () => {
   const selectedSku = selectedVariant?.sku ?? null;
   const selectedSizeValue = getVariantSizeValue(selectedVariant) ?? null;
 
+  /** Giá bán thực của biến thể đã chọn; SP có variants mà chưa đủ màu+size → 0 (không hiển thị một mức giá “ảo”). */
   const displayPrice = useMemo(() => {
     if (!product) return 0;
     if (!hasVariants) return getProductPriceInfo(product).effectivePrice;
     if (selectedVariant) return getProductPriceInfo(product, selectedVariant).effectivePrice;
-    if (selectedColorId) {
-      const list = product.variants.filter((v) => getVariantColorKeyStable(v) === selectedColorId);
-      const prices = list
-        .map((v) => getProductPriceInfo(product, v).effectivePrice)
-        .filter((p) => Number(p) > 0);
-      if (prices.length) return Math.min(...prices);
-    }
-    const all = product.variants.map((v) => getProductPriceInfo(product, v).effectivePrice);
-    const pos = all.filter((p) => Number(p) > 0);
-    return pos.length ? Math.min(...pos) : 0;
-  }, [product, hasVariants, selectedVariant, selectedColorId, getVariantColorKeyStable]);
+    return 0;
+  }, [product, hasVariants, selectedVariant]);
 
   const selectedPriceInfo = useMemo(() => {
     if (!product) return { originalPrice: 0, effectivePrice: 0, hasSale: false, discountPercent: 0 };
     if (!hasVariants) return getProductPriceInfo(product);
     if (selectedVariant) return getProductPriceInfo(product, selectedVariant);
+    return { originalPrice: 0, effectivePrice: 0, hasSale: false, discountPercent: 0 };
+  }, [product, hasVariants, selectedVariant]);
+
+  /** Khoảng giá (min–max) theo biến thể; nếu đã chọn màu thì thu hẹp theo màu đó. */
+  const variantPriceRangeForDisplay = useMemo(() => {
+    if (!product || !hasVariants || !Array.isArray(product.variants)) return { min: 0, max: 0 };
+    let list = product.variants;
     if (selectedColorId) {
-      const list = product.variants.filter((v) => getVariantColorKeyStable(v) === selectedColorId);
-      const first = list[0];
-      if (first) return getProductPriceInfo(product, first);
+      list = list.filter((v) => getVariantColorKeyStable(v) === selectedColorId);
     }
-    const first = product.variants?.[0];
-    return getProductPriceInfo(product, first || null);
-  }, [product, hasVariants, selectedVariant, selectedColorId, getVariantColorKeyStable]);
+    const prices = list
+      .map((v) => getProductPriceInfo(product, v).effectivePrice)
+      .filter((p) => Number(p) > 0);
+    if (!prices.length) return { min: 0, max: 0 };
+    return { min: Math.min(...prices), max: Math.max(...prices) };
+  }, [product, hasVariants, selectedColorId, getVariantColorKeyStable]);
+
+  /** Khoảng giá niêm yết (gốc) tương ứng — để gạch ngang cạnh khoảng giá sale. */
+  const variantOriginalPriceRangeForDisplay = useMemo(() => {
+    if (!product || !hasVariants || !Array.isArray(product.variants)) return { min: 0, max: 0 };
+    let list = product.variants;
+    if (selectedColorId) {
+      list = list.filter((v) => getVariantColorKeyStable(v) === selectedColorId);
+    }
+    const prices = list
+      .map((v) => getProductPriceInfo(product, v).originalPrice)
+      .filter((p) => Number(p) > 0);
+    if (!prices.length) return { min: 0, max: 0 };
+    return { min: Math.min(...prices), max: Math.max(...prices) };
+  }, [product, hasVariants, selectedColorId, getVariantColorKeyStable]);
+
+  const variantRangeShowsDiscount = useMemo(() => {
+    const oMin = variantOriginalPriceRangeForDisplay.min;
+    const oMax = variantOriginalPriceRangeForDisplay.max;
+    const eMin = variantPriceRangeForDisplay.min;
+    const eMax = variantPriceRangeForDisplay.max;
+    if (oMin <= 0 || eMin <= 0) return false;
+    return oMin > eMin || oMax > eMax;
+  }, [variantOriginalPriceRangeForDisplay, variantPriceRangeForDisplay]);
 
   /** Trung bình sao từ API (đánh giá hiển thị công khai); khi chưa tải xong thì tạm dùng dữ liệu sản phẩm nếu có */
   const ratingAverage = useMemo(() => {
@@ -967,14 +990,46 @@ const ProductDetail = () => {
             </h1>
 
             <div className="mt-6 flex flex-wrap items-baseline gap-3">
-              {selectedPriceInfo.hasSale && (
-                <span className="text-lg text-neutral-400 line-through">
-                  {Number(selectedPriceInfo.originalPrice).toLocaleString("vi-VN")}đ
-                </span>
+              {hasVariants && !selectedVariant ? (
+                <>
+                  {variantRangeShowsDiscount &&
+                  variantOriginalPriceRangeForDisplay.min > 0 &&
+                  variantPriceRangeForDisplay.min > 0 ? (
+                    <span className="text-lg text-neutral-400 line-through">
+                      {variantOriginalPriceRangeForDisplay.min ===
+                      variantOriginalPriceRangeForDisplay.max
+                        ? `${Number(variantOriginalPriceRangeForDisplay.min).toLocaleString("vi-VN")}đ`
+                        : `${Number(variantOriginalPriceRangeForDisplay.min).toLocaleString("vi-VN")}đ – ${Number(variantOriginalPriceRangeForDisplay.max).toLocaleString("vi-VN")}đ`}
+                    </span>
+                  ) : null}
+                  <span
+                    className={`text-3xl font-medium md:text-[2rem] ${variantRangeShowsDiscount ? "text-[#D0021B]" : "text-convot-charcoal"}`}
+                  >
+                    {variantPriceRangeForDisplay.min > 0 && variantPriceRangeForDisplay.max > 0 ? (
+                      variantPriceRangeForDisplay.min === variantPriceRangeForDisplay.max ? (
+                        `${Number(variantPriceRangeForDisplay.min).toLocaleString("vi-VN")}đ`
+                      ) : (
+                        `${Number(variantPriceRangeForDisplay.min).toLocaleString("vi-VN")}đ – ${Number(variantPriceRangeForDisplay.max).toLocaleString("vi-VN")}đ`
+                      )
+                    ) : (
+                      "—"
+                    )}
+                  </span>
+                </>
+              ) : (
+                <>
+                  {selectedPriceInfo.hasSale && (
+                    <span className="text-lg text-neutral-400 line-through">
+                      {Number(selectedPriceInfo.originalPrice).toLocaleString("vi-VN")}đ
+                    </span>
+                  )}
+                  <span
+                    className={`text-3xl font-medium md:text-[2rem] ${selectedPriceInfo.hasSale ? "text-[#D0021B]" : "text-convot-charcoal"}`}
+                  >
+                    {Number(displayPrice).toLocaleString("vi-VN")}đ
+                  </span>
+                </>
               )}
-              <span className="text-3xl font-medium text-convot-charcoal md:text-[2rem]">
-                {Number(displayPrice).toLocaleString("vi-VN")}đ
-              </span>
             </div>
 
             <div className="mt-5 flex flex-wrap items-center gap-3">

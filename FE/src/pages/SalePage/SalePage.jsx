@@ -175,6 +175,7 @@ const SalePage = () => {
                 {visibleList.map((item) => {
                   const image = getImageUrl(item?.image || item?.srcImages?.[0]);
                   const { minPrice, maxPrice } = getProductPriceRange(item);
+                  const discountPct = getDiscountPercent(item);
                   const outOfStock = isProductOutOfStock(item);
                   return (
                     <Link
@@ -231,8 +232,8 @@ const SalePage = () => {
                         ) : (
                           <div className="h-full w-full bg-neutral-200" />
                         )}
-                        <span className="absolute left-2 top-2 z-10 bg-[#D0021B] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
-                          Sale
+                        <span className="absolute left-2 top-2 z-10 bg-[#D0021B] px-2 py-1 text-[10px] font-bold tabular-nums tracking-wider text-white">
+                          {discountPct > 0 ? `-${discountPct}%` : "SALE"}
                         </span>
                       </div>
                       <div className="p-2.5">
