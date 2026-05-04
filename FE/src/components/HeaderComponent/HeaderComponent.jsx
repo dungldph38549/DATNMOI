@@ -177,7 +177,7 @@ const Header = () => {
       <Link to="/sale" className={navActive(isSaleNav)}>
         SALE
       </Link>
-      <Link to="/voucher" className={navActive(isVoucherNav)}>
+      <Link to="/voucher#voucher-kha-dung" className={navActive(isVoucherNav)}>
         VOUCHER
       </Link>
       <Link to="/contact" className={navActive(isContactNav)}>
@@ -333,7 +333,7 @@ const Header = () => {
           <Link to="/sale" className={`${navActive(isSaleNav)} whitespace-nowrap`}>
             SALE
           </Link>
-          <Link to="/voucher" className={`${navActive(isVoucherNav)} whitespace-nowrap`}>
+          <Link to="/voucher#voucher-kha-dung" className={`${navActive(isVoucherNav)} whitespace-nowrap`}>
             VOUCHER
           </Link>
           <Link to="/contact" className={`${navActive(isContactNav)} whitespace-nowrap`}>

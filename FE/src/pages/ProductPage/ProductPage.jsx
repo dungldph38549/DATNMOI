@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaChevronLeft, FaChevronRight, FaHeart, FaRegHeart, FaEye } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProducts, getAllCategories, getVoucherByCode } from "../../api";
-import { getProductPriceRange } from "../../utils/pricing.js";
+import { getProductPriceInfo, getProductPriceRange } from "../../utils/pricing.js";
 import { getVariantColorValue, getVariantSizeValue } from "../../utils/variantAttributes";
 import { isProductOutOfStock } from "../../utils/stock.js";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
@@ -72,6 +72,26 @@ const getProductSizes = (product) => {
     sizes.push(String(product.size).trim());
   }
   return [...new Set(sizes)];
+};
+
+/** Cùng chuẩn trang /sale — chỉ badge khi có giảm giá thật (saleRules / saleDiscountAmount). */
+const isProductOnRealSale = (p) => {
+  if (!p) return false;
+  const amt = (v) => Number(v) || 0;
+  if (amt(p.saleDiscountAmount) > 0) return true;
+  if (Array.isArray(p.variants) && p.variants.some((v) => amt(v?.saleDiscountAmount) > 0)) {
+    return true;
+  }
+  return false;
+};
+
+const getDiscountPercent = (p) => {
+  const info = getProductPriceInfo(p);
+  if (info.discountPercent > 0) return info.discountPercent;
+  const original = Number(p?.originalPriceRange?.min ?? p?.originalPrice ?? p?.price ?? 0);
+  const effective = Number(p?.priceRange?.min ?? p?.effectivePrice ?? p?.salePrice ?? p?.price ?? 0);
+  if (!Number.isFinite(original) || original <= 0 || !Number.isFinite(effective)) return 0;
+  return Math.max(0, Math.round(((original - effective) / original) * 100));
 };
 
 const getProductColors = (product) => {
@@ -493,6 +513,8 @@ const ProductPage = () => {
                     const { minPrice, maxPrice } = getProductPriceRange(item);
                     const categoryText = item?.categoryId?.name || item?.category || "Sneakers";
                     const outOfStock = isProductOutOfStock(item);
+                    const onSale = isProductOnRealSale(item);
+                    const discountPct = onSale ? getDiscountPercent(item) : 0;
                     return (
                       <Link key={item?._id} to={`/product/${item?._id}`} className="group block overflow-hidden rounded-lg bg-white">
                         <div className="relative aspect-[4/4.4] overflow-hidden bg-neutral-100">
@@ -536,6 +558,11 @@ const ProductPage = () => {
                             </>
                           ) : (
                             <div className="h-full w-full bg-neutral-200" />
+                          )}
+                          {onSale && (
+                            <span className="pointer-events-none absolute left-2 top-2 z-10 bg-[#D0021B] px-2 py-1 text-[10px] font-bold tabular-nums tracking-wider text-white">
+                              {discountPct > 0 ? `-${discountPct}%` : "SALE"}
+                            </span>
                           )}
                         </div>
                         <div className="p-2.5">

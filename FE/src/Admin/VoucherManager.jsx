@@ -1,8 +1,7 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import {
   Table,
   Button,
-  Modal,
   Form,
   Input,
   InputNumber,
@@ -12,7 +11,6 @@ import {
   Space,
   Row,
   Col,
-  Checkbox,
   Tag,
   Tooltip,
   Slider,
@@ -26,6 +24,7 @@ import {
   GiftOutlined,
   CopyOutlined,
   PoweroffOutlined,
+  ArrowLeftOutlined,
 } from "@ant-design/icons";
 import {
   getAdminVouchers,
@@ -42,22 +41,67 @@ const T = {
   primary: "#f49d25",
   primarySoft: "rgba(244,157,37,0.12)",
   primaryStrong: "#d97706",
+  brown: "#92400e",
+  brownSoft: "#b45309",
+  brownBg: "linear-gradient(145deg, #78350f 0%, #92400e 55%, #7c2d12 100%)",
   text: "#0F172A",
   textMuted: "#64748B",
   border: "#E2E8F0",
-  bg: "#F8F7F5",
+  bg: "#F1F5F9",
   card: "#ffffff",
   radius: 12,
 };
 
 const normList = (data) => data?.data ?? (Array.isArray(data) ? data : []);
 
+function PercentValueControl({ value = 10, onChange }) {
+  const v = value == null || Number.isNaN(Number(value)) ? 10 : Number(value);
+  return (
+    <Row gutter={[12, 8]} align="middle" wrap={false}>
+      <Col flex="1 1 auto" style={{ minWidth: 0 }}>
+        <Slider min={1} max={100} value={v} onChange={(n) => onChange?.(n)} tooltip={{ formatter: (n) => `${n}%` }} />
+      </Col>
+      <Col flex="none" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <InputNumber min={1} max={100} value={v} onChange={(n) => onChange?.(n ?? 1)} style={{ width: 100 }} />
+        <span style={{ color: T.textMuted, fontSize: 13, fontWeight: 600 }}>%</span>
+      </Col>
+    </Row>
+  );
+}
+
+function SectionCard({ title, children }) {
+  return (
+    <div
+      style={{
+        background: T.card,
+        borderRadius: 16,
+        border: `1px solid ${T.border}`,
+        padding: "20px 22px",
+        marginBottom: 20,
+        boxShadow: "0 4px 20px rgba(15, 23, 42, 0.06)",
+      }}
+    >
+      <h3
+        style={{
+          margin: "0 0 18px",
+          fontSize: 15,
+          fontWeight: 700,
+          color: T.text,
+          letterSpacing: "-0.02em",
+        }}
+      >
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
 export default function VoucherManager() {
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
-  const [modalOpen, setModalOpen] = useState(false);
+  const [formPageOpen, setFormPageOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [productSearch, setProductSearch] = useState("");
   const voucherType = Form.useWatch("type", form);
 
   const { data, isLoading } = useQuery({
@@ -95,20 +139,13 @@ export default function VoucherManager() {
     label: c?.name || c?._id,
   }));
 
-  const filteredProducts = useMemo(() => {
-    const q = productSearch.trim().toLowerCase();
-    if (!q) return productList;
-    return productList.filter((p) =>
-      String(p?.name || "").toLowerCase().includes(q),
-    );
-  }, [productList, productSearch]);
-
   const createMutation = useMutation({
     mutationFn: createVoucher,
     onSuccess: () => {
       message.success("Tạo voucher thành công");
       queryClient.invalidateQueries({ queryKey: ["admin-vouchers"] });
-      setModalOpen(false);
+      setEditingId(null);
+      setFormPageOpen(false);
       form.resetFields();
     },
     onError: (err) => {
@@ -121,7 +158,7 @@ export default function VoucherManager() {
     onSuccess: () => {
       message.success("Cập nhật thành công");
       queryClient.invalidateQueries({ queryKey: ["admin-vouchers"] });
-      setModalOpen(false);
+      setFormPageOpen(false);
       setEditingId(null);
       form.resetFields();
     },
@@ -239,8 +276,7 @@ export default function VoucherManager() {
         ? record.applicableCategories.map((id) => String(id))
         : [],
     });
-    setProductSearch("");
-    setModalOpen(true);
+    setFormPageOpen(true);
   };
 
   const openCreate = () => {
@@ -257,8 +293,13 @@ export default function VoucherManager() {
       applicableProducts: [],
       applicableCategories: [],
     });
-    setProductSearch("");
-    setModalOpen(true);
+    setFormPageOpen(true);
+  };
+
+  const closeFormPage = () => {
+    setFormPageOpen(false);
+    setEditingId(null);
+    form.resetFields();
   };
 
   const columns = [
@@ -384,6 +425,326 @@ export default function VoucherManager() {
 
   const maxD = Form.useWatch("maxDiscount", form) || 0;
   const pctVal = Form.useWatch("value", form) ?? 10;
+  const previewCode = Form.useWatch("code", form);
+  const previewDesc = Form.useWatch("description", form);
+  const previewMin = Form.useWatch("minOrderValue", form) || 0;
+  const previewEnd = Form.useWatch("endDate", form);
+  const previewType = Form.useWatch("type", form);
+  const previewVal = Form.useWatch("value", form);
+  const previewActive = Form.useWatch("isActive", form);
+
+  const previewOfferLine = (() => {
+    const minK = Number(previewMin) > 0;
+    const minFmt = Number(previewMin).toLocaleString("vi-VN");
+    if (previewType === "fixed") {
+      const v = Number(previewVal) || 0;
+      return `Giảm ${v.toLocaleString("vi-VN")}đ${minK ? ` cho đơn từ ${minFmt}đ` : ""}`;
+    }
+    const p = Number(previewVal) || 0;
+    return `Giảm ${p}%${minK ? ` cho đơn từ ${minFmt}đ` : ""}`;
+  })();
+
+  const voucherFormInner = (
+    <>
+      <Row gutter={[24, 0]}>
+        <Col xs={24} lg={15}>
+          <SectionCard title="Thông tin cơ bản">
+            <Row gutter={[16, 16]} align="middle">
+              <Col xs={24} sm={16}>
+                <Form.Item
+                  name="code"
+                  label="Mã voucher"
+                  rules={[{ required: true, message: "Nhập mã voucher" }]}
+                  style={{ marginBottom: 0 }}
+                >
+                  <Input placeholder="Vd: SNEAKER2024" disabled={!!editingId} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={8}>
+                <div style={{ paddingTop: 4 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 8 }}>
+                    Trạng thái hoạt động
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 13, color: T.textMuted }}>Kích hoạt</span>
+                    <Form.Item name="isActive" valuePropName="checked" initialValue={true} noStyle>
+                      <Switch />
+                    </Form.Item>
+                  </div>
+                </div>
+              </Col>
+            </Row>
+            <Form.Item name="description" label="Mô tả" style={{ marginBottom: 0, marginTop: 16 }}>
+              <Input.TextArea rows={3} placeholder="Nhập mô tả chương trình khuyến mãi…" />
+            </Form.Item>
+          </SectionCard>
+
+          <SectionCard title="Cấu hình giảm giá">
+            <Form.Item name="type" label="Loại giảm" initialValue="percent" style={{ marginBottom: 16 }}>
+              <Select
+                options={[
+                  { value: "percent", label: "Phần trăm (%)" },
+                  { value: "fixed", label: "Số tiền cố định (VNĐ)" },
+                ]}
+                onChange={() => form.validateFields(["value"])}
+              />
+            </Form.Item>
+            {voucherType === "percent" ? (
+              <>
+                <Form.Item
+                  name="value"
+                  label="Giá trị giảm"
+                  rules={[
+                    { required: true, message: "Chọn %" },
+                    { type: "number", min: 1, max: 100, message: "Từ 1 đến 100" },
+                  ]}
+                >
+                  <PercentValueControl />
+                </Form.Item>
+                <div
+                  style={{
+                    marginTop: -8,
+                    marginBottom: 16,
+                    padding: "10px 14px",
+                    borderRadius: T.radius,
+                    background: T.primarySoft,
+                    color: "#78350f",
+                    fontWeight: 600,
+                    fontSize: 13,
+                  }}
+                >
+                  Áp dụng: giảm {pctVal}% — tối đa{" "}
+                  {maxD > 0 ? `${Number(maxD).toLocaleString("vi-VN")}đ` : "không trần (theo đơn)"}
+                </div>
+              </>
+            ) : (
+              <Form.Item name="value" label="Giá trị giảm" rules={[{ required: true, message: "Nhập số tiền" }]}>
+                <InputNumber min={0} style={{ width: "100%" }} addonAfter="VNĐ" />
+              </Form.Item>
+            )}
+            <Row gutter={[16, 0]}>
+              <Col xs={24} sm={12}>
+                <Form.Item name="maxDiscount" label="Giảm tối đa" initialValue={0}>
+                  <InputNumber
+                    min={0}
+                    style={{ width: "100%" }}
+                    placeholder="0 = không trần"
+                    addonAfter="VNĐ"
+                    disabled={voucherType !== "percent"}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item name="minOrderValue" label="Đơn tối thiểu">
+                  <InputNumber min={0} style={{ width: "100%" }} addonAfter="VNĐ" />
+                </Form.Item>
+              </Col>
+            </Row>
+          </SectionCard>
+
+          <SectionCard title="Giới hạn sử dụng">
+            <Row gutter={[16, 0]}>
+              <Col xs={24} sm={12}>
+                <Form.Item name="usageLimit" label="Tổng lượt dùng">
+                  <InputNumber min={0} style={{ width: "100%" }} placeholder="Không giới hạn (0)" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item name="userLimit" label="Mỗi khách tối đa">
+                  <InputNumber min={0} style={{ width: "100%" }} placeholder="1" />
+                </Form.Item>
+              </Col>
+            </Row>
+          </SectionCard>
+
+          <SectionCard title="Thời gian áp dụng">
+            <Row gutter={[16, 0]}>
+              <Col xs={24} sm={12}>
+                <Form.Item name="startDate" label="Từ ngày" rules={[{ required: true }]}>
+                  <DatePicker showTime style={{ width: "100%" }} format="DD/MM/YYYY HH:mm" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item
+                  name="endDate"
+                  label="Đến ngày"
+                  dependencies={["startDate"]}
+                  rules={[
+                    { required: true, message: "Chọn ngày kết thúc" },
+                    ({ getFieldValue }) => ({
+                      validator(_, value) {
+                        const start = getFieldValue("startDate");
+                        if (!value || !start) return Promise.resolve();
+                        if (dayjs(value).isBefore(dayjs(start))) {
+                          return Promise.reject(new Error("Ngày kết thúc phải ≥ ngày bắt đầu"));
+                        }
+                        return Promise.resolve();
+                      },
+                    }),
+                  ]}
+                >
+                  <DatePicker showTime style={{ width: "100%" }} format="DD/MM/YYYY HH:mm" />
+                </Form.Item>
+              </Col>
+            </Row>
+          </SectionCard>
+        </Col>
+
+        <Col xs={24} lg={9}>
+          <SectionCard title="Phạm vi áp dụng">
+            <Form.Item name="applicableCategories" label="Danh mục áp dụng">
+              <Select
+                mode="multiple"
+                options={categoryOptions}
+                allowClear
+                placeholder="+ Chọn danh mục"
+                optionFilterProp="label"
+                maxTagCount="responsive"
+              />
+            </Form.Item>
+            <Form.Item name="applicableProducts" label="Sản phẩm áp dụng">
+              <Select
+                mode="multiple"
+                options={productOptions}
+                placeholder="Tìm sản phẩm…"
+                allowClear
+                optionFilterProp="label"
+                showSearch
+                maxTagCount="responsive"
+              />
+            </Form.Item>
+            <p style={{ margin: 0, fontSize: 12, color: T.textMuted, lineHeight: 1.5 }}>
+              Tất cả sản phẩm đều được áp dụng nếu để trống phạm vi.
+            </p>
+          </SectionCard>
+
+          <SectionCard title="Xem trước voucher">
+            <div
+              style={{
+                background: T.brownBg,
+                borderRadius: 16,
+                padding: "22px 20px",
+                color: "#fff",
+                boxShadow: "0 12px 28px rgba(120, 53, 15, 0.35)",
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", opacity: 0.9 }}>
+                SNEAKERCONVERSE
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 800, marginTop: 12, lineHeight: 1.35 }}>
+                {previewOfferLine}
+              </div>
+              {previewDesc?.trim() ? (
+                <div style={{ fontSize: 13, opacity: 0.9, marginTop: 8, lineHeight: 1.45 }}>{previewDesc}</div>
+              ) : null}
+              <div style={{ fontSize: 12, opacity: 0.85, marginTop: 14 }}>
+                HSD: {previewEnd ? dayjs(previewEnd).format("DD/MM/YYYY") : "—"}
+                {previewActive === false ? " · Đang tắt" : ""}
+              </div>
+              <div
+                style={{
+                  marginTop: 16,
+                  padding: "10px 14px",
+                  background: "rgba(255,255,255,0.15)",
+                  borderRadius: 10,
+                  fontWeight: 700,
+                  fontSize: 14,
+                  letterSpacing: "0.04em",
+                }}
+              >
+                #{(previewCode || "MÃVOUCHER").toString().toUpperCase()}
+              </div>
+              <Button
+                type="primary"
+                block
+                style={{
+                  marginTop: 14,
+                  borderRadius: 10,
+                  fontWeight: 700,
+                  background: "#fff",
+                  color: T.brown,
+                  border: "none",
+                }}
+                onClick={() => copyCode(previewCode || "DEMO")}
+              >
+                LƯU MÃ
+              </Button>
+            </div>
+          </SectionCard>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
+            <Button
+              size="large"
+              onClick={closeFormPage}
+              style={{
+                borderRadius: T.radius,
+                minWidth: 120,
+                borderColor: T.brown,
+                color: T.brown,
+                fontWeight: 600,
+              }}
+            >
+              Hủy bỏ
+            </Button>
+            <Button
+              type="primary"
+              size="large"
+              loading={createMutation.isPending || updateMutation.isPending}
+              onClick={() => form.submit()}
+              style={{
+                borderRadius: T.radius,
+                minWidth: 160,
+                fontWeight: 700,
+                background: T.brownSoft,
+                borderColor: T.brownSoft,
+              }}
+            >
+              {editingId ? "Cập nhật voucher" : "Lưu voucher"}
+            </Button>
+          </div>
+        </Col>
+      </Row>
+    </>
+  );
+
+  if (formPageOpen) {
+    return (
+      <div
+        style={{
+          padding: "20px 24px 32px",
+          background: T.bg,
+          minHeight: "100%",
+          fontFamily: "'Lexend', sans-serif",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            marginBottom: 24,
+            flexWrap: "wrap",
+          }}
+        >
+          <Button
+            type="text"
+            icon={<ArrowLeftOutlined />}
+            onClick={closeFormPage}
+            style={{ color: T.text, fontWeight: 600 }}
+          >
+            Quay lại
+          </Button>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: T.text }}>
+            {editingId ? "Sửa voucher" : "Thêm voucher mới"}
+          </h1>
+        </div>
+
+        <Form form={form} layout="vertical" onFinish={onFinish} requiredMark="optional">
+          {voucherFormInner}
+        </Form>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -461,251 +822,6 @@ export default function VoucherManager() {
           }}
         />
       </div>
-
-      <Modal
-        title={editingId ? "Sửa voucher" : "Thêm voucher"}
-        open={modalOpen}
-        width={920}
-        onCancel={() => {
-          setModalOpen(false);
-          setEditingId(null);
-          form.resetFields();
-          setProductSearch("");
-        }}
-        footer={null}
-        centered
-        styles={{
-          content: { borderRadius: T.radius },
-        }}
-      >
-        <Form form={form} layout="vertical" onFinish={onFinish}>
-          <Form.Item name="code" label="Mã" rules={[{ required: true }]}>
-            <Input placeholder="SUMMER20" disabled={!!editingId} />
-          </Form.Item>
-          <Form.Item name="description" label="Mô tả">
-            <Input />
-          </Form.Item>
-
-          <Form.Item name="type" label="Loại giảm" initialValue="percent">
-            <Select
-              options={[
-                { value: "percent", label: "Phần trăm (%)" },
-                { value: "fixed", label: "Số tiền cố định (đ)" },
-              ]}
-              onChange={() => form.validateFields(["value"])}
-            />
-          </Form.Item>
-
-          {voucherType === "percent" ? (
-            <>
-              <Form.Item
-                name="value"
-                label="Phần trăm giảm (1–100)"
-                rules={[
-                  { required: true, message: "Chọn %" },
-                  {
-                    type: "number",
-                    min: 1,
-                    max: 100,
-                    message: "Giá trị % phải từ 1 đến 100",
-                  },
-                ]}
-              >
-                <Slider
-                  min={1}
-                  max={100}
-                  marks={{ 1: "1%", 50: "50%", 100: "100%" }}
-                />
-              </Form.Item>
-              <div
-                style={{
-                  marginBottom: 16,
-                  padding: 12,
-                  borderRadius: T.radius,
-                  background: T.primarySoft,
-                  color: "#78350f",
-                  fontWeight: 600,
-                }}
-              >
-                Giảm {pctVal}% tối đa{" "}
-                {maxD > 0
-                  ? `${Number(maxD).toLocaleString("vi-VN")}đ`
-                  : "không giới hạn (theo giá trị đơn)"}
-              </div>
-            </>
-          ) : (
-            <Form.Item
-              name="value"
-              label="Số tiền giảm (đ)"
-              rules={[{ required: true, message: "Nhập số tiền" }]}
-            >
-              <InputNumber min={0} style={{ width: "100%" }} />
-            </Form.Item>
-          )}
-
-          <Form.Item
-            name="maxDiscount"
-            label="Giảm tối đa (đ) — chỉ áp khi loại %"
-            initialValue={0}
-          >
-            <InputNumber min={0} style={{ width: "100%" }} placeholder="0 = không trần" />
-          </Form.Item>
-
-          <Form.Item name="minOrderValue" label="Đơn tối thiểu (đ)">
-            <InputNumber min={0} style={{ width: "100%" }} />
-          </Form.Item>
-
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="usageLimit" label="Tổng lượt dùng (0 = không giới hạn)">
-                <InputNumber min={0} style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="userLimit" label="Mỗi khách tối đa (0 = không giới hạn)">
-                <InputNumber min={0} style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item name="startDate" label="Từ ngày" rules={[{ required: true }]}>
-            <DatePicker showTime style={{ width: "100%" }} format="DD/MM/YYYY HH:mm" />
-          </Form.Item>
-          <Form.Item
-            name="endDate"
-            label="Đến ngày"
-            dependencies={["startDate"]}
-            rules={[
-              { required: true, message: "Chọn ngày kết thúc" },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  const start = getFieldValue("startDate");
-                  if (!value || !start) return Promise.resolve();
-                  if (dayjs(value).isBefore(dayjs(start))) {
-                    return Promise.reject(
-                      new Error("Ngày kết thúc phải ≥ ngày bắt đầu"),
-                    );
-                  }
-                  return Promise.resolve();
-                },
-              }),
-            ]}
-          >
-            <DatePicker showTime style={{ width: "100%" }} format="DD/MM/YYYY HH:mm" />
-          </Form.Item>
-
-          <Form.Item
-            name="isActive"
-            label="Hoạt động"
-            valuePropName="checked"
-            initialValue={true}
-          >
-            <Switch />
-          </Form.Item>
-
-          <Form.Item
-            name="applicableCategories"
-            label="Danh mục áp dụng (để trống = tất cả)"
-          >
-            <Select
-              mode="multiple"
-              options={categoryOptions}
-              allowClear
-              placeholder="Chọn danh mục"
-              optionFilterProp="label"
-            />
-          </Form.Item>
-
-          <Form.Item label="Sản phẩm áp dụng (để trống = tất cả)">
-            <Row gutter={[16, 16]}>
-              <Col xs={24} lg={12}>
-                <Space direction="vertical" style={{ width: "100%" }} size="small">
-                  <Form.Item name="applicableProducts" noStyle>
-                    <Select
-                      mode="multiple"
-                      options={productOptions}
-                      placeholder="Chọn sản phẩm"
-                      allowClear
-                      optionFilterProp="label"
-                      style={{ width: "100%" }}
-                    />
-                  </Form.Item>
-                  <Button
-                    type="default"
-                    size="small"
-                    onClick={() => {
-                      form.setFieldsValue({ applicableProducts: [] });
-                      message.info("Áp dụng cho tất cả sản phẩm (theo phạm vi trên)");
-                    }}
-                  >
-                    Xóa chọn SP — dùng toàn shop (theo điều kiện)
-                  </Button>
-                </Space>
-              </Col>
-              <Col xs={24} lg={12}>
-                <Input.Search
-                  allowClear
-                  placeholder="Tìm sản phẩm..."
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  style={{ marginBottom: 8 }}
-                />
-                <div
-                  style={{
-                    maxHeight: 240,
-                    overflowY: "auto",
-                    border: `1px solid ${T.border}`,
-                    borderRadius: T.radius,
-                    padding: "8px 12px",
-                  }}
-                >
-                  <Form.Item noStyle shouldUpdate={() => true}>
-                    {() => {
-                      const raw = form.getFieldValue("applicableProducts") || [];
-                      const ids = Array.isArray(raw) ? raw.map((id) => String(id)) : [];
-                      return (
-                        <Checkbox.Group
-                          style={{ width: "100%" }}
-                          value={ids}
-                          onChange={(vals) => {
-                            form.setFieldsValue({
-                              applicableProducts: vals.map((v) => String(v)),
-                            });
-                          }}
-                        >
-                          <Space direction="vertical" style={{ width: "100%" }} size={4}>
-                            {filteredProducts.map((p) => (
-                              <Checkbox key={String(p._id)} value={String(p._id)}>
-                                {p?.name || p?._id}
-                              </Checkbox>
-                            ))}
-                          </Space>
-                        </Checkbox.Group>
-                      );
-                    }}
-                  </Form.Item>
-                </div>
-              </Col>
-            </Row>
-          </Form.Item>
-
-          <Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              loading={createMutation.isPending || updateMutation.isPending}
-              style={{
-                borderRadius: T.radius,
-                fontWeight: 700,
-                background: T.primary,
-                borderColor: T.primary,
-              }}
-            >
-              {editingId ? "Cập nhật" : "Tạo"}
-            </Button>
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   );
 }

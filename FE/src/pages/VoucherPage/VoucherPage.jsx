@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { Modal } from "antd";
 import {
+  FaChevronDown,
   FaCopy,
   FaGift,
   FaPercent,
@@ -14,8 +15,27 @@ import notify from "../../utils/notify";
 
 const ICONS = [FaTruck, FaTag, FaPercent, FaGift];
 
+/** API hiện tại: isActive + type + value; dữ liệu cũ: status + discountType + discountValue */
+const voucherIsActivePublic = (v) =>
+  v?.isActive === true || v?.status === "active";
+
+const voucherDiscountType = (v) =>
+  v?.type === "fixed" || v?.discountType === "fixed" ? "fixed" : "percent";
+
+const voucherDiscountValue = (v) => Number(v?.value ?? v?.discountValue ?? 0);
+
 const HERO_IMG =
   "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?q=85&w=1200&auto=format&fit=crop";
+
+/** Neo cuộn tới block “Voucher khả dụng” (dùng cả với /voucher#voucher-kha-dung) */
+const VOUCHER_AVAILABLE_ID = "voucher-kha-dung";
+
+const scrollToAvailableVouchers = () => {
+  document.getElementById(VOUCHER_AVAILABLE_ID)?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+};
 
 const VoucherPage = () => {
   const navigate = useNavigate();
@@ -109,7 +129,7 @@ const VoucherPage = () => {
       if (code && (collectedSet.has(code) || expiredSet.has(code))) return false;
       const start = v?.startDate ? new Date(v.startDate) : null;
       const end = v?.endDate ? new Date(v.endDate) : null;
-      const statusOk = v?.status === "active";
+      const statusOk = voucherIsActivePublic(v);
       const timeOk = (!start || now >= start) && (!end || now <= end);
       const usageLimit = Number(v?.usageLimit ?? 0);
       const usedCount = Number(v?.usedCount ?? 0);
@@ -120,14 +140,24 @@ const VoucherPage = () => {
 
   const sortedActive = useMemo(() => {
     const score = (v) => {
-      if (v?.discountType === "percent") return Number(v?.discountValue || 0) * 1000;
-      return Number(v?.discountValue || 0);
+      if (voucherDiscountType(v) === "percent") return voucherDiscountValue(v) * 1000;
+      return voucherDiscountValue(v);
     };
     return [...activeVouchers].sort((a, b) => score(b) - score(a));
   }, [activeVouchers]);
 
+  /** Voucher nổi bật ở hero; toàn bộ mã (kể cả mã đầu) vẫn render trong lưới «Voucher khả dụng» để Lưu / Mua ngay */
   const featured = sortedActive[0];
-  const gridVouchers = sortedActive.slice(1);
+
+  /** Cuộn tới danh sách khi mở /voucher#voucher-kha-dung */
+  useEffect(() => {
+    if (loading) return;
+    const hash = (location.hash || "").replace(/^#/, "");
+    if (hash !== VOUCHER_AVAILABLE_ID) return;
+    const id = window.setTimeout(() => scrollToAvailableVouchers(), 120);
+    return () => window.clearTimeout(id);
+  }, [loading, location.hash, activeVouchers.length]);
+
   const voucherByCode = useMemo(() => {
     const map = new Map();
     vouchers.forEach((voucher) => {
@@ -145,7 +175,7 @@ const VoucherPage = () => {
           const now = new Date();
           const start = voucher?.startDate ? new Date(voucher.startDate) : null;
           const end = voucher?.endDate ? new Date(voucher.endDate) : null;
-          const statusOk = voucher?.status === "active";
+          const statusOk = voucherIsActivePublic(voucher);
           const timeOk = (!start || now >= start) && (!end || now <= end);
           const usedCount = Number(voucher?.usedCount ?? 0);
           return statusOk && timeOk && usedCount < 1;
@@ -162,7 +192,7 @@ const VoucherPage = () => {
         const code = String(v?.code || "").trim().toUpperCase();
         if (code && (collectedSet.has(code) || expiredSet.has(code))) return false;
         const start = v?.startDate ? new Date(v.startDate) : null;
-        const statusOk = v?.status === "active";
+        const statusOk = voucherIsActivePublic(v);
         const usageLimit = Number(v?.usageLimit ?? 0);
         const usedCount = Number(v?.usedCount ?? 0);
         const usageOk = usageLimit === 0 || usedCount < usageLimit;
@@ -188,14 +218,14 @@ const VoucherPage = () => {
 
   const discountHeadline = (v) => {
     if (!v) return "";
-    if (v.discountType === "fixed") return `Giảm ${formatMoney(v.discountValue)}`;
-    return `Giảm ${Number(v.discountValue || 0)}%`;
+    if (voucherDiscountType(v) === "fixed") return `Giảm ${formatMoney(voucherDiscountValue(v))}`;
+    return `Giảm ${voucherDiscountValue(v)}%`;
   };
 
   const discountShort = (v) => {
     if (!v) return "";
-    if (v.discountType === "fixed") return formatMoney(v.discountValue);
-    return `${Number(v.discountValue || 0)}%`;
+    if (voucherDiscountType(v) === "fixed") return formatMoney(voucherDiscountValue(v));
+    return `${voucherDiscountValue(v)}%`;
   };
 
   const voucherTag = (v) => {
@@ -423,6 +453,26 @@ const VoucherPage = () => {
                   <p className="mt-4 text-xs italic text-neutral-400">
                     * Áp dụng theo điều kiện đơn tối thiểu và danh mục sản phẩm được cấu hình trên hệ thống.
                   </p>
+                  {sortedActive.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={scrollToAvailableVouchers}
+                      className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[#4a5d4e] underline decoration-2 underline-offset-4 hover:text-[#3d4f42]"
+                    >
+                      Xem thêm mã trong danh sách
+                      <FaChevronDown className="text-xs" aria-hidden />
+                    </button>
+                  )}
+                  {sortedActive.length === 1 && (
+                    <button
+                      type="button"
+                      onClick={scrollToAvailableVouchers}
+                      className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[#4a5d4e] underline decoration-2 underline-offset-4 hover:text-[#3d4f42]"
+                    >
+                      Lưu / dùng mã ở mục bên dưới
+                      <FaChevronDown className="text-xs" aria-hidden />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -437,7 +487,10 @@ const VoucherPage = () => {
 
         {/* Available grid */}
         {!loading && (activeVouchers.length > 0 || featured) && (
-          <section className="mb-16">
+          <section
+            id={VOUCHER_AVAILABLE_ID}
+            className="mb-16 scroll-mt-24 md:scroll-mt-28"
+          >
             <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <h2 className="font-display text-2xl font-bold text-neutral-900">Voucher khả dụng</h2>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
@@ -446,22 +499,13 @@ const VoucherPage = () => {
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {gridVouchers.map((voucher, idx) => (
-                <VoucherMiniCard key={voucher._id || voucher.code} voucher={voucher} dark={idx === 1} />
+              {sortedActive.map((voucher, idx) => (
+                <VoucherMiniCard
+                  key={voucher._id || voucher.code}
+                  voucher={voucher}
+                  dark={idx % 3 === 1}
+                />
               ))}
-
-              {/* Placeholder card */}
-              <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-neutral-300 bg-white/50 p-8 text-center">
-                <span className="text-4xl text-neutral-300" aria-hidden>
-                  ◈
-                </span>
-                <p className="mt-4 font-display text-sm font-semibold text-neutral-600">
-                  Còn nhiều đợt drop sắp tới
-                </p>
-                <p className="mt-2 max-w-xs text-xs leading-relaxed text-neutral-400">
-                  Theo dõi trang này để không bỏ lỡ mã mới.
-                </p>
-              </div>
             </div>
           </section>
         )}
