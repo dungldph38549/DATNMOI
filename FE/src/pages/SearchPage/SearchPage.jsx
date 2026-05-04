@@ -9,6 +9,20 @@ const PAGE_SIZE = 15;
 const normalize = (str = "") =>
   str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
+const searchFilterRowClass =
+  "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium outline-none transition hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-red-400/40";
+
+const SearchRadioDot = ({ on }) => (
+  <span
+    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+      on ? "border-red-500 bg-red-500" : "border-slate-300 bg-white"
+    }`}
+    aria-hidden
+  >
+    {on ? <span className="h-1.5 w-1.5 rounded-full bg-white shadow-sm" /> : null}
+  </span>
+);
+
 const SearchPage = () => {
   const [searchParams] = useSearchParams();
   const keyword = (searchParams.get("q") || "").trim();
@@ -175,38 +189,39 @@ const SearchPage = () => {
 
           </div>
 
-          <div className="space-y-2 text-sm mb-6">
+          <div className="space-y-1 text-sm mb-6" role="radiogroup" aria-label="Khoảng giá">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={price === "low"}
+              className={searchFilterRowClass}
+              onClick={() => setPrice(price === "low" ? "" : "low")}
+            >
+              <SearchRadioDot on={price === "low"} />
+              Dưới 500k
+            </button>
 
-            <label className="flex items-center gap-2 cursor-pointer rounded-xl px-3 py-2 hover:bg-slate-50 transition">
-              <input
-                type="radio"
-                checked={price === "low"}
-                onChange={() => setPrice("low")}
-                className="w-4 h-4"
-              />
-              <span className="font-medium">Dưới 500k</span>
-            </label>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={price === "mid"}
+              className={searchFilterRowClass}
+              onClick={() => setPrice(price === "mid" ? "" : "mid")}
+            >
+              <SearchRadioDot on={price === "mid"} />
+              500k - 1 triệu
+            </button>
 
-            <label className="flex items-center gap-2 cursor-pointer rounded-xl px-3 py-2 hover:bg-slate-50 transition">
-              <input
-                type="radio"
-                checked={price === "mid"}
-                onChange={() => setPrice("mid")}
-                className="w-4 h-4"
-              />
-              <span className="font-medium">500k - 1 triệu</span>
-            </label>
-
-            <label className="flex items-center gap-2 cursor-pointer rounded-xl px-3 py-2 hover:bg-slate-50 transition">
-              <input
-                type="radio"
-                checked={price === "high"}
-                onChange={() => setPrice("high")}
-                className="w-4 h-4"
-              />
-              <span className="font-medium">Trên 1 triệu</span>
-            </label>
-
+            <button
+              type="button"
+              role="radio"
+              aria-checked={price === "high"}
+              className={searchFilterRowClass}
+              onClick={() => setPrice(price === "high" ? "" : "high")}
+            >
+              <SearchRadioDot on={price === "high"} />
+              Trên 1 triệu
+            </button>
           </div>
 
 
@@ -227,28 +242,28 @@ const SearchPage = () => {
 
           </div>
 
-          <div className="space-y-2 text-sm">
+          <div className="space-y-1 text-sm" role="radiogroup" aria-label="Đánh giá">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={rating === "3"}
+              className={searchFilterRowClass}
+              onClick={() => setRating(rating === "3" ? "" : "3")}
+            >
+              <SearchRadioDot on={rating === "3"} />
+              ⭐ Từ 3/5 sao trở lên
+            </button>
 
-            <label className="flex items-center gap-2 cursor-pointer rounded-xl px-3 py-2 hover:bg-slate-50 transition">
-              <input
-                type="radio"
-                checked={rating === "3"}
-                onChange={() => setRating("3")}
-                className="w-4 h-4"
-              />
-              <span className="font-medium">⭐ Từ 3/5 sao trở lên</span>
-            </label>
-
-            <label className="flex items-center gap-2 cursor-pointer rounded-xl px-3 py-2 hover:bg-slate-50 transition">
-              <input
-                type="radio"
-                checked={rating === "5"}
-                onChange={() => setRating("5")}
-                className="w-4 h-4"
-              />
-              <span className="font-medium">⭐ 5/5 sao (từ 4,5 điểm)</span>
-            </label>
-
+            <button
+              type="button"
+              role="radio"
+              aria-checked={rating === "5"}
+              className={searchFilterRowClass}
+              onClick={() => setRating(rating === "5" ? "" : "5")}
+            >
+              <SearchRadioDot on={rating === "5"} />
+              ⭐ 5/5 sao (từ 4,5 điểm)
+            </button>
           </div>
 
         </div>

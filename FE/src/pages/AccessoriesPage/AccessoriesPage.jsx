@@ -10,7 +10,7 @@ import {
   getVariantShoelaceLengthValue,
   getVariantAccessorySizeValue,
   getVariantSoleValue,
-  inferAccessorySubKind,
+  inferAccessorySubKindFromProduct,
 } from "../../utils/variantAttributes";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 
@@ -50,6 +50,33 @@ const getProductMinPrice = (product) => {
 
 const normalizeValue = (value) => String(value || "").trim().toLowerCase();
 
+/** Khớp độ dài dây khi dữ liệu lệch định dạng (120 / 120cm / 120 CM). */
+const lengthLabelMatchesFilter = (len, filter) => {
+  const a = normalizeValue(len).replace(/\s+/g, "").replace(",", ".");
+  const b = normalizeValue(filter).replace(/\s+/g, "").replace(",", ".");
+  if (!b) return true;
+  if (a === b) return true;
+  const num = (s) => {
+    const m = s.match(/(\d+(?:\.\d+)?)/);
+    return m ? parseFloat(m[1]) : NaN;
+  };
+  const na = num(a);
+  const nb = num(b);
+  if (!Number.isNaN(na) && !Number.isNaN(nb) && na === nb) return true;
+  return false;
+};
+
+/** Khớp màu khi UI có "Màu Đen" còn biến thể chỉ "Đen" hoặc ngược lại. */
+const colorLabelMatchesFilter = (label, filter) => {
+  const strip = (s) => normalizeValue(s).replace(/^(màu|mau)\s+/, "").trim();
+  const a = strip(label);
+  const b = strip(filter);
+  if (!b) return true;
+  if (a === b) return true;
+  if (a.includes(b) || b.includes(a)) return true;
+  return false;
+};
+
 const getProductLaceColors = (product) => {
   const colors = [];
   if (Array.isArray(product?.variants)) {
@@ -71,11 +98,7 @@ const getProductShoelaceLengths = (product) => {
   const lengths = [];
   if (Array.isArray(product?.variants)) {
     product.variants.forEach((variant) => {
-      const v =
-        getVariantShoelaceLengthValue(variant) ??
-        (variant?.size != null && String(variant.size).trim() !== ""
-          ? String(variant.size).trim()
-          : null);
+      const v = getVariantShoelaceLengthValue(variant, product);
       if (v != null && String(v).trim() !== "") lengths.push(String(v).trim());
     });
   }
@@ -93,7 +116,9 @@ const getProductSoleValues = (product) => {
   return [...new Set(vals)];
 };
 
-const getProductVariantSizes = (product) => {
+/** Cỡ lót — chỉ SP nhận diện là lót; không gộp độ dài dây (đã tách ở variantAttributes). */
+const getProductInsoleSizes = (product) => {
+  if (inferAccessorySubKindFromProduct(product) !== "insole") return [];
   const vals = [];
   if (Array.isArray(product?.variants)) {
     product.variants.forEach((variant) => {
@@ -138,6 +163,8 @@ const colorToHex = (name) => {
 };
 
 const FILTER_LABELS = {
+  typeSection: "Lo\u1ea1i ph\u1ee5 ki\u1ec7n",
+  allTypes: "T\u1ea5t c\u1ea3 lo\u1ea1i",
   lengthSection: "\u0110\u1ed9 d\u00e0i d\u00e2y",
   allLengths: "T\u1ea5t c\u1ea3 \u0111\u1ed9 d\u00e0i",
   soleSection: "\u0110\u1ebf gi\u00e0y",
@@ -148,36 +175,61 @@ const FILTER_LABELS = {
   genericColor: "M\u00e0u s\u1eafc",
 };
 
+const TYPE_FILTER_CHOICES = [
+  { id: "shoelace", label: "D\u00e2y gi\u00e0y" },
+  { id: "insole", label: "L\u00f3t gi\u00e0y" },
+  { id: "other", label: "Kh\u00e1c (balo, ph\u1ee5 ki\u1ec7n\u2026)" },
+];
+
 const filterHeadingClass = "mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500";
 
+const filterRadioRowClass =
+  "flex w-full items-center gap-2 rounded-md py-1.5 text-left text-sm text-neutral-700 outline-none transition hover:bg-neutral-100/80 focus-visible:ring-2 focus-visible:ring-[#8ca587]/40";
+
+const AccessoryRadioDot = ({ on }) => (
+  <span
+    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+      on ? "border-[#8ca587] bg-[#8ca587]" : "border-neutral-300 bg-white"
+    }`}
+    aria-hidden
+  >
+    {on ? <span className="h-1.5 w-1.5 rounded-full bg-white shadow-sm" /> : null}
+  </span>
+);
+
+/** Nút role=radio: bấm chọn / bấm lại cùng mục = bỏ chọn — không dùng <input type="radio"> để tránh lệch UI trình duyệt. */
 const VerticalOptionFilter = ({ title, allLabel, options, value, onChange, radioName }) => {
   if (!options.length) return null;
-  const name = radioName || "accessory-option";
+  const gid = radioName || "accessory-option";
+  const titleId = `${gid}-legend`;
   return (
     <div>
-      <h3 className={filterHeadingClass}>{title}</h3>
-      <div className="space-y-3">
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
-          <input
-            type="radio"
-            name={name}
-            checked={value === ""}
-            onChange={() => onChange("")}
-            className="h-4 w-4 accent-[#8ca587]"
-          />
+      <h3 id={titleId} className={filterHeadingClass}>
+        {title}
+      </h3>
+      <div role="radiogroup" aria-labelledby={titleId} className="space-y-1">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={value === ""}
+          className={filterRadioRowClass}
+          onClick={() => onChange("")}
+        >
+          <AccessoryRadioDot on={value === ""} />
           {allLabel}
-        </label>
+        </button>
         {options.map((opt) => (
-          <label key={opt} className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
-            <input
-              type="radio"
-              name={name}
-              checked={value === opt}
-              onChange={() => onChange(opt)}
-              className="h-4 w-4 accent-[#8ca587]"
-            />
+          <button
+            key={opt}
+            type="button"
+            role="radio"
+            aria-checked={value === opt}
+            className={filterRadioRowClass}
+            onClick={() => onChange(value === opt ? "" : opt)}
+          >
+            <AccessoryRadioDot on={value === opt} />
             {opt}
-          </label>
+          </button>
         ))}
       </div>
     </div>
@@ -189,11 +241,12 @@ const AccessoriesPage = () => {
   const wishlistItems = useSelector((state) => state.wishlist.items || []);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [categoryFilterId, setCategoryFilterId] = useState("");
+  /** "" | "shoelace" | "insole" | "other" — lọc theo tên SP + danh mục, không theo categoryId trùng lặp */
+  const [typeFilter, setTypeFilter] = useState("");
   const [colorFilter, setColorFilter] = useState("");
   const [lengthFilter, setLengthFilter] = useState("");
   const [soleFilter, setSoleFilter] = useState("");
-  // const [sizeFilter, setSizeFilter] = useState("");
+  const [sizeFilter, setSizeFilter] = useState("");
   const [sort, setSort] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_STEP);
 
@@ -233,44 +286,26 @@ const AccessoriesPage = () => {
     load();
   }, []);
 
-  const categoryOptions = useMemo(() => {
-    const map = new Map();
-    products.forEach((p) => {
-      const id = String(p?.categoryId?._id ?? p?.categoryId ?? "");
-      const cat = p?.categoryId;
-      const name = cat?.name || p?.category || "";
-      const slug = cat?.slug != null && String(cat.slug).trim() !== "" ? String(cat.slug).trim() : "";
-      if (id && name && !map.has(id)) map.set(id, { name, slug });
-    });
-    return [
-      { id: "", label: "TẤT CẢ PHỤ KIỆN", name: "", slug: "" },
-      ...[...map.entries()].map(([id, meta]) => ({
-        id,
-        label: String(meta.name).toUpperCase(),
-        name: meta.name,
-        slug: meta.slug,
-      })),
-    ];
-  }, [products]);
-
   const selectedAccessoryKind = useMemo(() => {
-    if (!categoryFilterId) return "all";
-    const opt = categoryOptions.find((o) => o.id === categoryFilterId);
-    return inferAccessorySubKind(opt?.name || "", opt?.slug || "");
-  }, [categoryFilterId, categoryOptions]);
+    if (typeFilter === "shoelace") return "shoelace";
+    if (typeFilter === "insole") return "insole";
+    if (typeFilter === "other") return "other";
+    return "all";
+  }, [typeFilter]);
 
   const productsForFilterOptions = useMemo(() => {
-    if (!categoryFilterId) return products;
-    return products.filter((p) => String(p?.categoryId?._id ?? p?.categoryId ?? "") === categoryFilterId);
-  }, [products, categoryFilterId]);
+    if (!typeFilter) return products;
+    return products.filter((p) => inferAccessorySubKindFromProduct(p) === typeFilter);
+  }, [products, typeFilter]);
 
   useEffect(() => {
     if (selectedAccessoryKind === "insole") setLengthFilter("");
-    // if (selectedAccessoryKind === "shoelace") {
-    //   setSizeFilter("");
-    //   setSoleFilter("");
-    // }
+    if (selectedAccessoryKind === "shoelace") setSizeFilter("");
   }, [selectedAccessoryKind]);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_STEP);
+  }, [typeFilter, colorFilter, lengthFilter, soleFilter, sizeFilter, sort]);
 
   const colorOptions = useMemo(() => {
     const set = new Set();
@@ -290,18 +325,18 @@ const AccessoriesPage = () => {
     return [...set].sort((a, b) => a.localeCompare(b, "vi"));
   }, [productsForFilterOptions]);
 
-  // const sizeOptions = useMemo(() => {
-  //   const set = new Set();
-  //   productsForFilterOptions.forEach((p) => getProductVariantSizes(p).forEach((v) => set.add(v)));
-  //   return [...set].sort(sortLengthLabels);
-  // }, [productsForFilterOptions]);
+  const sizeOptions = useMemo(() => {
+    const set = new Set();
+    productsForFilterOptions.forEach((p) => getProductInsoleSizes(p).forEach((v) => set.add(v)));
+    return [...set].sort(sortLengthLabels);
+  }, [productsForFilterOptions]);
 
   const showLengthFilter =
     (selectedAccessoryKind === "all" || selectedAccessoryKind === "other" || selectedAccessoryKind === "shoelace") &&
     lengthOptions.length > 0;
-  // const showSizeFilter =
-  //   (selectedAccessoryKind === "all" || selectedAccessoryKind === "other" || selectedAccessoryKind === "insole") &&
-  //   sizeOptions.length > 0;
+  const showSizeFilter =
+    (selectedAccessoryKind === "all" || selectedAccessoryKind === "other" || selectedAccessoryKind === "insole") &&
+    sizeOptions.length > 0;
   const showSoleFilter =
     (selectedAccessoryKind === "all" || selectedAccessoryKind === "other" || selectedAccessoryKind === "insole") &&
     soleOptions.length > 0;
@@ -312,21 +347,19 @@ const AccessoriesPage = () => {
   const filteredProducts = useMemo(() => {
     let data = [...products];
 
-    if (categoryFilterId) {
-      data = data.filter(
-        (p) => String(p?.categoryId?._id ?? p?.categoryId ?? "") === categoryFilterId,
-      );
+    if (typeFilter) {
+      data = data.filter((p) => inferAccessorySubKindFromProduct(p) === typeFilter);
     }
 
     if (colorFilter) {
       data = data.filter((p) =>
-        getProductLaceColors(p).some((c) => normalizeValue(c) === normalizeValue(colorFilter)),
+        getProductLaceColors(p).some((c) => colorLabelMatchesFilter(c, colorFilter)),
       );
     }
 
     if (lengthFilter && showLengthFilter) {
       data = data.filter((p) =>
-        getProductShoelaceLengths(p).some((len) => normalizeValue(len) === normalizeValue(lengthFilter)),
+        getProductShoelaceLengths(p).some((len) => lengthLabelMatchesFilter(len, lengthFilter)),
       );
     }
 
@@ -336,11 +369,11 @@ const AccessoriesPage = () => {
       );
     }
 
-    // if (sizeFilter && showSizeFilter) {
-    //   data = data.filter((p) =>
-    //     getProductVariantSizes(p).some((v) => normalizeValue(v) === normalizeValue(sizeFilter)),
-    //   );
-    // }
+    if (sizeFilter && showSizeFilter) {
+      data = data.filter((p) =>
+        getProductInsoleSizes(p).some((v) => normalizeValue(v) === normalizeValue(sizeFilter)),
+      );
+    }
 
     if (sort === "priceAsc") data.sort((a, b) => getProductMinPrice(a) - getProductMinPrice(b));
     else if (sort === "priceDesc") data.sort((a, b) => getProductMinPrice(b) - getProductMinPrice(a));
@@ -350,18 +383,16 @@ const AccessoriesPage = () => {
     return data;
   }, [
     products,
-    categoryFilterId,
+    typeFilter,
     colorFilter,
     lengthFilter,
     soleFilter,
+    sizeFilter,
     showLengthFilter,
     showSoleFilter,
+    showSizeFilter,
     sort,
   ]);
-
-  // useEffect(() => {
-  //   setVisibleCount(PAGE_STEP);
-  // }, [categoryFilterId, priceBracket, colorFilter, lengthFilter, soleFilter, sizeFilter, sort]);
 
   const visibleList = useMemo(
     () => filteredProducts.slice(0, visibleCount),
@@ -378,11 +409,11 @@ const AccessoriesPage = () => {
 
   const clearFilters = () => {
     setSort("");
-    setCategoryFilterId("");
+    setTypeFilter("");
     setColorFilter("");
-    // setLengthFilter("");
-    // setSoleFilter("");
-    // setSizeFilter("");
+    setLengthFilter("");
+    setSoleFilter("");
+    setSizeFilter("");
   };
 
   const wishlistIds = useMemo(
@@ -396,27 +427,43 @@ const AccessoriesPage = () => {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
           <aside className="w-full lg:w-[248px] lg:shrink-0 space-y-6">
             <div>
-              <h3 className={filterHeadingClass}>Danh mục</h3>
-              <div className="space-y-3">
-                {categoryOptions.map((opt) => {
-                  const value = opt.id;
-                  const checked = categoryFilterId === value;
-                  return (
-                    <label
-                      key={opt.id || "all-cat"}
-                      className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700"
-                    >
-                      <input
-                        type="radio"
-                        name="accessory-category"
-                        checked={checked}
-                        onChange={() => setCategoryFilterId(value)}
-                        className="h-4 w-4 accent-[#8ca587]"
-                      />
-                      {opt.label}
-                    </label>
-                  );
-                })}
+              <h3 id="accessory-type-legend" className={filterHeadingClass}>
+                {FILTER_LABELS.typeSection}
+              </h3>
+              <div role="radiogroup" aria-labelledby="accessory-type-legend" className="space-y-1">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={typeFilter === ""}
+                  className={filterRadioRowClass}
+                  onClick={() => {
+                    setTypeFilter("");
+                    setColorFilter("");
+                  }}
+                >
+                  <AccessoryRadioDot on={typeFilter === ""} />
+                  {FILTER_LABELS.allTypes}
+                </button>
+                {TYPE_FILTER_CHOICES.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={typeFilter === opt.id}
+                    className={filterRadioRowClass}
+                    onClick={() => {
+                      if (typeFilter === opt.id) {
+                        setTypeFilter("");
+                        setColorFilter("");
+                      } else {
+                        setTypeFilter(opt.id);
+                      }
+                    }}
+                  >
+                    <AccessoryRadioDot on={typeFilter === opt.id} />
+                    {opt.label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -442,7 +489,7 @@ const AccessoriesPage = () => {
               />
             )}
 
-            {/* {showSizeFilter && (
+            {showSizeFilter && (
               <VerticalOptionFilter
                 title={FILTER_LABELS.sizeSection}
                 allLabel={FILTER_LABELS.allSizes}
@@ -451,31 +498,34 @@ const AccessoriesPage = () => {
                 onChange={setSizeFilter}
                 radioName="accessory-size"
               />
-            )} */}
+            )}
 
             {colorOptions.length > 0 && (
               <div>
-                <h3 className={filterHeadingClass}>{colorSectionTitle}</h3>
-                <div className="space-y-3">
-                  <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
-                    <input
-                      type="radio"
-                      name="accessory-color"
-                      checked={colorFilter === ""}
-                      onChange={() => setColorFilter("")}
-                      className="h-4 w-4 accent-[#8ca587]"
-                    />
+                <h3 id="accessory-color-legend" className={filterHeadingClass}>
+                  {colorSectionTitle}
+                </h3>
+                <div role="radiogroup" aria-labelledby="accessory-color-legend" className="space-y-1">
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={colorFilter === ""}
+                    className={filterRadioRowClass}
+                    onClick={() => setColorFilter("")}
+                  >
+                    <AccessoryRadioDot on={colorFilter === ""} />
                     Tất cả màu
-                  </label>
+                  </button>
                   {colorOptions.slice(0, 24).map((c) => (
-                    <label key={c} className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
-                      <input
-                        type="radio"
-                        name="accessory-color"
-                        checked={colorFilter === c}
-                        onChange={() => setColorFilter(c)}
-                        className="h-4 w-4 accent-[#8ca587]"
-                      />
+                    <button
+                      key={c}
+                      type="button"
+                      role="radio"
+                      aria-checked={colorFilter === c}
+                      className={filterRadioRowClass}
+                      onClick={() => setColorFilter(colorFilter === c ? "" : c)}
+                    >
+                      <AccessoryRadioDot on={colorFilter === c} />
                       <span className="inline-flex items-center gap-2">
                         <span
                           className="h-4 w-4 shrink-0 rounded-full border border-neutral-200"
@@ -484,7 +534,7 @@ const AccessoriesPage = () => {
                         />
                         {c}
                       </span>
-                    </label>
+                    </button>
                   ))}
                 </div>
               </div>

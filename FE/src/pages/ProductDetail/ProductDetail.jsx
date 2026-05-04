@@ -117,7 +117,7 @@ const ProductDetail = () => {
     if (variant?.size != null && String(variant.size).trim() !== "") {
       return String(variant.size).trim();
     }
-    const fromLen = getVariantShoelaceLengthValue(variant);
+    const fromLen = getVariantShoelaceLengthValue(variant, product);
     if (fromLen != null && String(fromLen).trim() !== "") {
       return String(fromLen).trim();
     }
@@ -136,7 +136,7 @@ const ProductDetail = () => {
       if (v != null && String(v).trim() !== "") return v;
     }
     return null;
-  }, []);
+  }, [product]);
 
   const getVariantSizeLabel = useCallback((variant) => {
     const val = getVariantSizeValue(variant);

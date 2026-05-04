@@ -43,6 +43,20 @@ const getProductMinPrice = (product) => {
 
 const normalizeValue = (value) => String(value || "").trim().toLowerCase().normalize("NFC");
 
+const categoryFilterRowClass =
+  "flex w-full items-center gap-2 rounded-md py-1.5 text-left text-sm text-neutral-700 outline-none transition hover:bg-neutral-100/80 focus-visible:ring-2 focus-visible:ring-[#8ca587]/40";
+
+const CategoryRadioDot = ({ on }) => (
+  <span
+    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+      on ? "border-[#8ca587] bg-[#8ca587]" : "border-neutral-300 bg-white"
+    }`}
+    aria-hidden
+  >
+    {on ? <span className="h-1.5 w-1.5 rounded-full bg-white shadow-sm" /> : null}
+  </span>
+);
+
 const getProductSizes = (product) => {
   const sizes = [];
   if (Array.isArray(product?.variants)) {
@@ -312,31 +326,44 @@ const ProductPage = () => {
           <aside className="w-full lg:w-[248px] lg:shrink-0 space-y-6">
             {!categorySlug && sidebarCategories.length > 0 && (
               <div>
-                <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Loại sản phẩm</h3>
-                <div className="space-y-3">
-                  <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
-                    <input
-                      type="radio"
-                      name="product-category-filter"
-                      checked={categoryFilter === ""}
-                      onChange={() => setCategoryFilter("")}
-                      className="h-4 w-4 cursor-pointer appearance-none rounded-full border-2 border-neutral-300 transition-all checked:border-[#8ca587] checked:bg-[#8ca587] relative after:absolute after:left-1 after:top-0.5 after:hidden after:h-2 after:w-1 after:rotate-45 after:border-b-2 after:border-r-2 after:border-white checked:after:block after:content-['']"
-                    />
+                <h3 id="product-category-legend" className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
+                  Loại sản phẩm
+                </h3>
+                <div role="radiogroup" aria-labelledby="product-category-legend" className="space-y-1">
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={categoryFilter === ""}
+                    className={categoryFilterRowClass}
+                    onClick={() => {
+                      setCategoryFilter("");
+                      setSelectedColor("");
+                    }}
+                  >
+                    <CategoryRadioDot on={categoryFilter === ""} />
                     Tất cả sản phẩm
-                  </label>
+                  </button>
                   {sidebarCategories.map((c) => {
                     const value = String(c?._id || "");
                     return (
-                      <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
-                        <input
-                          type="radio"
-                          name="product-category-filter"
-                          checked={categoryFilter === value}
-                          onChange={() => setCategoryFilter(value)}
-                          className="h-4 w-4 cursor-pointer appearance-none rounded-full border-2 border-neutral-300 transition-all checked:border-[#8ca587] checked:bg-[#8ca587] relative after:absolute after:left-1 after:top-0.5 after:hidden after:h-2 after:w-1 after:rotate-45 after:border-b-2 after:border-r-2 after:border-white checked:after:block after:content-['']"
-                        />
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={categoryFilter === value}
+                        className={categoryFilterRowClass}
+                        onClick={() => {
+                          if (categoryFilter === value) {
+                            setCategoryFilter("");
+                            setSelectedColor("");
+                          } else {
+                            setCategoryFilter(value);
+                          }
+                        }}
+                      >
+                        <CategoryRadioDot on={categoryFilter === value} />
                         {c?.name || "Danh mục"}
-                      </label>
+                      </button>
                     );
                   })}
                 </div>
@@ -351,7 +378,14 @@ const ProductPage = () => {
                     <button
                       key={size}
                       type="button"
-                      onClick={() => setSelectedSize((prev) => (prev === size ? "" : size))}
+                      onClick={() => {
+                        if (selectedSize === size) {
+                          setSelectedSize("");
+                          setSelectedColor("");
+                        } else {
+                          setSelectedSize(size);
+                        }
+                      }}
                       className={`h-8 rounded-md border text-xs font-semibold transition ${
                         selectedSize === size
                           ? "border-[#8ca587] bg-[#8ca587] text-white"
