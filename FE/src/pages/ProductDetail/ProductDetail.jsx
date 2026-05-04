@@ -9,6 +9,7 @@ import {
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 import { FaStar, FaStarHalfAlt, FaShoppingCart, FaCheckCircle, FaShippingFast, FaShieldAlt, FaHeart, FaRegHeart, FaRulerCombined, FaTimes, FaThumbsUp, FaChevronDown } from "react-icons/fa";
 import { getProductPriceInfo } from "../../utils/pricing.js";
+import { isProductOutOfStock } from "../../utils/stock.js";
 import notify from "../../utils/notify";
 import {
   getOrderStatusLabelForReview,
@@ -966,7 +967,7 @@ const ProductDetail = () => {
                 {isOutOfStock && (
                   <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/20">
                     <span className="inline-flex h-28 w-28 items-center justify-center rounded-full bg-black/65 px-3 text-center text-xl font-semibold text-white shadow-lg">
-                      Hết hàng
+                      Bán hết
                     </span>
                   </div>
                 )}
@@ -1072,7 +1073,7 @@ const ProductDetail = () => {
             )}
             {isOutOfStock && (
               <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-red-600">
-                Hết hàng
+                Bán hết
               </p>
             )}
 
@@ -1110,7 +1111,7 @@ const ProductDetail = () => {
                         />
                         <span>{opt.name}</span>
                         {opt.allOOS ? (
-                          <span className="ml-1 text-[10px] font-bold uppercase text-red-500">Hết hàng</span>
+                          <span className="ml-1 text-[10px] font-bold uppercase text-red-500">Bán hết</span>
                         ) : null}
                       </button>
                     );
@@ -1524,24 +1525,36 @@ const ProductDetail = () => {
                   {(relatedProducts || []).slice(0, 8).map((p) => {
                     const img = p?.image || p?.srcImages?.[0] || "";
                     const priceInfo = getProductPriceInfo(p);
+                    const outOfStock = isProductOutOfStock(p);
                     return (
                       <Link
                         key={p._id}
                         to={`/product/${p._id}`}
                         className="group block"
                       >
-                        <div className="aspect-square overflow-hidden rounded-xl bg-neutral-100">
+                        <div className="relative aspect-square overflow-hidden rounded-xl bg-neutral-100">
                           <img
                             src={getImage(img)}
                             alt={p.name}
-                            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                            className={`h-full w-full object-cover transition duration-500 ${outOfStock ? "opacity-90" : "group-hover:scale-105"}`}
                           />
+                          {outOfStock && (
+                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
+                              <span className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-black/65 px-2 text-center text-xs font-semibold text-white shadow-lg sm:h-24 sm:w-24 sm:text-sm">
+                                Bán hết
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <p className="mt-2 line-clamp-2 text-center text-xs font-medium text-convot-charcoal group-hover:underline md:text-sm">
                           {p.name}
                         </p>
-                        <p className="mt-0.5 text-center text-xs text-neutral-500 tabular-nums">
-                          {Number(priceInfo.effectivePrice).toLocaleString("vi-VN")}đ
+                        <p
+                          className={`mt-0.5 text-center text-xs tabular-nums ${outOfStock ? "font-semibold text-neutral-500" : "text-neutral-500"}`}
+                        >
+                          {outOfStock
+                            ? "Bán hết"
+                            : `${Number(priceInfo.effectivePrice).toLocaleString("vi-VN")}đ`}
                         </p>
                       </Link>
                     );

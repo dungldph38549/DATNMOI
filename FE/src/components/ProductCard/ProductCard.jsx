@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { getProductPriceInfo } from "../../utils/pricing";
+import { isProductOutOfStock } from "../../utils/stock.js";
 
 const PLACEHOLDER =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='100%25' height='100%25' fill='%23f3f4f6'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='22'>No Image</text></svg>";
@@ -24,6 +25,7 @@ const getImageSrc = (img) => {
  */
 export default function ProductCard({ product, badges = [] }) {
   const priceInfo = useMemo(() => getProductPriceInfo(product), [product]);
+  const outOfStock = useMemo(() => isProductOutOfStock(product), [product]);
   const img = getImageSrc(product?.image || product?.srcImages?.[0]);
   const name = product?.name || "Sản phẩm";
   const id = product?._id;
@@ -49,13 +51,20 @@ export default function ProductCard({ product, badges = [] }) {
         <img
           src={img}
           alt={name}
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          className={`h-full w-full object-cover transition duration-500 ${outOfStock ? "opacity-90" : "group-hover:scale-105"}`}
           onError={(e) => {
             e.target.src = PLACEHOLDER;
           }}
         />
+        {outOfStock && (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/20">
+            <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-black/65 px-3 text-center text-lg font-semibold text-white shadow-lg">
+              Bán hết
+            </span>
+          </div>
+        )}
         {badgeList.length > 0 && (
-          <div className="absolute left-2 top-2 flex max-w-[calc(100%-12px)] flex-wrap gap-1">
+          <div className="absolute left-2 top-2 z-10 flex max-w-[calc(100%-12px)] flex-wrap gap-1">
             {badgeList.map((key) => {
               const cfg = BADGE_STYLES[key];
               if (!cfg) return null;
@@ -75,8 +84,10 @@ export default function ProductCard({ product, badges = [] }) {
         <p className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold text-neutral-900 group-hover:text-[#f49d25]">
           {name}
         </p>
-        <p className="mt-1.5 text-sm font-bold tabular-nums text-[#f49d25]">
-          {Number(priceInfo.effectivePrice ?? 0).toLocaleString("vi-VN")}đ
+        <p
+          className={`mt-1.5 text-sm font-bold tabular-nums ${outOfStock ? "text-neutral-500" : "text-[#f49d25]"}`}
+        >
+          {outOfStock ? "Bán hết" : `${Number(priceInfo.effectivePrice ?? 0).toLocaleString("vi-VN")}đ`}
         </p>
       </div>
     </Link>

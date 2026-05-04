@@ -571,10 +571,14 @@ const ProductPage = () => {
                             {categoryText}
                           </p>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className="text-base font-bold text-neutral-900">
-                              {minPrice === maxPrice
-                                ? `${Number(minPrice || 0).toLocaleString("vi-VN")}đ`
-                                : `${Number(minPrice || 0).toLocaleString("vi-VN")} - ${Number(maxPrice || 0).toLocaleString("vi-VN")}đ`}
+                            <span
+                              className={`text-base font-bold ${outOfStock ? "text-neutral-500" : "text-neutral-900"}`}
+                            >
+                              {outOfStock
+                                ? "Bán hết"
+                                : minPrice === maxPrice
+                                  ? `${Number(minPrice || 0).toLocaleString("vi-VN")}đ`
+                                  : `${Number(minPrice || 0).toLocaleString("vi-VN")} - ${Number(maxPrice || 0).toLocaleString("vi-VN")}đ`}
                             </span>
                           </div>
                         </div>
