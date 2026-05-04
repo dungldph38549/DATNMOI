@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  FaStar,
   FaShoppingCart,
   FaHeart,
   FaRegHeart,
@@ -13,6 +12,7 @@ import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 import { getProductPriceInfo, getProductPriceRange } from "../../utils/pricing.js";
 import notify from "../../utils/notify";
 import { isProductOutOfStock } from "../../utils/stock.js";
+import ProductCardRating from "../ProductCardRating/ProductCardRating";
 
 const Product = ({
   product,
@@ -54,19 +54,6 @@ const Product = ({
   const { minPrice, maxPrice } = useMemo(() => getProductPriceRange(product), [product]);
 
   const cardPriceInfo = useMemo(() => getProductPriceInfo(product), [product]);
-
-  const ratingOutOf5 = useMemo(() => {
-    let raw =
-      ratingValue !== undefined && ratingValue !== null
-        ? Number(ratingValue)
-        : Number(product?.rating);
-
-    if (!Number.isFinite(raw)) return { value: 4, label: "4/5" };
-
-    const v = Math.min(5, Math.max(0, raw));
-    const label = v % 1 === 0 ? `${Math.round(v)}/5` : `${v.toFixed(1)}/5`;
-    return { value: v, label };
-  }, [ratingValue, product?.rating]);
 
   if (!product) return null;
 
@@ -185,18 +172,10 @@ const Product = ({
       <div className="p-4">
         <h3 className="font-semibold text-sm">{product.name}</h3>
 
-        <div className="flex items-center gap-1">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <FaStar
-              key={star}
-              className={star <= Math.round(ratingOutOf5.value) ? "text-yellow-400" : "text-neutral-300"}
-            />
-          ))}
-          <span className="ml-1 text-xs text-neutral-500">({ratingOutOf5.label})</span>
-        </div>
+        <ProductCardRating product={product} ratingOverride={ratingValue} className="mt-1" />
 
         <div className="mt-2">
-          <span className={`font-bold ${isOutOfStock ? "text-neutral-500" : "text-red-500"}`}>
+          <span className={`font-bold tabular-nums ${isOutOfStock ? "text-neutral-500" : "text-[#D0021B]"}`}>
             {isOutOfStock
               ? "Bán hết"
               : minPrice === maxPrice

@@ -8,6 +8,7 @@ import notify from "../../utils/notify";
 import { getStocks } from "../../api";
 import { isProductOutOfStock } from "../../utils/stock.js";
 import { getProductPriceRange } from "../../utils/pricing.js";
+import ProductCardRating from "../../components/ProductCardRating/ProductCardRating";
 
 const WishlistPage = () => {
     const navigate = useNavigate();
@@ -186,8 +187,12 @@ const WishlistPage = () => {
                                                 {item.name}
                                             </Link>
 
+                                            <ProductCardRating product={item} tone="warm" className="mt-3" />
+
                                             <div className="mt-5 flex items-center justify-between gap-3">
-                                                <p className="text-2xl font-bold text-[#2a2116]">
+                                                <p
+                                                    className={`text-2xl font-bold tabular-nums ${outOfStock ? "text-neutral-500" : "text-[#D0021B]"}`}
+                                                >
                                                     {getDisplayPrice(item)}
                                                 </p>
                                                 <button

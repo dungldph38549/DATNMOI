@@ -85,7 +85,7 @@ export default function ProductCard({ product, badges = [] }) {
           {name}
         </p>
         <p
-          className={`mt-1.5 text-sm font-bold tabular-nums ${outOfStock ? "text-neutral-500" : "text-[#f49d25]"}`}
+          className={`mt-1.5 text-sm font-bold tabular-nums ${outOfStock ? "text-neutral-500" : "text-[#D0021B]"}`}
         >
           {outOfStock ? "Bán hết" : `${Number(priceInfo.effectivePrice ?? 0).toLocaleString("vi-VN")}đ`}
         </p>

@@ -1058,9 +1058,7 @@ const ProductDetail = () => {
                         : `${Number(variantOriginalPriceRangeForDisplay.min).toLocaleString("vi-VN")}đ – ${Number(variantOriginalPriceRangeForDisplay.max).toLocaleString("vi-VN")}đ`}
                     </span>
                   ) : null}
-                  <span
-                    className={`text-3xl font-medium md:text-[2rem] ${variantRangeShowsDiscount ? "text-[#D0021B]" : "text-convot-charcoal"}`}
-                  >
+                  <span className="text-3xl font-medium text-[#D0021B] md:text-[2rem]">
                     {variantPriceRangeForDisplay.min > 0 && variantPriceRangeForDisplay.max > 0 ? (
                       variantPriceRangeForDisplay.min === variantPriceRangeForDisplay.max ? (
                         `${Number(variantPriceRangeForDisplay.min).toLocaleString("vi-VN")}đ`
@@ -1079,9 +1077,7 @@ const ProductDetail = () => {
                       {Number(selectedPriceInfo.originalPrice).toLocaleString("vi-VN")}đ
                     </span>
                   )}
-                  <span
-                    className={`text-3xl font-medium md:text-[2rem] ${selectedPriceInfo.hasSale ? "text-[#D0021B]" : "text-convot-charcoal"}`}
-                  >
+                  <span className="text-3xl font-medium text-[#D0021B] md:text-[2rem]">
                     {Number(displayPrice).toLocaleString("vi-VN")}đ
                   </span>
                 </>
@@ -1594,7 +1590,7 @@ const ProductDetail = () => {
                           {p.name}
                         </p>
                         <p
-                          className={`mt-0.5 text-center text-xs tabular-nums ${outOfStock ? "font-semibold text-neutral-500" : "text-neutral-500"}`}
+                          className={`mt-0.5 text-center text-xs tabular-nums ${outOfStock ? "font-semibold text-neutral-500" : "font-semibold text-[#D0021B]"}`}
                         >
                           {outOfStock
                             ? "Bán hết"

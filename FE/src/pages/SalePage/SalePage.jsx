@@ -8,6 +8,7 @@ import { isProductOutOfStock } from "../../utils/stock.js";
 import { getVariantColorValue } from "../../utils/variantAttributes";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 import notify from "../../utils/notify";
+import ProductCardRating from "../../components/ProductCardRating/ProductCardRating";
 
 const PAGE_STEP = 12;
 
@@ -241,6 +242,7 @@ const SalePage = () => {
                         <p className="mt-0.5 line-clamp-1 text-[11px] uppercase tracking-[0.08em] text-neutral-500">
                           {getSubLabel(item)}
                         </p>
+                        <ProductCardRating product={item} className="mt-1" />
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <span
                             className={`text-base font-bold tabular-nums ${outOfStock ? "text-neutral-500" : "text-[#D0021B]"}`}

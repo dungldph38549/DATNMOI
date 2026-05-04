@@ -51,7 +51,7 @@ const Product = ({ product }) => {
 
         <div className="mt-auto flex items-end justify-between">
           <div>
-            <p className={`font-black text-xl ${outOfStock ? "text-neutral-500" : "text-secondary"}`}>
+            <p className={`font-black text-xl tabular-nums ${outOfStock ? "text-neutral-500" : "text-[#D0021B]"}`}>
               {outOfStock ? "Bán hết" : getDisplayPrice(p)}
             </p>
           </div>
