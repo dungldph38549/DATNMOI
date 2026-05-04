@@ -28,6 +28,47 @@ const STATUS_LABELS = {
 };
 
 const RETURN_STATUSES = new Set(["return-request", "accepted", "rejected", "returned"]);
+
+const INV_BLUE = "#2E5BFF";
+const INV_NAVY = "#1e3a8a";
+
+const getInvoiceStatusPresentation = (st) => {
+  const s = String(st || "").trim().toLowerCase();
+  if (s === "received" || s === "delivered") {
+    return {
+      label: "HOÀN THÀNH",
+      pillClass: "bg-sky-100 text-sky-900 border border-sky-200",
+    };
+  }
+  if (s === "shipped") {
+    return {
+      label: "ĐANG GIAO",
+      pillClass: "bg-amber-100 text-amber-900 border border-amber-200",
+    };
+  }
+  if (s === "confirmed" || s === "pending") {
+    return {
+      label: "ĐANG XỬ LÝ",
+      pillClass: "bg-violet-100 text-violet-900 border border-violet-200",
+    };
+  }
+  if (s === "canceled") {
+    return {
+      label: "ĐÃ HỦY",
+      pillClass: "bg-red-100 text-red-800 border border-red-200",
+    };
+  }
+  if (RETURN_STATUSES.has(s)) {
+    return {
+      label: String(STATUS_LABELS[s] || s).toUpperCase(),
+      pillClass: "bg-orange-100 text-orange-900 border border-orange-200",
+    };
+  }
+  return {
+    label: String(STATUS_LABELS[s] || s || "—").toUpperCase(),
+    pillClass: "bg-slate-100 text-slate-800 border border-slate-200",
+  };
+};
 const REVIEWABLE_STATUSES = new Set([
   "delivered",
   "received",
@@ -302,6 +343,7 @@ const OrderDetailPage = () => {
   const [reviewFiles, setReviewFiles] = useState([]);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewError, setReviewError] = useState("");
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [myReviewsByProduct, setMyReviewsByProduct] = useState({});
   const user = useSelector((state) => state.user);
   const dispatch = useDispatch();
@@ -495,10 +537,6 @@ const OrderDetailPage = () => {
     navigate("/cart");
   };
 
-  const handlePrintInvoice = () => {
-    window.print();
-  };
-
   const handleTrackPackage = () => {
     const t = order?.trackingNumber ?? order?.tracking ?? order?.trackingCode;
     if (t && String(t).trim()) {
@@ -646,6 +684,15 @@ const OrderDetailPage = () => {
   }, [reviewFilePreviews]);
 
   useEffect(() => {
+    if (!invoiceModalOpen) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") setInvoiceModalOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [invoiceModalOpen]);
+
+  useEffect(() => {
     if (!location?.state?.openReview) return;
     if (!canReviewOrder || !isLoggedIn) return;
     const firstProduct = Array.isArray(order?.products)
@@ -657,7 +704,7 @@ const OrderDetailPage = () => {
   }, [location?.state, canReviewOrder, isLoggedIn, order, navigate, location.pathname]);
 
   if (loading) return (
-    <div className="min-h-screen bg-background-light pt-24 pb-20 flex justify-center items-center">
+    <div className="min-h-screen bg-background-light pt-4 pb-20 sm:pt-6 flex justify-center items-center">
       <div className="flex flex-col items-center gap-4">
         <div className="w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
         <p className="text-slate-500 font-bold">Đang tải...</p>
@@ -666,7 +713,7 @@ const OrderDetailPage = () => {
   );
 
   if (!order) return (
-    <div className="min-h-screen bg-background-light pt-24 pb-20 flex justify-center items-center">
+    <div className="min-h-screen bg-background-light pt-4 pb-20 sm:pt-6 flex justify-center items-center">
       <div className="bg-white p-12 rounded-3xl shadow-sm text-center border border-slate-100">
         <h2 className="text-2xl font-black text-slate-800 mb-2">Đơn hàng không tồn tại</h2>
         <p className="text-slate-500 mb-6">Xin lỗi, chúng tôi không thể tìm thấy thông tin đơn hàng này.</p>
@@ -709,19 +756,42 @@ const OrderDetailPage = () => {
     Number(order.shippingFee || 0) +
     Number(order.discount || 0);
 
+  const activeLines = (order.products || []).filter(isOrderLineActive);
+  const linesSubtotalActive = activeLines.reduce(
+    (s, p) => s + Number(p.price || 0) * Number(p.quantity || 1),
+    0,
+  );
+  const invoiceSubtotal = linesSubtotalActive + saleDiscountTotal;
+  const invoiceDiscountTotal =
+    Number(order.discount || 0) + Number(saleDiscountTotal || 0);
+  const invoiceStatus = getInvoiceStatusPresentation(st);
+  const invoicePurchaseDate = order?.createdAt
+    ? new Date(order.createdAt).toLocaleDateString("vi-VN", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : "—";
+
   return (
-    <div className="min-h-screen bg-[#F8F9FA] font-body pb-16 pt-24 print:pt-4">
+    <div className="min-h-screen bg-[#F8F9FA] font-body pb-16 pt-4 sm:pt-6 print:bg-white print:pt-4">
+      <style>{`
+        @media print {
+          @page { margin: 12mm; size: A4; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+      `}</style>
       <div className="container mx-auto max-w-6xl px-4" id="order-detail-print">
 
         <Link
           to="/orders"
-          className="print:hidden mb-6 inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-4 py-2 text-sm font-bold text-slate-600 shadow-sm transition-colors hover:border-[#2E5BFF]/30 hover:text-[#2E5BFF]"
+          className="print:hidden mb-4 inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-4 py-2 text-sm font-bold text-slate-600 shadow-sm transition-colors hover:border-[#2E5BFF]/30 hover:text-[#2E5BFF]"
         >
           <FaChevronLeft className="text-xs" /> Quay lại lịch sử đơn hàng
         </Link>
 
         {/* Page header — mock Convot */}
-        <div className="mb-8 flex flex-col gap-6 print:mb-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="print:hidden mb-6 flex flex-col gap-4 sm:gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-[#2E5BFF]">
               Mã đơn hàng:{" "}
@@ -734,27 +804,27 @@ const OrderDetailPage = () => {
               <p className="mt-2 text-sm font-medium text-slate-500">{orderedAtLabel}</p>
             ) : null}
           </div>
-          <div className="flex flex-wrap items-center gap-3 print:hidden">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={handlePrintInvoice}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+              onClick={() => setInvoiceModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#2E5BFF] px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-[#2E5BFF]/30 transition-colors hover:bg-[#2550e0]"
             >
-              <FaPrint className="text-slate-400" />
+              <FaPrint className="text-white/95" />
               In hóa đơn
             </button>
             <button
               type="button"
               onClick={handleTrackPackage}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#2E5BFF] px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-[#2E5BFF]/25 transition-colors hover:bg-[#2550e0]"
+              className="inline-flex items-center gap-2 rounded-xl border-2 border-[#2E5BFF]/25 bg-white px-4 py-2.5 text-sm font-bold text-[#2E5BFF] shadow-sm transition-colors hover:bg-[#2E5BFF]/5"
             >
-              <FaGlobe className="text-white/90" />
+              <FaGlobe />
               Theo dõi kiện hàng
             </button>
           </div>
         </div>
 
-        <div className="flex flex-col gap-8 lg:flex-row">
+        <div className="print:hidden flex flex-col gap-8 lg:flex-row">
 
           {/* MAIN COLUMN */}
           <div className="w-full space-y-6 lg:w-2/3">
@@ -1253,9 +1323,232 @@ const OrderDetailPage = () => {
         </div>
       </div>
 
+      {invoiceModalOpen && (
+        <div
+          className="fixed inset-0 z-[205] flex items-center justify-center p-4 sm:p-6 print:static print:inset-auto print:z-auto print:block print:min-h-0 print:p-0"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="invoice-modal-title"
+        >
+          <button
+            type="button"
+            className="print:hidden absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+            onClick={() => setInvoiceModalOpen(false)}
+            aria-label="Đóng xem hóa đơn"
+          />
+          <div
+            className="relative z-[1] flex max-h-[min(92vh,900px)] w-full max-w-[min(210mm+3rem,100%)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-2xl print:max-h-none print:w-full print:max-w-none print:rounded-none print:border-0 print:bg-white print:shadow-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="print:hidden flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
+              <h2 id="invoice-modal-title" className="text-lg font-black text-slate-900">
+                In hóa đơn
+              </h2>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setInvoiceModalOpen(false)}
+                  className="rounded-xl border-2 border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#2E5BFF] px-4 py-2 text-sm font-bold text-white shadow-md shadow-[#2E5BFF]/25 transition-colors hover:bg-[#2550e0]"
+                >
+                  <FaPrint className="text-white/95" aria-hidden />
+                  In ngay
+                </button>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 print:overflow-visible print:p-0">
+              <article
+                className="mx-auto max-w-[210mm] rounded-xl border border-slate-200/90 bg-white px-5 py-6 shadow-xl shadow-slate-900/10 sm:px-8 sm:py-8 print:mx-0 print:mb-0 print:max-w-none print:rounded-none print:border-0 print:px-0 print:py-0 print:shadow-none"
+                aria-label="Hóa đơn bán hàng"
+              >
+                <header className="flex flex-col gap-4 border-b-4 pb-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6" style={{ borderColor: INV_BLUE }}>
+                  <div>
+                    <p className="font-display text-2xl font-black tracking-tight sm:text-3xl" style={{ color: INV_BLUE }}>
+                      SNEAKERCONVERSE
+                    </p>
+                    <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">
+                      Authentic footwear culture
+                    </p>
+                  </div>
+                  <div className="text-left sm:text-right">
+                    <h3 className="text-lg font-black uppercase tracking-wide text-slate-900 sm:text-xl">
+                      Hóa đơn bán hàng
+                    </h3>
+                    <p className="mt-1 font-mono text-base font-bold sm:text-lg" style={{ color: INV_BLUE }}>
+                      {orderRefDisplay}
+                    </p>
+                  </div>
+                </header>
+
+                <div className="mt-6 grid gap-5 md:grid-cols-2">
+                  <section>
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">
+                      Thông tin khách hàng
+                    </h4>
+                    <p className="mt-3 text-base font-bold text-slate-900">{order.fullName || "—"}</p>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-600">{order.address || "—"}</p>
+                    <p className="mt-2 text-sm font-semibold text-slate-700">{order.phone || "—"}</p>
+                    <p className="mt-1 text-sm text-slate-600">{order.email || "—"}</p>
+                  </section>
+                  <section className="rounded-xl bg-slate-50/90 px-4 py-4 ring-1 ring-slate-100">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">
+                      Chi tiết đơn hàng
+                    </h4>
+                    <dl className="mt-3 space-y-2.5 text-sm">
+                      <div className="flex justify-between gap-3">
+                        <dt className="font-semibold text-slate-500">Ngày mua</dt>
+                        <dd className="text-right font-bold text-slate-800">{invoicePurchaseDate}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="font-semibold text-slate-500">Thanh toán</dt>
+                        <dd className="text-right font-bold text-slate-800">{paymentMethodLong}</dd>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <dt className="font-semibold text-slate-500">Trạng thái</dt>
+                        <dd>
+                          <span className={`inline-block rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide ${invoiceStatus.pillClass}`}>
+                            {invoiceStatus.label}
+                          </span>
+                        </dd>
+                      </div>
+                    </dl>
+                  </section>
+                </div>
+
+                <section className="mt-8">
+                  <h4 className="mb-3 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">
+                    Sản phẩm
+                  </h4>
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full min-w-[520px] text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50/80">
+                          <th className="px-3 py-3 text-[10px] font-black uppercase tracking-wider text-slate-600 sm:px-4">
+                            Sản phẩm
+                          </th>
+                          <th className="px-2 py-3 text-center text-[10px] font-black uppercase tracking-wider text-slate-600">
+                            SL
+                          </th>
+                          <th className="hidden px-2 py-3 text-right text-[10px] font-black uppercase tracking-wider text-slate-600 sm:table-cell">
+                            Đơn giá
+                          </th>
+                          <th className="px-3 py-3 text-right text-[10px] font-black uppercase tracking-wider text-slate-600 sm:px-4">
+                            Thành tiền
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(order.products || []).map((p, i) => {
+                          const active = isOrderLineActive(p);
+                          const lineTotal = Number(p.price || 0) * Number(p.quantity || 1);
+                          return (
+                            <tr
+                              key={i}
+                              className={`border-b border-slate-100 last:border-0 ${active ? "" : "bg-slate-50/50 opacity-75"}`}
+                            >
+                              <td className="px-3 py-3 sm:px-4">
+                                <div className="flex gap-3">
+                                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
+                                    <img
+                                      src={getReviewProductThumb(p)}
+                                      alt=""
+                                      className="h-full w-full object-cover"
+                                    />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className={`font-bold leading-snug text-slate-900 ${active ? "" : "line-through"}`}>
+                                      {p.productId?.name || p.name || "Sản phẩm"}
+                                    </p>
+                                    <p className="mt-0.5 text-xs text-slate-500">{getReviewVariantLabel(p)}</p>
+                                    {!active ? (
+                                      <p className="mt-1 text-[10px] font-bold uppercase text-red-600">Đã hủy dòng</p>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-2 py-3 text-center font-bold text-slate-800">{p.quantity || 1}</td>
+                              <td className="hidden px-2 py-3 text-right font-semibold text-slate-700 sm:table-cell">
+                                {formatMoney(p.price)}
+                              </td>
+                              <td className="px-3 py-3 text-right font-black text-slate-900 sm:px-4">
+                                {formatMoney(lineTotal)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
+                <div className="mt-8 grid gap-8 md:grid-cols-2 md:items-end">
+                  <section className="text-sm text-slate-600">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">
+                      Ghi chú & chính sách
+                    </h4>
+                    <p className="mt-3 italic text-slate-600">
+                      Cảm ơn bạn đã mua hàng tại SneakerConverse.
+                    </p>
+                    <ul className="mt-3 list-inside list-disc space-y-1.5 text-xs leading-relaxed">
+                      <li>Đổi trả trong 30 ngày theo chính sách hiển thị trên website.</li>
+                      <li>Hỗ trợ: liên hệ qua mục Liên hệ / Chat trên shop.</li>
+                    </ul>
+                    <p className="mt-6 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                      Người lập biểu
+                    </p>
+                    <div className="mt-2 max-w-[200px] border-b border-dotted border-slate-400 pb-6" />
+                  </section>
+                  <section className="md:text-right">
+                    <dl className="ml-auto max-w-xs space-y-2 text-sm">
+                      <div className="flex justify-between gap-6 font-semibold text-slate-700">
+                        <dt>Tạm tính</dt>
+                        <dd>{formatMoney(invoiceSubtotal)}</dd>
+                      </div>
+                      {invoiceDiscountTotal > 0 ? (
+                        <div className="flex justify-between gap-6 font-bold text-red-600">
+                          <dt>Giảm giá</dt>
+                          <dd>-{formatMoney(invoiceDiscountTotal)}</dd>
+                        </div>
+                      ) : null}
+                      <div className="flex justify-between gap-6 font-semibold text-slate-700">
+                        <dt>Phí vận chuyển</dt>
+                        <dd>{formatMoney(order.shippingFee || 0)}</dd>
+                      </div>
+                    </dl>
+                    <div className="ml-auto mt-4 max-w-xs border-t-4 pt-4" style={{ borderColor: INV_BLUE }}>
+                      <div className="flex justify-between gap-4">
+                        <span className="text-sm font-black uppercase tracking-wide text-slate-800">Tổng cộng</span>
+                        <span className="font-display text-2xl font-black" style={{ color: INV_NAVY }}>
+                          {formatMoney(order.totalAmount)}
+                        </span>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <footer className="mt-8 flex flex-col gap-1 border-t border-slate-200 pt-4 text-[10px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+                  <span>© {new Date().getFullYear()} SneakerConverse. Tối ưu cho in A4.</span>
+                  <span className="mt-1 block sm:mt-0 sm:text-right">
+                    <span className="font-semibold text-slate-500">Hỗ trợ thanh toán</span>
+                    {" · "}
+                    Liên hệ qua website
+                  </span>
+                </footer>
+              </article>
+            </div>
+          </div>
+        </div>
+      )}
+
       {returnModalOpen && (
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
+          className="print:hidden fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="return-modal-title"
@@ -1356,7 +1649,7 @@ const OrderDetailPage = () => {
 
       {reviewModalOpen && (
         <div
-          className="fixed inset-0 z-[210] flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm"
+          className="print:hidden fixed inset-0 z-[210] flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="review-modal-title"

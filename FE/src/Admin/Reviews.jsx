@@ -12,11 +12,6 @@ import {
   rejectAdminReview,
   getReviewStatsByProduct,
 } from "../api/index";
-import {
-  getOrderStatusLabelForReview,
-  shouldShowOrderStatusOnReview,
-} from "../utils/orderStatusForReview";
-
 const T = {
   primary: "#f49d25",
   primaryBg: "rgba(244,157,37,0.12)",
@@ -1448,9 +1443,6 @@ function ProductReviewDetail({ product, onBack }) {
             const av = userAvatarSrc(u);
             const { dateStr, sizeLine } = reviewDateAndSizeLine(r);
             const st = statusBadge(r.status);
-            const ost = r.orderId?.status;
-            const orderLbl =
-              shouldShowOrderStatusOnReview(ost) && getOrderStatusLabelForReview(ost);
             const admins = adminRepliesOnly(r);
             const open = !!replyOpen[r._id];
             const draft = replyDrafts[r._id] ?? "";
@@ -1627,11 +1619,6 @@ function ProductReviewDetail({ product, onBack }) {
                             }}
                           />
                         ))}
-                      </div>
-                    ) : null}
-                    {orderLbl ? (
-                      <div style={{ marginTop: 10, fontSize: 12, fontWeight: 600, color: T.orangeWarn }}>
-                        Đơn: {orderLbl}
                       </div>
                     ) : null}
                     {admins.length > 0 ? (

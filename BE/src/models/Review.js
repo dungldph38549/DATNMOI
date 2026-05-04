@@ -77,6 +77,12 @@ const reviewSchema = new mongoose.Schema(
       ref: "Order",
       default: null,
     },
+    /** Trạng thái đơn khi gửi đánh giá — luôn hiển thị được dù populate lỗi hoặc đơn đổi sau */
+    orderStatusAtReview: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     /** Phân loại tại thời điểm mua (SKU, thuộc tính dòng đơn) — hiển thị trên đánh giá */
     variantLabel: {
       type: String,

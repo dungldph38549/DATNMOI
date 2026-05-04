@@ -12,17 +12,15 @@ import { getProductPriceInfo } from "../../utils/pricing.js";
 import { isProductOutOfStock } from "../../utils/stock.js";
 import notify from "../../utils/notify";
 import {
-  getOrderStatusLabelForReview,
-  shouldShowOrderStatusOnReview,
-} from "../../utils/orderStatusForReview";
-import {
   getVariantShoelaceLengthValue,
   isShoelaceCategoryHints,
 } from "../../utils/variantAttributes";
 import SizeGuideInner from "../../components/SizeGuide/SizeGuideInner";
 import RecommendSection from "../../components/RecommendSection/RecommendSection";
 
-const REVIEW_ACCENT = "#1a1a1a";
+/** Tab đánh giá: palette ấm (vàng–cam), tách khỏi sao đen ở khối giá. */
+const REVIEW_PANEL_CLASS =
+  "rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50/95 via-white to-orange-50/70 shadow-lg shadow-orange-950/[0.07] ring-1 ring-amber-100/90";
 
 /** Biến thể không có colorId / colorName / thuộc tính màu — gom một nhóm để vẫn chọn được size */
 const DEFAULT_VARIANT_COLOR_KEY = "n:__default__";
@@ -253,6 +251,18 @@ const ProductDetail = () => {
     return [...map.values()];
   }, [product, hasVariants, getVariantColorKeyStable, getVariantColorLabel]);
 
+  const allVariantColorsOOS =
+    hasVariants &&
+    colorOptions.length > 0 &&
+    colorOptions.every((c) => c.allOOS);
+  const selectedColorAllOOS =
+    hasVariants &&
+    !!selectedColorId &&
+    (colorOptions.find((c) => c.id === selectedColorId)?.allOOS ?? false);
+  /** Màu đang chọn hoặc toàn bộ SP biến thể đã hết theo dữ liệu local (không chờ API). */
+  const variantSoldOutBySelection =
+    allVariantColorsOOS || selectedColorAllOOS;
+
   /** Chỉ một nhóm màu (hoặc mặc định) → bỏ bước chọn màu thủ công */
   useEffect(() => {
     if (!product || !hasVariants) return;
@@ -392,6 +402,24 @@ const ProductDetail = () => {
       if (fill >= 1) return <FaStar key={i} className="text-sm text-convot-charcoal" />;
       if (fill >= 0.5) return <FaStarHalfAlt key={i} className="text-sm text-convot-charcoal" />;
       return <FaStar key={i} className="text-sm text-neutral-300" />;
+    });
+  }, [ratingAverage]);
+
+  const averageStarsDisplayReviewWarm = useMemo(() => {
+    const v = Math.min(5, Math.max(0, Number(ratingAverage) || 0));
+    return [1, 2, 3, 4, 5].map((i) => {
+      const fill = Math.min(1, Math.max(0, v - (i - 1)));
+      if (fill >= 1) {
+        return (
+          <FaStar key={i} className="text-lg md:text-xl text-amber-500 drop-shadow-[0_1px_2px_rgba(245,158,11,0.35)]" />
+        );
+      }
+      if (fill >= 0.5) {
+        return (
+          <FaStarHalfAlt key={i} className="text-lg md:text-xl text-amber-500 drop-shadow-[0_1px_2px_rgba(245,158,11,0.35)]" />
+        );
+      }
+      return <FaStar key={i} className="text-lg md:text-xl text-amber-200/90" />;
     });
   }, [ratingAverage]);
 
@@ -627,6 +655,14 @@ const ProductDetail = () => {
 
   const handleAddToCart = async () => {
     if (!product) return false;
+    if (variantSoldOutBySelection) {
+      notify.warning(
+        allVariantColorsOOS
+          ? "Sản phẩm đã hết hàng."
+          : "Màu này đã hết hàng.",
+      );
+      return false;
+    }
     if (!user?.login || !user?.token) {
       notify.warning("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.");
       navigate("/login", { state: { from: `/product/${product._id}` } });
@@ -743,6 +779,14 @@ const ProductDetail = () => {
 
   const handleBuyNow = async () => {
     if (!product) return;
+    if (variantSoldOutBySelection) {
+      notify.warning(
+        allVariantColorsOOS
+          ? "Sản phẩm đã hết hàng."
+          : "Màu này đã hết hàng.",
+      );
+      return;
+    }
     if (!user?.login || !user?.token) {
       notify.warning("Vui lòng đăng nhập để mua hàng.");
       navigate("/login", { state: { from: `/product/${product._id}` } });
@@ -848,12 +892,17 @@ const ProductDetail = () => {
   const stockCountDisplay = stockStatePending
     ? null
     : (stockInfo?.countInStock ?? product?.countInStock ?? product?.stock ?? 0);
-  const maxSelectableQty = Math.max(
-    0,
-    Number(stockCountDisplay ?? product?.countInStock ?? product?.stock ?? 0),
-  );
+  const maxSelectableQty = variantSoldOutBySelection
+    ? 0
+    : Math.max(
+        0,
+        Number(stockCountDisplay ?? product?.countInStock ?? product?.stock ?? 0),
+      );
   const canIncreaseQty = maxSelectableQty <= 0 ? false : quantity < maxSelectableQty;
-  const isOutOfStock = !stockStatePending && (maxSelectableQty <= 0 || stockInfo?.available === false);
+  const isOutOfStock =
+    variantSoldOutBySelection ||
+    (!stockStatePending &&
+      (maxSelectableQty <= 0 || stockInfo?.available === false));
   useEffect(() => {
     if (!showSizeGuide) return undefined;
     const prevOverflow = document.body.style.overflow;
@@ -1204,11 +1253,15 @@ const ProductDetail = () => {
                 </button>
               </div>
               <span className="text-sm text-neutral-500">
-                {stockStatePending
-                  ? isShoelaceProduct
-                    ? "Vui lòng chọn màu và độ dài dây trước"
-                    : "Vui lòng chọn màu và kích cỡ trước"
-                  : `${Math.max(0, maxSelectableQty)} sản phẩm có sẵn`}
+                {variantSoldOutBySelection
+                  ? allVariantColorsOOS
+                    ? "Sản phẩm đã hết hàng"
+                    : "Màu này đã hết hàng"
+                  : stockStatePending
+                    ? isShoelaceProduct
+                      ? "Vui lòng chọn màu và độ dài dây trước"
+                      : "Vui lòng chọn màu và kích cỡ trước"
+                    : `${Math.max(0, maxSelectableQty)} sản phẩm có sẵn`}
               </span>
             </div>
 
@@ -1256,12 +1309,14 @@ const ProductDetail = () => {
                     type="button"
                     onClick={() => setActiveTab(tab.key)}
                     className={`relative whitespace-nowrap pb-3 text-xs font-semibold uppercase tracking-[0.18em] transition-colors ${
-                      activeTab === tab.key ? "text-convot-charcoal" : "text-neutral-400 hover:text-neutral-600"
+                      activeTab === tab.key
+                        ? "text-amber-900"
+                        : "text-neutral-400 hover:text-amber-700"
                     }`}
                   >
                     {tab.label}
                     {activeTab === tab.key && (
-                      <span className="absolute bottom-0 left-0 h-[3px] w-full bg-convot-charcoal" />
+                      <span className="absolute bottom-0 left-0 h-[3px] w-full rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-400 shadow-sm shadow-amber-500/40" />
                     )}
                   </button>
                 ))}
@@ -1286,30 +1341,23 @@ const ProductDetail = () => {
 
             {activeTab === "review" && (
               <div className="max-w-none">
-                <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
-                  <div className="border-b border-neutral-100 bg-slate-50/80 px-4 py-3">
-                    <h4 className="font-display text-sm font-black uppercase tracking-wide text-slate-800">
+                <div className={`overflow-hidden ${REVIEW_PANEL_CLASS}`}>
+                  <div className="border-b border-amber-200/50 bg-gradient-to-r from-amber-500/[0.14] via-orange-400/[0.1] to-amber-300/[0.12] px-4 py-3.5 md:px-5">
+                    <h4 className="font-display text-sm font-black uppercase tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-amber-900 via-orange-800 to-amber-800">
                       Đánh giá sản phẩm
                     </h4>
                   </div>
-                  <div className="border-b border-neutral-100 px-4 py-5 md:px-5">
+                  <div className="border-b border-amber-100/90 px-4 py-5 md:px-5 bg-white/50">
                   <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                     <div className="shrink-0">
-                      <p
-                        className="font-display text-2xl md:text-3xl font-black leading-tight"
-                        style={{ color: REVIEW_ACCENT }}
-                      >
+                      <p className="font-display text-2xl md:text-3xl font-black leading-tight text-transparent bg-clip-text bg-gradient-to-br from-amber-600 via-orange-600 to-amber-700">
                         {ratingAverage == null ? "—" : Number(ratingAverage).toFixed(1)}{" "}
-                        <span className="text-base md:text-lg font-bold text-slate-800">trên 5</span>
+                        <span className="text-base md:text-lg font-bold text-slate-700">trên 5</span>
                       </p>
-                      <div
-                        className="flex gap-0.5 mt-2 text-lg md:text-xl"
-                        style={{ color: REVIEW_ACCENT }}
-                        aria-hidden
-                      >
-                        {averageStarsDisplay}
+                      <div className="flex gap-0.5 mt-2" aria-hidden>
+                        {averageStarsDisplayReviewWarm}
                       </div>
-                      <p className="text-sm text-slate-500 mt-2 font-medium">
+                      <p className="text-sm text-amber-900/70 mt-2 font-semibold">
                         {ratingTotal == null ? "—" : ratingTotal} đánh giá
                       </p>
                     </div>
@@ -1328,10 +1376,10 @@ const ProductDetail = () => {
                             key={chip.id}
                             type="button"
                             onClick={() => setReviewListFilter(chip.id)}
-                            className={`px-3 py-1.5 rounded-full border text-xs font-bold transition-colors ${
+                            className={`px-3.5 py-1.5 rounded-full border text-xs font-bold transition-all duration-200 ${
                               reviewListFilter === chip.id
-                                ? "border-convot-charcoal text-convot-charcoal bg-white shadow-sm"
-                                : "border-neutral-200 text-neutral-600 bg-white hover:border-neutral-300"
+                                ? "border-transparent text-white bg-gradient-to-r from-amber-500 to-orange-500 shadow-md shadow-orange-500/30 scale-[1.02]"
+                                : "border-amber-200/90 text-amber-900/85 bg-white/90 hover:border-amber-400 hover:bg-amber-50 hover:shadow-sm"
                             }`}
                           >
                             {chip.label}
@@ -1343,10 +1391,10 @@ const ProductDetail = () => {
                         <button
                           type="button"
                           onClick={() => setReviewListFilter("media")}
-                          className={`px-3 py-1.5 rounded-full border text-xs font-bold transition-colors ${
+                          className={`px-3.5 py-1.5 rounded-full border text-xs font-bold transition-all duration-200 ${
                             reviewListFilter === "media"
-                              ? "border-convot-charcoal text-convot-charcoal bg-white shadow-sm"
-                              : "border-neutral-200 text-neutral-600 bg-white hover:border-neutral-300"
+                              ? "border-transparent text-white bg-gradient-to-r from-amber-500 to-orange-500 shadow-md shadow-orange-500/30 scale-[1.02]"
+                              : "border-amber-200/90 text-amber-900/85 bg-white/90 hover:border-amber-400 hover:bg-amber-50 hover:shadow-sm"
                           }`}
                         >
                           Có Hình Ảnh / Video
@@ -1356,19 +1404,21 @@ const ProductDetail = () => {
                   </div>
                   </div>
 
-                  <div className="p-4 md:p-6">
+                  <div className="p-4 md:p-6 bg-gradient-to-b from-transparent to-amber-50/25">
                     {reviewsLoading ? (
-                      <div className="text-center py-12 font-medium text-slate-500">Đang tải đánh giá...</div>
+                      <div className="text-center py-12 font-medium text-amber-800/80">
+                        Đang tải đánh giá...
+                      </div>
                     ) : reviews.length === 0 ? (
-                      <div className="text-center py-12">
-                        <p className="font-medium text-slate-500">
+                      <div className="text-center py-12 rounded-xl border border-dashed border-amber-200/80 bg-amber-50/40">
+                        <p className="font-medium text-amber-900/70">
                           {ratingTotal == null || ratingTotal === 0
                             ? "Chưa có đánh giá nào cho sản phẩm này."
                             : "Không có đánh giá phù hợp bộ lọc đã chọn."}
                         </p>
                       </div>
                     ) : (
-                      <div className="divide-y divide-slate-100">
+                      <div className="space-y-4">
                         {reviews.map((r) => {
                           const parsed = parseReviewContentBlocks(r.content || "");
                           const snap = r.productSnapshot;
@@ -1391,9 +1441,12 @@ const ProductDetail = () => {
                           const metaLine = dateStr ? `${dateStr} | ${sizeLine}` : sizeLine;
                           const shopReplies = shopRepliesFromReview(r);
                           return (
-                            <div key={r._id} className="py-5 first:pt-0">
+                            <div
+                              key={r._id}
+                              className="rounded-2xl border border-amber-100/95 bg-gradient-to-br from-white via-white to-amber-50/40 p-4 shadow-md shadow-orange-950/[0.06] ring-1 ring-amber-100/70 md:p-5"
+                            >
                               <div className="flex gap-3">
-                                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-sm shrink-0 border border-slate-200">
+                                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white font-bold text-sm shrink-0 border-2 border-white shadow-md shadow-amber-400/35">
                                   {(r.userId?.name || "U")[0]}
                                 </div>
                                 <div className="min-w-0 flex-1">
@@ -1403,27 +1456,18 @@ const ProductDetail = () => {
                                       <FaStar
                                         key={i}
                                         className="text-sm"
-                                        style={{ color: i < r.rating ? REVIEW_ACCENT : "#e5e7eb" }}
+                                        style={{
+                                          color: i < r.rating ? "#f59e0b" : "#fde68a",
+                                        }}
                                       />
                                     ))}
                                   </div>
                                   <div className="mt-1.5 space-y-0.5" title={metaLine}>
                                     {dateStr ? (
-                                      <p className="text-xs text-slate-400">{dateStr}</p>
+                                      <p className="text-xs text-amber-800/55">{dateStr}</p>
                                     ) : null}
-                                    <p className="text-xs text-slate-500">{sizeLine}</p>
+                                    <p className="text-xs font-medium text-amber-900/65">{sizeLine}</p>
                                   </div>
-                                  {(() => {
-                                    const ost = r.orderId?.status;
-                                    if (!shouldShowOrderStatusOnReview(ost)) return null;
-                                    const lbl = getOrderStatusLabelForReview(ost);
-                                    if (!lbl) return null;
-                                    return (
-                                      <p className="text-xs text-amber-900 mt-1 font-semibold">
-                                        Trạng thái đơn: {lbl}
-                                      </p>
-                                    );
-                                  })()}
                                   {r.title && <p className="font-bold text-slate-900 mt-3 text-sm">{r.title}</p>}
                                   {parsed.kv.length > 0 && (
                                     <div className="mt-2 space-y-1">
@@ -1455,16 +1499,16 @@ const ProductDetail = () => {
                                       {shopReplies.map((reply, idx) => (
                                         <div
                                           key={reply?._id || `shop-reply-${idx}`}
-                                          className="rounded-xl border border-amber-200/80 bg-amber-50/90 px-3 py-3 md:px-4"
+                                          className="rounded-xl border border-orange-200/70 bg-gradient-to-br from-amber-100/95 via-orange-50/90 to-amber-50/80 px-3 py-3 md:px-4 shadow-inner shadow-orange-200/40"
                                         >
-                                          <p className="text-[10px] font-black uppercase tracking-wider text-amber-800">
+                                          <p className="text-[10px] font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-orange-700 to-amber-700">
                                             Phản hồi từ shop
                                           </p>
                                           <p className="mt-2 text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
                                             {reply?.content || "—"}
                                           </p>
                                           {reply?.createdAt ? (
-                                            <p className="mt-2 text-xs text-slate-500">
+                                            <p className="mt-2 text-xs text-amber-900/50">
                                               {new Date(reply.createdAt).toLocaleString("vi-VN")}
                                             </p>
                                           ) : null}
@@ -1474,9 +1518,9 @@ const ProductDetail = () => {
                                   )}
                                   <button
                                     type="button"
-                                    className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-500 hover:text-convot-charcoal transition-colors"
+                                    className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-amber-200/90 bg-amber-50/60 px-3 py-1.5 text-xs font-semibold text-amber-900/90 transition-all hover:border-amber-400 hover:bg-amber-100/80 hover:shadow-sm"
                                   >
-                                    <FaThumbsUp className="text-sm" />
+                                    <FaThumbsUp className="text-sm text-amber-600" />
                                     Hữu ích?
                                   </button>
                                 </div>

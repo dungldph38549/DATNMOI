@@ -113,6 +113,71 @@ const productPopulateForReview = {
 
 const orderPopulateForReview = { path: "orderId", select: "status" };
 
+/** Bổ sung orderId.status khi populate không trả về (ObjectId thuần / thiếu ref). */
+async function attachOrderStatusToReviewList(reviews) {
+  if (!Array.isArray(reviews) || reviews.length === 0) return;
+  const needIds = [];
+  for (const r of reviews) {
+    if (!r) continue;
+    const hasSnap =
+      r.orderStatusAtReview != null &&
+      String(r.orderStatusAtReview).trim() !== "";
+    if (hasSnap) continue;
+    const hasPop =
+      r.orderId &&
+      typeof r.orderId === "object" &&
+      r.orderId.status != null &&
+      String(r.orderId.status).trim() !== "";
+    if (hasPop) continue;
+    const raw = r.orderId;
+    const id =
+      raw == null
+        ? null
+        : mongoose.isValidObjectId(raw)
+          ? raw
+          : typeof raw === "object" && raw._id != null
+            ? raw._id
+            : null;
+    if (id) needIds.push(String(id));
+  }
+  const unique = [...new Set(needIds)];
+  if (unique.length === 0) return;
+  const orders = await Order.find({ _id: { $in: unique.map(toId) } })
+    .select("status")
+    .lean();
+  const map = new Map(orders.map((o) => [String(o._id), o.status]));
+  for (const r of reviews) {
+    if (!r) continue;
+    if (
+      r.orderStatusAtReview != null &&
+      String(r.orderStatusAtReview).trim() !== ""
+    )
+      continue;
+    if (
+      r.orderId &&
+      typeof r.orderId === "object" &&
+      r.orderId.status != null &&
+      String(r.orderId.status).trim() !== ""
+    )
+      continue;
+    const raw = r.orderId;
+    const idStr =
+      raw == null
+        ? ""
+        : mongoose.isValidObjectId(raw)
+          ? String(raw)
+          : typeof raw === "object" && raw._id != null
+            ? String(raw._id)
+            : "";
+    const st = idStr ? map.get(idStr) : null;
+    if (st == null || String(st).trim() === "") continue;
+    r.orderId =
+      raw != null && typeof raw === "object"
+        ? { ...raw, status: st }
+        : { _id: raw, status: st };
+  }
+}
+
 const toId = (id) => new mongoose.Types.ObjectId(id);
 const isValid = (id) => mongoose.isValidObjectId(id);
 /** Mỗi lần mua (đã giao/nhận hoặc đang xử lý hoàn hàng) → một đánh giá / sản phẩm. */
@@ -175,6 +240,8 @@ const getReviews = async ({
     r.replies = r.replies?.filter((rp) => !rp.isDeleted) ?? [];
   });
 
+  await attachOrderStatusToReviewList(reviews);
+
   return {
     reviews,
     meta: {
@@ -192,10 +259,12 @@ const getReviewById = async (id) => {
   if (!isValid(id)) throw new AppError("ID không hợp lệ");
   const review = await Review.findOne({ _id: id, isDeleted: false })
     .populate("userId", "name avatar")
+    .populate(orderPopulateForReview)
     .populate("replies.userId", "name avatar")
     .lean({ virtuals: true });
   if (!review) throw new AppError("Không tìm thấy review", 404);
   review.replies = review.replies?.filter((r) => !r.isDeleted) ?? [];
+  await attachOrderStatusToReviewList([review]);
   return review;
 };
 
@@ -234,7 +303,9 @@ const getMyReview = async ({ productId, orderId, all }, userId) => {
     const list = await myReviewPopulateChain(
       Review.find(base).sort({ createdAt: -1 }),
     ).lean({ virtuals: true });
-    return filterActiveReplies(list);
+    const filtered = filterActiveReplies(list);
+    await attachOrderStatusToReviewList(filtered);
+    return filtered;
   }
   if (orderId && isValid(orderId)) {
     const review = await myReviewPopulateChain(
@@ -243,12 +314,16 @@ const getMyReview = async ({ productId, orderId, all }, userId) => {
         orderId: toId(orderId),
       }),
     ).lean({ virtuals: true });
-    return filterActiveReplies(review || null);
+    const one = filterActiveReplies(review || null);
+    if (one) await attachOrderStatusToReviewList([one]);
+    return one;
   }
   const review = await myReviewPopulateChain(
     Review.findOne(base).sort({ createdAt: -1 }),
   ).lean({ virtuals: true });
-  return filterActiveReplies(review || null);
+  const one = filterActiveReplies(review || null);
+  if (one) await attachOrderStatusToReviewList([one]);
+  return one;
 };
 
 // ── GET /api/reviews/eligible-orders?productId=... ───────────
@@ -315,7 +390,7 @@ const createReview = async (
     status: { $in: REVIEW_ELIGIBLE_ORDER_STATUSES },
     products: { $elemMatch: { productId: toId(productId) } },
   })
-    .select("_id userId email products")
+    .select("_id userId email products status")
     .lean();
   if (!matchedOrder)
     throw new AppError(
@@ -406,6 +481,9 @@ const createReview = async (
       content: content?.trim() || null,
       images: images || [],
       orderId: verifiedOrderId,
+      orderStatusAtReview: matchedOrder?.status
+        ? String(matchedOrder.status).trim()
+        : null,
       status: "approved",
       verifiedPurchase: true,
       variantLabel,
@@ -621,6 +699,7 @@ const adminGetReviews = async ({ page = 1, limit = 20, status, productId }) => {
       .lean({ virtuals: true }),
     Review.countDocuments(filter),
   ]);
+  await attachOrderStatusToReviewList(reviews);
   return {
     reviews,
     meta: {
