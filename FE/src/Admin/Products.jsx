@@ -8,6 +8,8 @@ import {
   getAdminInventorySummary,
   restoreProductById,
   getAllCategories,
+  toggleVisible,
+  showAllProductsOnStore,
 } from "./../api/index";
 
 // ── Design tokens ──────────────────────────────────────────────
@@ -63,7 +65,7 @@ const StockBar = ({ count }) => {
 };
 
 // ── Status badge ───────────────────────────────────────────────
-const StatusBadge = ({ deleted, count }) => {
+const StatusBadge = ({ deleted, count, hiddenFromStore }) => {
   if (deleted)
     return (
       <span
@@ -78,6 +80,22 @@ const StatusBadge = ({ deleted, count }) => {
         }}
       >
         Đã xóa
+      </span>
+    );
+  if (hiddenFromStore)
+    return (
+      <span
+        style={{
+          padding: "3px 10px",
+          borderRadius: 99,
+          fontSize: 11,
+          fontWeight: 700,
+          background: "rgba(100,116,139,0.12)",
+          color: "#64748B",
+          textTransform: "uppercase",
+        }}
+      >
+        Ẩn
       </span>
     );
   if (count === 0)
@@ -467,6 +485,59 @@ export default function Products() {
     setPage(1);
   };
 
+  const handleToggleVisible = async (record) => {
+    const isHidden = record.isVisible === false;
+    const result = await Swal.fire({
+      title: isHidden ? "Hiển thị?" : "Ẩn?",
+      text: isHidden
+        ? "Sản phẩm sẽ hiển thị cho khách: trang chủ, danh mục, tìm kiếm và trang chi tiết."
+        : "Sản phẩm sẽ không hiển thị cho khách (không xóa dữ liệu). Admin vẫn xem và sửa được.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#f49d25",
+      cancelButtonColor: "#94A3B8",
+      confirmButtonText: isHidden ? "Hiển thị" : "Ẩn",
+      cancelButtonText: "Huỷ",
+    });
+    if (!result.isConfirmed) return;
+    try {
+      const res = await toggleVisible({ id: String(record._id) });
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      Swal.fire("Đã cập nhật", res?.message || "Trạng thái hiển thị đã đổi.", "success");
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Không thể đổi trạng thái hiển thị (kiểm tra đăng nhập admin / quyền staff).";
+      Swal.fire("Thất bại", msg, "error");
+    }
+  };
+
+  const handleShowAllOnStore = async () => {
+    const result = await Swal.fire({
+      title: "Bật hiển thị tất cả?",
+      text: "Mọi sản phẩm chưa xóa mềm sẽ được bật hiển thị (isVisible). Khách chỉ thấy nếu sản phẩm còn active và không inactive.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#f49d25",
+      cancelButtonColor: "#94A3B8",
+      confirmButtonText: "Bật tất cả",
+      cancelButtonText: "Huỷ",
+    });
+    if (!result.isConfirmed) return;
+    try {
+      const res = await showAllProductsOnStore();
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      Swal.fire("Xong", res?.message || "Đã cập nhật.", "success");
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Không thực hiện được. Kiểm tra quyền admin.";
+      Swal.fire("Lỗi", msg, "error");
+    }
+  };
+
   const handleRestore = async (id) => {
     const result = await Swal.fire({
       title: "Khôi phục sản phẩm này?",
@@ -578,10 +649,38 @@ export default function Products() {
             <p style={{ margin: "4px 0 0", fontSize: 13, color: T.textMuted }}>
               {isListProductRemoved
                 ? "Danh sách sản phẩm đã bị xóa mềm"
-                : "Quản lý toàn bộ sản phẩm trong cửa hàng"}
+                : "Quản lý toàn bộ sản phẩm"}
             </p>
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {!isListProductRemoved && (
+              <button
+                type="button"
+                onClick={handleShowAllOnStore}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "9px 16px",
+                  borderRadius: 999,
+                  border: `1.5px solid ${T.green}`,
+                  background: T.greenBg,
+                  color: "#15803D",
+                  fontWeight: 600,
+                  fontSize: 12,
+                  cursor: "pointer",
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                }}
+              >
+                <span
+                  className="material-symbols-outlined"
+                  style={{ fontSize: 16 }}
+                >
+                  storefront
+                </span>
+                Hiển thị tất cả
+              </button>
+            )}
             <button
               onClick={handleList}
               style={{
@@ -1005,12 +1104,12 @@ export default function Products() {
                       "Trạng thái",
                       "Ngày tạo",
                       "Thao tác",
-                    ].map((h) => (
+                    ].map((h, colIdx) => (
                       <th
-                        key={h}
+                        key={`pcol-${colIdx}`}
                         style={{
                           padding: "12px 16px",
-                          textAlign: "left",
+                          textAlign: colIdx === 7 ? "right" : "left",
                           fontSize: 10,
                           fontWeight: 700,
                           color: T.textMuted,
@@ -1193,6 +1292,7 @@ export default function Products() {
                             <td style={{ padding: "12px 16px" }}>
                               <StatusBadge
                                 deleted={!!record.deletedAt}
+                                hiddenFromStore={!record.deletedAt && record.isVisible === false}
                                 count={stockCount}
                               />
                             </td>
@@ -1210,8 +1310,23 @@ export default function Products() {
                               )}
                             </td>
                             {/* Actions */}
-                            <td style={{ padding: "12px 16px" }}>
-                              <div style={{ display: "flex", gap: 6 }}>
+                            <td
+                              style={{
+                                padding: "10px 12px",
+                                textAlign: "right",
+                                verticalAlign: "middle",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "inline-flex",
+                                  flexWrap: "nowrap",
+                                  alignItems: "center",
+                                  justifyContent: "flex-end",
+                                  gap: 5,
+                                }}
+                              >
                                 {!record.deletedAt && (
                                   <>
                                     <button
@@ -1219,18 +1334,19 @@ export default function Products() {
                                         setProductSelected(record._id)
                                       }
                                       style={{
-                                        padding: "6px 12px",
-                                        borderRadius: 8,
-                                        border: `1.5px solid ${T.border}`,
+                                        padding: "3px 8px",
+                                        borderRadius: 6,
+                                        border: `1px solid ${T.border}`,
                                         background: "#fff",
                                         color: T.textMid,
-                                        fontSize: 12,
+                                        fontSize: 11,
                                         fontWeight: 600,
                                         cursor: "pointer",
                                         fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                        display: "flex",
+                                        display: "inline-flex",
                                         alignItems: "center",
-                                        gap: 4,
+                                        gap: 3,
+                                        lineHeight: 1.2,
                                       }}
                                       onMouseEnter={(e) => {
                                         e.currentTarget.style.borderColor =
@@ -1245,11 +1361,47 @@ export default function Products() {
                                     >
                                       <span
                                         className="material-symbols-outlined"
-                                        style={{ fontSize: 14 }}
+                                        style={{ fontSize: 13 }}
                                       >
                                         edit
                                       </span>
                                       Sửa
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleVisible(record)}
+                                      style={{
+                                        padding: "3px 8px",
+                                        borderRadius: 6,
+                                        border: `1px solid ${record.isVisible === false ? T.primary : T.border}`,
+                                        background:
+                                          record.isVisible === false ? T.primaryBg : "#fff",
+                                        color:
+                                          record.isVisible === false ? T.primary : T.textMid,
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 3,
+                                        lineHeight: 1.2,
+                                      }}
+                                      title={
+                                        record.isVisible === false
+                                          ? "Hiển thị"
+                                          : "Ẩn"
+                                      }
+                                    >
+                                      <span
+                                        className="material-symbols-outlined"
+                                        style={{ fontSize: 13 }}
+                                      >
+                                        {record.isVisible === false ? "visibility" : "visibility_off"}
+                                      </span>
+                                      {record.isVisible === false
+                                        ? "Hiển thị"
+                                        : "Ẩn"}
                                     </button>
                                   </>
                                 )}
@@ -1257,23 +1409,24 @@ export default function Products() {
                                   <button
                                     onClick={() => handleRestore(record._id)}
                                     style={{
-                                      padding: "6px 12px",
-                                      borderRadius: 8,
-                                      border: `1.5px solid ${T.primary}`,
+                                      padding: "3px 8px",
+                                      borderRadius: 6,
+                                      border: `1px solid ${T.primary}`,
                                       background: T.primaryBg,
                                       color: T.primary,
-                                      fontSize: 12,
+                                      fontSize: 11,
                                       fontWeight: 600,
                                       cursor: "pointer",
                                       fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                      display: "flex",
+                                      display: "inline-flex",
                                       alignItems: "center",
-                                      gap: 4,
+                                      gap: 3,
+                                      lineHeight: 1.2,
                                     }}
                                   >
                                     <span
                                       className="material-symbols-outlined"
-                                      style={{ fontSize: 14 }}
+                                      style={{ fontSize: 13 }}
                                     >
                                       restore
                                     </span>

@@ -67,10 +67,11 @@ const normalizeVariants = (variants) => {
 const normalizeSaleRulesInput = (saleRules) =>
   normalizeSaleRules(Array.isArray(saleRules) ? saleRules : []);
 
+/** Truy vấn catalog khách: hỗ trợ bản ghi cũ thiếu field (coi như đang bật). */
 const baseProductQuery = {
   isDeleted: { $ne: true },
-  isActive: true,
-  isVisible: true,
+  isActive: { $ne: false },
+  isVisible: { $ne: false },
   status: { $ne: "inactive" },
 };
 
@@ -408,14 +409,27 @@ const getAdminInventorySummary = async (isListProductRemoved = 0) => {
 // ================================================================
 // GET BY ID
 // ================================================================
-const getProductById = async (id) => {
+/** Điều kiện hiển thị trên cửa hàng (khách) — khớp baseProductQuery. */
+const isProductShownOnStorefront = (doc) => {
+  if (!doc) return false;
+  if (doc.isDeleted === true) return false;
+  if (doc.isActive === false) return false;
+  if (doc.isVisible === false) return false;
+  if (doc.status === "inactive") return false;
+  return true;
+};
+
+const getProductById = async (id, options = {}) => {
+  const { bypassVisibility = false } = options;
   if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
   const product = await Product.findById(id)
     .populate("brandId", "name logo")
     .populate("categoryId", "name")
     .populate("variants.colorId", "name code rgb")
     .lean();
-  return product ? enrichProductPricing(product) : null;
+  if (!product) return null;
+  if (!bypassVisibility && !isProductShownOnStorefront(product)) return null;
+  return enrichProductPricing(product);
 };
 
 const getProductDetail = getProductById;
@@ -599,7 +613,7 @@ const getProducts = async (
   filter = {},
   sort = "newest",
 ) => {
-  const query = { isDeleted: { $ne: true } };
+  const query = { ...baseProductQuery };
 
   if (filter.brandId) query.brandId = filter.brandId;
   if (filter.categoryId) query.categoryId = filter.categoryId;
@@ -652,7 +666,7 @@ const getProducts = async (
 // ================================================================
 const getProductsByCategory = async (categoryId) => {
   if (!categoryId || !mongoose.Types.ObjectId.isValid(categoryId)) return [];
-  const data = await Product.find({ categoryId, isDeleted: { $ne: true } })
+  const data = await Product.find({ ...baseProductQuery, categoryId })
     .populate("brandId", "name logo")
     .populate("categoryId", "name")
     .sort({ createdAt: -1 })
@@ -664,7 +678,7 @@ const getProductsByCategory = async (categoryId) => {
 // RELATION
 // ================================================================
 const relationProduct = async (categoryId, brandId, excludeId) => {
-  const query = { isDeleted: { $ne: true }, _id: { $ne: excludeId } };
+  const query = { ...baseProductQuery, _id: { $ne: excludeId } };
   if (categoryId) query.categoryId = categoryId;
   if (brandId) query.brandId = brandId;
   const data = await Product.find(query)
@@ -872,6 +886,8 @@ const getHomeRecommendations = async ({ userId, limit = 8 } = {}) => {
 // EXPORTS
 // ================================================================
 module.exports = {
+  baseProductQuery,
+  isProductShownOnStorefront,
   getAllProducts,
   getAllProductsAdmin,
   getAdminInventorySummary,

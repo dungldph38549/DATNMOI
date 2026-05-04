@@ -1,6 +1,7 @@
 const Product = require("../models/ProductModel.js");
 const Order = require("../models/OrderModel.js");
 const ProductService = require("../services/ProductService");
+const { baseProductQuery } = ProductService;
 const { successResponse, errorResponse } = require("../utils/response.js");
 const { enrichProductPricing } = require("../utils/salePricing");
 const { findVariantBySku } = require("../utils/variantHelpers.js");
@@ -113,6 +114,23 @@ exports.getAdminInventorySummary = async (req, res) => {
   }
 };
 
+// PATCH /api/product/admin/show-all-on-store — Bật hiển thị cho mọi SP chưa xóa mềm
+exports.showAllProductsOnStore = async (req, res) => {
+  try {
+    const result = await Product.updateMany(
+      { isDeleted: { $ne: true } },
+      { $set: { isVisible: true } },
+    );
+    res.json({
+      message: `Đã bật hiển thị cho ${result.modifiedCount} sản phẩm (khớp ${result.matchedCount} bản ghi).`,
+      matchedCount: result.matchedCount,
+      modifiedCount: result.modifiedCount,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // ================================================================
 // GET BY ID — Chi tiết sản phẩm
 // GET /api/product/:id
@@ -120,7 +138,10 @@ exports.getAdminInventorySummary = async (req, res) => {
 exports.getProductById = async (req, res) => {
   try {
     const { id } = req.params;
-    const product = await ProductService.getProductById(id);
+    const u = req.user;
+    const bypassVisibility =
+      u && !u.isBanned && (u.isAdmin === true || u.isStaff === true);
+    const product = await ProductService.getProductById(id, { bypassVisibility });
     if (!product)
       return res.status(404).json({ message: "Không tìm thấy sản phẩm" });
 
@@ -377,8 +398,8 @@ exports.getByBrand = async (req, res) => {
   try {
     const { brandId } = req.params;
     const products = await Product.find({
+      ...baseProductQuery,
       brandId,
-      isDeleted: { $ne: true },
     })
       .populate("brandId", "name logo")
       .populate("categoryId", "name")
@@ -398,7 +419,7 @@ exports.getByBrandAndCategory = async (req, res) => {
   try {
     const { brandId, categoryId, gender, minPrice, maxPrice } = req.query;
 
-    const filter = { isDeleted: { $ne: true } };
+    const filter = { ...baseProductQuery };
     if (brandId) filter.brandId = brandId;
     if (categoryId) filter.categoryId = categoryId;
     if (gender) filter.gender = gender;
@@ -428,8 +449,8 @@ exports.getFeaturedProducts = async (req, res) => {
   try {
     const { limit = 8 } = req.query;
     const products = await Product.find({
+      ...baseProductQuery,
       isFeatured: true,
-      isDeleted: { $ne: true },
     })
       .populate("brandId", "name logo")
       .populate("categoryId", "name")
@@ -453,8 +474,8 @@ exports.getNewArrivals = async (req, res) => {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     const products = await Product.find({
+      ...baseProductQuery,
       createdAt: { $gte: thirtyDaysAgo },
-      isDeleted: { $ne: true },
     })
       .populate("brandId", "name logo")
       .populate("categoryId", "name")
@@ -475,7 +496,7 @@ exports.getNewArrivals = async (req, res) => {
 exports.getBestSellers = async (req, res) => {
   try {
     const { limit = 10 } = req.query;
-    const products = await Product.find({ isDeleted: { $ne: true } })
+    const products = await Product.find({ ...baseProductQuery })
       .populate("brandId", "name logo")
       .populate("categoryId", "name")
       .limit(Number(limit))
@@ -537,8 +558,8 @@ exports.getTopSellingProducts = async (req, res) => {
       {
         $match: {
           "product.isDeleted": { $ne: true },
-          "product.isActive": true,
-          "product.isVisible": true,
+          "product.isActive": { $ne: false },
+          "product.isVisible": { $ne: false },
           "product.status": { $ne: "inactive" },
         },
       },
@@ -606,7 +627,7 @@ exports.searchProducts = async (req, res) => {
 
     const regex = new RegExp(keyword.trim(), "i");
     const filter = {
-      isDeleted: { $ne: true },
+      ...baseProductQuery,
       $or: [{ name: { $regex: regex } }, { description: { $regex: regex } }],
     };
 
@@ -714,15 +735,20 @@ exports.toggleFeatured = async (req, res) => {
 exports.toggleVisible = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!id?.match(/^[0-9a-fA-F]{24}$/))
+      return res.status(400).json({ message: "ID sản phẩm không hợp lệ" });
+
     const product = await Product.findById(id);
     if (!product)
       return res.status(404).json({ message: "Không tìm thấy sản phẩm" });
 
-    product.isVisible = !product.isVisible;
-    await product.save();
+    // undefined / null coi như đang hiện (đồng bộ với baseProductQuery isVisible: { $ne: false })
+    const currentlyShown = product.isVisible !== false;
+    product.isVisible = !currentlyShown;
+    await product.save({ validateModifiedOnly: true });
 
     res.json({
-      message: `Sản phẩm đã được ${product.isVisible ? "hiển thị" : "ẩn"} trên cửa hàng`,
+      message: `Sản phẩm đã được ${product.isVisible ? "hiển thị" : "ẩn"}`,
       isVisible: product.isVisible,
     });
   } catch (err) {

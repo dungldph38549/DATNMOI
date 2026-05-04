@@ -151,16 +151,16 @@ const SalePage = () => {
         {/* Product grid — không bộ lọc */}
         <section className="pb-16">
           {loading ? (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
               {[...Array(8)].map((_, i) => (
-                <div key={i}>
-                  <div className="aspect-[4/5] animate-pulse rounded-lg bg-neutral-100" />
-                  <div className="mt-4 flex justify-between gap-4">
-                    <div className="space-y-2">
-                      <div className="h-4 w-3/4 animate-pulse rounded bg-neutral-200" />
-                      <div className="h-3 w-1/2 animate-pulse rounded bg-neutral-100" />
-                    </div>
-                    <div className="h-4 w-16 animate-pulse rounded bg-neutral-200" />
+                <div
+                  key={i}
+                  className="overflow-hidden rounded-lg border border-neutral-200/80 bg-white shadow-sm"
+                >
+                  <div className="aspect-[4/4.4] animate-pulse bg-neutral-200" />
+                  <div className="space-y-2 p-3">
+                    <div className="h-3 rounded bg-neutral-200" />
+                    <div className="h-3 w-2/3 rounded bg-neutral-200" />
                   </div>
                 </div>
               ))}
@@ -171,14 +171,18 @@ const SalePage = () => {
             </p>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
                 {visibleList.map((item) => {
                   const image = getImageUrl(item?.image || item?.srcImages?.[0]);
                   const { minPrice, maxPrice } = getProductPriceRange(item);
                   const outOfStock = isProductOutOfStock(item);
                   return (
-                    <Link key={item._id} to={`/product/${item._id}`} className="group block">
-                      <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-neutral-100">
+                    <Link
+                      key={item._id}
+                      to={`/product/${item._id}`}
+                      className="group block overflow-hidden rounded-lg border border-neutral-200/80 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                    >
+                      <div className="relative aspect-[4/4.4] overflow-hidden bg-neutral-100">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -207,7 +211,7 @@ const SalePage = () => {
                             <img
                               src={image}
                               alt={item.name}
-                              className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]"
+                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                             />
                             {!outOfStock && (
                               <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
@@ -219,7 +223,7 @@ const SalePage = () => {
                             {outOfStock && (
                               <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
                                 <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-black/65 px-3 text-center text-lg font-semibold text-white shadow-lg">
-                                  Hết hàng
+                                  Bán hết
                                 </span>
                               </div>
                             )}
@@ -227,25 +231,21 @@ const SalePage = () => {
                         ) : (
                           <div className="h-full w-full bg-neutral-200" />
                         )}
-                        <span className="absolute left-2 top-2 bg-[#D0021B] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+                        <span className="absolute left-2 top-2 z-10 bg-[#D0021B] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
                           Sale
                         </span>
                       </div>
-                      <div className="mt-4 flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <h2 className="font-display text-sm font-bold leading-snug text-black md:text-base">
-                            {item.name}
-                          </h2>
-                          <p className="mt-1 line-clamp-2 text-[11px] uppercase leading-relaxed tracking-[0.06em] text-neutral-500">
-                            {getSubLabel(item)}
-                          </p>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <p className="text-sm font-semibold tabular-nums text-[#D0021B] md:text-base">
+                      <div className="p-2.5">
+                        <h3 className="line-clamp-1 text-sm font-semibold text-neutral-900">{item.name}</h3>
+                        <p className="mt-0.5 line-clamp-1 text-[11px] uppercase tracking-[0.08em] text-neutral-500">
+                          {getSubLabel(item)}
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <span className="text-base font-bold tabular-nums text-[#D0021B]">
                             {minPrice === maxPrice
                               ? `${Number(minPrice || 0).toLocaleString("vi-VN")}đ`
                               : `${Number(minPrice || 0).toLocaleString("vi-VN")} - ${Number(maxPrice || 0).toLocaleString("vi-VN")}đ`}
-                          </p>
+                          </span>
                         </div>
                       </div>
                     </Link>

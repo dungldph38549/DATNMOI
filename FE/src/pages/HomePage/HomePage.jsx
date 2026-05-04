@@ -14,6 +14,9 @@ import {
   getAllCategories,
 } from "../../api";
 
+/** Số sản phẩm hiển thị ở block "Sản phẩm mới" trên trang chủ. */
+const HOME_NEW_PRODUCTS_COUNT = 8;
+
 const normalizeText = (value = "") =>
   String(value)
     .normalize("NFD")
@@ -97,14 +100,14 @@ const HomePage = () => {
 
         const [newRes, topSellingRes, bestRes, allProductRes, recommendRes, categoryRes] =
           await Promise.all([
-            getNewArrivals(24),
+            getNewArrivals(48),
             getTopSellingProducts({
               limit: 24,
               startDate: allTimeStart.toISOString(),
               endDate: new Date().toISOString(),
             }).catch(() => ({ data: [] })),
             getBestSellers(48),
-            fetchProducts({ limit: 200, page: 0 }).catch(() => ({ data: [] })),
+            fetchProducts({ limit: 400, page: 0 }).catch(() => ({ data: [] })),
             fetchRecommendProducts({
               userId: recommendUserId || undefined,
               limit: 8,
@@ -134,11 +137,12 @@ const HomePage = () => {
           ),
         );
 
-        // —— Sản phẩm mới: theo API new-arrivals (30 ngày), sắp xếp mới nhất trước
-        const newestSorted = [...newArr].sort(
-          (a, b) => getCreatedTimestamp(b) - getCreatedTimestamp(a),
-        );
-        setNewProducts(newestSorted.slice(0, 8));
+        // —— Sản phẩm mới: mọi thời điểm (theo createdAt/updatedAt), mới nhất trước — không giới hạn 30 ngày như API new-arrivals
+        const poolNew = allProducts.length > 0 ? allProducts : newArr;
+        const allTimeNewest = [...poolNew]
+          .filter((p) => p && String(p?._id || ""))
+          .sort((a, b) => getCreatedTimestamp(b) - getCreatedTimestamp(a));
+        setNewProducts(allTimeNewest.slice(0, HOME_NEW_PRODUCTS_COUNT));
 
         // —— Sản phẩm hot: ưu tiên top theo đơn (bán thực), bổ sung theo điểm hot (featured + bán)
         const hotIds = new Set();

@@ -1875,15 +1875,15 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
               </SectionCard>
 
               {/* Trạng thái hiển thị */}
-              <SectionCard icon="visibility" title="Trạng thái hiển thị">
+              <SectionCard icon="visibility" title="Hiển thị">
                 <div
                   style={{ display: "flex", flexDirection: "column", gap: 10 }}
                 >
                   <Toggle
                     checked={visible}
                     onChange={setVisible}
-                    label="Hiển thị trên cửa hàng"
-                    sub="Khách hàng có thể tìm thấy"
+                    label="Hiển thị sản phẩm"
+                    sub="Bật: khách thấy sản phẩm. Tắt: ẩn khỏi danh mục, tìm kiếm, trang chi tiết (admin vẫn xem và sửa)."
                   />
                   <Toggle
                     checked={featured}

@@ -38,11 +38,12 @@ router.post("/get-products", PC.getProducts);
 router.get("/admin/sale-report", adminGuard, PC.getSaleReport);
 router.get("/admin/inventory-summary", adminGuard, PC.getAdminInventorySummary);
 router.get("/admin/get-all", adminGuard, PC.getAllProducts);
+router.patch("/admin/show-all-on-store", adminGuard, PC.showAllProductsOnStore);
 router.post("/:id/view", authMiddleware, PC.trackViewedProduct);
 router.get("/:id/recommendations", PC.getRecommendations);
 
-// /:id phải đặt sau các route tĩnh
-router.get("/:id", PC.getProductById);
+// /:id phải đặt sau các route tĩnh — staff/admin (có token) vẫn xem được SP đã ẩn
+router.get("/:id", optionalAuthMiddleware, PC.getProductById);
 
 // ================================================================
 // ADMIN

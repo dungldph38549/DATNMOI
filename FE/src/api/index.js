@@ -376,6 +376,12 @@ export const getAdminInventorySummary = async (isListProductRemoved = 0) => {
   return res.data;
 };
 
+/** Bật hiển thị (isVisible) cho toàn bộ sản phẩm chưa xóa mềm (admin) */
+export const showAllProductsOnStore = async () => {
+  const res = await axiosInstance.patch("/product/admin/show-all-on-store");
+  return res.data;
+};
+
 export const createProduct = async (payload) => {
   const res = await axiosInstance.post("/product/create", { payload });
   return res.data;

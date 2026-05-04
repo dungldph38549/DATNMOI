@@ -357,84 +357,107 @@ export default function SaleManager() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
         .material-symbols-outlined { font-family:'Material Symbols Outlined'; font-style:normal; line-height:1; font-size:22px; }
-        .sale-table-wrap { overflow-x: auto; border-radius: 16px; border: 1px solid ${T.border}; background: ${T.card}; }
-        .sale-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .sale-table-wrap { overflow-x: auto; border-radius: 16px; border: 1px solid ${T.border}; background: ${T.card}; max-width: 100%; -webkit-overflow-scrolling: touch; }
+        .sale-table { width: 100%; min-width: 920px; border-collapse: collapse; font-size: 13px; }
         .sale-table th { text-align: left; padding: 12px 14px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: ${T.textMuted}; background: #f8fafc; border-bottom: 1px solid ${T.border}; white-space: nowrap; }
         .sale-table td { padding: 12px 14px; border-bottom: 1px solid ${T.border}; vertical-align: middle; color: ${T.textMid}; }
+        .sale-table th:nth-last-child(2), .sale-table td:nth-last-child(2),
+        .sale-table th:last-child, .sale-table td:last-child { text-align: right; }
         .sale-table tbody tr:hover td { background: #fffbf5; }
+        @media (max-width: 900px) {
+          .sale-hub-search { grid-template-columns: 1fr !important; }
+          .sale-hub-search-view { justify-self: start; }
+        }
       `}</style>
       <div
         style={{
-          padding: "24px 28px 40px",
+          padding: "24px 16px 40px",
           fontFamily: "'Plus Jakarta Sans', sans-serif",
           minHeight: "100vh",
           background: T.bg,
+          boxSizing: "border-box",
         }}
       >
         <div
           style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: 16,
-            marginBottom: 22,
+            maxWidth: 1280,
+            margin: "0 auto",
+            width: "100%",
           }}
         >
-          <div style={{ maxWidth: 560 }}>
-            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: T.text, letterSpacing: "-0.4px" }}>
-              Trung tâm Sale
-            </h1>
-            <p style={{ margin: "8px 0 0", fontSize: 13, color: T.textMuted, lineHeight: 1.55 }}>
-              {listScope === "program" ? (
-                <>
-                  Theo dõi SKU đang trong chương trình: <strong>Nổi bật</strong> hoặc <strong>rule giảm giá còn hiệu lực</strong>
-                  (gồm cả phụ kiện nếu đủ điều kiện). Bấm <strong>Toàn bộ SP &amp; phụ kiện</strong> để xem và gán sale cho mọi mặt hàng.
-                </>
-              ) : (
-                <>
-                  Đang hiển thị <strong>toàn bộ</strong> sản phẩm và phụ kiện trong catalog. Dùng lọc loại / trạng thái sale để thu hẹp, rồi{" "}
-                  <strong>Mở chi tiết</strong> để cấu hình nổi bật hoặc giảm giá.
-                </>
-              )}
-            </p>
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-            <span style={{ fontSize: 12, color: T.textMuted }}>
-              Đồng bộ: <strong style={{ color: T.textMid }}>{lastSync}</strong>
-              {isFetching && !isLoading ? " · Đang cập nhật…" : ""}
-            </span>
-            <button
-              type="button"
-              onClick={() => refetch()}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+              marginBottom: 24,
+            }}
+          >
+            <div style={{ minWidth: 0, flex: "1 1 280px", maxWidth: 720 }}>
+              <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: T.text, letterSpacing: "-0.4px" }}>
+                Trung tâm Sale
+              </h1>
+              <p style={{ margin: "8px 0 0", fontSize: 13, color: T.textMuted, lineHeight: 1.55 }}>
+                {listScope === "program" ? (
+                  <>
+                    Theo dõi SKU đang trong chương trình: <strong>Nổi bật</strong> hoặc <strong>rule giảm giá còn hiệu lực</strong>
+                    (gồm cả phụ kiện nếu đủ điều kiện). Bấm <strong>Toàn bộ SP &amp; phụ kiện</strong> để xem và gán sale cho mọi mặt hàng.
+                  </>
+                ) : (
+                  <>
+                    Đang hiển thị <strong>toàn bộ</strong> sản phẩm và phụ kiện trong catalog. Dùng lọc loại / trạng thái sale để thu hẹp, rồi bấm{" "}
+                    <strong>Sale</strong> để cấu hình nổi bật hoặc giảm giá.
+                  </>
+                )}
+              </p>
+            </div>
+            <div
               style={{
-                ...btnBase,
-                display: "inline-flex",
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 10,
                 alignItems: "center",
-                gap: 6,
-                borderColor: T.primary,
-                color: T.primary,
-                background: T.primaryBg,
+                justifyContent: "flex-end",
+                flexShrink: 0,
               }}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-                refresh
+              <span style={{ fontSize: 12, color: T.textMuted, textAlign: "right", lineHeight: 1.4 }}>
+                Đồng bộ: <strong style={{ color: T.textMid }}>{lastSync}</strong>
+                {isFetching && !isLoading ? " · Đang cập nhật…" : ""}
               </span>
-              Làm mới
-            </button>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                style={{
+                  ...btnBase,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  borderColor: T.primary,
+                  color: T.primary,
+                  background: T.primaryBg,
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                  refresh
+                </span>
+                Làm mới
+              </button>
+            </div>
           </div>
-        </div>
 
-        {isLoading ? (
-          <SkeletonBlock />
-        ) : (
-          <>
+          {isLoading ? (
+            <SkeletonBlock />
+          ) : (
+            <>
             <div
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: 14,
-                marginBottom: 22,
+                gap: 16,
+                marginBottom: 24,
               }}
             >
               <StatCard
@@ -476,11 +499,11 @@ export default function SaleManager() {
                 display: "flex",
                 flexWrap: "wrap",
                 gap: 10,
-                marginBottom: 16,
+                marginBottom: 12,
                 alignItems: "center",
               }}
             >
-              <span style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, marginRight: 4 }}>Phạm vi:</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, flexShrink: 0 }}>Phạm vi:</span>
               {[
                 { id: "program", label: "Chương trình đang chạy" },
                 { id: "full", label: "Toàn bộ SP & phụ kiện" },
@@ -507,8 +530,8 @@ export default function SaleManager() {
             </div>
 
             {listScope === "full" && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16, alignItems: "center" }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: T.textMuted }}>Loại hàng:</span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12, alignItems: "center" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, flexShrink: 0 }}>Loại hàng:</span>
                 {[
                   { id: "all", label: "Tất cả", count: stats.catalog },
                   { id: "shoe", label: "Sản phẩm (không phụ kiện)", count: stats.shoes },
@@ -536,76 +559,9 @@ export default function SaleManager() {
               </div>
             )}
 
-            <div
-              style={{
-                background: T.card,
-                borderRadius: 16,
-                border: `1px solid ${T.border}`,
-                padding: 16,
-                marginBottom: 18,
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 12,
-                alignItems: "center",
-                boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
-              }}
-            >
-              <input
-                type="search"
-                placeholder="Tìm theo tên hoặc SKU biến thể…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{
-                  flex: "1 1 220px",
-                  minWidth: 200,
-                  padding: "10px 14px",
-                  borderRadius: 12,
-                  border: `1.5px solid ${T.border}`,
-                  fontSize: 13,
-                  fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  outline: "none",
-                }}
-              />
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                style={{ ...btnBase, padding: "10px 12px" }}
-              >
-                <option value="ruleEnd">Sắp xếp: Rule kết thúc sớm nhất</option>
-                <option value="name">Sắp xếp: Tên A–Z</option>
-                <option value="price">Sắp xếp: Giá tăng dần</option>
-              </select>
-              <div style={{ display: "flex", gap: 6, marginLeft: "auto", flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  onClick={() => setViewMode("table")}
-                  style={{
-                    ...btnBase,
-                    background: viewMode === "table" ? T.primaryBg : "#fff",
-                    borderColor: viewMode === "table" ? T.primary : T.border,
-                    color: viewMode === "table" ? T.primary : T.textMid,
-                  }}
-                >
-                  Bảng
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode("grid")}
-                  style={{
-                    ...btnBase,
-                    background: viewMode === "grid" ? T.primaryBg : "#fff",
-                    borderColor: viewMode === "grid" ? T.primary : T.border,
-                    color: viewMode === "grid" ? T.primary : T.textMid,
-                  }}
-                >
-                  Lưới ảnh
-                </button>
-              </div>
-            </div>
-
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16, alignItems: "center" }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, width: "100%" }}>
-                {listScope === "program" ? "Lọc trong chương trình:" : "Lọc trạng thái sale (trên danh sách đang xem):"}
+              <span style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, flexShrink: 0, maxWidth: 280, lineHeight: 1.35 }}>
+                {listScope === "program" ? "Lọc CT:" : "Lọc sale:"}
               </span>
               {[
                 { id: "all", label: "Tất cả", count: filterTabCounts.all },
@@ -634,6 +590,93 @@ export default function SaleManager() {
               ))}
             </div>
 
+            <div
+              style={{
+                background: T.card,
+                borderRadius: 16,
+                border: `1px solid ${T.border}`,
+                padding: "14px 16px",
+                marginBottom: 18,
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) minmax(168px, 240px) auto",
+                gap: 12,
+                alignItems: "center",
+                boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+              }}
+              className="sale-hub-search"
+            >
+              <input
+                type="search"
+                placeholder="Tìm theo tên hoặc SKU biến thể…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  width: "100%",
+                  minWidth: 0,
+                  padding: "10px 14px",
+                  borderRadius: 12,
+                  border: `1.5px solid ${T.border}`,
+                  fontSize: 13,
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                style={{
+                  ...btnBase,
+                  padding: "10px 12px",
+                  width: "100%",
+                  maxWidth: "100%",
+                  minHeight: 42,
+                  boxSizing: "border-box",
+                }}
+              >
+                <option value="ruleEnd">Sắp xếp: Rule kết thúc sớm nhất</option>
+                <option value="name">Sắp xếp: Tên A–Z</option>
+                <option value="price">Sắp xếp: Giá tăng dần</option>
+              </select>
+              <div
+                className="sale-hub-search-view"
+                style={{ display: "inline-flex", flexWrap: "nowrap", gap: 6, alignItems: "center", justifySelf: "end" }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setViewMode("table")}
+                  style={{
+                    ...btnBase,
+                    flexShrink: 0,
+                    minHeight: 42,
+                    padding: "10px 12px",
+                    boxSizing: "border-box",
+                    background: viewMode === "table" ? T.primaryBg : "#fff",
+                    borderColor: viewMode === "table" ? T.primary : T.border,
+                    color: viewMode === "table" ? T.primary : T.textMid,
+                  }}
+                >
+                  Bảng
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("grid")}
+                  style={{
+                    ...btnBase,
+                    flexShrink: 0,
+                    minHeight: 42,
+                    padding: "10px 12px",
+                    boxSizing: "border-box",
+                    background: viewMode === "grid" ? T.primaryBg : "#fff",
+                    borderColor: viewMode === "grid" ? T.primary : T.border,
+                    color: viewMode === "grid" ? T.primary : T.textMid,
+                  }}
+                >
+                  Lưới ảnh
+                </button>
+              </div>
+            </div>
+
             {isError && (
               <p style={{ color: "#DC2626", fontSize: 14, fontWeight: 600 }}>
                 Không tải được dữ liệu. Kiểm tra mạng hoặc đăng nhập admin rồi bấm Làm mới.
@@ -658,7 +701,7 @@ export default function SaleManager() {
                     ? "Không có mặt hàng khớp tìm kiếm. Thử từ khóa khác."
                     : listScope === "full"
                       ? "Không có SKU trong phạm vi lọc hiện tại. Đổi loại hàng hoặc bỏ lọc trạng thái sale."
-                      : "Chưa có SKU trong chương trình. Chuyển sang Toàn bộ SP & phụ kiện để gán sale, hoặc bật Nổi bật / rule tại chi tiết."}
+                      : "Chưa có SKU trong chương trình. Chuyển sang Toàn bộ SP & phụ kiện để gán sale, hoặc bật Nổi bật / rule tại Sale."}
                 </p>
               </div>
             )}
@@ -674,7 +717,7 @@ export default function SaleManager() {
                       <th>Trạng thái sale</th>
                       <th>Rule chính</th>
                       <th>Giá hiển thị</th>
-                      <th style={{ textAlign: "right" }}>Thao tác</th>
+                      <th>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -762,7 +805,7 @@ export default function SaleManager() {
                             <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2 }}>{ruleFmt.detail}</div>
                           </td>
                           <td style={{ fontWeight: 700, color: T.primary }}>{getDisplayPrice(p)}</td>
-                          <td style={{ textAlign: "right" }}>
+                          <td>
                             <button
                               type="button"
                               onClick={() => setProductId(p._id)}
@@ -778,7 +821,7 @@ export default function SaleManager() {
                                 fontFamily: "'Plus Jakarta Sans', sans-serif",
                               }}
                             >
-                              Mở chi tiết
+                              Sale
                             </button>
                           </td>
                         </tr>
@@ -894,7 +937,7 @@ export default function SaleManager() {
                             fontFamily: "'Plus Jakarta Sans', sans-serif",
                           }}
                         >
-                          Chỉnh sửa ưu đãi
+                          Sale
                         </button>
                       </div>
                     </div>
@@ -903,12 +946,13 @@ export default function SaleManager() {
               </div>
             )}
 
-            <p style={{ marginTop: 20, fontSize: 12, color: T.textMuted, lineHeight: 1.5 }}>
+            <p style={{ marginTop: 24, fontSize: 12, color: T.textMuted, lineHeight: 1.55, maxWidth: 900 }}>
               Gợi ý chuyên nghiệp: phân tách <strong>Voucher</strong> (toàn đơn / danh mục) với <strong>Sale theo sản phẩm</strong> (rule trên SKU);
               màn này chỉ phản ánh <strong>trạng thái hiện tại</strong> trên catalog — không tạo chiến dịch mới.
             </p>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </>
   );

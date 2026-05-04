@@ -7,8 +7,8 @@ const { enrichProductPricing } = require("../utils/salePricing");
 
 const baseProductQuery = {
   isDeleted: { $ne: true },
-  isActive: true,
-  isVisible: true,
+  isActive: { $ne: false },
+  isVisible: { $ne: false },
   status: { $ne: "inactive" },
 };
 
