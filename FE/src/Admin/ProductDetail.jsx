@@ -369,7 +369,12 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
   }, [isShoelaceMatrix, shoelaceSizesRes, sizes]);
 
   const mutation = useMutation({
-    mutationFn: productId !== "create" ? updateProduct : createProduct,
+    mutationFn: async (vars) => {
+      if (vars?.action === "update") {
+        return updateProduct({ id: vars.id, payload: vars.payload });
+      }
+      return createProduct(vars.payload);
+    },
     onSuccess: () => {
       Swal.fire(
         "Thành công",
@@ -695,7 +700,7 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
             ]
           : [],
     };
-    mutation.mutate({ id: productId, payload });
+    mutation.mutate({ action: "update", id: productId, payload });
   };
 
   const onFinish = (values) => {
@@ -759,9 +764,9 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
     // createProduct expects `payload` directly
     // updateProduct expects `{ id, payload }`
     if (productId !== "create") {
-      mutation.mutate({ id: productId, payload });
+      mutation.mutate({ action: "update", id: productId, payload });
     } else {
-      mutation.mutate(payload);
+      mutation.mutate({ action: "create", payload });
     }
   };
 

@@ -445,7 +445,7 @@ const ProductDetail = () => {
     setSelectedSize(next);
   };
 
-  /** Bước 1: chọn màu — reset size để khách chọn lại cỡ. */
+  /** 11: chọn màu — reset size để khách chọn lại cỡ. */
   const handleColorClick = (colorId) => {
     setSelectedColorId(colorId);
     setSelectedSize(null);
@@ -1019,7 +1019,7 @@ const ProductDetail = () => {
               <div className="mt-8 font-['Lexend',sans-serif]">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
-                    Bước 1 — Màu sắc
+                    Màu sắc
                   </span>
                   <span className="rounded-[12px] bg-[#FFF5E6] px-2.5 py-1 text-[11px] font-semibold text-[#f49d25]">
                     {colorOptions.find((c) => c.id === selectedColorId)?.name || "Chưa chọn"}
@@ -1062,7 +1062,7 @@ const ProductDetail = () => {
               <div className="mt-8 font-['Lexend',sans-serif]">
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
-                    {isShoelaceProduct ? "Bước 2 — Độ dài dây" : "Bước 2 — Kích cỡ"}
+                    {isShoelaceProduct ? "Độ dài dây" : "Kích cỡ"}
                   </span>
                   {!isAccessoryProduct ? (
                     <button
