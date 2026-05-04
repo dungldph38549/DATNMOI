@@ -83,7 +83,7 @@ const Header = () => {
     const home = "Trang ch\u1ee7";
     const rest = [{ label: home, to: "/" }];
     if (path === "/") {
-      return [{ label: home, to: null }];
+      return [];
     }
     if (path === "/phu-kien") {
       rest.push({ label: "Ph\u1ee5 ki\u1ec7n", to: null });
