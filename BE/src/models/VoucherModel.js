@@ -146,48 +146,43 @@ const voucherSchema = new mongoose.Schema(
   },
 );
 
-voucherSchema.pre("validate", function (next) {
-  try {
-    if (!this.type && this.discountType) {
-      this.type = this.discountType;
-    }
-    if (this.value == null && this.discountValue != null) {
-      this.value = this.discountValue;
-    }
-    if (
-      (this.maxDiscount == null || this.maxDiscount === undefined) &&
-      this.maxDiscountAmount != null
-    ) {
-      this.maxDiscount = this.maxDiscountAmount;
-    }
-    if (this.isActive == null && this.status != null) {
-      this.isActive = this.status === "active";
-    }
-    if (
-      (!this.applicableProducts || this.applicableProducts.length === 0) &&
-      Array.isArray(this.applicableProductIds) &&
-      this.applicableProductIds.length > 0
-    ) {
-      this.applicableProducts = [...this.applicableProductIds];
-    }
+// Không dùng next() — Mongoose 6+ có thể không truyền next → "next is not a function"
+voucherSchema.pre("validate", function () {
+  if (!this.type && this.discountType) {
+    this.type = this.discountType;
+  }
+  if (this.value == null && this.discountValue != null) {
+    this.value = this.discountValue;
+  }
+  if (
+    (this.maxDiscount == null || this.maxDiscount === undefined) &&
+    this.maxDiscountAmount != null
+  ) {
+    this.maxDiscount = this.maxDiscountAmount;
+  }
+  if (this.isActive == null && this.status != null) {
+    this.isActive = this.status === "active";
+  }
+  if (
+    (!this.applicableProducts || this.applicableProducts.length === 0) &&
+    Array.isArray(this.applicableProductIds) &&
+    this.applicableProductIds.length > 0
+  ) {
+    this.applicableProducts = [...this.applicableProductIds];
+  }
 
-    const t = this.type || "percent";
-    if (t === "percent") {
-      const v = Number(this.value);
-      if (v < 1 || v > 100) {
-        throw new Error("Giá trị % phải từ 1 đến 100");
-      }
+  const t = this.type || "percent";
+  if (t === "percent") {
+    const v = Number(this.value);
+    if (v < 1 || v > 100) {
+      throw new Error("Giá trị % phải từ 1 đến 100");
     }
+  }
 
-    const start = this.startDate ? new Date(this.startDate) : null;
-    const end = this.endDate ? new Date(this.endDate) : null;
-    if (start && end && end < start) {
-      throw new Error("Ngày kết thúc phải sau ngày bắt đầu");
-    }
-
-    next();
-  } catch (err) {
-    next(err);
+  const start = this.startDate ? new Date(this.startDate) : null;
+  const end = this.endDate ? new Date(this.endDate) : null;
+  if (start && end && end < start) {
+    throw new Error("Ngày kết thúc phải sau ngày bắt đầu");
   }
 });
 
