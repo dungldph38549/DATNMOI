@@ -10,6 +10,7 @@ import {
   getVariantShoelaceLengthValue,
   getVariantAccessorySizeValue,
   getVariantSoleValue,
+  inferAccessorySubKind,
 } from "../../utils/variantAttributes";
 import { toggleWishlist } from "../../redux/wishlist/wishlistSlice";
 
@@ -32,39 +33,6 @@ const isAccessoryCategory = (c) => {
       : null;
   if (slugFromDb === "phu-kien") return true;
   return categoryNameToSlug(c?.name || "") === "phu-kien";
-};
-
-/** Normalize category name/slug hints for insole vs shoelace. */
-const slugifyAccessoryHint = (str = "") =>
-  String(str)
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .trim();
-
-/**
- * @returns {"all"|"insole"|"shoelace"|"other"}
- * - insole: lót giày → hiện bộ lọc Size
- * - shoelace: dây giày → hiện bộ lọc độ dài dây
- */
-const inferAccessorySubKind = (name = "", slug = "") => {
-  const s = `${slugifyAccessoryHint(name)} ${slugifyAccessoryHint(slug)}`.trim();
-  if (!s) return "other";
-  const shoelace =
-    (s.includes("day") && s.includes("giay")) ||
-    s.includes("shoelace") ||
-    s.includes("day-giay");
-  const insole =
-    (s.includes("lot") && s.includes("giay")) ||
-    s.includes("lot-giay") ||
-    s.includes("insole") ||
-    (s.includes("lot") && !s.includes("day"));
-  if (shoelace && !insole) return "shoelace";
-  if (insole && !shoelace) return "insole";
-  if (shoelace) return "shoelace";
-  if (insole) return "insole";
-  return "other";
 };
 
 const getProductMinPrice = (product) => {
@@ -103,7 +71,11 @@ const getProductShoelaceLengths = (product) => {
   const lengths = [];
   if (Array.isArray(product?.variants)) {
     product.variants.forEach((variant) => {
-      const v = getVariantShoelaceLengthValue(variant);
+      const v =
+        getVariantShoelaceLengthValue(variant) ??
+        (variant?.size != null && String(variant.size).trim() !== ""
+          ? String(variant.size).trim()
+          : null);
       if (v != null && String(v).trim() !== "") lengths.push(String(v).trim());
     });
   }

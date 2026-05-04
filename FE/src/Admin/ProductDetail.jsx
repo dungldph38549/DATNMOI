@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Form, InputNumber, Select, Input } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import Swal from "sweetalert2";
@@ -11,8 +11,13 @@ import {
   uploadImages,
   getAllCategories,
   getAllSizes,
+  getAllShoelaceSizes,
   getAllColors,
 } from "./../api/index";
+import {
+  getVariantShoelaceLengthValue,
+  isShoelaceCategoryHints,
+} from "../utils/variantAttributes";
 
 // Backend đang chạy tại 3002. Nếu build/ENV bị lệch (vẫn còn 3001), ảnh sẽ request sai port và lỗi ERR_CONNECTION_REFUSED.
 // Ép URL base về đúng port để admin luôn load được ảnh.
@@ -198,7 +203,10 @@ const matrixFromProductVariants = (variants) => {
   const colorMap = new Map();
   const cells = {};
   for (const v of variants || []) {
-    const sz = String(v.size ?? "").trim() || legacyVariantAttr(v, "size");
+    const sz =
+      String(v.size ?? "").trim() ||
+      legacyVariantAttr(v, "size") ||
+      String(getVariantShoelaceLengthValue(v) ?? "").trim();
     if (!sz) continue;
     if (!sizes.includes(sz)) sizes.push(sz);
     const cidRaw = v.colorId?._id ?? v.colorId;
@@ -243,7 +251,8 @@ const collectMatrixSkus = (matrix) => {
   return out;
 };
 
-const buildVariantsPayloadFromMatrix = (matrix) => {
+const buildVariantsPayloadFromMatrix = (matrix, opts = {}) => {
+  const colLabel = opts.shoelace ? "độ dài" : "size";
   const variants = [];
   for (const row of matrix.colorRows || []) {
     if (!row.colorId || !/^[a-f\d]{24}$/i.test(String(row.colorId))) {
@@ -257,7 +266,7 @@ const buildVariantsPayloadFromMatrix = (matrix) => {
       const price = Number(cell.price);
       if (!Number.isFinite(price) || price <= 0) {
         throw new Error(
-          `Ô ${row.colorName} / size ${size}: giá phải lớn hơn 0.`,
+          `Ô ${row.colorName} / ${colLabel} ${size}: giá phải lớn hơn 0.`,
         );
       }
       variants.push({
@@ -318,6 +327,12 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
     keepPreviousData: true,
     enabled: !saleOnly,
   });
+  const { data: shoelaceSizesRes } = useQuery({
+    queryKey: ["admin-shoelace-sizes"],
+    queryFn: getAllShoelaceSizes,
+    keepPreviousData: true,
+    enabled: !saleOnly,
+  });
   const { data: colorsRes } = useQuery({
     queryKey: ["admin-colors"],
     queryFn: getAllColors,
@@ -329,6 +344,29 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
     : Array.isArray(colorsRes)
       ? colorsRes
       : [];
+
+  const watchedCategoryId = Form.useWatch("categoryId", form);
+  const watchedProductName = Form.useWatch("name", form);
+  const categoryList = categories?.data || [];
+  const watchedCategory = useMemo(
+    () => categoryList.find((c) => String(c._id) === String(watchedCategoryId)),
+    [categoryList, watchedCategoryId],
+  );
+  /** Danh mục dây giày HOẶC tên SP gợi ý dây giày (tạo mới hay để nhầm danh mục phụ kiện chung). */
+  const isShoelaceMatrix = useMemo(
+    () =>
+      isShoelaceCategoryHints(watchedCategory?.name, watchedCategory?.slug) ||
+      isShoelaceCategoryHints(watchedProductName || "", ""),
+    [watchedCategory?.name, watchedCategory?.slug, watchedProductName],
+  );
+  const matrixColumnCatalog = useMemo(() => {
+    if (isShoelaceMatrix) {
+      const raw = shoelaceSizesRes?.data;
+      return Array.isArray(raw) ? raw : [];
+    }
+    const raw = sizes?.data;
+    return Array.isArray(raw) ? raw : [];
+  }, [isShoelaceMatrix, shoelaceSizesRes, sizes]);
 
   const mutation = useMutation({
     mutationFn: productId !== "create" ? updateProduct : createProduct,
@@ -502,14 +540,22 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
       .filter(Boolean);
     const unique = [...new Set(list)];
     if (!unique.length) {
-      Swal.fire("Thiếu size", "Vui lòng chọn ít nhất một size.", "warning");
+      Swal.fire(
+        isShoelaceMatrix ? "Thiếu độ dài" : "Thiếu size",
+        isShoelaceMatrix
+          ? "Vui lòng chọn ít nhất một mức độ dài dây."
+          : "Vui lòng chọn ít nhất một size.",
+        "warning",
+      );
       return;
     }
     const toAddPreview = unique.filter((s) => !varMatrix.sizes.includes(s));
     if (!toAddPreview.length) {
       Swal.fire(
-        "Không thêm size mới",
-        "Các size bạn chọn đã có trong lưới.",
+        isShoelaceMatrix ? "Không thêm độ dài mới" : "Không thêm size mới",
+        isShoelaceMatrix
+          ? "Các mức độ dài bạn chọn đã có trong lưới."
+          : "Các size bạn chọn đã có trong lưới.",
         "info",
       );
       setNewSizeDraftMulti([]);
@@ -559,8 +605,10 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
     if (!colorDoc?._id) return;
     if (varMatrix.sizes.length === 0) {
       Swal.fire(
-        "Thêm size trước",
-        "Vui lòng thêm ít nhất một cột size trước khi thêm màu.",
+        isShoelaceMatrix ? "Thêm độ dài trước" : "Thêm size trước",
+        isShoelaceMatrix
+          ? "Vui lòng thêm ít nhất một cột độ dài dây trước khi thêm màu."
+          : "Vui lòng thêm ít nhất một cột size trước khi thêm màu.",
         "info",
       );
       return;
@@ -667,11 +715,16 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
     // (Form.List có thể làm rơi field không được render bằng Form.Item trong `values`).
     if (hasVar) {
       try {
-        payload.variants = buildVariantsPayloadFromMatrix(varMatrix);
+        payload.variants = buildVariantsPayloadFromMatrix(varMatrix, {
+          shoelace: isShoelaceMatrix,
+        });
       } catch (e) {
         Swal.fire(
           "Biến thể không hợp lệ",
-          e?.message || "Vui lòng kiểm tra lưới size × màu.",
+          e?.message ||
+            (isShoelaceMatrix
+              ? "Vui lòng kiểm tra lưới độ dài × màu."
+              : "Vui lòng kiểm tra lưới size × màu."),
           "error",
         );
         return;
@@ -679,7 +732,9 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
       if (!payload.variants.length) {
         Swal.fire(
           "Thiếu biến thể",
-          "Vui lòng thêm size, màu và điền SKU + giá cho từng ô trong lưới.",
+          isShoelaceMatrix
+            ? "Vui lòng thêm độ dài dây, màu và điền SKU + giá cho từng ô trong lưới."
+            : "Vui lòng thêm size, màu và điền SKU + giá cho từng ô trong lưới.",
           "error",
         );
         return;
@@ -1184,7 +1239,9 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
                         marginBottom: 12,
                       }}
                     >
-                      Lưới biến thể: <b>cột = Size</b>, <b>hàng = Màu</b>. Mỗi ô có SKU, giá, tồn và ảnh riêng.
+                      Lưới biến thể:{" "}
+                      <b>cột = {isShoelaceMatrix ? "Độ dài dây" : "Size"}</b>, <b>hàng = Màu</b>. Mỗi ô có
+                      SKU, giá, tồn và ảnh riêng.
                     </p>
                     <div
                       style={{
@@ -1196,18 +1253,22 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
                       }}
                     >
                       <div style={{ flex: "1 1 280px" }}>
-                        <FieldLabel>Thêm size</FieldLabel>
+                        <FieldLabel>{isShoelaceMatrix ? "Thêm độ dài dây" : "Thêm size"}</FieldLabel>
                         <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                           <Select
                             mode="multiple"
                             showSearch
                             allowClear
-                            placeholder="Chọn một hoặc nhiều size"
+                            placeholder={
+                              isShoelaceMatrix
+                                ? "Chọn một hoặc nhiều mức độ dài"
+                                : "Chọn một hoặc nhiều size"
+                            }
                             style={{ flex: 1, borderRadius: 12 }}
                             maxTagCount="responsive"
                             value={newSizeDraftMulti}
                             onChange={(vals) => setNewSizeDraftMulti(Array.isArray(vals) ? vals : [])}
-                            options={(sizes?.data || []).map((s) => ({
+                            options={matrixColumnCatalog.map((s) => ({
                               label: s.name,
                               value: s.name,
                             }))}
@@ -1230,7 +1291,7 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
                               flexShrink: 0,
                             }}
                           >
-                            Thêm size
+                            {isShoelaceMatrix ? "Thêm độ dài" : "Thêm size"}
                           </button>
                         </div>
                       </div>
@@ -1350,7 +1411,7 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
                                     textDecoration: "underline",
                                   }}
                                 >
-                                  Xóa cột
+                                  {isShoelaceMatrix ? "Xóa cột độ dài" : "Xóa cột"}
                                 </button>
                               </th>
                             ))}
@@ -1367,7 +1428,9 @@ const ProductDetail = ({ productId = null, onClose, saleOnly = false }) => {
                                   color: "#94A3B8",
                                 }}
                               >
-                                Thêm size và màu để tạo ô trong lưới.
+                                {isShoelaceMatrix
+                                  ? "Thêm độ dài dây và màu để tạo ô trong lưới."
+                                  : "Thêm size và màu để tạo ô trong lưới."}
                               </td>
                             </tr>
                           ) : (

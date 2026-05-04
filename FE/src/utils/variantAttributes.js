@@ -102,3 +102,39 @@ export function getVariantSoleValue(variant) {
     "Insole",
   ]);
 }
+
+const slugifyAccessoryHint = (str = "") =>
+  String(str)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .trim();
+
+/**
+ * Phân loại phụ kiện theo tên/slug danh mục (đồng bộ với AccessoriesPage).
+ * @returns {"all"|"insole"|"shoelace"|"other"}
+ */
+export function inferAccessorySubKind(name = "", slug = "") {
+  const s = `${slugifyAccessoryHint(name)} ${slugifyAccessoryHint(slug)}`.trim();
+  if (!s) return "other";
+  const shoelace =
+    (s.includes("day") && s.includes("giay")) ||
+    s.includes("shoelace") ||
+    s.includes("day-giay");
+  const insole =
+    (s.includes("lot") && s.includes("giay")) ||
+    s.includes("lot-giay") ||
+    s.includes("insole") ||
+    (s.includes("lot") && !s.includes("day"));
+  if (shoelace && !insole) return "shoelace";
+  if (insole && !shoelace) return "insole";
+  if (shoelace) return "shoelace";
+  if (insole) return "insole";
+  return "other";
+}
+
+/** Danh mục dây giày (độ dài) — dùng admin + trang chi tiết. */
+export function isShoelaceCategoryHints(name, slug) {
+  return inferAccessorySubKind(name, slug) === "shoelace";
+}

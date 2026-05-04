@@ -14,6 +14,10 @@ import {
   getOrderStatusLabelForReview,
   shouldShowOrderStatusOnReview,
 } from "../../utils/orderStatusForReview";
+import {
+  getVariantShoelaceLengthValue,
+  isShoelaceCategoryHints,
+} from "../../utils/variantAttributes";
 import SizeGuideInner from "../../components/SizeGuide/SizeGuideInner";
 import RecommendSection from "../../components/RecommendSection/RecommendSection";
 
@@ -42,7 +46,7 @@ const parseSizeFromVariantLabel = (label) => {
   if (!label || typeof label !== "string") return null;
   for (const part of label.split("·")) {
     const t = part.trim();
-    const m = t.match(/^(?:Size|EU|Kích\s*cỡ)\s*:\s*(.+)$/i);
+    const m = t.match(/^(?:Size|EU|Kích\s*cỡ|Độ\s*dài)\s*:\s*(.+)$/i);
     if (m) return m[1].trim();
   }
   return null;
@@ -112,6 +116,10 @@ const ProductDetail = () => {
   const getVariantSizeValue = useCallback((variant) => {
     if (variant?.size != null && String(variant.size).trim() !== "") {
       return String(variant.size).trim();
+    }
+    const fromLen = getVariantShoelaceLengthValue(variant);
+    if (fromLen != null && String(fromLen).trim() !== "") {
+      return String(fromLen).trim();
     }
     const attrs = variant?.attributes;
     if (!attrs) return null;
@@ -191,6 +199,9 @@ const ProductDetail = () => {
   )
     .toLowerCase()
     .includes("phụ kiện");
+  const isShoelaceProduct =
+    isShoelaceCategoryHints(product?.categoryId?.name, product?.categoryId?.slug) ||
+    isShoelaceCategoryHints(product?.name || "", product?.slug || "");
 
   useEffect(() => {
     if (!id) return;
@@ -237,10 +248,10 @@ const ProductDetail = () => {
 
   /** Chỉ một nhóm màu (hoặc mặc định) → bỏ bước chọn màu thủ công */
   useEffect(() => {
-    if (!product || !hasVariants || isAccessoryProduct) return;
+    if (!product || !hasVariants) return;
     if (colorOptions.length !== 1) return;
     setSelectedColorId((prev) => (prev != null ? prev : colorOptions[0].id));
-  }, [product?._id, hasVariants, isAccessoryProduct, colorOptions]);
+  }, [product?._id, hasVariants, colorOptions]);
 
   const sizesForSelectedColor = useMemo(() => {
     if (!product || !hasVariants || !selectedColorId) return [];
@@ -602,7 +613,11 @@ const ProductDetail = () => {
     const colorHexToSave = hasVariants ? selectedVariant?.colorHex ?? null : null;
 
     if (hasVariants && (!selectedColorId || !selectedSize || !skuToSave)) {
-      notify.warning("Vui lòng chọn màu và kích cỡ.");
+      notify.warning(
+        isShoelaceProduct
+          ? "Vui lòng chọn màu và độ dài dây."
+          : "Vui lòng chọn màu và kích cỡ.",
+      );
       return false;
     }
     if (stockInfo?.available === false) { notify.warning("Sản phẩm đã hết, vui lòng mua sản phẩm khác."); return false; }
@@ -714,7 +729,11 @@ const ProductDetail = () => {
     const colorHexToSave = hasVariants ? selectedVariant?.colorHex ?? null : null;
 
     if (hasVariants && (!selectedColorId || !selectedSize || !skuToSave)) {
-      notify.warning("Vui lòng chọn màu và kích cỡ.");
+      notify.warning(
+        isShoelaceProduct
+          ? "Vui lòng chọn màu và độ dài dây."
+          : "Vui lòng chọn màu và kích cỡ.",
+      );
       return;
     }
     if (stockInfo?.available === false) {
@@ -829,6 +848,7 @@ const ProductDetail = () => {
     if (!s) return s;
     const afterEu = s.replace(/^eu\s*/i, "").trim();
     if (dimension === "size") {
+      if (isShoelaceProduct) return s;
       if (/^eu\s/i.test(s) || /^\d+(\.\d+)?$/.test(afterEu) || /^\d+(\.\d+)?$/.test(s)) {
         const num = /^\d+(\.\d+)?$/.test(s) ? s : afterEu;
         return `Size ${num}`;
@@ -995,7 +1015,7 @@ const ProductDetail = () => {
               </p>
             )}
 
-            {hasVariants && !isAccessoryProduct && colorOptions.length > 0 && (
+            {hasVariants && colorOptions.length > 0 && (
               <div className="mt-8 font-['Lexend',sans-serif]">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
@@ -1038,20 +1058,22 @@ const ProductDetail = () => {
               </div>
             )}
 
-            {hasVariants && !isAccessoryProduct && (
+            {hasVariants && (
               <div className="mt-8 font-['Lexend',sans-serif]">
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
-                    Bước 2 — Kích cỡ
+                    {isShoelaceProduct ? "Bước 2 — Độ dài dây" : "Bước 2 — Kích cỡ"}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowSizeGuide(true)}
-                    className="inline-flex items-center gap-2 rounded-[12px] border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition hover:border-[#f49d25] hover:text-[#f49d25]"
-                  >
-                    <FaRulerCombined className="text-[11px]" />
-                    Hướng dẫn chọn size
-                  </button>
+                  {!isAccessoryProduct ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowSizeGuide(true)}
+                      className="inline-flex items-center gap-2 rounded-[12px] border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition hover:border-[#f49d25] hover:text-[#f49d25]"
+                    >
+                      <FaRulerCombined className="text-[11px]" />
+                      Hướng dẫn chọn size
+                    </button>
+                  ) : null}
                 </div>
                 {!selectedColorId ? (
                   <p className="text-sm text-neutral-500">Vui lòng chọn màu trước.</p>
@@ -1121,7 +1143,9 @@ const ProductDetail = () => {
               </div>
               <span className="text-sm text-neutral-500">
                 {stockStatePending
-                  ? "Vui lòng chọn màu và kích cỡ trước"
+                  ? isShoelaceProduct
+                    ? "Vui lòng chọn màu và độ dài dây trước"
+                    : "Vui lòng chọn màu và kích cỡ trước"
                   : `${Math.max(0, maxSelectableQty)} sản phẩm có sẵn`}
               </span>
             </div>
