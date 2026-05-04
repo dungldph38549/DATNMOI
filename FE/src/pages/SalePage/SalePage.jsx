@@ -241,10 +241,14 @@ const SalePage = () => {
                           {getSubLabel(item)}
                         </p>
                         <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className="text-base font-bold tabular-nums text-[#D0021B]">
-                            {minPrice === maxPrice
-                              ? `${Number(minPrice || 0).toLocaleString("vi-VN")}đ`
-                              : `${Number(minPrice || 0).toLocaleString("vi-VN")} - ${Number(maxPrice || 0).toLocaleString("vi-VN")}đ`}
+                          <span
+                            className={`text-base font-bold tabular-nums ${outOfStock ? "text-neutral-500" : "text-[#D0021B]"}`}
+                          >
+                            {outOfStock
+                              ? "Bán hết"
+                              : minPrice === maxPrice
+                                ? `${Number(minPrice || 0).toLocaleString("vi-VN")}đ`
+                                : `${Number(minPrice || 0).toLocaleString("vi-VN")} - ${Number(maxPrice || 0).toLocaleString("vi-VN")}đ`}
                           </span>
                         </div>
                       </div>

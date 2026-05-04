@@ -162,7 +162,7 @@ const WishlistPage = () => {
 
                                             {outOfStock && (
                                                 <span className="absolute left-3 top-3 rounded-full bg-[#2a2116] px-3 py-1 text-xs font-semibold text-white">
-                                                    Hết hàng
+                                                    Bán hết
                                                 </span>
                                             )}
 

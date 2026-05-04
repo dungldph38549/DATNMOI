@@ -39,7 +39,7 @@ const Product = ({ product }) => {
         {outOfStock && (
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/20">
             <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-black/65 px-3 text-center text-lg font-semibold text-white shadow-lg">
-              Hết hàng
+              Bán hết
             </span>
           </div>
         )}
@@ -51,7 +51,9 @@ const Product = ({ product }) => {
 
         <div className="mt-auto flex items-end justify-between">
           <div>
-            <p className="text-secondary font-black text-xl">{getDisplayPrice(p)}</p>
+            <p className={`font-black text-xl ${outOfStock ? "text-neutral-500" : "text-secondary"}`}>
+              {outOfStock ? "Bán hết" : getDisplayPrice(p)}
+            </p>
           </div>
           <button className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-primary group-hover:text-white transition-all duration-300">
             <FaArrowRight size={14} className="-rotate-45 group-hover:rotate-0 transition-transform duration-300" />

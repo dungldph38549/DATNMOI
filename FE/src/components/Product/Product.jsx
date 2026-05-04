@@ -106,7 +106,7 @@ const Product = ({
     }
 
     if (isOutOfStock) {
-      notify.warning("Sản phẩm đã hết hàng");
+      notify.warning("Sản phẩm đã bán hết");
       return;
     }
 
@@ -158,7 +158,7 @@ const Product = ({
         {isOutOfStock && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
             <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-black/65 px-3 text-center text-lg font-semibold text-white shadow-lg">
-              Hết hàng
+              Bán hết
             </span>
           </div>
         )}
@@ -196,10 +196,12 @@ const Product = ({
         </div>
 
         <div className="mt-2">
-          <span className="text-red-500 font-bold">
-            {minPrice === maxPrice
-              ? `${formatPrice(minPrice)}₫`
-              : `${formatPrice(minPrice)} - ${formatPrice(maxPrice)}₫`}
+          <span className={`font-bold ${isOutOfStock ? "text-neutral-500" : "text-red-500"}`}>
+            {isOutOfStock
+              ? "Bán hết"
+              : minPrice === maxPrice
+                ? `${formatPrice(minPrice)}₫`
+                : `${formatPrice(minPrice)} - ${formatPrice(maxPrice)}₫`}
           </span>
         </div>
 
@@ -214,7 +216,7 @@ const Product = ({
             disabled={isOutOfStock}
             aria-label={hasVariants ? "Chọn kích cỡ" : "Thêm vào giỏ"}
           >
-            {isOutOfStock ? "Hết hàng" : added ? "Đã thêm" : "Thêm vào giỏ"}
+            {isOutOfStock ? "Bán hết" : added ? "Đã thêm" : "Thêm vào giỏ"}
           </button>
         )}
       </div>

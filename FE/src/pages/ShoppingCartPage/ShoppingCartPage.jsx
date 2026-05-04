@@ -456,9 +456,9 @@ const ShoppingCartPage = () => {
                               <div className="flex items-center h-10 w-28 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                                 <button onClick={() => dispatch(setQty({ cartKey: itemKey, qty: qty - 1 }))} disabled={qty <= 1} className="w-9 h-full flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors disabled:opacity-50 font-medium">-</button>
                                 <div className="flex-1 h-full border-x border-slate-100 flex items-center justify-center font-bold text-sm text-slate-900 bg-slate-50">{qty}</div>
-                                <button onClick={() => { if (canIncrease) { dispatch(setQty({ cartKey: itemKey, qty: qty + 1 })); } else { setStockNoticeKey(String(itemKey)); setTimeout(() => setStockNoticeKey(""), 2500); if (hasStockData) { notify.warning(safeMaxStock === 0 ? "Sản phẩm đã hết, vui lòng mua sản phẩm khác." : `Đã đạt số lượng tối đa trong kho (${safeMaxStock}).`); } else { notify.warning("Không thể tăng số lượng."); } } }} className="w-9 h-full flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors font-medium">+</button>
+                                <button onClick={() => { if (canIncrease) { dispatch(setQty({ cartKey: itemKey, qty: qty + 1 })); } else { setStockNoticeKey(String(itemKey)); setTimeout(() => setStockNoticeKey(""), 2500); if (hasStockData) { notify.warning(safeMaxStock === 0 ? "Sản phẩm đã bán hết, vui lòng chọn sản phẩm khác." : `Đã đạt số lượng tối đa trong kho (${safeMaxStock}).`); } else { notify.warning("Không thể tăng số lượng."); } } }} className="w-9 h-full flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors font-medium">+</button>
                               </div>
-                              {stockNoticeKey === String(itemKey) && <span className="text-xs font-bold text-red-500 animate-pulse">{safeMaxStock === 0 ? "Hết hàng" : `Tối đa ${safeMaxStock}`}</span>}
+                              {stockNoticeKey === String(itemKey) && <span className="text-xs font-bold text-red-500 animate-pulse">{safeMaxStock === 0 ? "Bán hết" : `Tối đa ${safeMaxStock}`}</span>}
                             </div>
 
                             <div className="flex items-center gap-4">
@@ -550,7 +550,7 @@ const ShoppingCartPage = () => {
                         selectedSku: optSku,
                       }))
                     }
-                    title={duplicated ? "Đã có trong giỏ" : outOfStock ? "Hết hàng" : ""}
+                    title={duplicated ? "Đã có trong giỏ" : outOfStock ? "Bán hết" : ""}
                     className={`min-w-[4rem] min-h-12 px-4 py-2 rounded-xl font-bold transition-all text-sm border
                       ${active ? "bg-primary border-primary text-white shadow-md shadow-primary/30" :
                         disabled ? "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed" :
